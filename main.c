@@ -180,14 +180,18 @@ bool hit_plane (Point* entrance,
     
     UFor( i, NDimensions )
     {
-        if (i != dim)
+        real x;
+        if (i == dim)
         {
-            real x;
-            x = origin->coords[i] + coeff * dir->coords[dim];
+            x = plane;
+        }
+        else
+        {
+            x = origin->coords[i] + coeff * dir->coords[i];
             if (x < box->min_corner.coords[i])  return false;
             if (x > box->max_corner.coords[i])  return false;
-            entrance->coords[i] = x;
         }
+        entrance->coords[i] = x;
     }
     return true;
 }
@@ -310,13 +314,12 @@ void build_KDTreeNode (KDTreeNode* node, BoundingBox* box,
                        uint depth)
 {
         /* printf ("%*sdepth=%u, nelems=%u\n", depth, "", depth, nelems); */
-    if (depth < 2 * NDimensions)
+    if (depth < NDimensions)
     {
         uint nbelow, nabove;
         KDTreeNode** children;
         children = node->data.node.children;
         node->split_dim = depth % NDimensions;
-        node->split_dim = 0; /* TODO changeme */
         node->split_pos = 0.5 * (box->min_corner.coords[node->split_dim] +
                                  box->max_corner.coords[node->split_dim]);
             /* printf ("%*ssplitting: %f\n", depth, "", node->split_pos); */
@@ -325,8 +328,19 @@ void build_KDTreeNode (KDTreeNode* node, BoundingBox* box,
         node->data.node.inclusive = 1;
         children[0] = (KDTreeNode*) malloc (2 * sizeof (KDTreeNode));
         children[1] = &children[0][1];
-        build_KDTreeNode (children[0], box, nbelow, elems, 1+depth);
-        build_KDTreeNode (children[1], box, nabove, &elems[nelems-nabove], 1+depth);
+
+        {
+            real tmp;
+            tmp = box->max_corner.coords[node->split_dim];
+            box->max_corner.coords[node->split_dim] = node->split_pos;
+            build_KDTreeNode (children[0], box, nbelow, elems, 1+depth);
+            box->max_corner.coords[node->split_dim] = tmp;
+
+            tmp = box->min_corner.coords[node->split_dim];
+            box->min_corner.coords[node->split_dim] = node->split_pos;
+            build_KDTreeNode (children[1], box, nabove, &elems[nelems-nabove], 1+depth);
+            box->min_corner.coords[node->split_dim] = tmp;
+        }
     }
     else
     {
@@ -396,7 +410,8 @@ const Triangle* cast_ray_rec (const Point* origin,
             child = 1;
             tbox.min_corner.coords[node->split_dim] = node->split_pos;
         }
-        elem = cast_ray_rec (origin, entrance, dir, node->data.node.children[child], &tbox);
+        elem = cast_ray_rec (origin, entrance, dir,
+                             node->data.node.children[child], &tbox);
         if (elem)  return elem;
         if (hit_plane (&desc_entrance, node->split_dim, node->split_pos,
                        box, origin, dir))
@@ -432,7 +447,7 @@ const Triangle* cast_ray (const Point* origin,
 {
     Point entrance;
     if (! hit_box (&entrance, &tree->box, origin, dir))  return 0;
-    return cast_ray_rec (&entrance, origin, dir, &tree->root, &tree->box);
+    return cast_ray_rec (origin, &entrance, dir, &tree->root, &tree->box);
 }
 
 
@@ -496,10 +511,13 @@ int main ()
 
         elem->pts[0].coords[0] = 10*i;
         elem->pts[0].coords[1] = 10;
+        elem->pts[0].coords[2] = 10;
         elem->pts[1].coords[0] = 10*i;
         elem->pts[1].coords[1] = 0;
+        elem->pts[1].coords[2] = 0;
         elem->pts[2].coords[0] = 10*i+10;
         elem->pts[2].coords[1] = 10;
+        elem->pts[2].coords[2] = 0;
 
         elems[i] = elem;
     }
@@ -513,7 +531,7 @@ int main ()
         {
             dir.coords[i] = tree.box.max_corner.coords[i];
             origin.coords[i] = - dir.coords[i];
-            origin.coords[i] = 0;
+                /* origin.coords[i] = 0; */
         }
         cast_ray (&origin, &dir, &tree);
     }
