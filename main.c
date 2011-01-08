@@ -39,26 +39,33 @@ struct bounding_box_struct
 };
 typedef struct bounding_box_struct BoundingBox;
 
-
+struct kd_tree_leaf_struct;
+struct kd_tree_inner_struct;
 struct kd_tree_node_struct;
-typedef struct kd_tree_node_struct KDTreeNode;
+typedef struct kd_tree_leaf_struct  KDTreeLeaf;
+typedef struct kd_tree_inner_struct KDTreeInner;
+typedef struct kd_tree_node_struct  KDTreeNode;
+
+struct kd_tree_leaf_struct
+{
+    uint nelems;
+    BoundingBox box;
+    const Triangle** elems;
+};
+struct kd_tree_inner_struct
+{
+    real split_pos;
+    KDTreeNode* children[2];
+};
 struct kd_tree_node_struct
 {
+    KDTreeNode* parent;
     uint split_dim;
-    real split_pos;
     union kd_tree_node_struct_union
     {
-        struct kd_tree_node_struct_leaf
-        {
-            uint nelems;
-            const Triangle** elems;
-        } leaf;
-        struct kd_tree_node_struct_node
-        {
-            bool inclusive; /* Child index including the split position. */
-            KDTreeNode* children[2];
-        } node;
-    } data;
+        KDTreeLeaf leaf;
+        KDTreeInner inner;
+    } as;
 };
 
 struct kd_tree_struct
@@ -67,6 +74,13 @@ struct kd_tree_struct
     KDTreeNode root;
 };
 typedef struct kd_tree_struct KDTree;
+
+
+bool leaf_KDTreeNode (const KDTreeNode* node)
+{
+    return node->split_dim == NDimensions;
+}
+
 
 void output_Point (FILE* out, const Point* point)
 {
@@ -91,16 +105,16 @@ void output_BoundingBox (FILE* out, const BoundingBox* box)
 void output_KDTreeNode (FILE* out, const KDTreeNode* node, uint depth)
 {
     fprintf (out, "%*sdepth=%u", 2*depth, "", depth);
-    if (NDimensions == node->split_dim)
+    if (leaf_KDTreeNode (node))
     {
         uint ei, pi;
         fputs ("  elems:", out);
-        UFor( ei, node->data.leaf.nelems )
+        UFor( ei, node->as.leaf.nelems )
         {
             const char* delim = "";
             const Triangle* elem;
             fputc ('[', out);
-            elem = node->data.leaf.elems[ei];
+            elem = node->as.leaf.elems[ei];
             UFor( pi, NTrianglePoints )
             {
                 fputs (delim, out);
@@ -115,10 +129,12 @@ void output_KDTreeNode (FILE* out, const KDTreeNode* node, uint depth)
     else
     {
         uint i;
+        const KDTreeInner* inner;
+        inner = &node->as.inner;
         fprintf (out, " split_dim=%u split_pos=%f\n",
-                 node->split_dim, node->split_pos);
+                 node->split_dim, inner->split_pos);
         UFor( i, 2 )
-            output_KDTreeNode (out, node->data.node.children[i], 1+depth);
+            output_KDTreeNode (out, inner->children[i], 1+depth);
     }
 }
 
@@ -277,7 +293,7 @@ void partition_split (uint nelems, const Triangle** elems,
     {
         int pos;
         pos = splitting_plane (elems[ei],
-                               node->split_dim, node->split_pos);
+                               node->split_dim, node->as.inner.split_pos);
         if (pos < 0)
         {
             const Triangle* tmp;
@@ -304,11 +320,6 @@ void partition_split (uint nelems, const Triangle** elems,
     *nabove = nelems - l;
 }
 
-bool leaf_KDTreeNode (const KDTreeNode* node)
-{
-    return node->split_dim == NDimensions;
-}
-
 void build_KDTreeNode (KDTreeNode* node, BoundingBox* box,
                        uint nelems, const Triangle** elems,
                        uint depth)
@@ -318,42 +329,48 @@ void build_KDTreeNode (KDTreeNode* node, BoundingBox* box,
     {
         uint nbelow, nabove;
         KDTreeNode** children;
-        children = node->data.node.children;
+        KDTreeInner* inner;
+        inner = &node->as.inner;
+        children = inner->children;
         node->split_dim = depth % NDimensions;
-        node->split_pos = 0.5 * (box->min_corner.coords[node->split_dim] +
-                                 box->max_corner.coords[node->split_dim]);
+        inner->split_pos = 0.5 * (box->min_corner.coords[node->split_dim] +
+                                  box->max_corner.coords[node->split_dim]);
             /* printf ("%*ssplitting: %f\n", depth, "", node->split_pos); */
             /* printf ("%*sbox: x=%f y=%f z=%f\n", depth, "", box->lengths.coords[0], box->lengths.coords[1], box->lengths.coords[2]); */
         partition_split (nelems, elems, &nbelow, &nabove, node);
-        node->data.node.inclusive = 1;
         children[0] = (KDTreeNode*) malloc (2 * sizeof (KDTreeNode));
         children[1] = &children[0][1];
 
         {
             real tmp;
             tmp = box->max_corner.coords[node->split_dim];
-            box->max_corner.coords[node->split_dim] = node->split_pos;
+            box->max_corner.coords[node->split_dim] = inner->split_pos;
+            children[0]->parent = node;
             build_KDTreeNode (children[0], box, nbelow, elems, 1+depth);
             box->max_corner.coords[node->split_dim] = tmp;
 
             tmp = box->min_corner.coords[node->split_dim];
-            box->min_corner.coords[node->split_dim] = node->split_pos;
+            box->min_corner.coords[node->split_dim] = inner->split_pos;
+            children[1]->parent = node;
             build_KDTreeNode (children[1], box, nabove, &elems[nelems-nabove], 1+depth);
             box->min_corner.coords[node->split_dim] = tmp;
         }
     }
     else
     {
+        KDTreeLeaf* leaf;
+        leaf = &node->as.leaf;
         node->split_dim = NDimensions;
-        node->split_pos = 0;
-        node->data.leaf.nelems = nelems;
-        node->data.leaf.elems = elems;
+        leaf->nelems = nelems;
+        leaf->elems = elems;
+        memcpy (&leaf->box, box, sizeof (BoundingBox));
     }
 }
 
 void build_KDTree (KDTree* tree, uint nelems, const Triangle** elems)
 {
     uint i, ei;
+    tree->root.parent = 0;
     assert (nelems > 0);
     UFor( i, NDimensions )
     {
@@ -380,6 +397,98 @@ void build_KDTree (KDTree* tree, uint nelems, const Triangle** elems)
     build_KDTreeNode (&tree->root, &tree->box, nelems, elems, 0);
 }
 
+const KDTreeNode* upnext_KDTreeNode (Point* entrance,
+                                     const Point* origin,
+                                     const Point* dir,
+                                     const KDTreeNode* node)
+{
+    const BoundingBox* box;
+    const KDTreeNode* child;
+    const KDTreeInner* inner;
+
+    assert (leaf_KDTreeNode (node));
+    box = &node->as.leaf.box;
+
+    while (1)
+    {
+        tristate facing;
+        uint ni;
+
+        child = node;
+        node = child->parent;
+            /* Backtracked from root node => no possible next leaf.*/
+        if (!node)  break;
+
+        assert (! leaf_KDTreeNode (node));
+        inner = &node->as.inner;
+
+        facing = signum_real (dir->coords[node->split_dim]);
+
+            /* Subtlety: Inclusive case opposite when descending tree.*/
+        ni = (facing < 0) ? 0 : 1;
+
+            /* Ray pointing to previously visited node => keep backtracking.*/
+        if (inner->children[ni] == child)  continue;
+
+        if (hit_plane (entrance, node->split_dim, inner->split_pos,
+                       box, origin, dir))
+        {
+            node = inner->children[ni];
+            break;
+        }
+    }
+    return node;
+}
+
+const Triangle* cast_ray_iter (const Point* origin,
+                               const Point* dir,
+                               const KDTree* tree)
+{
+    Point salo_entrance;
+
+    const BoundingBox* box;
+    Point* entrance;
+
+    const Triangle* elem = 0;
+    const KDTreeNode* node;
+
+    entrance = &salo_entrance;
+
+    if (! hit_box (entrance, &tree->box, origin, dir))  return 0;
+    box = &tree->box;
+    node = &tree->root;
+
+    while (node)
+    {
+        if (leaf_KDTreeNode (node))
+        {
+            const KDTreeLeaf* leaf;
+            leaf = &node->as.leaf;
+            box = &leaf->box;
+            output_BoundingBox (stdout, box);
+            fputc ('\n', stdout);
+                /* TODO: Intersection tests. */
+            elem = 0;
+            node = upnext_KDTreeNode (entrance, origin, dir, node);
+        }
+        else
+        {
+            const KDTreeInner* inner;
+            inner = &node->as.inner;
+
+                /* Subtlety: Inclusive case here must be opposite of
+                 * inclusive case in upnext_KDTreeNode to avoid infinite
+                 * iteration on rays in the splitting plane's subspace.
+                 */
+            if (entrance->coords[node->split_dim] <= inner->split_pos)
+                node = inner->children[0];
+            else
+                node = inner->children[1];
+        }
+    }
+    return elem;
+}
+
 const Triangle* cast_ray_rec (const Point* origin,
                               const Point* entrance,
                               const Point* dir,
@@ -398,29 +507,31 @@ const Triangle* cast_ray_rec (const Point* origin,
     {
         uint child;
         BoundingBox tbox;
+        const KDTreeInner* inner;
         Point desc_entrance;
+        inner = &node->as.inner;
         memcpy (&tbox, box, sizeof (BoundingBox));
-        if (entrance->coords[node->split_dim] <= node->split_pos)
+        if (entrance->coords[node->split_dim] <= inner->split_pos)
         {
             child = 0;
-            tbox.max_corner.coords[node->split_dim] = node->split_pos;
+            tbox.max_corner.coords[node->split_dim] = inner->split_pos;
         }
         else
         {
             child = 1;
-            tbox.min_corner.coords[node->split_dim] = node->split_pos;
+            tbox.min_corner.coords[node->split_dim] = inner->split_pos;
         }
         elem = cast_ray_rec (origin, entrance, dir,
-                             node->data.node.children[child], &tbox);
+                             inner->children[child], &tbox);
         if (elem)  return elem;
-        if (hit_plane (&desc_entrance, node->split_dim, node->split_pos,
+        if (hit_plane (&desc_entrance, node->split_dim, inner->split_pos,
                        box, origin, dir))
         {
             fputs ("HIT\n", stdout);
             child = (1+child) % 2;
             if (child == 0)
             {
-                tbox.max_corner.coords[node->split_dim] = node->split_pos;
+                tbox.max_corner.coords[node->split_dim] = inner->split_pos;
                 tbox.min_corner.coords[node->split_dim] =
                     box->min_corner.coords[node->split_dim];
             }
@@ -428,10 +539,10 @@ const Triangle* cast_ray_rec (const Point* origin,
             {
                 tbox.max_corner.coords[node->split_dim] =
                     box->max_corner.coords[node->split_dim];
-                tbox.min_corner.coords[node->split_dim] = node->split_pos;
+                tbox.min_corner.coords[node->split_dim] = inner->split_pos;
             }
             elem = cast_ray_rec (origin, &desc_entrance, dir,
-                                 node->data.node.children[child], &tbox);
+                                 inner->children[child], &tbox);
         }
         else
         {
@@ -453,10 +564,10 @@ const Triangle* cast_ray (const Point* origin,
 
 void cleanup_KDTreeNode (KDTreeNode* node)
 {
-    if (node->split_dim != NDimensions)
+    if (! leaf_KDTreeNode (node))
     {
         KDTreeNode** children;
-        children = node->data.node.children;
+        children = node->as.inner.children;
         cleanup_KDTreeNode (children[0]);
         cleanup_KDTreeNode (children[1]);
         free (children[0]);
@@ -534,6 +645,8 @@ int main ()
                 /* origin.coords[i] = 0; */
         }
         cast_ray (&origin, &dir, &tree);
+        puts ("");
+        cast_ray_iter (&origin, &dir, &tree);
     }
 
     cleanup_KDTree (&tree);
