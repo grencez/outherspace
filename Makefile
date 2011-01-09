@@ -15,3 +15,6 @@ CFLAGS += -Wall -Wextra
 main: main.o
 	$(CC) $(CFLAGS) $^ -o $@
 
+test: main
+	./main
+
