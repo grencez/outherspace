@@ -170,6 +170,28 @@ real dot_Point (const Point* a, const Point* b)
     return sum;
 }
 
+    /* a + b */
+void summ_Point (Point* dst, const Point* a, const Point* b)
+{
+    uint i;
+    UFor( i, NDimensions )
+        dst->coords[i] = a->coords[i] + b->coords[i];
+}
+
+void scale_Point (Point* dst, const Point* a, real k)
+{
+    uint i;
+    UFor( i, NDimensions )
+        dst->coords[i] = k * a->coords[i];
+}
+
+void zero_Point (Point* a)
+{
+    uint i;
+    UFor( i, NDimensions )
+        a->coords[i] = 0;
+}
+
 tristate compare_real (real a, real b)
 {
     if (a > b)  return  1;
@@ -246,23 +268,29 @@ bool hit_box (Point* entrance,
     return inside;
 }
 
-bool hit_tri (const Point* origin, const Point* dir,
+bool hit_tri (Point* hit,
+              const Point* origin, const Point* dir,
               const Triangle* elem)
 {
     uint i, j, k;
     Triangle t;
+    real trdots[NTrianglePoints];
     real tdots[NTrianglePoints];
     real dirdot;
+    bool inbounds = false;
 
     dirdot = dot_Point (dir, dir);
     UFor( i, NTrianglePoints )
+    {
         diff_Point (&t.pts[i], &elem->pts[i], origin);
+        trdots[i] = dot_Point (dir, &t.pts[i]);
+    }
     UFor( i, NTrianglePoints )
     {
         j = (1+i) % NTrianglePoints;
         k = (2+i) % NTrianglePoints;
         tdots[i] = dirdot * dot_Point (&t.pts[j], &t.pts[k])
-            - dot_Point (dir, &t.pts[j]) * dot_Point (dir, &t.pts[k]);
+            - trdots[j] * trdots[k];
     }
     UFor( i, NTrianglePoints )
     {
@@ -272,13 +300,39 @@ bool hit_tri (const Point* origin, const Point* dir,
         {
             tristate sign;
             real x;
-            x = dot_Point (dir, &t.pts[i]);
-            x = dirdot * dot_Point (&t.pts[i], &t.pts[i]) - x * x;
+            x = dirdot * dot_Point (&t.pts[i], &t.pts[i])
+                - trdots[i] * trdots[i];
             sign = compare_real (x * tdots[i], tdots[j] * tdots[k]);
-            return sign <= 0;
+            inbounds = sign <= 0;
+            break;
         }
     }
-    return false;
+    if (inbounds)
+    {
+        zero_Point (hit);
+        UFor( i, NTrianglePoints )
+        {
+            Point p;
+            scale_Point (&p, dir, trdots[i]);
+            summ_Point (hit, hit, &p);
+        }
+
+        UFor( i, NDimensions )
+        {
+            if (signum_real (hit->coords[i]) != signum_real (dir->coords[i]))
+            {
+                inbounds = false;
+                break;
+            }
+        }
+
+        if (inbounds)
+        {
+            scale_Point (hit, hit, 1 / (3 * dirdot));
+            summ_Point (hit, hit, origin);
+        }
+    }
+    return inbounds;
 }
 
 void adjust_BoundingBox (BoundingBox* box, const Point* point)
@@ -529,10 +583,10 @@ const Triangle* cast_ray (const Point* origin,
             elem = 0;
             UFor( i, leaf->nelems )
             {
-                if (hit_tri (origin, dir, leaf->elems[i]))
+                Point hit;
+                if (hit_tri (&hit, origin, dir, leaf->elems[i]))
                 {
                     elem = leaf->elems[i];
-                    break;
                 }
             }
             if (elem)  break;
