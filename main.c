@@ -1,5 +1,6 @@
 
 #include <assert.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -8,8 +9,10 @@
 #define UFor( i, bel )  for (i = 0; i < bel; ++i)
 
 #define NDimensions 3
-#define MaxKDTreeDepth NDimensions
+#define MaxKDTreeDepth 3*NDimensions
+    /* #define MaxKDTreeDepth 0 */
 
+    /* typedef double real; */
 typedef float real;
 typedef unsigned uint;
 typedef char tristate;
@@ -95,8 +98,10 @@ void output_Point (FILE* out, const Point* point)
     fputc ('(', out);
     UFor( ci, NDimensions )
     {
-        fprintf (out, "%s%4.1f", delim, point->coords[ci]);
-        delim = ", ";
+            /* fprintf (out, "%s%4.1f", delim, point->coords[ci]); */
+        fprintf (out, "%s%.1f", delim, point->coords[ci]);
+            /* delim = ", "; */
+        delim = " ";
     }
     fputc (')', out);
 }
@@ -123,16 +128,26 @@ void output_Triangle (FILE* out, const Triangle* elem)
     fputc (']', out);
 }
 
-void output_KDTreeNode (FILE* out, const KDTreeNode* node, uint depth)
+    void
+output_KDTreeNode (FILE* out, const KDTreeNode* node,
+                   uint depth,
+                   uint id,
+                   const Triangle* elems)
 {
-    fprintf (out, "%*sdepth=%u", 2*depth, "", depth);
+    fprintf (out, " %*s%-*u depth:%u   ", depth, "", depth+1, id, depth);
     if (leaf_KDTreeNode (node))
     {
         uint ei;
-        fputs ("  elems:", out);
-        UFor( ei, node->as.leaf.nelems )
-            output_Triangle (out, node->as.leaf.elems[ei]);
-        fputs ("\n", out);
+        const KDTreeLeaf* leaf = &node->as.leaf;
+        output_BoundingBox (out, &leaf->box);
+        fprintf (out, "\n %*selems:", 2*depth+2, "");
+        UFor( ei, leaf->nelems )
+        {
+            uint index;
+            index = index_of (leaf->elems[ei], elems, sizeof (Triangle));
+            fprintf (out, " %u", index);
+        }
+        fputc ('\n', out);
 
     }
     else
@@ -140,16 +155,30 @@ void output_KDTreeNode (FILE* out, const KDTreeNode* node, uint depth)
         uint i;
         const KDTreeInner* inner;
         inner = &node->as.inner;
-        fprintf (out, " split_dim=%u split_pos=%f\n",
+        fprintf (out, "dim:%u  pos:%.1f\n",
                  node->split_dim, inner->split_pos);
         UFor( i, 2 )
-            output_KDTreeNode (out, inner->children[i], 1+depth);
+            output_KDTreeNode (out, inner->children[i],
+                               1+depth,
+                               2*(id+1)-1 + i,
+                               elems);
     }
 }
 
-void output_KDTree (FILE* out, const KDTree* tree)
+    void
+output_KDTree (FILE* out, const KDTree* tree,
+               uint nelems, const Triangle* elems)
 {
-    output_KDTreeNode (out, &tree->root, 0);
+    uint i;
+    fputs ("-- KDTree --\n", out);
+    fputs ("- Elements -", out);
+    UFor( i, nelems )
+    {
+        fprintf (out, "\n %u  ", i);
+        output_Triangle (out, &elems[i]);
+    }
+    fputs ("\n- Nodes -\n", out);
+    output_KDTreeNode (out, &tree->root, 0, 0, elems);
 }
 
 
@@ -190,6 +219,23 @@ void zero_Point (Point* a)
     uint i;
     UFor( i, NDimensions )
         a->coords[i] = 0;
+}
+
+void set_Point (Point* dst, const Point* src)
+{
+    uint i;
+    UFor( i, NDimensions )
+        dst->coords[i] = src->coords[i];
+}
+
+real magnitude_Point (const Point* a)
+{
+    return sqrt (dot_Point (a, a));
+}
+
+void normalize_Point (Point* a)
+{
+    scale_Point (a, a, 1 / magnitude_Point (a));
 }
 
 tristate compare_real (real a, real b)
@@ -268,6 +314,7 @@ bool hit_box (Point* entrance,
     return inside;
 }
 
+#if 0
 bool hit_tri (Point* hit,
               const Point* origin, const Point* dir,
               const Triangle* elem)
@@ -334,6 +381,78 @@ bool hit_tri (Point* hit,
     }
     return inbounds;
 }
+#else
+
+
+void cross_Point (Point* dst, const Point* a, const Point* b)
+{
+    dst->coords[0] = a->coords[1] * b->coords[2] - a->coords[2] * b->coords[1];
+    dst->coords[1] = a->coords[2] * b->coords[0] - a->coords[0] * b->coords[2];
+    dst->coords[2] = a->coords[0] * b->coords[1] - a->coords[1] * b->coords[0];
+}
+
+
+    /* code rewritten to do tests on the sign of the determinant */
+    /* the division is before the test of the sign of the det    */
+    /* and one CROSS has been moved out from the if-else if-else */
+bool hit_tri (Point* hit,
+              const Point* origin, const Point* dir,
+              const Triangle* elem)
+{
+    const real epsilon = 0.000001;
+    Point edge1, edge2, tvec, pvec, qvec;
+    real det, inv_det;
+
+        /* find vectors for two edges sharing vert0 */
+    diff_Point (&edge1, &elem->pts[1], &elem->pts[0]);
+    diff_Point (&edge2, &elem->pts[2], &elem->pts[0]);
+
+        /* begin calculating determinant - also used to calculate U parameter */
+    cross_Point (&pvec, dir, &edge2);
+
+        /* if determinant is near zero, ray lies in plane of triangle */
+    det = dot_Point (&edge1, &pvec);
+
+        /* calculate distance from vert0 to ray origin */
+    diff_Point (&tvec, origin, &elem->pts[0]);
+    inv_det = 1 / det;
+
+    cross_Point (&qvec, &tvec, &edge1);
+
+    if (det > epsilon)
+    {
+        hit->coords[1] = dot_Point (&tvec, &pvec);
+        if (hit->coords[1] < 0.0 || hit->coords[1] > det)
+            return false;
+
+            /* calculate V parameter and test bounds */
+        hit->coords[2] = dot_Point (dir, &qvec);
+        if (hit->coords[2] < 0.0 || hit->coords[1] + hit->coords[2] > det)
+            return false;
+
+    }
+    else if (det < -epsilon)
+    {
+            /* calculate U parameter and test bounds */
+        hit->coords[1] = dot_Point (&tvec, &pvec);
+        if (hit->coords[1] > 0.0 || hit->coords[1] < det)
+            return false;
+
+            /* calculate V parameter and test bounds */
+        hit->coords[2] = dot_Point (dir, &qvec);
+        if (hit->coords[2] > 0.0 || hit->coords[1] + hit->coords[2] < det)
+            return false;
+    }
+    else return false;  /* ray is parallel to the plane of the triangle */
+
+    hit->coords[0] = dot_Point (&edge2, &qvec) * inv_det;
+    hit->coords[1] *= inv_det;
+    hit->coords[2] *= inv_det;
+
+    return true;
+}
+#endif
+
 
 void adjust_BoundingBox (BoundingBox* box, const Point* point)
 {
@@ -432,11 +551,28 @@ void build_KDTreeNode (KDTreeNode* node,
         inner = &node->as.inner;
         children = inner->children;
         node->split_dim = depth % NDimensions;
+            /* node->split_dim = depth % 2; */
         inner->split_pos = 0.5 * (box->min_corner.coords[node->split_dim] +
                                   box->max_corner.coords[node->split_dim]);
-            /* printf ("%*ssplitting: %f\n", depth, "", node->split_pos); */
-            /* printf ("%*sbox: x=%f y=%f z=%f\n", depth, "", box->lengths.coords[0], box->lengths.coords[1], box->lengths.coords[2]); */
         partition_split (nelems, elems, &nbelow, &nabove, node);
+
+#if 0
+        {
+            uint i;
+            FILE* out = stderr;
+            fprintf (out, "%*sdim:%u pos:%.1f\n", 2*depth, "",
+                     node->split_dim, inner->split_pos);
+            fprintf (out, "%*s", 2*depth+1, "");
+            output_BoundingBox (out, box);
+            UFor( i, nelems )
+            {
+                fprintf (out, "\n%*s", 2*depth+1, "");
+                output_Triangle (out, elems[i]);
+            }
+            fputc ('\n', out);
+        }
+#endif
+
         children[0] = (KDTreeNode*) malloc (2 * sizeof (KDTreeNode));
         children[1] = &children[0][1];
 
@@ -456,15 +592,20 @@ void build_KDTreeNode (KDTreeNode* node,
                               &elems[nelems-nabove], 1+depth);
             box->min_corner.coords[node->split_dim] = tmp;
         }
+
     }
     else
     {
         KDTreeLeaf* leaf;
         leaf = &node->as.leaf;
         node->split_dim = NDimensions;
-        leaf->nelems = nelems;
-        leaf->elems = elems;
         memcpy (&leaf->box, box, sizeof (BoundingBox));
+        leaf->nelems = nelems;
+        if (0 != nelems)
+        {
+            leaf->elems = (const Triangle**) malloc (nelems * sizeof (Triangle*));
+            memcpy (leaf->elems, elems, nelems * sizeof (Triangle*));
+        }
     }
 }
 
@@ -478,6 +619,8 @@ void build_KDTree (KDTree* tree, uint nelems, const Triangle** elems)
         x = elems[0]->pts[0].coords[i];
         tree->box.min_corner.coords[i] = x;
         tree->box.max_corner.coords[i] = x;
+        tree->box.min_corner.coords[i] = 0;
+        tree->box.max_corner.coords[i] = 100;
     }
 
     UFor( ei, nelems )
@@ -551,12 +694,26 @@ const KDTreeNode* upnext_KDTreeNode (Point* entrance,
     return child;
 }
 
+bool closer_hit (const Point* newhit, const Point* oldhit, const Point* dir)
+{
+    uint i;
+    UFor( i, NDimensions )
+    {
+        tristate sign;
+        sign = signum_real (dir->coords[i]);
+        if (sign != 0)
+            return sign == compare_real (oldhit->coords[i],
+                                         newhit->coords[i]);
+    }
+    return false;
+}
+
 const Triangle* cast_ray (const Point* origin,
                           const Point* dir,
                           const KDTree* tree)
 {
     Point salo_entrance;
-    const KDTreeNode* parent;
+    const KDTreeNode* parent = 0;
 
     const BoundingBox* box;
     Point* entrance;
@@ -576,17 +733,48 @@ const Triangle* cast_ray (const Point* origin,
         {
             uint i;
             const KDTreeLeaf* leaf;
+            Point close_hit;
+
             leaf = &node->as.leaf;
             box = &leaf->box;
                 /* output_BoundingBox (stdout, box); */
                 /* fputc ('\n', stdout); */
             elem = 0;
+
             UFor( i, leaf->nelems )
             {
                 Point hit;
-                if (hit_tri (&hit, origin, dir, leaf->elems[i]))
+                if (hit_tri (&hit, origin, dir, leaf->elems[i]) &&
+                    true
+                            /* && inside_BoundingBox (box, &hit) */
+                    )
+
                 {
-                    elem = leaf->elems[i];
+                        /* summ_Point (&hit, &hit, origin); */
+                    /*
+                    if (inside_BoundingBox (box, &hit))
+                    {
+                        output_BoundingBox (stderr, box);
+                        fputs ("\n", stderr);
+                        output_Point (stderr, origin);
+                        fputs (" => ", stderr);
+                        output_Point (stderr, &hit);
+                        fputs ("\n", stderr);
+                    }
+                    */
+                    if (elem)
+                    {
+                        if (closer_hit (&hit, &close_hit, dir))
+                        {
+                            elem = leaf->elems[i];
+                            set_Point (&close_hit, &hit);
+                        }
+                    }
+                    else
+                    {
+                        elem = leaf->elems[i];
+                        set_Point (&close_hit, &hit);
+                    }
                 }
             }
             if (elem)  break;
@@ -614,13 +802,20 @@ const Triangle* cast_ray (const Point* origin,
 
 void cleanup_KDTreeNode (KDTreeNode* node)
 {
-    if (! leaf_KDTreeNode (node))
+    if (leaf_KDTreeNode (node))
     {
-        KDTreeNode** children;
-        children = node->as.inner.children;
-        cleanup_KDTreeNode (children[0]);
-        cleanup_KDTreeNode (children[1]);
-        free (children[0]);
+        KDTreeLeaf* leaf;
+        leaf = &node->as.leaf;
+        if (0 != leaf->nelems)
+            free (leaf->elems);
+    }
+    else
+    {
+        KDTreeInner* inner;
+        inner = &node->as.inner;
+        cleanup_KDTreeNode (inner->children[0]);
+        cleanup_KDTreeNode (inner->children[1]);
+        free (inner->children[0]);
     }
 }
 
@@ -707,6 +902,7 @@ void rays_to_hits (uint* hits, uint nrows, uint ncols,
 
     row_start = space->box.min_corner.coords[row_dim];
     row_delta = (space->box.max_corner.coords[row_dim] - row_start) / nrows;
+    row_delta = row_delta;
     row_start += row_delta / 2;
 
     col_start = space->box.min_corner.coords[col_dim];
@@ -721,14 +917,15 @@ void rays_to_hits (uint* hits, uint nrows, uint ncols,
         dir.coords[row_dim] = 0;
         dir.coords[col_dim] = 0;
 
-        origin.coords[dir_dim] = 0;
-        origin.coords[row_dim] = row_start + row * row_delta;
+        origin.coords[dir_dim] = -1;
+        origin.coords[row_dim] = row_start + (nrows - row -1) * row_delta;
 
         offset = row * ncols;
         UFor( col, ncols )
         {
             const Triangle* elem;
             origin.coords[col_dim] = col_start + col * col_delta;
+            normalize_Point (&dir);
             elem = cast_ray (&origin, &dir, space);
             if (elem)
                 hits[offset + col] = index_of (elem, elems, sizeof (Triangle));
@@ -743,14 +940,20 @@ int main ()
     uint i;
     KDTree tree;
     FILE* out;
-#define NELEMS 10
+#define NELEMS 20
     uint nelems   = NELEMS;
     Triangle selems[NELEMS];
     const Triangle* elems[NELEMS];
 #undef NELEMS
 
     out = stdout;
-    srand (time (0));
+    {
+            /* unsigned seed = 1294785237; */
+        unsigned seed = 1294968341;
+            /* seed = time (0); */
+        fprintf (out, "Using seed: %u\n", seed);
+        srand (seed);
+    }
 
     UFor( i, nelems )
     {
@@ -766,26 +969,31 @@ int main ()
             }
         }
 
+        random_Triangle (elem);
+
+        /*
         elem->pts[0].coords[0] = 10*i;
         elem->pts[0].coords[1] = 10;
-        elem->pts[0].coords[2] = 10;
+        elem->pts[0].coords[2] = 0;
+
         elem->pts[1].coords[0] = 10*i;
         elem->pts[1].coords[1] = 0;
         elem->pts[1].coords[2] = 0;
+
         elem->pts[2].coords[0] = 10*i+10;
         elem->pts[2].coords[1] = 10;
         elem->pts[2].coords[2] = 0;
+        */
 
-        random_Triangle (elem);
         elems[i] = elem;
     }
 
     build_KDTree (&tree, nelems, elems);
-        /* output_KDTree (stdout, &tree); */
+        /* output_KDTree (stdout, &tree, nelems, selems); */
     {
         uint* hits;
-        const uint nrows = 400;
-        const uint ncols = 600;
+        const uint nrows = 500;
+        const uint ncols = 500;
         hits = (uint*) malloc (nrows * ncols * sizeof (uint));
         rays_to_hits (hits, nrows, ncols, nelems, selems, &tree);
         output_PBM_image ("out.pbm", nrows, ncols, hits, nelems);

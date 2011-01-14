@@ -5,6 +5,7 @@ CFLAGS = -g3
 
 CFLAGS += -ansi -pedantic
 CFLAGS += -Wall -Wextra
+LFLAGS += -lm
 
 #CC = clang
 
@@ -13,8 +14,9 @@ CFLAGS += -Wall -Wextra
 #CFLAGS += -DCOMPILER_HAS_BOOL
 
 main: main.o
-	$(CC) $(CFLAGS) $^ -o $@
+	$(CC) $(CFLAGS) $^ -o $@ $(LFLAGS)
 
 test: main
+	#valgrind --track-origins=yes ./main
 	./main
 
