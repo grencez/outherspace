@@ -1,9 +1,9 @@
 
 
 CFLAGS = -g3
-#CFLAGS = -O3
+CFLAGS = -O3
 
-CFLAGS += -ansi -pedantic
+#CFLAGS += -ansi -pedantic
 CFLAGS += -Wall -Wextra
 LFLAGS += -lm
 

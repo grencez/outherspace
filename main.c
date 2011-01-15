@@ -354,7 +354,7 @@ bool hit_tri (Point* hit,
             break;
         }
     }
-    if (inbounds)
+    if (inbounds)     j
     {
         zero_Point (hit);
         UFor( i, NTrianglePoints )
@@ -395,13 +395,14 @@ void cross_Point (Point* dst, const Point* a, const Point* b)
     /* code rewritten to do tests on the sign of the determinant */
     /* the division is before the test of the sign of the det    */
     /* and one CROSS has been moved out from the if-else if-else */
-bool hit_tri (Point* hit,
+bool hit_tri (real* mag,
               const Point* origin, const Point* dir,
               const Triangle* elem)
 {
     const real epsilon = 0.000001;
     Point edge1, edge2, tvec, pvec, qvec;
     real det, inv_det;
+    real u, v;
 
         /* find vectors for two edges sharing vert0 */
     diff_Point (&edge1, &elem->pts[1], &elem->pts[0]);
@@ -421,33 +422,34 @@ bool hit_tri (Point* hit,
 
     if (det > epsilon)
     {
-        hit->coords[1] = dot_Point (&tvec, &pvec);
-        if (hit->coords[1] < 0.0 || hit->coords[1] > det)
+        u = dot_Point (&tvec, &pvec);
+        if (u < 0.0 || u > det)
             return false;
 
             /* calculate V parameter and test bounds */
-        hit->coords[2] = dot_Point (dir, &qvec);
-        if (hit->coords[2] < 0.0 || hit->coords[1] + hit->coords[2] > det)
+        v = dot_Point (dir, &qvec);
+        if (v < 0.0 || u + v > det)
             return false;
 
     }
     else if (det < -epsilon)
     {
             /* calculate U parameter and test bounds */
-        hit->coords[1] = dot_Point (&tvec, &pvec);
-        if (hit->coords[1] > 0.0 || hit->coords[1] < det)
+        u = dot_Point (&tvec, &pvec);
+        if (u > 0.0 || u < det)
             return false;
 
             /* calculate V parameter and test bounds */
-        hit->coords[2] = dot_Point (dir, &qvec);
-        if (hit->coords[2] > 0.0 || hit->coords[1] + hit->coords[2] < det)
+        v = dot_Point (dir, &qvec);
+        if (v > 0.0 || u + v < det)
             return false;
     }
     else return false;  /* ray is parallel to the plane of the triangle */
 
-    hit->coords[0] = dot_Point (&edge2, &qvec) * inv_det;
-    hit->coords[1] *= inv_det;
-    hit->coords[2] *= inv_det;
+    *mag = dot_Point (&edge2, &qvec) * inv_det;
+
+        /* u *= inv_det; */
+        /* v *= inv_det; */
 
     return true;
 }
@@ -560,8 +562,10 @@ void build_KDTreeNode (KDTreeNode* node,
         {
             uint i;
             FILE* out = stderr;
-            fprintf (out, "%*sdim:%u pos:%.1f\n", 2*depth, "",
-                     node->split_dim, inner->split_pos);
+            fprintf (out, "%*sdim:%u pos:%.1f  blw:%u abv:%u\n",
+                     2*depth, "",
+                     node->split_dim, inner->split_pos,
+                     nbelow, nabove);
             fprintf (out, "%*s", 2*depth+1, "");
             output_BoundingBox (out, box);
             UFor( i, nelems )
@@ -580,11 +584,19 @@ void build_KDTreeNode (KDTreeNode* node,
 
         {
             real tmp;
+            const Triangle** blw_elems;
+
+            blw_elems = (const Triangle**)
+                malloc (nbelow * sizeof (Triangle*));
+            memcpy (blw_elems, elems, nbelow * sizeof (Triangle*));
+
             tmp = box->max_corner.coords[node->split_dim];
             box->max_corner.coords[node->split_dim] = inner->split_pos;
             build_KDTreeNode (children[0], node, box, nbelow,
-                              elems, 1+depth);
+                              blw_elems, 1+depth);
             box->max_corner.coords[node->split_dim] = tmp;
+
+            free (blw_elems);
 
             tmp = box->min_corner.coords[node->split_dim];
             box->min_corner.coords[node->split_dim] = inner->split_pos;
@@ -744,37 +756,36 @@ const Triangle* cast_ray (const Point* origin,
             UFor( i, leaf->nelems )
             {
                 Point hit;
-                if (hit_tri (&hit, origin, dir, leaf->elems[i]) &&
-                    true
-                            /* && inside_BoundingBox (box, &hit) */
-                    )
+                real mag;
+                if (!hit_tri (&mag, origin, dir, leaf->elems[i]))  continue;
 
+                scale_Point (&hit, dir, mag);
+                summ_Point (&hit, &hit, origin);
+
+                if (!inside_BoundingBox (box, &hit))  continue;
+#if 0
+                if (!inside_BoundingBox (box, &hit))
                 {
-                        /* summ_Point (&hit, &hit, origin); */
-                    /*
-                    if (inside_BoundingBox (box, &hit))
-                    {
-                        output_BoundingBox (stderr, box);
-                        fputs ("\n", stderr);
-                        output_Point (stderr, origin);
-                        fputs (" => ", stderr);
-                        output_Point (stderr, &hit);
-                        fputs ("\n", stderr);
-                    }
-                    */
-                    if (elem)
-                    {
-                        if (closer_hit (&hit, &close_hit, dir))
-                        {
-                            elem = leaf->elems[i];
-                            set_Point (&close_hit, &hit);
-                        }
-                    }
-                    else
+                    output_BoundingBox (stderr, box);
+                    fputs ("\n", stderr);
+                    output_Point (stderr, origin);
+                    fputs (" => ", stderr);
+                    output_Point (stderr, &hit);
+                    fputs ("\n", stderr);
+                }
+#endif
+                if (elem)
+                {
+                    if (closer_hit (&hit, &close_hit, dir))
                     {
                         elem = leaf->elems[i];
                         set_Point (&close_hit, &hit);
                     }
+                }
+                else
+                {
+                    elem = leaf->elems[i];
+                    set_Point (&close_hit, &hit);
                 }
             }
             if (elem)  break;
@@ -902,7 +913,6 @@ void rays_to_hits (uint* hits, uint nrows, uint ncols,
 
     row_start = space->box.min_corner.coords[row_dim];
     row_delta = (space->box.max_corner.coords[row_dim] - row_start) / nrows;
-    row_delta = row_delta;
     row_start += row_delta / 2;
 
     col_start = space->box.min_corner.coords[col_dim];
@@ -916,6 +926,7 @@ void rays_to_hits (uint* hits, uint nrows, uint ncols,
         dir.coords[dir_dim] = 1;
         dir.coords[row_dim] = 0;
         dir.coords[col_dim] = 0;
+        normalize_Point (&dir);
 
         origin.coords[dir_dim] = -1;
         origin.coords[row_dim] = row_start + (nrows - row -1) * row_delta;
@@ -925,7 +936,6 @@ void rays_to_hits (uint* hits, uint nrows, uint ncols,
         {
             const Triangle* elem;
             origin.coords[col_dim] = col_start + col * col_delta;
-            normalize_Point (&dir);
             elem = cast_ray (&origin, &dir, space);
             if (elem)
                 hits[offset + col] = index_of (elem, elems, sizeof (Triangle));
@@ -948,8 +958,8 @@ int main ()
 
     out = stdout;
     {
-            /* unsigned seed = 1294785237; */
-        unsigned seed = 1294968341;
+        unsigned seed = 1294785237;
+            /* unsigned seed = 1294968341; */
             /* seed = time (0); */
         fprintf (out, "Using seed: %u\n", seed);
         srand (seed);
@@ -992,8 +1002,8 @@ int main ()
         /* output_KDTree (stdout, &tree, nelems, selems); */
     {
         uint* hits;
-        const uint nrows = 500;
-        const uint ncols = 500;
+        const uint nrows = 50;
+        const uint ncols = 50;
         hits = (uint*) malloc (nrows * ncols * sizeof (uint));
         rays_to_hits (hits, nrows, ncols, nelems, selems, &tree);
         output_PBM_image ("out.pbm", nrows, ncols, hits, nelems);
@@ -1027,6 +1037,7 @@ int main ()
 #endif
 
     cleanup_KDTree (&tree);
+
     return 0;
 }
 
