@@ -5,6 +5,16 @@ CFLAGS = -O3
 
 CFLAGS += -ansi -pedantic
 CFLAGS += -Wall -Wextra
+#CFLAGS += -funsafe-loop-optimizations
+#CFLAGS += -fstrict-aliasing
+#CFLAGS += -ftree-loop-linear
+#CFLAGS += -funsafe-math-optimizations
+#CFLAGS += -ftree-loop-im
+#CFLAGS += -march=native
+#CFLAGS += -ftree-loop-distribution
+#CFLAGS += -ftree-loop-ivcanon
+#CFLAGS += -fivopts
+
 LFLAGS += -lm
 
 #CC = clang
@@ -13,7 +23,8 @@ LFLAGS += -lm
 #CC = g++
 #CFLAGS += -DCOMPILER_HAS_BOOL
 
-main: main.o
+#main: kdtree.o main.o util.o space.o
+main: main.c
 	$(CC) $(CFLAGS) $^ -o $@ $(LFLAGS)
 
 gui: gui.c
@@ -23,4 +34,8 @@ gui: gui.c
 test: main
 	#valgrind --track-origins=yes ./main
 	./main
+
+.PHONY: clean
+clean:
+	rm -f main gui kdtree.o main.o util.o space.o
 
