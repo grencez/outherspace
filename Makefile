@@ -23,9 +23,8 @@ LFLAGS += -lm
 #CC = g++
 #CFLAGS += -DCOMPILER_HAS_BOOL
 
-#main: kdtree.o main.o util.o space.o
-main: main.c
-	$(CC) $(CFLAGS) $^ -o $@ $(LFLAGS)
+main: cli.c kdtree.c main.c util.c raytrace.c space.c
+	$(CC) $(CFLAGS) $< -o $@ $(LFLAGS)
 
 gui: gui.c
 	$(CC) $(CFLAGS) `pkg-config --cflags gtk+-2.0` $< -o $@ \

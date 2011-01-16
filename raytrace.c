@@ -5,6 +5,16 @@
 #include <stdlib.h>
 #include <string.h>
 
+void cleanup_RaySpace (RaySpace* space)
+{
+    cleanup_KDTree (&space->tree);
+    if (space->nelems > 0)
+    {
+        free (space->elems);
+        free (space->selems);
+    }
+}
+
 #if 0
 static
     bool

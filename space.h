@@ -3,7 +3,7 @@
 #define SPACE_H_
 
 #include <stdio.h>
-#include "util.c"
+#include "util.h"
 
 #define NDimensions 3
 
@@ -48,5 +48,6 @@ bool hit_BoundingBox (Point* entrance,
 void adjust_BoundingBox (BoundingBox* box, const Point* point);
 bool inside_BoundingBox (const BoundingBox* box, const Point* point);
 
+#include "space.c"
 #endif
 

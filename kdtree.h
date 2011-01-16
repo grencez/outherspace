@@ -2,7 +2,7 @@
 #ifndef KDTREE_H_
 #define KDTREE_H_
 
-#include "space.c"
+#include "space.h"
 
 struct kd_tree_leaf_struct;
 struct kd_tree_inner_struct;
@@ -56,5 +56,6 @@ const KDTreeNode* upnext_KDTreeNode (Point* entrance,
                                      const Point* dir,
                                      const KDTreeNode* node);
 
+#include "kdtree.c"
 #endif
 

@@ -18,9 +18,13 @@ typedef byte bool;
 #define false 0
 #endif
 
+#define AllocT( Type, capacity ) \
+    ((Type*) malloc ((capacity) * sizeof (Type)))
+
 uint index_of (const void* e, const void* arr, size_t size);
 tristate compare_real (real a, real b);
 tristate signum_real (real a);
 
+#include "util.c"
 #endif
 

@@ -1,6 +1,7 @@
 
+#include "main.h"
+
 #include <math.h>
-#include <stdlib.h>
 #include <gtk/gtk.h>
 
 static gboolean delete_event (GtkWidget* widget,
