@@ -900,6 +900,23 @@ void output_PGM_image (const char* filename, uint nrows, uint ncols,
     fclose (out);
 }
 
+#if 0
+void rays_to_hits_fish (uint* hits, uint nrows, uint ncols,
+                        uint nelems, const Triangle* elems,
+                        const KDTree* space,
+                        real vert_angle, real horiz_angle)
+{
+    uint row;
+    UFor( row, nrows )
+    {
+        uint col, offset;
+        UFor( col, ncols )
+        {
+        }
+    }
+}
+#endif
+
 void rays_to_hits (uint* hits, uint nrows, uint ncols,
                    uint nelems, const Triangle* elems,
                    const KDTree* space)
