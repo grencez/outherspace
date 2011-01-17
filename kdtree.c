@@ -4,7 +4,7 @@
 #include <assert.h>
 #include <string.h>
 
-#define MaxKDTreeDepth 3*NDimensions
+#define MaxKDTreeDepth 2*NDimensions
     /* #define MaxKDTreeDepth 0 */
 
 

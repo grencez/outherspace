@@ -3,6 +3,9 @@
 
 #include <math.h>
 #include <gtk/gtk.h>
+#include <gdk/gdkkeysyms.h>
+
+static real zposition = -1;
 
 static gboolean delete_event (GtkWidget* widget,
                               GdkEvent* event,
@@ -25,31 +28,37 @@ static void destroy_app (GtkWidget* widget,
 
 static
     gboolean
-render_expose (GtkWidget* da,
-               GdkEventExpose* event,
-               gpointer _data)
+key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
 {
-    cairo_surface_t* surface;
-    cairo_t* cr;
-    unsigned char* data;
-    int width, height, stride;
-    gint32 y, x;
-
-    (void) event;
+    tristate step = 0;
     (void) _data;
 
-    gdk_drawable_get_size (da->window, &width, &height);
+    if (event->keyval == GDK_i)  step =  1;
+    if (event->keyval == GDK_o)  step = -1;
 
-    surface = cairo_image_surface_create (CAIRO_FORMAT_ARGB32, width, height);
+    if (step != 0)
+    {
+        zposition += step * 10;
+        printf ("z:%f\n", zposition);
+        gtk_widget_queue_draw(widget);
+    }
 
-    stride = cairo_image_surface_get_stride (surface);
-    data = cairo_image_surface_get_data (surface);
-    
-    for (y = 0; y < height; ++y)
+    return TRUE;
+}
+
+#if 0
+#elif 0
+static
+    void
+render_pattern (byte* data, void* state, int height, int width, int stride)
+{
+    gint32 x, y;
+    (void) state;
+    UFor( y, height )
     {
         guint32* line;
         line = (guint32*) &data[stride * y];
-        for (x = 0; x < width; ++x)
+        UFor( x, width )
         {
             guint32 v;
             unsigned char r, g, b;
@@ -68,6 +77,70 @@ render_expose (GtkWidget* da,
             line[x] = v;
         }
     }
+}
+
+#elif 1
+
+static
+    void
+render_RaySpace (byte* data, const RaySpace* space,
+                 uint nrows, uint ncols, uint stride)
+{
+    uint* hits;
+    guint32 color_diff;
+    uint row, col;
+    hits = AllocT( uint, nrows * ncols );
+    rays_to_hits (hits, nrows, ncols,
+                  space->nelems, space->selems, &space->tree, zposition);
+
+    color_diff = (guint32) 0xFFFFFF / (guint32) space->nelems;
+
+    UFor( row, nrows )
+    {
+        uint* hitline;
+        guint32* outline;
+
+        hitline = &hits[ncols * row];
+        outline = (guint32*) &data[stride * row];
+
+        UFor( col, ncols )
+        {
+            outline[col] = (0xFF000000 |
+                            (color_diff * (space->nelems - hitline[col])));
+        }
+    }
+
+    free (hits);
+}
+#endif
+
+static
+    gboolean
+render_expose (GtkWidget* da,
+               GdkEventExpose* event,
+               gpointer state)
+{
+    cairo_surface_t* surface;
+    cairo_t* cr;
+    byte* data;
+    int width, height, stride;
+
+    (void) event;
+
+    gdk_drawable_get_size (da->window, &width, &height);
+
+    surface = cairo_image_surface_create (CAIRO_FORMAT_ARGB32, width, height);
+
+    stride = cairo_image_surface_get_stride (surface);
+    data = cairo_image_surface_get_data (surface);
+
+#if 0
+#elif 0
+    render_pattern (data, (void*) state, height, width, stride);
+#elif 1
+    render_RaySpace (data, (RaySpace*) state,
+                     (uint) height, (uint) width, (uint) stride);
+#endif
 
     cairo_surface_mark_dirty (surface);
     cr = gdk_cairo_create (da->window);
@@ -82,11 +155,15 @@ render_expose (GtkWidget* da,
 
 int main (int argc, char* argv[])
 {
+    RaySpace space;
+
         /* GtkWidget is the storage type for widgets */
     GtkWidget *frame;
     GtkWidget *window;
     GtkWidget *vbox;
     GtkWidget *da;
+
+    random_RaySpace (&space, 20);
 
     gtk_init (&argc, &argv);
 
@@ -97,7 +174,10 @@ int main (int argc, char* argv[])
     g_signal_connect (window, "destroy",
                       G_CALLBACK (destroy_app), NULL);
     g_signal_connect (window, "expose-event",
-                      G_CALLBACK (render_expose), NULL);
+                      G_CALLBACK (render_expose), &space);
+    g_signal_connect (window, "key-press-event",
+                      G_CALLBACK (key_press_fn), NULL);
+
 
 #if 0
     vbox = gtk_vbox_new (FALSE, 8);

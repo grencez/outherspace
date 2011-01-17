@@ -1,6 +1,7 @@
 
 
 CFLAGS = -g3
+#CFLAGS = -g
 CFLAGS = -O3
 
 CFLAGS += -ansi -pedantic
@@ -26,7 +27,7 @@ LFLAGS += -lm
 main: cli.c kdtree.c main.c util.c raytrace.c space.c
 	$(CC) $(CFLAGS) $< -o $@ $(LFLAGS)
 
-gui: gui.c
+gui: gui.c kdtree.c main.c util.c raytrace.c space.c
 	$(CC) $(CFLAGS) `pkg-config --cflags gtk+-2.0` $< -o $@ \
 		`pkg-config --libs gtk+-2.0`
 

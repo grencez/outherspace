@@ -158,7 +158,8 @@ hit_tri (real* mag,
         /* u *= inv_det; */
         /* v *= inv_det; */
 
-    return true;
+        /* Return false when the ray is behind the origin. */
+    return *mag >= 0;
 }
 #endif
 
@@ -194,7 +195,20 @@ const Triangle* cast_ray (const Point* origin,
 
     entrance = &salo_entrance;
 
-    if (! hit_BoundingBox (entrance, &tree->box, origin, dir))  return 0;
+        /* Cast in the reverse direction if the origin is within the
+         * geometry's bounds to get a good start location.
+         */
+    if (inside_BoundingBox (&tree->box, origin))
+    {
+        Point revdir;
+        scale_Point (&revdir, dir, -1);
+        if (! hit_BoundingBox (entrance, &tree->box, origin, &revdir))  return 0;
+    }
+    else
+    {
+        if (! hit_BoundingBox (entrance, &tree->box, origin, dir))  return 0;
+    }
+
     box = &tree->box;
     node = &tree->root;
 
@@ -288,7 +302,7 @@ void rays_to_hits_fish (uint* hits, uint nrows, uint ncols,
 
 void rays_to_hits (uint* hits, uint nrows, uint ncols,
                    uint nelems, const Triangle* elems,
-                   const KDTree* space)
+                   const KDTree* space, real zpos)
 {
     uint row;
     const uint dir_dim = 2;
@@ -314,7 +328,7 @@ void rays_to_hits (uint* hits, uint nrows, uint ncols,
         dir.coords[col_dim] = 0;
         normalize_Point (&dir);
 
-        origin.coords[dir_dim] = -1;
+        origin.coords[dir_dim] = zpos;
         origin.coords[row_dim] = row_start + (nrows - row -1) * row_delta;
 
         offset = row * ncols;

@@ -139,7 +139,7 @@ bool hit_BoundingBox (Point* entrance,
                       const BoundingBox* box,
                       const Point* origin, const Point* dir)
 {
-    bool inside = true;
+        /* bool inside = true; */
     uint dim;
     UFor( dim, NDimensions )
     {
@@ -154,10 +154,21 @@ bool hit_BoundingBox (Point* entrance,
             if (hit_BoundingPlane (entrance, dim, corner->coords[dim],
                                    box, origin, dir))
                 return true;
-            inside = false;
+                /* inside = false; */
+        }
+        else
+        {
+                /* This is done to fill /entrance/ with a corect value. */
+            if (hit_BoundingPlane (entrance, dim, box->min_corner.coords[dim],
+                                   box, origin, dir))
+                return true;
+            if (hit_BoundingPlane (entrance, dim, box->max_corner.coords[dim],
+                                   box, origin, dir))
+                return true;
         }
     }
-    return inside;
+        /* return inside; */
+    return false;
 }
 
 void adjust_BoundingBox (BoundingBox* box, const Point* point)

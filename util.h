@@ -6,8 +6,8 @@
 
 #define UFor( i, bel )  for (i = 0; i < bel; ++i)
 
-    /* typedef double real; */
-typedef float real;
+typedef double real;
+    /* typedef float real; */
 typedef unsigned uint;
 typedef char tristate;
 typedef unsigned char byte;
