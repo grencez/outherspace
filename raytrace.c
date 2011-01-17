@@ -102,7 +102,7 @@ cross_Point (Point* dst, const Point* a, const Point* b)
     /* and one CROSS has been moved out from the if-else if-else */
 static
     bool
-hit_tri (real* mag,
+hit_tri (real* dist,
          const Point* origin, const Point* dir,
          const Triangle* elem)
 {
@@ -153,13 +153,13 @@ hit_tri (real* mag,
     }
     else return false;  /* ray is parallel to the plane of the triangle */
 
-    *mag = dot_Point (&edge2, &qvec) * inv_det;
+    *dist = dot_Point (&edge2, &qvec) * inv_det;
 
         /* u *= inv_det; */
         /* v *= inv_det; */
 
         /* Return false when the ray is behind the origin. */
-    return *mag >= 0;
+    return *dist >= 0;
 }
 #endif
 
@@ -182,7 +182,8 @@ closer_hit (const Point* newhit, const Point* oldhit, const Point* dir)
 
 const Triangle* cast_ray (const Point* origin,
                           const Point* dir,
-                          const KDTree* tree)
+                          const KDTree* tree,
+                          bool inside_box)
 {
     Point salo_entrance;
     const KDTreeNode* parent = 0;
@@ -195,22 +196,22 @@ const Triangle* cast_ray (const Point* origin,
 
     entrance = &salo_entrance;
 
-        /* Cast in the reverse direction if the origin is within the
-         * geometry's bounds to get a good start location.
-         */
-    if (inside_BoundingBox (&tree->box, origin))
+    if (inside_box)
     {
-        Point revdir;
-        scale_Point (&revdir, dir, -1);
-        if (! hit_BoundingBox (entrance, &tree->box, origin, &revdir))  return 0;
+            /* Find the initial node.*/
+        node = find_KDTreeNode (&parent, origin, tree);
+        box = &node->as.leaf.box;
+
+        assert (leaf_KDTreeNode (node));
+        assert (inside_BoundingBox (box, origin));
     }
     else
     {
         if (! hit_BoundingBox (entrance, &tree->box, origin, dir))  return 0;
+        node = &tree->root;
+        box = &tree->box;
     }
 
-    box = &tree->box;
-    node = &tree->root;
 
     while (node)
     {
@@ -305,6 +306,7 @@ void rays_to_hits (uint* hits, uint nrows, uint ncols,
                    const KDTree* space, real zpos)
 {
     uint row;
+    bool inside_box;
     const uint dir_dim = 2;
     const uint row_dim = 1;
     const uint col_dim = 0;
@@ -319,10 +321,17 @@ void rays_to_hits (uint* hits, uint nrows, uint ncols,
     col_delta = (space->box.max_corner.coords[col_dim] - col_start) / ncols;
     col_start += col_delta / 2;
 
+    inside_box = (zpos > space->box.min_corner.coords[dir_dim] &&
+                  zpos < space->box.max_corner.coords[dir_dim]);
+
     UFor( row, nrows )
     {
-        uint col, offset;
+        uint col;
         Point origin, dir;
+        uint* hitline;
+
+        hitline = &hits[row * ncols];
+
         dir.coords[dir_dim] = 1;
         dir.coords[row_dim] = 0;
         dir.coords[col_dim] = 0;
@@ -331,16 +340,17 @@ void rays_to_hits (uint* hits, uint nrows, uint ncols,
         origin.coords[dir_dim] = zpos;
         origin.coords[row_dim] = row_start + (nrows - row -1) * row_delta;
 
-        offset = row * ncols;
         UFor( col, ncols )
         {
             const Triangle* elem;
             origin.coords[col_dim] = col_start + col * col_delta;
-            elem = cast_ray (&origin, &dir, space);
+            elem = cast_ray (&origin, &dir, space, inside_box);
+
             if (elem)
-                hits[offset + col] = index_of (elem, elems, sizeof (Triangle));
+                hitline[col] = index_of (elem, elems, sizeof (Triangle));
             else
-                hits[offset + col] = nelems;
+                hitline[col] = nelems;
         }
     }
 }
+

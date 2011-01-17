@@ -265,6 +265,27 @@ void build_KDTree (KDTree* tree, uint nelems, const Triangle** elems)
     build_KDTreeNode (&tree->root, 0, &tree->box, nelems, elems, 0);
 }
 
+const KDTreeNode* find_KDTreeNode (const KDTreeNode** parent_ptr,
+                                   const Point* origin,
+                                   const KDTree* tree)
+{
+    const KDTreeNode* node;
+    const KDTreeNode* parent = 0;
+    node = &tree->root;
+    while (! leaf_KDTreeNode (node))
+    {
+        const KDTreeInner* inner;
+        inner = &node->as.inner;
+        parent = node;
+        if (origin->coords[node->split_dim] < inner->split_pos)
+            node = inner->children[0];
+        else
+            node = inner->children[1];
+    }
+    *parent_ptr = parent;
+    return node;
+}
+
 const KDTreeNode* upnext_KDTreeNode (Point* entrance,
                                      const KDTreeNode** parent_ptr,
                                      const Point* origin,

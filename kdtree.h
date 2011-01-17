@@ -50,6 +50,10 @@ void cleanup_KDTree (KDTree* tree);
 
 void build_KDTree (KDTree* tree, uint nelems, const Triangle** elems);
 
+const KDTreeNode* find_KDTreeNode (const KDTreeNode** parent_ptr,
+                                   const Point* origin,
+                                   const KDTree* tree);
+
 const KDTreeNode* upnext_KDTreeNode (Point* entrance,
                                      const KDTreeNode** parent_ptr,
                                      const Point* origin,

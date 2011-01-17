@@ -1,11 +1,12 @@
 
 
 CFLAGS = -g3
-#CFLAGS = -g
 CFLAGS = -O3
+#CFLAGS += -DNDEBUG
 
-CFLAGS += -ansi -pedantic
+#CFLAGS += -ansi -pedantic
 CFLAGS += -Wall -Wextra
+
 #CFLAGS += -funsafe-loop-optimizations
 #CFLAGS += -fstrict-aliasing
 #CFLAGS += -ftree-loop-linear
@@ -24,10 +25,10 @@ LFLAGS += -lm
 #CC = g++
 #CFLAGS += -DCOMPILER_HAS_BOOL
 
-main: cli.c kdtree.c main.c util.c raytrace.c space.c
+main: cli.c kdtree.c main.c raytrace.c space.c util.c
 	$(CC) $(CFLAGS) $< -o $@ $(LFLAGS)
 
-gui: gui.c kdtree.c main.c util.c raytrace.c space.c
+gui: gui.c kdtree.c main.c raytrace.c space.c util.c
 	$(CC) $(CFLAGS) `pkg-config --cflags gtk+-2.0` $< -o $@ \
 		`pkg-config --libs gtk+-2.0`
 
@@ -37,5 +38,5 @@ test: main
 
 .PHONY: clean
 clean:
-	rm -f main gui kdtree.o main.o util.o space.o
+	rm -f main gui
 

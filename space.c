@@ -79,6 +79,13 @@ void zero_Point (Point* a)
         a->coords[i] = 0;
 }
 
+void negate_Point (Point* dst, const Point* src)
+{
+    uint i;
+    UFor( i, NDimensions )
+        dst->coords[i] = - src->coords[i];
+}
+
 void set_Point (Point* dst, const Point* src)
 {
     uint i;
@@ -111,6 +118,7 @@ bool hit_BoundingPlane (Point* entrance,
                         const Point* origin, const Point* dir)
 {
     uint i;
+    bool didhit = true;
     real coeff;
 
     if (! facing_BoundingPlane (dim, plane, origin, dir))  return false;
@@ -127,47 +135,47 @@ bool hit_BoundingPlane (Point* entrance,
         else
         {
             x = origin->coords[i] + coeff * dir->coords[i];
-            if (x < box->min_corner.coords[i])  return false;
-            if (x > box->max_corner.coords[i])  return false;
+            if (x < box->min_corner.coords[i] ||
+                x > box->max_corner.coords[i])
+                didhit = false;
         }
         entrance->coords[i] = x;
     }
-    return true;
+    return didhit;
 }
 
 bool hit_BoundingBox (Point* entrance,
                       const BoundingBox* box,
                       const Point* origin, const Point* dir)
 {
-        /* bool inside = true; */
     uint dim;
     UFor( dim, NDimensions )
     {
-        const Point* corner = 0;
         if (origin->coords[dim] < box->min_corner.coords[dim])
-            corner = &box->min_corner;
-        else if (origin->coords[dim] > box->max_corner.coords[dim])
-            corner = &box->max_corner;
-
-        if (corner)
         {
-            if (hit_BoundingPlane (entrance, dim, corner->coords[dim],
-                                   box, origin, dir))
-                return true;
-                /* inside = false; */
-        }
-        else
-        {
-                /* This is done to fill /entrance/ with a corect value. */
             if (hit_BoundingPlane (entrance, dim, box->min_corner.coords[dim],
                                    box, origin, dir))
                 return true;
+        }
+        else if (origin->coords[dim] > box->max_corner.coords[dim])
+        {
+            if (hit_BoundingPlane (entrance, dim, box->max_corner.coords[dim],
+                                   box, origin, dir))
+                return true;
+        }
+        else if (dir->coords[dim] < 0)
+        {
+            if (hit_BoundingPlane (entrance, dim, box->min_corner.coords[dim],
+                                   box, origin, dir))
+                return true;
+        }
+        else
+        {
             if (hit_BoundingPlane (entrance, dim, box->max_corner.coords[dim],
                                    box, origin, dir))
                 return true;
         }
     }
-        /* return inside; */
     return false;
 }
 
@@ -185,13 +193,14 @@ void adjust_BoundingBox (BoundingBox* box, const Point* point)
 
 bool inside_BoundingBox (const BoundingBox* box, const Point* point)
 {
+    bool inside = true;
     uint i;
     UFor( i, NDimensions )
     {
         if (!(box->min_corner.coords[i] <= point->coords[i] &&
               box->max_corner.coords[i] >= point->coords[i]))
-            return false;
+            inside = false;
     }
-    return true;
+    return inside;
 }
 

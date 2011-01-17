@@ -13,8 +13,8 @@ int main ()
 
     {
         uint* hits;
-        const uint nrows = 50;
-        const uint ncols = 50;
+        const uint nrows = 2000;
+        const uint ncols = 2000;
         hits = AllocT( uint, nrows * ncols );
         rays_to_hits (hits, nrows, ncols,
                       space.nelems, space.selems, &space.tree, -1);
