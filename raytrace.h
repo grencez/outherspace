@@ -14,6 +14,9 @@ struct ray_space_struct
 typedef struct ray_space_struct RaySpace;
 
 void cleanup_RaySpace (RaySpace* space);
+void rays_to_hits_from_point (uint* hits, uint nrows, uint ncols,
+                              uint nelems, const Triangle* elems,
+                              const KDTree* space, real zpos);
 void rays_to_hits (uint* hits, uint nrows, uint ncols,
                    uint nelems, const Triangle* elems,
                    const KDTree* space, real zpos);

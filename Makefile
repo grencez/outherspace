@@ -25,6 +25,9 @@ LFLAGS += -lm
 #CC = g++
 #CFLAGS += -DCOMPILER_HAS_BOOL
 
+all: main gui
+	# Done!
+
 main: cli.c kdtree.c main.c raytrace.c space.c util.c
 	$(CC) $(CFLAGS) $< -o $@ $(LFLAGS)
 

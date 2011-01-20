@@ -301,6 +301,74 @@ void rays_to_hits_fish (uint* hits, uint nrows, uint ncols,
 }
 #endif
 
+void rays_to_hits_from_point (uint* hits, uint nrows, uint ncols,
+                              uint nelems, const Triangle* elems,
+                              const KDTree* space, real zpos)
+{
+    uint row;
+    bool inside_box;
+    const uint dir_dim = 2;
+    const uint row_dim = 1;
+    const uint col_dim = 0;
+    Point origin, tdir;
+    real col_start, row_start;
+    real col_delta, row_delta;
+
+    row_start = - M_PI / 3;
+    row_delta = 2 * M_PI / (3 * nrows);
+    row_start += row_delta / 2;
+
+    col_start = - M_PI / 3;
+    col_delta = 2 * M_PI / (3 * ncols);
+    col_start += col_delta / 2;
+
+    origin.coords[dir_dim] = zpos;
+    origin.coords[row_dim] = 50;
+    origin.coords[col_dim] = 50;
+    
+    tdir.coords[dir_dim] = 1;
+    tdir.coords[row_dim] = 0;
+    tdir.coords[col_dim] = 0;
+
+    inside_box = inside_BoundingBox (&space->box, &origin);
+
+    UFor( row, nrows )
+    {
+        uint col;
+        real row_angle;
+        uint* hitline;
+
+        hitline = &hits[row * ncols];
+
+        row_angle = row_start + row_delta * row;
+
+        UFor( col, ncols )
+        {
+            Point dir;
+            const Triangle* elem;
+            real col_angle;
+            col_angle = col_start + col_delta * col;
+
+            dir.coords[row_dim] = (tdir.coords[row_dim] * (1 + cos (row_angle))
+                                   + tdir.coords[dir_dim] * sin (row_angle));
+
+            dir.coords[col_dim] = (tdir.coords[col_dim] * (1 + cos (col_angle))
+                                   + tdir.coords[dir_dim] * sin (col_angle));
+
+            dir.coords[dir_dim] = (tdir.coords[dir_dim] * (cos (row_angle) + cos (col_angle))
+                                   - tdir.coords[row_dim] * sin (row_angle)
+                                   - tdir.coords[col_dim] * sin (col_angle));
+
+            normalize_Point (&dir);
+            elem = cast_ray (&origin, &dir, space, inside_box);
+            if (elem)
+                hitline[col] = index_of (elem, elems, sizeof (Triangle));
+            else
+                hitline[col] = nelems;
+        }
+    }
+}
+
 void rays_to_hits (uint* hits, uint nrows, uint ncols,
                    uint nelems, const Triangle* elems,
                    const KDTree* space, real zpos)
