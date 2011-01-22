@@ -90,6 +90,7 @@ render_RaySpace (byte* data, const RaySpace* space,
     guint32 color_diff;
     uint row, col;
     hits = AllocT( uint, nrows * ncols );
+        /* fprintf (stderr, "nrows:%u  ncols:%u\n", nrows, ncols); */
     rays_to_hits_perspective (hits, nrows, ncols,
                               space->nelems, space->selems,
                               &space->tree, zposition);

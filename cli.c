@@ -7,17 +7,17 @@ int main ()
     RaySpace space;
 
     out = stdout;
-    random_RaySpace (&space, 1);
+    random_RaySpace (&space, 20);
 
         /* output_KDTree (out, &space.tree, space.nelems, space.selems); */
 
     {
         uint* hits;
-        const uint nrows = 50;
-        const uint ncols = 50;
+        const uint nrows = 448;
+        const uint ncols = 574;
         hits = AllocT( uint, nrows * ncols );
-        rays_to_hits_perspective (hits, nrows, ncols,
-                                  space.nelems, space.selems, &space.tree, -40);
+        rays_to_hits (hits, nrows, ncols,
+                      space.nelems, space.selems, &space.tree, -1);
         output_PBM_image ("out.pbm", nrows, ncols, hits, space.nelems);
         output_PGM_image ("out.pgm", nrows, ncols, hits, space.nelems);
         free (hits);

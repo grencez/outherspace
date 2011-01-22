@@ -109,7 +109,7 @@ bool facing_BoundingPlane (uint dim, real plane,
     tristate sign;
     sign = compare_real (plane, origin->coords[dim]);
     sign *= signum_real (dir->coords[dim]);
-    return sign >= 0;
+    return sign > 0;
 }
 
 bool hit_BoundingPlane (Point* entrance,
