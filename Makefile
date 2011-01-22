@@ -6,6 +6,7 @@ CFLAGS = -O3
 
 CFLAGS += -ansi -pedantic
 CFLAGS += -Wall -Wextra
+CFLAGS += -fopenmp
 
 #CFLAGS += -funsafe-loop-optimizations
 #CFLAGS += -fstrict-aliasing

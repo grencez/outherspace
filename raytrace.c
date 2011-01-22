@@ -4,6 +4,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
+#include <omp.h>
 
 void cleanup_RaySpace (RaySpace* space)
 {
@@ -320,6 +321,7 @@ void rays_to_hits_fish (uint* hits, uint nrows, uint ncols,
 
     inside_box = inside_BoundingBox (&space->box, &origin);
 
+#pragma omp parallel for
     UFor( row, nrows )
     {
         uint col;
@@ -328,7 +330,7 @@ void rays_to_hits_fish (uint* hits, uint nrows, uint ncols,
 
         hitline = &hits[row * ncols];
 
-        row_angle = row_start + row_delta * row;
+        row_angle = row_start + row_delta * (nrows - row -1);
 
         UFor( col, ncols )
         {
@@ -391,6 +393,7 @@ void rays_to_hits_perspective (uint* hits, uint nrows, uint ncols,
 
     inside_box = inside_BoundingBox (&space->box, &origin);
 
+#pragma omp parallel for
     UFor( row, nrows )
     {
         uint col;
@@ -442,6 +445,7 @@ void rays_to_hits (uint* hits, uint nrows, uint ncols,
     inside_box = (zpos > space->box.min_corner.coords[dir_dim] &&
                   zpos < space->box.max_corner.coords[dir_dim]);
 
+#pragma omp parallel for
     UFor( row, nrows )
     {
         uint col;

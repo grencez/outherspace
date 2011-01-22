@@ -33,12 +33,12 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
     tristate step = 0;
     (void) _data;
 
-    if (event->keyval == GDK_i)  step =  1;
-    if (event->keyval == GDK_o)  step = -1;
+    if (event->keyval == GDK_Up)  step =  1;
+    if (event->keyval == GDK_Down)  step = -1;
 
     if (step != 0)
     {
-        zposition += step * 10;
+        zposition += step * 5;
         printf ("z:%f\n", zposition);
         gtk_widget_queue_draw(widget);
     }
@@ -91,7 +91,7 @@ render_RaySpace (byte* data, const RaySpace* space,
     uint row, col;
     hits = AllocT( uint, nrows * ncols );
         /* fprintf (stderr, "nrows:%u  ncols:%u\n", nrows, ncols); */
-    rays_to_hits_perspective (hits, nrows, ncols,
+    rays_to_hits_fish (hits, nrows, ncols,
                               space->nelems, space->selems,
                               &space->tree, zposition);
 
