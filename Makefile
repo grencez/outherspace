@@ -4,7 +4,7 @@ CFLAGS = -g3
 CFLAGS = -O3
 #CFLAGS += -DNDEBUG
 
-#CFLAGS += -ansi -pedantic
+CFLAGS += -ansi -pedantic
 CFLAGS += -Wall -Wextra
 
 #CFLAGS += -funsafe-loop-optimizations

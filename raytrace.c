@@ -15,6 +15,10 @@ void cleanup_RaySpace (RaySpace* space)
     }
 }
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
 #if 0
 static
     bool
@@ -207,7 +211,8 @@ const Triangle* cast_ray (const Point* origin,
     }
     else
     {
-        if (! hit_BoundingBox (entrance, &tree->box, origin, dir))  return 0;
+        if (! hit_outer_BoundingBox (entrance, &tree->box, origin, dir))
+            return 0;
         node = &tree->root;
         box = &tree->box;
     }
@@ -284,26 +289,9 @@ const Triangle* cast_ray (const Point* origin,
     return elem;
 }
 
-#if 0
 void rays_to_hits_fish (uint* hits, uint nrows, uint ncols,
                         uint nelems, const Triangle* elems,
-                        const KDTree* space,
-                        real vert_angle, real horiz_angle)
-{
-    uint row;
-    UFor( row, nrows )
-    {
-        uint col, offset;
-        UFor( col, ncols )
-        {
-        }
-    }
-}
-#endif
-
-void rays_to_hits_from_point (uint* hits, uint nrows, uint ncols,
-                              uint nelems, const Triangle* elems,
-                              const KDTree* space, real zpos)
+                        const KDTree* space, real zpos)
 {
     uint row;
     bool inside_box;
@@ -360,6 +348,68 @@ void rays_to_hits_from_point (uint* hits, uint nrows, uint ncols,
                                    - tdir.coords[col_dim] * sin (col_angle));
 
             normalize_Point (&dir);
+            elem = cast_ray (&origin, &dir, space, inside_box);
+            if (elem)
+                hitline[col] = index_of (elem, elems, sizeof (Triangle));
+            else
+                hitline[col] = nelems;
+        }
+    }
+}
+
+void rays_to_hits_perspective (uint* hits, uint nrows, uint ncols,
+                               uint nelems, const Triangle* elems,
+                               const KDTree* space, real zpos)
+{
+    uint row;
+    bool inside_box;
+    const uint dir_dim = 2;
+    const uint row_dim = 1;
+    const uint col_dim = 0;
+    Point origin, tdir;
+    real col_start, row_start;
+    real col_delta, row_delta;
+
+    row_start = space->box.min_corner.coords[row_dim];
+    row_delta = (space->box.max_corner.coords[row_dim] - row_start) / nrows;
+    row_start += row_delta / 2;
+
+    col_start = space->box.min_corner.coords[col_dim];
+    col_delta = (space->box.max_corner.coords[col_dim] - col_start) / ncols;
+    col_start += col_delta / 2;
+
+    inside_box = (zpos > space->box.min_corner.coords[dir_dim] &&
+                  zpos < space->box.max_corner.coords[dir_dim]);
+
+    origin.coords[dir_dim] = zpos;
+    origin.coords[row_dim] = 50;
+    origin.coords[col_dim] = 50;
+    
+    tdir.coords[dir_dim] = 1;
+    tdir.coords[row_dim] = 0;
+    tdir.coords[col_dim] = 0;
+
+    inside_box = inside_BoundingBox (&space->box, &origin);
+
+    UFor( row, nrows )
+    {
+        uint col;
+        uint* hitline;
+
+        hitline = &hits[row * ncols];
+
+        UFor( col, ncols )
+        {
+            Point dir;
+            const Triangle* elem;
+
+            dir.coords[dir_dim] = 0;
+            dir.coords[row_dim] = row_start + (nrows - row -1) * row_delta;
+            dir.coords[col_dim] = col_start + col * col_delta;
+
+            diff_Point (&dir, &dir, &origin);
+            normalize_Point (&dir);
+
             elem = cast_ray (&origin, &dir, space, inside_box);
             if (elem)
                 hitline[col] = index_of (elem, elems, sizeof (Triangle));

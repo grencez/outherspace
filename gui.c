@@ -90,9 +90,9 @@ render_RaySpace (byte* data, const RaySpace* space,
     guint32 color_diff;
     uint row, col;
     hits = AllocT( uint, nrows * ncols );
-    rays_to_hits_from_point (hits, nrows, ncols,
-                             space->nelems, space->selems,
-                             &space->tree, zposition);
+    rays_to_hits_perspective (hits, nrows, ncols,
+                              space->nelems, space->selems,
+                              &space->tree, zposition);
 
     color_diff = (guint32) 0xFFFFFF / (guint32) space->nelems;
 

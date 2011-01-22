@@ -144,39 +144,127 @@ bool hit_BoundingPlane (Point* entrance,
     return didhit;
 }
 
+bool hit_outer_BoundingBox (Point* entrance,
+                            const BoundingBox* box,
+                            const Point* origin, const Point* dir)
+{
+    uint dim;
+    Point cost;
+    real hit_cost;
+    uint hit_dim;
+
+    UFor( dim, NDimensions )
+    {
+        if (dir->coords[dim] > 0)
+        {
+            if (origin->coords[dim] > box->max_corner.coords[dim])
+                return false;
+            if (origin->coords[dim] > box->min_corner.coords[dim])
+                cost.coords[dim] = Max_real;
+            else
+                cost.coords[dim] = ((box->min_corner.coords[dim]
+                                     - origin->coords[dim])
+                                    / dir->coords[dim]);
+        }
+        else if (dir->coords[dim] < 0)
+        {
+            if (origin->coords[dim] < box->min_corner.coords[dim])
+                return false;
+            if (origin->coords[dim] < box->max_corner.coords[dim])
+                cost.coords[dim] = Max_real;
+            else
+                cost.coords[dim] = ((box->max_corner.coords[dim]
+                                     - origin->coords[dim])
+                                    / dir->coords[dim]);
+        }
+        else
+        {
+            cost.coords[dim] = Max_real;
+        }
+    }
+
+    hit_cost = Max_real;
+    hit_dim = 0;
+
+    UFor( dim, NDimensions )
+    {
+        if (cost.coords[dim] < hit_cost)
+        {
+            hit_cost = cost.coords[dim];
+            hit_dim = dim;
+        }
+    }
+
+    UFor( dim, NDimensions )
+    {
+        if (dim == hit_dim)
+        {
+            if (dir->coords[dim] > 0)
+                entrance->coords[dim] = box->min_corner.coords[dim];
+            else
+                entrance->coords[dim] = box->max_corner.coords[dim];
+        }
+        else
+        {
+            entrance->coords[dim] = (origin->coords[dim]
+                                     + hit_cost * dir->coords[dim]);
+        }
+    }
+    return true;
+}
+
 bool hit_BoundingBox (Point* entrance,
                       const BoundingBox* box,
                       const Point* origin, const Point* dir)
 {
     uint dim;
+    Point cost;
+    real hit_cost;
+
     UFor( dim, NDimensions )
     {
-        if (origin->coords[dim] < box->min_corner.coords[dim])
+        if (dir->coords[dim] > 0)
         {
-            if (hit_BoundingPlane (entrance, dim, box->min_corner.coords[dim],
-                                   box, origin, dir))
-                return true;
-        }
-        else if (origin->coords[dim] > box->max_corner.coords[dim])
-        {
-            if (hit_BoundingPlane (entrance, dim, box->max_corner.coords[dim],
-                                   box, origin, dir))
-                return true;
+            real bound;
+            if (origin->coords[dim] > box->max_corner.coords[dim])
+                return false;
+            if (origin->coords[dim] > box->min_corner.coords[dim])
+                bound = box->max_corner.coords[dim];
+            else
+                bound = box->min_corner.coords[dim];
+
+            cost.coords[dim] = ((bound - origin->coords[dim])
+                                / dir->coords[dim]);
         }
         else if (dir->coords[dim] < 0)
         {
-            if (hit_BoundingPlane (entrance, dim, box->min_corner.coords[dim],
-                                   box, origin, dir))
-                return true;
+            real bound;
+            if (origin->coords[dim] < box->min_corner.coords[dim])
+                return false;
+            if (origin->coords[dim] < box->max_corner.coords[dim])
+                bound = box->min_corner.coords[dim];
+            else
+                bound = box->max_corner.coords[dim];
+
+            cost.coords[dim] = ((bound - origin->coords[dim])
+                                / dir->coords[dim]);
         }
         else
         {
-            if (hit_BoundingPlane (entrance, dim, box->max_corner.coords[dim],
-                                   box, origin, dir))
-                return true;
+            cost.coords[dim] = Max_real;
         }
     }
-    return false;
+
+    hit_cost = Max_real;
+
+    UFor( dim, NDimensions )
+        if (cost.coords[dim] < hit_cost)
+            hit_cost = cost.coords[dim];
+
+    UFor( dim, NDimensions )
+        entrance->coords[dim] = (origin->coords[dim]
+                                 + hit_cost * dir->coords[dim]);
+    return true;
 }
 
 void adjust_BoundingBox (BoundingBox* box, const Point* point)

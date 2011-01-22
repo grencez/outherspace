@@ -2,12 +2,21 @@
 #ifndef UTIL_H_
 #define UTIL_H_
 
+#include <float.h>
 #include <stdlib.h>
 
 #define UFor( i, bel )  for (i = 0; i < bel; ++i)
 
-    /* typedef double real; */
+#if 0
+typedef double real;
+#define Max_real DBL_MAX
+#define Min_real DBL_MIN
+#else
 typedef float real;
+#define Max_real FLT_MAX
+#define Min_real FLT_MIN
+#endif
+
 typedef unsigned uint;
 typedef char tristate;
 typedef unsigned char byte;
