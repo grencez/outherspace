@@ -406,6 +406,8 @@ void rays_to_hits_perspective (uint* hits, uint nrows, uint ncols,
             Point dir;
             const Triangle* elem;
 
+                /* if (! (row == 333 && col == 322))  continue; */
+
             dir.coords[dir_dim] = 0;
             dir.coords[row_dim] = row_start + (nrows - row -1) * row_delta;
             dir.coords[col_dim] = col_start + col * col_delta;
@@ -414,6 +416,9 @@ void rays_to_hits_perspective (uint* hits, uint nrows, uint ncols,
             normalize_Point (&dir, &dir);
 
             elem = cast_ray (&origin, &dir, space, inside_box);
+
+                /* if (row == 333 && col == 322)  puts (elem ? "hit" : "miss"); */
+
             if (elem)
                 hitline[col] = index_of (elem, elems, sizeof (Triangle));
             else
@@ -528,7 +533,7 @@ void rays_to_hits (uint* hits, uint nrows, uint ncols,
             Point dir;
             const Triangle* elem;
 
-                /* if (! (row == 127 && col == 467))  continue; */
+                /* if (! (row == 333 && col == 322))  continue; */
 
             scale_Point (&dir, &col_delta, col);
             summ_Point (&dir, &dir, &partial_dir);
@@ -536,7 +541,7 @@ void rays_to_hits (uint* hits, uint nrows, uint ncols,
 
             elem = cast_ray (origin, &dir, space, inside_box);
 
-                /* if (row == 127 && col == 467)  puts (elem ? "hit" : "miss"); */
+                /* if (row == 333 && col == 322)  puts (elem ? "hit" : "miss"); */
 
             if (elem)
                 hitline[col] = index_of (elem, elems, sizeof (Triangle));

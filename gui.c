@@ -192,7 +192,7 @@ render_RaySpace (byte* data, const RaySpace* space,
     hits = AllocT( uint, nrows * ncols );
     fprintf (stderr, "nrows:%u  ncols:%u\n", nrows, ncols);
 #if 0
-#elif 1
+#elif 0
     rays_to_hits_perspective (hits, nrows, ncols,
                               space->nelems, space->selems,
                               &space->tree,

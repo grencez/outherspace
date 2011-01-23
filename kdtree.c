@@ -4,8 +4,7 @@
 #include <assert.h>
 #include <string.h>
 
-    /* #define MaxKDTreeDepth 2*NDimensions */
-#define MaxKDTreeDepth 2
+#define MaxKDTreeDepth 2*NDimensions
     /* #define MaxKDTreeDepth 0 */
 
 
@@ -166,12 +165,7 @@ build_KDTreeNode (KDTreeNode* node,
         KDTreeInner* inner;
         inner = &node->as.inner;
         children = inner->children;
-            /* node->split_dim = depth % NDimensions; */
-        switch (depth)
-        {
-            case 0: node->split_dim = 0;
-            case 1: node->split_dim = 0;
-        }
+        node->split_dim = depth % NDimensions;
             /* node->split_dim = depth % 2; */
         inner->split_pos = 0.5 * (box->min_corner.coords[node->split_dim] +
                                   box->max_corner.coords[node->split_dim]);
@@ -331,9 +325,9 @@ const KDTreeNode* upnext_KDTreeNode (Point* entrance,
             /* Ray pointing to previously visited node => keep backtracking.*/
         if (inner->children[ni] != child)
         {
-            if (hit_BoundingPlane (entrance,
-                                   node->split_dim, inner->split_pos,
-                                   box, origin, dir))
+            if (hit_inner_BoundingPlane (entrance,
+                                         node->split_dim, inner->split_pos,
+                                         box, origin, dir))
             {
                 *parent_ptr = node;
                 child = inner->children[ni];

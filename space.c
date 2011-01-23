@@ -113,10 +113,11 @@ tristate facing_BoundingPlane (uint dim, real plane,
     return mul_signum (sign, signum_real (dir->coords[dim]));
 }
 
-bool hit_BoundingPlane (Point* entrance,
-                        uint dim, real plane,
-                        const BoundingBox* box,
-                        const Point* origin, const Point* dir)
+    /* Assume ray is coming from inside BoundingBox.*/
+bool hit_inner_BoundingPlane (Point* entrance,
+                              uint dim, real plane,
+                              const BoundingBox* box,
+                              const Point* origin, const Point* dir)
 {
     uint i;
     bool didhit = true;
@@ -138,20 +139,20 @@ bool hit_BoundingPlane (Point* entrance,
             }
             else if (origin->coords[i] < box->min_corner.coords[i])
             {
-                if (dir->coords[i] <= 0)  return false;
-                entrance->coords[i] = box->min_corner.coords[i];
+                if (dir->coords[i] <= 0)  didhit = false;
+                else  entrance->coords[i] = box->min_corner.coords[i];
             }
             else if (origin->coords[i] > box->max_corner.coords[i])
             {
-                if (dir->coords[i] >= 0)  return false;
-                entrance->coords[i] = box->max_corner.coords[i];
+                if (dir->coords[i] >= 0)  didhit = false;
+                else  entrance->coords[i] = box->max_corner.coords[i];
             }
             else
             {
                 entrance->coords[i] = origin->coords[i];
             }
         }
-        return true;
+        return didhit;
     }
 
     coeff = (plane - origin->coords[dim]) / dir->coords[dim];
@@ -166,15 +167,23 @@ bool hit_BoundingPlane (Point* entrance,
         else
         {
             x = origin->coords[i] + coeff * dir->coords[i];
-            if (x < box->min_corner.coords[i] ||
-                x > box->max_corner.coords[i])
-                didhit = false;
+            if (x < box->min_corner.coords[i])
+            {
+                if (dir->coords[i] < 0)  didhit = false;
+                else  x = box->min_corner.coords[i];
+            }
+            else if (x > box->max_corner.coords[i])
+            {
+                if (dir->coords[i] > 0)  didhit = false;
+                else  x = box->max_corner.coords[i];
+            }
         }
         entrance->coords[i] = x;
     }
     return didhit;
 }
 
+    /* Assume ray is coming from outside BoundingBox.*/
 bool hit_outer_BoundingBox (Point* entrance,
                             const BoundingBox* box,
                             const Point* origin, const Point* dir)

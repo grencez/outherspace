@@ -39,15 +39,15 @@ void copy_Point (Point* dst, const Point* src);
 real magnitude_Point (const Point* a);
 void normalize_Point (Point* dst, const Point* a);
 void proj_Point (Point* dst, const Point* a, const Point* b);
+tristate facing_BoundingPlane (uint dim, real plane,
+                               const Point* origin, const Point* dir);
+bool hit_inner_BoundingPlane (Point* entrance,
+                              uint dim, real plane,
+                              const BoundingBox* box,
+                              const Point* origin, const Point* dir);
 bool hit_outer_BoundingBox (Point* entrance,
                             const BoundingBox* box,
                             const Point* origin, const Point* dir);
-tristate facing_BoundingPlane (uint dim, real plane,
-                               const Point* origin, const Point* dir);
-bool hit_BoundingPlane (Point* entrance,
-                        uint dim, real plane,
-                        const BoundingBox* box,
-                        const Point* origin, const Point* dir);
 bool hit_BoundingBox (Point* entrance,
                       const BoundingBox* box,
                       const Point* origin, const Point* dir);
