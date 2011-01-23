@@ -105,13 +105,12 @@ void proj_Point (Point* dst, const Point* a, const Point* b)
     scale_Point (dst, b, dot_Point (a, b) / dot_Point (b, b));
 }
 
-bool facing_BoundingPlane (uint dim, real plane,
-                           const Point* origin, const Point* dir)
+tristate facing_BoundingPlane (uint dim, real plane,
+                               const Point* origin, const Point* dir)
 {
     tristate sign;
     sign = compare_real (plane, origin->coords[dim]);
-    sign *= signum_real (dir->coords[dim]);
-    return sign >= 0;
+    return mul_signum (sign, signum_real (dir->coords[dim]));
 }
 
 bool hit_BoundingPlane (Point* entrance,
@@ -122,8 +121,38 @@ bool hit_BoundingPlane (Point* entrance,
     uint i;
     bool didhit = true;
     real coeff;
+    tristate facing;
 
-    if (! facing_BoundingPlane (dim, plane, origin, dir))  return false;
+    facing = facing_BoundingPlane (dim, plane, origin, dir);
+
+    if (facing < 0)  return false;
+
+    if (facing == 0)
+    {
+            /* It's on plane.*/
+        UFor( i, NDimensions )
+        {
+            if (i == dim)
+            {
+                entrance->coords[i] = origin->coords[i];
+            }
+            else if (origin->coords[i] < box->min_corner.coords[i])
+            {
+                if (dir->coords[i] <= 0)  return false;
+                entrance->coords[i] = box->min_corner.coords[i];
+            }
+            else if (origin->coords[i] > box->max_corner.coords[i])
+            {
+                if (dir->coords[i] >= 0)  return false;
+                entrance->coords[i] = box->max_corner.coords[i];
+            }
+            else
+            {
+                entrance->coords[i] = origin->coords[i];
+            }
+        }
+        return true;
+    }
 
     coeff = (plane - origin->coords[dim]) / dir->coords[dim];
     

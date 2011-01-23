@@ -42,6 +42,8 @@ void proj_Point (Point* dst, const Point* a, const Point* b);
 bool hit_outer_BoundingBox (Point* entrance,
                             const BoundingBox* box,
                             const Point* origin, const Point* dir);
+tristate facing_BoundingPlane (uint dim, real plane,
+                               const Point* origin, const Point* dir);
 bool hit_BoundingPlane (Point* entrance,
                         uint dim, real plane,
                         const BoundingBox* box,

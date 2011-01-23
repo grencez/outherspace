@@ -33,6 +33,7 @@ typedef byte bool;
 uint index_of (const void* e, const void* arr, size_t size);
 tristate compare_real (real a, real b);
 tristate signum_real (real a);
+tristate mul_signum (real a, real b);
 
 #include "util.c"
 #endif

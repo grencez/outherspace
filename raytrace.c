@@ -528,11 +528,16 @@ void rays_to_hits (uint* hits, uint nrows, uint ncols,
             Point dir;
             const Triangle* elem;
 
+                /* if (! (row == 127 && col == 467))  continue; */
+
             scale_Point (&dir, &col_delta, col);
             summ_Point (&dir, &dir, &partial_dir);
             normalize_Point (&dir, &dir);
 
             elem = cast_ray (origin, &dir, space, inside_box);
+
+                /* if (row == 127 && col == 467)  puts (elem ? "hit" : "miss"); */
+
             if (elem)
                 hitline[col] = index_of (elem, elems, sizeof (Triangle));
             else

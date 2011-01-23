@@ -9,12 +9,13 @@ int main ()
     PointXfrm view_basis;
 
     out = stdout;
-    random_RaySpace (&space, 20);
+        /* random_RaySpace (&space, 20); */
+    random_RaySpace (&space, 1);
     
     zero_Point (&view_origin);
-    view_origin.coords[0] = -5;
+    view_origin.coords[0] = 50;
     view_origin.coords[1] = 50;
-    view_origin.coords[2] = -100;
+    view_origin.coords[2] = -60;
 
     identity_PointXfrm (&view_basis);
 
@@ -22,8 +23,8 @@ int main ()
 
     {
         uint* hits;
-        const uint nrows = 50;
-        const uint ncols = 50;
+        const uint nrows = 440;
+        const uint ncols = 935;
         hits = AllocT( uint, nrows * ncols );
         rays_to_hits (hits, nrows, ncols,
                       space.nelems, space.selems, &space.tree,

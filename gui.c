@@ -190,11 +190,19 @@ render_RaySpace (byte* data, const RaySpace* space,
     guint32 color_diff;
     uint row, col;
     hits = AllocT( uint, nrows * ncols );
-        /* fprintf (stderr, "nrows:%u  ncols:%u\n", nrows, ncols); */
+    fprintf (stderr, "nrows:%u  ncols:%u\n", nrows, ncols);
+#if 0
+#elif 1
+    rays_to_hits_perspective (hits, nrows, ncols,
+                              space->nelems, space->selems,
+                              &space->tree,
+                              view_origin.coords[2]);
+#elif 1
     rays_to_hits (hits, nrows, ncols,
                   space->nelems, space->selems,
                   &space->tree,
                   &view_origin, &view_basis);
+#endif
 
     color_diff = (guint32) 0xFFFFFF / (guint32) space->nelems;
 
@@ -269,10 +277,11 @@ int main (int argc, char* argv[])
     zero_Point (&view_origin);
     view_origin.coords[0] = 50;
     view_origin.coords[1] = 50;
-    view_origin.coords[2] = -100;
+    view_origin.coords[2] = -1;
     identity_PointXfrm (&view_basis);
 
     random_RaySpace (&space, 20);
+        /* random_RaySpace (&space, 2); */
 
     gtk_init (&argc, &argv);
 

@@ -18,3 +18,12 @@ tristate signum_real (real a)
     return compare_real (a, 0);
 }
 
+tristate mul_signum (real a, real b)
+{
+    if (a == 0 || b == 0)
+        return 0;
+    if (a == b)
+        return 1;
+    return -1;
+}
+
