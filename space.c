@@ -2,6 +2,7 @@
 #include "space.h"
 
 #include <math.h>
+#include <string.h>
 
 void output_Point (FILE* out, const Point* point)
 {
@@ -74,9 +75,12 @@ void scale_Point (Point* dst, const Point* a, real k)
 
 void zero_Point (Point* a)
 {
-    uint i;
-    UFor( i, NDimensions )
-        a->coords[i] = 0;
+    memset (a, 0, sizeof (Point));
+}
+
+void copy_Point (Point* dst, const Point* src)
+{
+    memcpy (dst, src, sizeof (Point));
 }
 
 void negate_Point (Point* dst, const Point* src)
@@ -84,13 +88,6 @@ void negate_Point (Point* dst, const Point* src)
     uint i;
     UFor( i, NDimensions )
         dst->coords[i] = - src->coords[i];
-}
-
-void set_Point (Point* dst, const Point* src)
-{
-    uint i;
-    UFor( i, NDimensions )
-        dst->coords[i] = src->coords[i];
 }
 
 real magnitude_Point (const Point* a)

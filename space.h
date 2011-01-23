@@ -35,7 +35,7 @@ real dot_Point (const Point* a, const Point* b);
 void summ_Point (Point* dst, const Point* a, const Point* b);
 void scale_Point (Point* dst, const Point* a, real k);
 void zero_Point (Point* a);
-void set_Point (Point* dst, const Point* src);
+void copy_Point (Point* dst, const Point* src);
 real magnitude_Point (const Point* a);
 void normalize_Point (Point* a);
 bool hit_outer_BoundingBox (Point* entrance,

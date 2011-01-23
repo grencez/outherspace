@@ -259,13 +259,13 @@ const Triangle* cast_ray (const Point* origin,
                     if (closer_hit (&hit, &close_hit, dir))
                     {
                         elem = leaf->elems[i];
-                        set_Point (&close_hit, &hit);
+                        copy_Point (&close_hit, &hit);
                     }
                 }
                 else
                 {
                     elem = leaf->elems[i];
-                    set_Point (&close_hit, &hit);
+                    copy_Point (&close_hit, &hit);
                 }
             }
             if (elem)  break;
@@ -422,9 +422,9 @@ void rays_to_hits_perspective (uint* hits, uint nrows, uint ncols,
     }
 }
 
-void rays_to_hits (uint* hits, uint nrows, uint ncols,
-                   uint nelems, const Triangle* elems,
-                   const KDTree* space, real zpos)
+void rays_to_hits_plane (uint* hits, uint nrows, uint ncols,
+                         uint nelems, const Triangle* elems,
+                         const KDTree* space, real zpos)
 {
     uint row;
     bool inside_box;
@@ -468,6 +468,71 @@ void rays_to_hits (uint* hits, uint nrows, uint ncols,
             origin.coords[col_dim] = col_start + col * col_delta;
             elem = cast_ray (&origin, &dir, space, inside_box);
 
+            if (elem)
+                hitline[col] = index_of (elem, elems, sizeof (Triangle));
+            else
+                hitline[col] = nelems;
+        }
+    }
+}
+
+void rays_to_hits (uint* hits, uint nrows, uint ncols,
+                   uint nelems, const Triangle* elems,
+                   const KDTree* space,
+                   const Point* origin, const PointXfrm* view_basis)
+{
+    uint row;
+    bool inside_box;
+    Point dir_start, row_delta, col_delta;
+    const uint dir_dim = 2, row_dim = 1, col_dim = 0;
+
+    {
+        Point dstart, rdelta, cdelta;
+        real tcos;
+        tcos = cos (M_PI / 3); /* cos (view_angle / 2) */
+
+        zero_Point (&dstart);
+        zero_Point (&rdelta);
+        zero_Point (&cdelta);
+
+        dstart.coords[dir_dim] = 1;
+        dstart.coords[row_dim] = - tcos;
+        dstart.coords[col_dim] = - tcos;
+
+        rdelta.coords[row_dim] = -2 * dstart.coords[row_dim] / nrows;
+        cdelta.coords[col_dim] = -2 * dstart.coords[col_dim] / ncols;
+
+        dstart.coords[row_dim] -= dstart.coords[row_dim] / nrows;
+        dstart.coords[col_dim] -= dstart.coords[col_dim] / ncols;
+
+        trxfrm_Point (&dir_start, view_basis, &dstart);
+        trxfrm_Point (&row_delta, view_basis, &rdelta);
+        trxfrm_Point (&col_delta, view_basis, &cdelta);
+    }
+
+    inside_box = inside_BoundingBox (&space->box, origin);
+
+#pragma omp parallel for
+    UFor( row, nrows )
+    {
+        uint col;
+        uint* hitline;
+        Point partial_dir;
+
+        hitline = &hits[row * ncols];
+        scale_Point (&partial_dir, &row_delta, nrows - row -1);
+        summ_Point (&partial_dir, &partial_dir, &dir_start);
+
+        UFor( col, ncols )
+        {
+            Point dir;
+            const Triangle* elem;
+
+            scale_Point (&dir, &col_delta, col);
+            summ_Point (&dir, &dir, &partial_dir);
+            normalize_Point (&dir);
+
+            elem = cast_ray (origin, &dir, space, inside_box);
             if (elem)
                 hitline[col] = index_of (elem, elems, sizeof (Triangle));
             else

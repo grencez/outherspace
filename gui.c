@@ -5,7 +5,8 @@
 #include <gtk/gtk.h>
 #include <gdk/gdkkeysyms.h>
 
-static real zposition = -1;
+static Point view_origin;
+static PointXfrm view_basis;
 
 static gboolean delete_event (GtkWidget* widget,
                               GdkEvent* event,
@@ -31,15 +32,40 @@ static
 key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
 {
     tristate step = 0;
+    tristate stride = 0;
+    const real scale = 5;
     (void) _data;
 
-    if (event->keyval == GDK_Up)  step =  1;
+    if (event->keyval == GDK_Up)    step =  1;
     if (event->keyval == GDK_Down)  step = -1;
+    if (event->keyval == GDK_Right)  stride =  1;
+    if (event->keyval == GDK_Left)   stride = -1;
 
     if (step != 0)
     {
-        zposition += step * 5;
-        printf ("z:%f\n", zposition);
+        Point diff;
+        col_PointXfrm (&diff, &view_basis, NDimensions-1);
+        scale_Point (&diff, &diff, scale * step);
+        summ_Point (&view_origin, &view_origin, &diff);
+    }
+    if (stride != 0)
+    {
+        Point diff;
+        col_PointXfrm (&diff, &view_basis, 0);
+        scale_Point (&diff, &diff, scale * stride);
+        summ_Point (&view_origin, &view_origin, &diff);
+    }
+
+    if (step != 0 || stride != 0)
+    {
+        FILE* out;
+        out = stdout;
+
+
+        fputs ("pos:", out);
+        output_Point (out, &view_origin);
+        fputc ('\n', out);
+
         gtk_widget_queue_draw(widget);
     }
 
@@ -91,9 +117,10 @@ render_RaySpace (byte* data, const RaySpace* space,
     uint row, col;
     hits = AllocT( uint, nrows * ncols );
         /* fprintf (stderr, "nrows:%u  ncols:%u\n", nrows, ncols); */
-    rays_to_hits_fish (hits, nrows, ncols,
-                              space->nelems, space->selems,
-                              &space->tree, zposition);
+    rays_to_hits (hits, nrows, ncols,
+                  space->nelems, space->selems,
+                  &space->tree,
+                  &view_origin, &view_basis);
 
     color_diff = (guint32) 0xFFFFFF / (guint32) space->nelems;
 
@@ -164,6 +191,12 @@ int main (int argc, char* argv[])
     GtkWidget *window;
     GtkWidget *vbox;
     GtkWidget *da;
+
+    zero_Point (&view_origin);
+    view_origin.coords[0] = 50;
+    view_origin.coords[1] = 50;
+    view_origin.coords[2] = -1;
+    identity_PointXfrm (&view_basis);
 
     random_RaySpace (&space, 20);
 
