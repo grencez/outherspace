@@ -44,16 +44,22 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
     if (step != 0)
     {
         Point diff;
-        col_PointXfrm (&diff, &view_basis, NDimensions-1);
-        scale_Point (&diff, &diff, scale * step);
+        scale_Point (&diff, &view_basis.pts[NDimensions-1], scale * step);
         summ_Point (&view_origin, &view_origin, &diff);
     }
     if (stride != 0)
     {
+        /*
         Point diff;
         col_PointXfrm (&diff, &view_basis, 0);
         scale_Point (&diff, &diff, scale * stride);
         summ_Point (&view_origin, &view_origin, &diff);
+        */
+        PointXfrm tmp, rotation;
+        rotation_PointXfrm (&tmp, 2, 0, stride * M_PI / 8);
+        to_basis_PointXfrm (&rotation, &tmp, &view_basis);
+        xfrm_PointXfrm (&tmp, &rotation, &view_basis);
+        orthonormalize_PointXfrm (&view_basis, &tmp);
     }
 
     if (step != 0 || stride != 0)
@@ -64,6 +70,8 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
 
         fputs ("pos:", out);
         output_Point (out, &view_origin);
+        fputs (" basis:", out);
+        output_PointXfrm (out, &view_basis);
         fputc ('\n', out);
 
         gtk_widget_queue_draw(widget);

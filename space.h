@@ -37,7 +37,8 @@ void scale_Point (Point* dst, const Point* a, real k);
 void zero_Point (Point* a);
 void copy_Point (Point* dst, const Point* src);
 real magnitude_Point (const Point* a);
-void normalize_Point (Point* a);
+void normalize_Point (Point* dst, const Point* a);
+void proj_Point (Point* dst, const Point* a, const Point* b);
 bool hit_outer_BoundingBox (Point* entrance,
                             const BoundingBox* box,
                             const Point* origin, const Point* dir);

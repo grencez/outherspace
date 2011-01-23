@@ -95,9 +95,14 @@ real magnitude_Point (const Point* a)
     return sqrt (dot_Point (a, a));
 }
 
-void normalize_Point (Point* a)
+void normalize_Point (Point* dst, const Point* a)
 {
-    scale_Point (a, a, 1 / magnitude_Point (a));
+    scale_Point (dst, a, 1 / magnitude_Point (a));
+}
+
+void proj_Point (Point* dst, const Point* a, const Point* b)
+{
+    scale_Point (dst, b, dot_Point (a, b) / dot_Point (b, b));
 }
 
 bool facing_BoundingPlane (uint dim, real plane,

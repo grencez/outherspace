@@ -349,7 +349,7 @@ void rays_to_hits_fish (uint* hits, uint nrows, uint ncols,
                                    - tdir.coords[row_dim] * sin (row_angle)
                                    - tdir.coords[col_dim] * sin (col_angle));
 
-            normalize_Point (&dir);
+            normalize_Point (&dir, &dir);
             elem = cast_ray (&origin, &dir, space, inside_box);
             if (elem)
                 hitline[col] = index_of (elem, elems, sizeof (Triangle));
@@ -411,7 +411,7 @@ void rays_to_hits_perspective (uint* hits, uint nrows, uint ncols,
             dir.coords[col_dim] = col_start + col * col_delta;
 
             diff_Point (&dir, &dir, &origin);
-            normalize_Point (&dir);
+            normalize_Point (&dir, &dir);
 
             elem = cast_ray (&origin, &dir, space, inside_box);
             if (elem)
@@ -457,7 +457,7 @@ void rays_to_hits_plane (uint* hits, uint nrows, uint ncols,
         dir.coords[dir_dim] = 1;
         dir.coords[row_dim] = 0;
         dir.coords[col_dim] = 0;
-        normalize_Point (&dir);
+        normalize_Point (&dir, &dir);
 
         origin.coords[dir_dim] = zpos;
         origin.coords[row_dim] = row_start + (nrows - row -1) * row_delta;
@@ -530,7 +530,7 @@ void rays_to_hits (uint* hits, uint nrows, uint ncols,
 
             scale_Point (&dir, &col_delta, col);
             summ_Point (&dir, &dir, &partial_dir);
-            normalize_Point (&dir);
+            normalize_Point (&dir, &dir);
 
             elem = cast_ray (origin, &dir, space, inside_box);
             if (elem)
