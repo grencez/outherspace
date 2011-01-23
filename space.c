@@ -157,7 +157,7 @@ bool hit_outer_BoundingBox (Point* entrance,
             if (origin->coords[dim] > box->max_corner.coords[dim])
                 return false;
             if (origin->coords[dim] > box->min_corner.coords[dim])
-                cost.coords[dim] = Max_real;
+                cost.coords[dim] = Min_real;
             else
                 cost.coords[dim] = ((box->min_corner.coords[dim]
                                      - origin->coords[dim])
@@ -168,7 +168,7 @@ bool hit_outer_BoundingBox (Point* entrance,
             if (origin->coords[dim] < box->min_corner.coords[dim])
                 return false;
             if (origin->coords[dim] < box->max_corner.coords[dim])
-                cost.coords[dim] = Max_real;
+                cost.coords[dim] = Min_real;
             else
                 cost.coords[dim] = ((box->max_corner.coords[dim]
                                      - origin->coords[dim])
@@ -176,16 +176,16 @@ bool hit_outer_BoundingBox (Point* entrance,
         }
         else
         {
-            cost.coords[dim] = Max_real;
+            cost.coords[dim] = Min_real;
         }
     }
 
-    hit_cost = Max_real;
+    hit_cost = 0;
     hit_dim = 0;
 
     UFor( dim, NDimensions )
     {
-        if (cost.coords[dim] < hit_cost)
+        if (cost.coords[dim] > hit_cost)
         {
             hit_cost = cost.coords[dim];
             hit_dim = dim;
@@ -205,8 +205,19 @@ bool hit_outer_BoundingBox (Point* entrance,
         {
             entrance->coords[dim] = (origin->coords[dim]
                                      + hit_cost * dir->coords[dim]);
+            if (dir->coords[dim] > 0)
+            {
+                if (entrance->coords[dim] > box->max_corner.coords[dim])
+                    return false;
+            }
+            else
+            {
+                if (entrance->coords[dim] < box->min_corner.coords[dim])
+                    return false;
+            }
         }
     }
+
     return true;
 }
 
