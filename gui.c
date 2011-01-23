@@ -7,6 +7,8 @@
 
 static Point view_origin;
 static PointXfrm view_basis;
+static uint mouse_coords[2];
+static uint mouse_diff[2];
 
 static gboolean delete_event (GtkWidget* widget,
                               GdkEvent* event,
@@ -40,6 +42,7 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
     if (event->keyval == GDK_Down)  step = -1;
     if (event->keyval == GDK_Right)  stride =  1;
     if (event->keyval == GDK_Left)   stride = -1;
+    if (event->keyval == GDK_Escape)  gdk_pointer_ungrab (event->time);
 
     if (step != 0)
     {
@@ -49,17 +52,17 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
     }
     if (stride != 0)
     {
-        /*
         Point diff;
-        col_PointXfrm (&diff, &view_basis, 0);
-        scale_Point (&diff, &diff, scale * stride);
+        scale_Point (&diff, &view_basis.pts[0], scale * stride);
         summ_Point (&view_origin, &view_origin, &diff);
-        */
+#if 0
         PointXfrm tmp, rotation;
         rotation_PointXfrm (&tmp, 2, 0, stride * M_PI / 8);
         to_basis_PointXfrm (&rotation, &tmp, &view_basis);
         xfrm_PointXfrm (&tmp, &rotation, &view_basis);
         orthonormalize_PointXfrm (&view_basis, &tmp);
+#endif
+
     }
 
     if (step != 0 || stride != 0)
@@ -74,10 +77,73 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
         output_PointXfrm (out, &view_basis);
         fputc ('\n', out);
 
-        gtk_widget_queue_draw(widget);
+        gtk_widget_queue_draw (widget);
     }
 
     return TRUE;
+}
+
+#if 0
+static gboolean move_mouse_fn (GtkWidget* widget,
+                               GdkEventButton* event,
+                               Gdk)
+{
+    return TRUE;
+}
+#endif
+
+static gboolean grab_mouse_fn (GtkWidget* da,
+                               GdkEventButton* event,
+                               GdkWindowEdge edge)
+{
+        /* GdkCursor* cursor; */
+    int width, height;
+    real x, y;
+    PointXfrm tmp;
+    Point dir;
+    FILE* out;
+
+    (void) edge;
+
+    out = stdout;
+
+    gdk_drawable_get_size (da->window, &width, &height);
+    x = (2 * event->x - width) / width;
+    y = (height - 2 * event->y) / height;
+
+    fprintf (out, "x:%f  y:%f\n", x, y);
+
+    copy_PointXfrm (&tmp, &view_basis);
+    zero_Point (&dir);
+    dir.coords[0] = x * cos (M_PI / 3);
+    dir.coords[1] = y * cos (M_PI / 3);
+    dir.coords[2] = 1;
+    trxfrm_Point (&tmp.pts[2], &view_basis, &dir);
+    orthorotate_PointXfrm (&view_basis, &tmp, 2);
+
+    fputs (" basis:", out);
+    output_PointXfrm (out, &view_basis);
+    fputc ('\n', out);
+    gtk_widget_queue_draw (da);
+
+#if 0
+    cursor = gdk_cursor_new (GDK_GUMBY);
+    gdk_pointer_grab (da->window,
+                      FALSE,
+                      0,
+                      da->window,
+                      cursor,
+                      event->time);
+    gdk_cursor_unref (cursor);
+
+#endif
+
+    mouse_coords[0] = event->x_root;
+    mouse_coords[1] = event->y_root;
+    mouse_diff[0] = 0;
+    mouse_diff[1] = 0;
+
+    return FALSE;
 }
 
 #if 0
@@ -195,15 +261,15 @@ int main (int argc, char* argv[])
     RaySpace space;
 
         /* GtkWidget is the storage type for widgets */
-    GtkWidget *frame;
+        /* GtkWidget *frame; */
     GtkWidget *window;
-    GtkWidget *vbox;
-    GtkWidget *da;
+        /* GtkWidget *vbox; */
+        /* GtkWidget *da; */
 
     zero_Point (&view_origin);
     view_origin.coords[0] = 50;
     view_origin.coords[1] = 50;
-    view_origin.coords[2] = -1;
+    view_origin.coords[2] = -100;
     identity_PointXfrm (&view_basis);
 
     random_RaySpace (&space, 20);
@@ -211,15 +277,18 @@ int main (int argc, char* argv[])
     gtk_init (&argc, &argv);
 
     window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
+    gtk_widget_add_events (window, GDK_BUTTON_PRESS_MASK);
 
     g_signal_connect (window, "delete-event",
-                      G_CALLBACK (delete_event), NULL);
+                      G_CALLBACK(delete_event), NULL);
     g_signal_connect (window, "destroy",
-                      G_CALLBACK (destroy_app), NULL);
+                      G_CALLBACK(destroy_app), NULL);
     g_signal_connect (window, "expose-event",
-                      G_CALLBACK (render_expose), &space);
+                      G_CALLBACK(render_expose), &space);
     g_signal_connect (window, "key-press-event",
-                      G_CALLBACK (key_press_fn), NULL);
+                      G_CALLBACK(key_press_fn), NULL);
+    g_signal_connect (window, "button-press-event",
+                      G_CALLBACK(grab_mouse_fn), NULL);
 
 
 #if 0

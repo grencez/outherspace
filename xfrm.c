@@ -139,6 +139,7 @@ void orthonormalize_PointXfrm (PointXfrm* dst, const PointXfrm* A)
 {
     uint i;
     assert (dst != A);
+        /* Perform (numerically stable) Gram-Schmidt process.*/
     UFor( i, NDimensions )
     {
         uint j;
@@ -147,7 +148,47 @@ void orthonormalize_PointXfrm (PointXfrm* dst, const PointXfrm* A)
         UFor( j, i )
         {
             Point proj;
-            proj_Point (&proj, &A->pts[i], &A->pts[j]);
+            proj_Point (&proj, &tmp, &dst->pts[j]);
+            diff_Point (&tmp, &tmp, &proj);
+        }
+        normalize_Point (&dst->pts[i], &tmp);
+    }
+}
+
+void orthorotate_PointXfrm (PointXfrm* dst, const PointXfrm* A, uint dim)
+{
+    uint i = dim;
+    assert (dst != A);
+
+        /* Perform Gram-Schmidt process, but starting from a specific
+         * dimension so it can be adjusted to achieve rotation.
+         */
+    normalize_Point (&dst->pts[i], &A->pts[i]);
+    while (i != 0)
+    {
+        uint j;
+        Point tmp;
+        --i;
+        copy_Point (&tmp, &A->pts[i]);
+
+        for (j = dim; j != i; --j)
+        {
+            Point proj;
+            proj_Point (&proj, &tmp, &dst->pts[j]);
+            diff_Point (&tmp, &tmp, &proj);
+        }
+        normalize_Point (&dst->pts[i], &tmp);
+    }
+
+    for (i = dim+1; i < NDimensions; ++i)
+    {
+        uint j;
+        Point tmp;
+        copy_Point (&tmp, &A->pts[i]);
+        UFor( j, i )
+        {
+            Point proj;
+            proj_Point (&proj, &tmp, &dst->pts[j]);
             diff_Point (&tmp, &tmp, &proj);
         }
         normalize_Point (&dst->pts[i], &tmp);
