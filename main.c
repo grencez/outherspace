@@ -55,10 +55,25 @@ void random_RaySpace (RaySpace* space, uint nelems)
     space->selems = random_Triangles (nelems, &box);
 
     space->elems = AllocT( const Triangle*, nelems );
-    UFor( i, nelems )  space->elems[i] = &space->selems[i];
+    space->scene.nverts = NTrianglePoints * nelems;
+    space->scene.nelems = nelems;
+    space->scene.verts = AllocT( Point, space->scene.nverts );
+    space->scene.elems = AllocT( SceneTriangle, space->scene.nelems );
 
+    UFor( i, nelems )
+    {
+        uint pi, offset;
+        space->elems[i] = &space->selems[i];
+        offset = i * NTrianglePoints;
+        UFor( pi, NTrianglePoints )
+        {
+            copy_Point (&space->scene.verts[pi + offset],
+                        &space->selems[i].pts[pi]);
+            space->scene.elems[i].pts[pi] = pi + offset;
+        }
+    }
 
-    build_KDTree (&space->tree, nelems, space->elems);
+    build_KDTree (&space->tree, nelems, space->elems, space->selems);
 }
 
 void output_PBM_image (const char* filename, uint nrows, uint ncols,

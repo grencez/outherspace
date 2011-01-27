@@ -8,6 +8,7 @@
 
 void cleanup_RaySpace (RaySpace* space)
 {
+    cleanup_Scene (&space->scene);
     cleanup_KDTree (&space->tree);
     if (space->nelems > 0)
     {
@@ -185,21 +186,24 @@ closer_hit (const Point* newhit, const Point* oldhit, const Point* dir)
     return false;
 }
 
-const Triangle* cast_ray (const Point* origin,
-                          const Point* dir,
-                          const KDTree* tree,
-                          bool inside_box)
+uint cast_ray (const Point* origin,
+               const Point* dir,
+               const RaySpace* space,
+               bool inside_box)
 {
     Point salo_entrance;
     const KDTreeNode* parent = 0;
 
     const BoundingBox* box;
     Point* entrance;
+    const KDTree* tree;
+    uint elemIdx;
 
-    const Triangle* elem = 0;
     const KDTreeNode* node;
 
     entrance = &salo_entrance;
+    tree = &space->tree;
+    elemIdx = space->scene.nelems;
 
     if (inside_box)
     {
@@ -213,7 +217,7 @@ const Triangle* cast_ray (const Point* origin,
     else
     {
         if (! hit_outer_BoundingBox (entrance, &tree->box, origin, dir))
-            return 0;
+            return space->scene.nelems;
         node = &tree->root;
         box = &tree->box;
     }
@@ -231,13 +235,17 @@ const Triangle* cast_ray (const Point* origin,
             box = &leaf->box;
                 /* output_BoundingBox (stdout, box); */
                 /* fputc ('\n', stdout); */
-            elem = 0;
 
             UFor( i, leaf->nelems )
             {
                 Point hit;
                 real mag;
-                if (!hit_tri (&mag, origin, dir, leaf->elems[i]))  continue;
+                const Triangle* tri;
+                tri = &space->selems[leaf->elems[i]];
+                    /* Triangle tri; */
+                    /* elem_Scene (&tri, &space->scene, leaf->elems[i]); */
+
+                if (!hit_tri (&mag, origin, dir, tri))  continue;
 
                 scale_Point (&hit, dir, mag);
                 summ_Point (&hit, &hit, origin);
@@ -254,21 +262,21 @@ const Triangle* cast_ray (const Point* origin,
                     fputs ("\n", stderr);
                 }
 #endif
-                if (elem)
+                if (elemIdx != space->scene.nelems)
                 {
                     if (closer_hit (&hit, &close_hit, dir))
                     {
-                        elem = leaf->elems[i];
+                        elemIdx = leaf->elems[i];
                         copy_Point (&close_hit, &hit);
                     }
                 }
                 else
                 {
-                    elem = leaf->elems[i];
+                    elemIdx = leaf->elems[i];
                     copy_Point (&close_hit, &hit);
                 }
             }
-            if (elem)  break;
+            if (elemIdx != space->scene.nelems)  break;
             node = upnext_KDTreeNode (entrance, &parent, origin, dir, node);
         }
         else
@@ -287,12 +295,11 @@ const Triangle* cast_ray (const Point* origin,
                 node = inner->children[1];
         }
     }
-    return elem;
+    return elemIdx;
 }
 
 void rays_to_hits_fish (uint* hits, uint nrows, uint ncols,
-                        uint nelems, const Triangle* elems,
-                        const KDTree* space, real zpos)
+                        const RaySpace* space, real zpos)
 {
     uint row;
     bool inside_box;
@@ -302,6 +309,9 @@ void rays_to_hits_fish (uint* hits, uint nrows, uint ncols,
     Point origin, tdir;
     real col_start, row_start;
     real col_delta, row_delta;
+    const KDTree* tree;
+
+    tree = &space->tree;
 
     row_start = - M_PI / 3;
     row_delta = 2 * M_PI / (3 * nrows);
@@ -319,7 +329,7 @@ void rays_to_hits_fish (uint* hits, uint nrows, uint ncols,
     tdir.coords[row_dim] = 0;
     tdir.coords[col_dim] = 0;
 
-    inside_box = inside_BoundingBox (&space->box, &origin);
+    inside_box = inside_BoundingBox (&tree->box, &origin);
 
 #pragma omp parallel for
     UFor( row, nrows )
@@ -335,7 +345,6 @@ void rays_to_hits_fish (uint* hits, uint nrows, uint ncols,
         UFor( col, ncols )
         {
             Point dir;
-            const Triangle* elem;
             real col_angle;
             col_angle = col_start + col_delta * col;
 
@@ -350,18 +359,13 @@ void rays_to_hits_fish (uint* hits, uint nrows, uint ncols,
                                    - tdir.coords[col_dim] * sin (col_angle));
 
             normalize_Point (&dir, &dir);
-            elem = cast_ray (&origin, &dir, space, inside_box);
-            if (elem)
-                hitline[col] = index_of (elem, elems, sizeof (Triangle));
-            else
-                hitline[col] = nelems;
+            hitline[col] = cast_ray (&origin, &dir, space, inside_box);
         }
     }
 }
 
 void rays_to_hits_perspective (uint* hits, uint nrows, uint ncols,
-                               uint nelems, const Triangle* elems,
-                               const KDTree* space, real zpos)
+                               const RaySpace* space, real zpos)
 {
     uint row;
     bool inside_box;
@@ -371,17 +375,20 @@ void rays_to_hits_perspective (uint* hits, uint nrows, uint ncols,
     Point origin, tdir;
     real col_start, row_start;
     real col_delta, row_delta;
+    const KDTree* tree;
 
-    row_start = space->box.min_corner.coords[row_dim];
-    row_delta = (space->box.max_corner.coords[row_dim] - row_start) / nrows;
+    tree = &space->tree;
+
+    row_start = tree->box.min_corner.coords[row_dim];
+    row_delta = (tree->box.max_corner.coords[row_dim] - row_start) / nrows;
     row_start += row_delta / 2;
 
-    col_start = space->box.min_corner.coords[col_dim];
-    col_delta = (space->box.max_corner.coords[col_dim] - col_start) / ncols;
+    col_start = tree->box.min_corner.coords[col_dim];
+    col_delta = (tree->box.max_corner.coords[col_dim] - col_start) / ncols;
     col_start += col_delta / 2;
 
-    inside_box = (zpos > space->box.min_corner.coords[dir_dim] &&
-                  zpos < space->box.max_corner.coords[dir_dim]);
+    inside_box = (zpos > tree->box.min_corner.coords[dir_dim] &&
+                  zpos < tree->box.max_corner.coords[dir_dim]);
 
     origin.coords[dir_dim] = zpos;
     origin.coords[row_dim] = 50;
@@ -391,7 +398,7 @@ void rays_to_hits_perspective (uint* hits, uint nrows, uint ncols,
     tdir.coords[row_dim] = 0;
     tdir.coords[col_dim] = 0;
 
-    inside_box = inside_BoundingBox (&space->box, &origin);
+    inside_box = inside_BoundingBox (&tree->box, &origin);
 
 #pragma omp parallel for
     UFor( row, nrows )
@@ -404,7 +411,6 @@ void rays_to_hits_perspective (uint* hits, uint nrows, uint ncols,
         UFor( col, ncols )
         {
             Point dir;
-            const Triangle* elem;
 
                 /* if (! (row == 333 && col == 322))  continue; */
 
@@ -415,21 +421,15 @@ void rays_to_hits_perspective (uint* hits, uint nrows, uint ncols,
             diff_Point (&dir, &dir, &origin);
             normalize_Point (&dir, &dir);
 
-            elem = cast_ray (&origin, &dir, space, inside_box);
+            hitline[col] = cast_ray (&origin, &dir, space, inside_box);
 
                 /* if (row == 333 && col == 322)  puts (elem ? "hit" : "miss"); */
-
-            if (elem)
-                hitline[col] = index_of (elem, elems, sizeof (Triangle));
-            else
-                hitline[col] = nelems;
         }
     }
 }
 
 void rays_to_hits_plane (uint* hits, uint nrows, uint ncols,
-                         uint nelems, const Triangle* elems,
-                         const KDTree* space, real zpos)
+                         const RaySpace* space, real zpos)
 {
     uint row;
     bool inside_box;
@@ -438,17 +438,20 @@ void rays_to_hits_plane (uint* hits, uint nrows, uint ncols,
     const uint col_dim = 0;
     real col_start, row_start;
     real col_delta, row_delta;
+    const KDTree* tree;
 
-    row_start = space->box.min_corner.coords[row_dim];
-    row_delta = (space->box.max_corner.coords[row_dim] - row_start) / nrows;
+    tree = &space->tree;
+
+    row_start = tree->box.min_corner.coords[row_dim];
+    row_delta = (tree->box.max_corner.coords[row_dim] - row_start) / nrows;
     row_start += row_delta / 2;
 
-    col_start = space->box.min_corner.coords[col_dim];
-    col_delta = (space->box.max_corner.coords[col_dim] - col_start) / ncols;
+    col_start = tree->box.min_corner.coords[col_dim];
+    col_delta = (tree->box.max_corner.coords[col_dim] - col_start) / ncols;
     col_start += col_delta / 2;
 
-    inside_box = (zpos > space->box.min_corner.coords[dir_dim] &&
-                  zpos < space->box.max_corner.coords[dir_dim]);
+    inside_box = (zpos > tree->box.min_corner.coords[dir_dim] &&
+                  zpos < tree->box.max_corner.coords[dir_dim]);
 
 #pragma omp parallel for
     UFor( row, nrows )
@@ -469,27 +472,24 @@ void rays_to_hits_plane (uint* hits, uint nrows, uint ncols,
 
         UFor( col, ncols )
         {
-            const Triangle* elem;
             origin.coords[col_dim] = col_start + col * col_delta;
-            elem = cast_ray (&origin, &dir, space, inside_box);
-
-            if (elem)
-                hitline[col] = index_of (elem, elems, sizeof (Triangle));
-            else
-                hitline[col] = nelems;
+            hitline[col] = cast_ray (&origin, &dir, space, inside_box);
         }
     }
 }
 
 void rays_to_hits (uint* hits, uint nrows, uint ncols,
-                   uint nelems, const Triangle* elems,
-                   const KDTree* space,
-                   const Point* origin, const PointXfrm* view_basis)
+                   const RaySpace* space,
+                   const Point* origin,
+                   const PointXfrm* view_basis)
 {
     uint row;
     bool inside_box;
     Point dir_start, row_delta, col_delta;
+    const KDTree* tree;
     const uint dir_dim = 2, row_dim = 1, col_dim = 0;
+
+    tree = &space->tree;
 
     {
         Point dstart, rdelta, cdelta;
@@ -515,7 +515,7 @@ void rays_to_hits (uint* hits, uint nrows, uint ncols,
         trxfrm_Point (&col_delta, view_basis, &cdelta);
     }
 
-    inside_box = inside_BoundingBox (&space->box, origin);
+    inside_box = inside_BoundingBox (&tree->box, origin);
 
 #pragma omp parallel for
     UFor( row, nrows )
@@ -531,7 +531,6 @@ void rays_to_hits (uint* hits, uint nrows, uint ncols,
         UFor( col, ncols )
         {
             Point dir;
-            const Triangle* elem;
 
                 /* if (! (row == 333 && col == 322))  continue; */
 
@@ -539,14 +538,9 @@ void rays_to_hits (uint* hits, uint nrows, uint ncols,
             summ_Point (&dir, &dir, &partial_dir);
             normalize_Point (&dir, &dir);
 
-            elem = cast_ray (origin, &dir, space, inside_box);
+            hitline[col] = cast_ray (origin, &dir, space, inside_box);
 
                 /* if (row == 333 && col == 322)  puts (elem ? "hit" : "miss"); */
-
-            if (elem)
-                hitline[col] = index_of (elem, elems, sizeof (Triangle));
-            else
-                hitline[col] = nelems;
         }
     }
 }

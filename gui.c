@@ -194,14 +194,10 @@ render_RaySpace (byte* data, const RaySpace* space,
 #if 0
 #elif 0
     rays_to_hits_perspective (hits, nrows, ncols,
-                              space->nelems, space->selems,
-                              &space->tree,
-                              view_origin.coords[2]);
+                              space, view_origin.coords[2]);
 #elif 1
     rays_to_hits (hits, nrows, ncols,
-                  space->nelems, space->selems,
-                  &space->tree,
-                  &view_origin, &view_basis);
+                  space, &view_origin, &view_basis);
 #endif
 
     color_diff = (guint32) 0xFFFFFF / (guint32) space->nelems;

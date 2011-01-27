@@ -28,7 +28,7 @@ output_KDTreeNode (FILE* out, const KDTreeNode* node,
         UFor( ei, leaf->nelems )
         {
             uint index;
-            index = index_of (leaf->elems[ei], elems, sizeof (Triangle));
+            index = leaf->elems[ei];
             fprintf (out, " %u", index);
         }
         fputc ('\n', out);
@@ -155,7 +155,7 @@ static
 build_KDTreeNode (KDTreeNode* node,
                   KDTreeNode* parent, BoundingBox* box,
                   uint nelems, const Triangle** elems,
-                  uint depth)
+                  uint depth, const Triangle* selems)
 {
         /* printf ("%*sdepth=%u, nelems=%u\n", depth, "", depth, nelems); */
     if (depth < MaxKDTreeDepth)
@@ -206,7 +206,7 @@ build_KDTreeNode (KDTreeNode* node,
             tmp = box->max_corner.coords[node->split_dim];
             box->max_corner.coords[node->split_dim] = inner->split_pos;
             build_KDTreeNode (children[0], node, box, nbelow,
-                              blw_elems, 1+depth);
+                              blw_elems, 1+depth, selems);
             box->max_corner.coords[node->split_dim] = tmp;
 
             free (blw_elems);
@@ -214,7 +214,7 @@ build_KDTreeNode (KDTreeNode* node,
             tmp = box->min_corner.coords[node->split_dim];
             box->min_corner.coords[node->split_dim] = inner->split_pos;
             build_KDTreeNode (children[1], node, box, nabove,
-                              &elems[nelems-nabove], 1+depth);
+                              &elems[nelems-nabove], 1+depth, selems);
             box->min_corner.coords[node->split_dim] = tmp;
         }
 
@@ -228,13 +228,16 @@ build_KDTreeNode (KDTreeNode* node,
         leaf->nelems = nelems;
         if (0 != nelems)
         {
-            leaf->elems = (const Triangle**) malloc (nelems * sizeof (Triangle*));
-            memcpy (leaf->elems, elems, nelems * sizeof (Triangle*));
+            uint i;
+            leaf->elems = AllocT( uint, nelems );
+            UFor( i, nelems )
+                leaf->elems[i] = index_of (elems[i], selems, sizeof (Triangle));
         }
     }
 }
 
-void build_KDTree (KDTree* tree, uint nelems, const Triangle** elems)
+void build_KDTree (KDTree* tree, uint nelems, const Triangle** elems,
+                   const Triangle* selems)
 {
     uint i, ei;
     assert (nelems > 0);
@@ -262,7 +265,7 @@ void build_KDTree (KDTree* tree, uint nelems, const Triangle** elems)
             assert (inside_BoundingBox (&tree->box, &elems[ei]->pts[pi]));
     }
 
-    build_KDTreeNode (&tree->root, 0, &tree->box, nelems, elems, 0);
+    build_KDTreeNode (&tree->root, 0, &tree->box, nelems, elems, 0, selems);
 }
 
 const KDTreeNode* find_KDTreeNode (const KDTreeNode** parent_ptr,

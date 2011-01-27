@@ -15,7 +15,7 @@ struct kd_tree_leaf_struct
 {
     uint nelems;
     BoundingBox box;
-    const Triangle** elems;
+    uint* elems;
 };
 struct kd_tree_inner_struct
 {
@@ -48,7 +48,8 @@ void output_KDTree (FILE* out, const KDTree* tree,
 
 void cleanup_KDTree (KDTree* tree);
 
-void build_KDTree (KDTree* tree, uint nelems, const Triangle** elems);
+void build_KDTree (KDTree* tree, uint nelems, const Triangle** elems,
+                   const Triangle* selems);
 
 const KDTreeNode* find_KDTreeNode (const KDTreeNode** parent_ptr,
                                    const Point* origin,

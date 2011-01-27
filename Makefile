@@ -29,10 +29,10 @@ LFLAGS += -lm
 all: main gui
 	# Done!
 
-main: cli.c kdtree.c main.c raytrace.c space.c util.c xfrm.c
+main: cli.c kdtree.c main.c raytrace.c scene.c space.c util.c xfrm.c
 	$(CC) $(CFLAGS) $< -o $@ $(LFLAGS)
 
-gui: gui.c kdtree.c main.c raytrace.c space.c util.c xfrm.c
+gui: gui.c kdtree.c main.c raytrace.c scene.c space.c util.c xfrm.c
 	$(CC) $(CFLAGS) `pkg-config --cflags gtk+-2.0` $< -o $@ \
 		`pkg-config --libs gtk+-2.0`
 
