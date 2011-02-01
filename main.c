@@ -1,6 +1,7 @@
 
 #include "main.h"
 
+#include <assert.h>
 #include <time.h>
 
 void random_Triangle (Triangle* elem, const BoundingBox* box)
@@ -124,5 +125,27 @@ void output_PGM_image (const char* filename, uint nrows, uint ncols,
         fputc ('\n', out);
     }
     fclose (out);
+}
+
+void readin_wavefront (RaySpace* space, const char* filename)
+{
+    FILE* in;
+    size_t size;
+    Scene* scene;
+    char buf[BUFSIZ];
+
+    assert (0); /* don't call this function */
+    scene = &space->scene;
+
+    in = fopen (filename, "rb");
+    assert (in);
+
+    size = fread (buf, sizeof(char), size, in);
+
+    scene->nverts = 0;
+    scene->nelems = 0;
+
+
+    fclose (in);
 }
 

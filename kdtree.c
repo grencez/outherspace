@@ -1,5 +1,6 @@
 
 #include "kdtree.h"
+#include "slist.h"
 
 #include <assert.h>
 #include <string.h>
@@ -15,10 +16,14 @@ bool leaf_KDTreeNode (const KDTreeNode* node)
 
 static
     void
-output_KDTreeNode (FILE* out, const KDTreeNode* node,
-                   uint depth, uint id, const Triangle* elems)
+output_KDTreeNode (FILE* out, uint node_idx,
+                   uint depth, const KDTreeNode* nodes)
 {
-    fprintf (out, " %*s%-*u depth:%u   ", depth, "", depth+1, id, depth);
+    const KDTreeNode* node;
+    node = &nodes[node_idx];
+    fprintf (out, " %*s%-*u depth:%u   ",
+             depth, "", depth+1,
+             node_idx, depth);
     if (leaf_KDTreeNode (node))
     {
         uint ei;
@@ -43,9 +48,7 @@ output_KDTreeNode (FILE* out, const KDTreeNode* node,
                  node->split_dim, inner->split_pos);
         UFor( i, 2 )
             output_KDTreeNode (out, inner->children[i],
-                               1+depth,
-                               2*(id+1)-1 + i,
-                               elems);
+                               1+depth, nodes);
     }
 }
 
@@ -61,12 +64,15 @@ void output_KDTree (FILE* out, const KDTree* tree,
         output_Triangle (out, &elems[i]);
     }
     fputs ("\n- Nodes -\n", out);
-    output_KDTreeNode (out, &tree->root, 0, 0, elems);
+    output_KDTreeNode (out, 0, 0, tree->nodes);
+
 }
 
 
-static void cleanup_KDTreeNode (KDTreeNode* node)
+static void cleanup_KDTreeNode (uint node_idx, KDTreeNode* nodes)
 {
+    KDTreeNode* node;
+    node = &nodes[node_idx];
     if (leaf_KDTreeNode (node))
     {
         KDTreeLeaf* leaf;
@@ -78,15 +84,19 @@ static void cleanup_KDTreeNode (KDTreeNode* node)
     {
         KDTreeInner* inner;
         inner = &node->as.inner;
-        cleanup_KDTreeNode (inner->children[0]);
-        cleanup_KDTreeNode (inner->children[1]);
-        free (inner->children[0]);
+        cleanup_KDTreeNode (inner->children[0], nodes);
+        cleanup_KDTreeNode (inner->children[1], nodes);
     }
 }
 
 void cleanup_KDTree (KDTree* tree)
 {
-    cleanup_KDTreeNode (&tree->root);
+    if (tree->nodes)
+    {
+        cleanup_KDTreeNode (0, tree->nodes);
+
+        free (tree->nodes);
+    }
 }
 
     /* -1 strictly below, 0 in both, 1 strictly greater or equal */
@@ -152,19 +162,21 @@ partition_split (uint nelems, const Triangle** elems,
 
 static
     void
-build_KDTreeNode (KDTreeNode* node,
-                  KDTreeNode* parent, BoundingBox* box,
+build_KDTreeNode (uint node_idx,
+                  uint parent, BoundingBox* box,
                   uint nelems, const Triangle** elems,
-                  uint depth, const Triangle* selems)
+                  uint depth, const Triangle* selems,
+                  SList* lis)
 {
+    KDTreeNode* node;
+    node = AllocT( KDTreeNode, 1 );
+    app_SList (lis, node);
         /* printf ("%*sdepth=%u, nelems=%u\n", depth, "", depth, nelems); */
     if (depth < MaxKDTreeDepth)
     {
         uint nbelow, nabove;
-        KDTreeNode** children;
         KDTreeInner* inner;
         inner = &node->as.inner;
-        children = inner->children;
         node->split_dim = depth % NDimensions;
             /* node->split_dim = depth % 2; */
         inner->split_pos = 0.5 * (box->min_corner.coords[node->split_dim] +
@@ -190,9 +202,6 @@ build_KDTreeNode (KDTreeNode* node,
         }
 #endif
 
-        children[0] = (KDTreeNode*) malloc (2 * sizeof (KDTreeNode));
-        children[1] = &children[0][1];
-
         inner->parent = parent;
 
         {
@@ -205,16 +214,20 @@ build_KDTreeNode (KDTreeNode* node,
 
             tmp = box->max_corner.coords[node->split_dim];
             box->max_corner.coords[node->split_dim] = inner->split_pos;
-            build_KDTreeNode (children[0], node, box, nbelow,
-                              blw_elems, 1+depth, selems);
+            inner->children[0] = lis->nmembs;
+            build_KDTreeNode (inner->children[0], node_idx,
+                              box, nbelow, blw_elems,
+                              1+depth, selems, lis);
             box->max_corner.coords[node->split_dim] = tmp;
 
             free (blw_elems);
 
             tmp = box->min_corner.coords[node->split_dim];
             box->min_corner.coords[node->split_dim] = inner->split_pos;
-            build_KDTreeNode (children[1], node, box, nabove,
-                              &elems[nelems-nabove], 1+depth, selems);
+            inner->children[1] = lis->nmembs;
+            build_KDTreeNode (inner->children[1], node_idx,
+                              box, nabove, &elems[nelems-nabove],
+                              1+depth, selems, lis);
             box->min_corner.coords[node->split_dim] = tmp;
         }
 
@@ -240,6 +253,8 @@ void build_KDTree (KDTree* tree, uint nelems, const Triangle** elems,
                    const Triangle* selems)
 {
     uint i, ei;
+    SList lis;
+
     assert (nelems > 0);
     UFor( i, NDimensions )
     {
@@ -265,57 +280,71 @@ void build_KDTree (KDTree* tree, uint nelems, const Triangle** elems,
             assert (inside_BoundingBox (&tree->box, &elems[ei]->pts[pi]));
     }
 
-    build_KDTreeNode (&tree->root, 0, &tree->box, nelems, elems, 0, selems);
+    init_SList (&lis);
+    build_KDTreeNode (0, 0, &tree->box, nelems, elems, 0, selems, &lis);
+
+    tree->nnodes = lis.nmembs;
+    tree->nodes = AllocT( KDTreeNode, tree->nnodes );
+    acpy_SList (tree->nodes, &lis, sizeof (KDTreeNode));
+    cleanup_SList (&lis);
 }
 
-const KDTreeNode* find_KDTreeNode (const KDTreeNode** parent_ptr,
-                                   const Point* origin,
-                                   const KDTree* tree)
+uint find_KDTreeNode (uint* ret_parent,
+                      const Point* origin,
+                      const KDTree* tree)
 {
     const KDTreeNode* node;
-    const KDTreeNode* parent = 0;
-    node = &tree->root;
+    uint node_idx = 0, parent = 0;
+    assert (tree->nnodes > 0);
+    node = &tree->nodes[0];
     while (! leaf_KDTreeNode (node))
     {
         const KDTreeInner* inner;
         inner = &node->as.inner;
-        parent = node;
+        parent = node_idx;
         if (origin->coords[node->split_dim] < inner->split_pos)
-            node = inner->children[0];
+            node_idx = inner->children[0];
         else
-            node = inner->children[1];
+            node_idx = inner->children[1];
+        node = &tree->nodes[node_idx];
     }
-    *parent_ptr = parent;
-    return node;
+    *ret_parent = parent;
+    assert (leaf_KDTreeNode (node));
+    return node_idx;
 }
 
-const KDTreeNode* upnext_KDTreeNode (Point* entrance,
-                                     const KDTreeNode** parent_ptr,
-                                     const Point* origin,
-                                     const Point* dir,
-                                     const KDTreeNode* node)
+uint upnext_KDTreeNode (Point* entrance,
+                        uint* ret_parent,
+                        const Point* origin,
+                        const Point* dir,
+                        uint node_idx,
+                        const KDTreeNode* nodes)
 {
     const BoundingBox* box;
-    const KDTreeNode* child;
+    uint child_idx;
 
-    assert (leaf_KDTreeNode (node));
-    box = &node->as.leaf.box;
-    child = node;
-    assert (parent_ptr);
-    node = *parent_ptr;
-
-    while (1)
     {
+        const KDTreeNode* node;
+        node = &nodes[node_idx];
+        assert (leaf_KDTreeNode (node));
+        box = &node->as.leaf.box;
+    }
+
+    child_idx = node_idx;
+    assert (ret_parent);
+    node_idx = *ret_parent;
+
+        /* Terminating condition:
+         * Backtracked from root node => no possible next leaf.
+         */
+    while (node_idx != child_idx)
+    {
+        const KDTreeNode* node;
         const KDTreeInner* inner;
         tristate facing;
         uint ni;
 
-            /* Backtracked from root node => no possible next leaf.*/
-        if (!node)
-        {
-            child = 0;
-            break;
-        }
+        node = &nodes[node_idx];
 
         assert (! leaf_KDTreeNode (node));
         inner = &node->as.inner;
@@ -326,21 +355,21 @@ const KDTreeNode* upnext_KDTreeNode (Point* entrance,
         ni = (facing < 0) ? 0 : 1;
 
             /* Ray pointing to previously visited node => keep backtracking.*/
-        if (inner->children[ni] != child)
+        if (inner->children[ni] != child_idx)
         {
             if (hit_inner_BoundingPlane (entrance,
                                          node->split_dim, inner->split_pos,
                                          box, origin, dir))
             {
-                *parent_ptr = node;
-                child = inner->children[ni];
+                child_idx = inner->children[ni];
                 break;
             }
         }
 
-        child = node;
-        node = inner->parent;
+        child_idx = node_idx;
+        node_idx = inner->parent;
     }
-    return child;
+    *ret_parent = node_idx;
+    return child_idx;
 }
 

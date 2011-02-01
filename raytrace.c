@@ -192,14 +192,12 @@ uint cast_ray (const Point* origin,
                bool inside_box)
 {
     Point salo_entrance;
-    const KDTreeNode* parent = 0;
+    uint node_idx, parent = 0;
 
     const BoundingBox* box;
     Point* entrance;
     const KDTree* tree;
     uint elemIdx;
-
-    const KDTreeNode* node;
 
     entrance = &salo_entrance;
     tree = &space->tree;
@@ -208,23 +206,23 @@ uint cast_ray (const Point* origin,
     if (inside_box)
     {
             /* Find the initial node.*/
-        node = find_KDTreeNode (&parent, origin, tree);
-        box = &node->as.leaf.box;
-
-        assert (leaf_KDTreeNode (node));
+        node_idx = find_KDTreeNode (&parent, origin, tree);
+        box = &tree->nodes[node_idx].as.leaf.box;
         assert (inside_BoundingBox (box, origin));
     }
     else
     {
         if (! hit_outer_BoundingBox (entrance, &tree->box, origin, dir))
             return space->scene.nelems;
-        node = &tree->root;
+        node_idx = 0;
         box = &tree->box;
     }
 
-
-    while (node)
+    while (1)
     {
+        const KDTreeNode* node;
+        node = &tree->nodes[node_idx];
+
         if (leaf_KDTreeNode (node))
         {
             uint i;
@@ -277,22 +275,25 @@ uint cast_ray (const Point* origin,
                 }
             }
             if (elemIdx != space->scene.nelems)  break;
-            node = upnext_KDTreeNode (entrance, &parent, origin, dir, node);
+
+            node_idx = upnext_KDTreeNode (entrance, &parent,
+                                          origin, dir, node_idx, tree->nodes);
+            if (node_idx == parent)  break;
         }
         else
         {
             const KDTreeInner* inner;
             inner = &node->as.inner;
-            parent = node;
+            parent = node_idx;
 
                 /* Subtlety: Inclusive case here must be opposite of
                  * inclusive case in upnext_KDTreeNode to avoid infinite
                  * iteration on rays in the splitting plane's subspace.
                  */
             if (entrance->coords[node->split_dim] <= inner->split_pos)
-                node = inner->children[0];
+                node_idx = inner->children[0];
             else
-                node = inner->children[1];
+                node_idx = inner->children[1];
         }
     }
     return elemIdx;

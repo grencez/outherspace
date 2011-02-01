@@ -8,6 +8,7 @@ void output_PBM_image (const char* filename, uint nrows, uint ncols,
                        const uint* hits, uint nelems);
 void output_PGM_image (const char* filename, uint nrows, uint ncols,
                        const uint* hits, uint nelems);
+void readin_wavefront (RaySpace* space, const char* filename);
 
 #include "main.c"
 #endif

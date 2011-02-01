@@ -2,7 +2,7 @@
 #ifndef KDTREE_H_
 #define KDTREE_H_
 
-#include "space.h"
+#include "scene.h"
 
 struct kd_tree_leaf_struct;
 struct kd_tree_inner_struct;
@@ -20,8 +20,8 @@ struct kd_tree_leaf_struct
 struct kd_tree_inner_struct
 {
     real split_pos;
-    KDTreeNode* parent;
-    KDTreeNode* children[2];
+    uint parent;
+    uint children[2];
 };
 struct kd_tree_node_struct
 {
@@ -36,7 +36,8 @@ struct kd_tree_node_struct
 struct kd_tree_struct
 {
     BoundingBox box;
-    KDTreeNode root;
+    uint nnodes;
+    KDTreeNode* nodes;
 };
 typedef struct kd_tree_struct KDTree;
 
@@ -51,15 +52,16 @@ void cleanup_KDTree (KDTree* tree);
 void build_KDTree (KDTree* tree, uint nelems, const Triangle** elems,
                    const Triangle* selems);
 
-const KDTreeNode* find_KDTreeNode (const KDTreeNode** parent_ptr,
-                                   const Point* origin,
-                                   const KDTree* tree);
+uint find_KDTreeNode (uint* ret_parent,
+                      const Point* origin,
+                      const KDTree* tree);
 
-const KDTreeNode* upnext_KDTreeNode (Point* entrance,
-                                     const KDTreeNode** parent_ptr,
-                                     const Point* origin,
-                                     const Point* dir,
-                                     const KDTreeNode* node);
+uint upnext_KDTreeNode (Point* entrance,
+                        uint* ret_parent,
+                        const Point* origin,
+                        const Point* dir,
+                        uint node,
+                        const KDTreeNode* nodes);
 
 #include "kdtree.c"
 #endif

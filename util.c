@@ -1,9 +1,16 @@
 
 #include "util.h"
 
+#include <string.h>
+
 uint index_of (const void* e, const void* arr, size_t size)
 {
     return ((size_t) e - (size_t) arr) / size;
+}
+
+void array_set (void* arr, uint i, const void* e, size_t size)
+{
+    memcpy ((void*) ((size_t) arr + ((size_t) i * size)), e, size);
 }
 
 tristate compare_real (real a, real b)
