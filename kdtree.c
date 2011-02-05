@@ -160,6 +160,268 @@ partition_split (uint nelems, const Triangle** elems,
     *nabove = nelems - l;
 }
 
+struct kdtree_grid_struct
+{
+    uint nintls;
+    uint* intls[NDimensions];
+    real* coords[NDimensions];
+};
+typedef struct kdtree_grid_struct KDTreeGrid;
+
+static
+    void
+init_KDTreeGrid (KDTreeGrid* grid, uint nelems, const Triangle* elems)
+{
+    uint i;
+
+    grid->nintls = 2 * nelems;
+    grid->intls[0] = AllocT( uint, NDimensions * grid->nintls );
+    grid->coords[0] = AllocT( real, NDimensions * grid->nintls );
+
+    UFor( i, NDimensions )
+    {
+        grid->intls[i] = &grid->intls[0][i * grid->nintls];
+        grid->coords[i] = &grid->coords[0][i * grid->nintls];
+    }
+
+    UFor( i, nelems )
+    {
+        uint ti, dim;
+        const Triangle* elem;
+
+        ti = 2*i;
+        elem = &elems[i];
+
+        UFor( dim, NDimensions )
+        {
+            uint pi;
+            real min_coord = Max_real;
+            real max_coord = Min_real;
+
+            UFor( pi, NTrianglePoints )
+            {
+                if (elem->pts[pi].coords[dim] < min_coord)
+                    min_coord = elem->pts[pi].coords[dim];
+                if (elem->pts[pi].coords[dim] > max_coord)
+                    max_coord = elem->pts[pi].coords[dim];
+            }
+
+            grid->intls[dim][ti] = ti;
+            grid->intls[dim][ti+1] = ti+1;
+            grid->coords[dim][ti] = min_coord;
+            grid->coords[dim][ti+1] = max_coord;
+        }
+    }
+}
+
+static
+    void
+cleanup_KDTreeGrid (KDTreeGrid* grid)
+{
+    free (grid->intls[0]);
+    free (grid->coords[0]);
+}
+
+static
+    void
+split_KDTreeGrid (KDTreeGrid* logrid, KDTreeGrid* higrid,
+                  KDTreeGrid* grid,
+                  uint split_dim, real split_pos)
+{
+    uint dim, nintls;
+    const real* bounds;
+
+    assert (split_dim < NDimensions);
+    nintls = grid->nintls;
+    bounds = grid->coords[split_dim];
+
+    assert (even_uint (logrid->nintls));
+    assert (even_uint (higrid->nintls));
+
+    logrid->intls[0] = AllocT( uint, NDimensions * logrid->nintls );
+    higrid->intls[0] = AllocT( uint, NDimensions * higrid->nintls );
+
+    UFor( dim, NDimensions )
+    {
+        uint i, loidx = 0, hiidx = 0;
+        uint* lointls;
+        uint* hiintls;
+
+        logrid->intls[dim] = &logrid->intls[0][dim * logrid->nintls];
+        higrid->intls[dim] = &higrid->intls[0][dim * higrid->nintls];
+
+        logrid->coords[dim] = grid->coords[dim];
+        higrid->coords[dim] = grid->coords[dim];
+
+        lointls = logrid->intls[dim];
+        hiintls = higrid->intls[dim];
+
+        UFor( i, nintls )
+        {
+            uint ti, loti, hiti;
+            ti = lointls[i];
+            if (even_uint (ti))
+            {
+                loti = ti;
+                hiti = ti + 1;
+            }
+            else
+            {
+                loti = ti - 1;
+                hiti = ti;
+            }
+
+            if (bounds[loti] < split_pos)  lointls[loidx++] = ti;
+            if (bounds[hiti] > split_pos)  hiintls[hiidx++] = ti;
+        }
+
+        if (dim == 0)
+        {
+            assert (loidx <= logrid->nintls);
+            assert (hiidx <= higrid->nintls);
+            assert (even_uint (loidx));
+            assert (even_uint (hiidx));
+            if (loidx < logrid->nintls)  logrid->nintls = loidx;
+            if (hiidx < higrid->nintls)  higrid->nintls = hiidx;
+        }
+        else
+        {
+            assert (loidx == logrid->nintls);
+            assert (hiidx == higrid->nintls);
+        }
+    }
+}
+
+static
+    void
+sort_indexed_reals (uint nmembs, uint* indices, real* membs)
+{
+    uint i;
+    UFor( i, nmembs )
+    {
+        uint j, ti;
+        ti = indices[i];
+        UFor( j, i )
+        {
+            uint tj;
+            tj = indices[j];
+
+            if (membs[tj] > membs[ti])
+            {
+                indices[i] = tj;
+                indices[j] = ti;
+                ti = tj;
+            }
+        }
+    }
+    if (nmembs > 1)
+    {
+        UFor( i, nmembs-1 )
+            assert (membs[indices[i]] <= membs[indices[i+1]]);
+    }
+}
+
+static
+    real
+kdtree_cost_fn (uint split_dim, real split_pos,
+                uint nlo, uint nhi,
+                const BoundingBox* box)
+{
+    const real cost_it = 1;  /* Cost of intersection test.*/
+    const real cost_tr = 8;  /* Cost of traversal.*/
+    BoundingBox lo_box, hi_box;
+
+    split_BoundingBox (&lo_box, &hi_box, box, split_dim, split_pos);
+
+    return (cost_tr
+            + cost_it
+            * (nlo * surface_area_BoundingBox (&lo_box) +
+               nhi * surface_area_BoundingBox (&hi_box))
+            / surface_area_BoundingBox (box));
+}
+
+static
+    bool
+determine_split (KDTreeGrid* logrid, KDTreeGrid* higrid,
+                 KDTreeGrid* grid, const BoundingBox* box)
+{
+    const real cost_it = 1;  /* Cost of intersection test.*/
+    uint nelems, nintls;
+    uint dim;
+    real cost_split, cost_nosplit;
+    uint nbelow, nabove, split_dim;
+    real split_pos;
+
+    assert (even_uint (grid->nintls));
+    nintls = grid->nintls;
+    nelems = nintls / 2;
+    cost_split = Max_real;
+    cost_nosplit = cost_it * nelems;
+
+    UFor( dim, NDimensions )
+    {
+        uint i, nlo, nhi;  /* Element counts below and above split line.*/
+        real lo_box, hi_box;
+        const uint* intls;
+        const real* coords;
+
+        nlo = 0;
+        nhi = nelems;
+        lo_box = box->min_corner.coords[dim];
+        hi_box = box->max_corner.coords[dim];
+        intls = grid->intls[dim];
+        coords = grid->coords[dim];
+
+        UFor( i, nintls )
+        {
+            uint ti;
+            ti = intls[i];
+            if (coords[i] <= lo_box)
+            {
+                assert (even_uint (ti));
+                ++ nlo;
+            }
+            else if (coords[i] >= hi_box)
+            {
+                assert (!even_uint (ti));
+                -- nhi;
+            }
+            else
+            {
+                real cost;
+                if (even_uint (ti))
+                {
+                    cost = kdtree_cost_fn (dim, coords[ti], nlo, nhi, box);
+                    ++ nlo;
+                }
+                else
+                {
+                    -- nhi;
+                    cost = kdtree_cost_fn (dim, coords[ti], nlo, nhi, box);
+                }
+
+                if (cost < cost_split)
+                {
+                    cost_split = cost;
+                    split_dim = dim;
+                    split_pos = coords[ti];
+                    nbelow = nlo;
+                    nabove = nhi;
+                }
+            }
+        }
+    }
+
+    if (cost_split > cost_nosplit)  return false;
+
+        /* At this point, split_dim and split_pos are known.*/
+    logrid->nintls = 2 * nbelow;
+    higrid->nintls = 2 * nabove;
+    split_KDTreeGrid (logrid, higrid, grid, split_dim, split_pos);
+
+    return true;
+}
+
 static
     void
 build_KDTreeNode (uint node_idx,
@@ -230,7 +492,6 @@ build_KDTreeNode (uint node_idx,
                               1+depth, selems, lis);
             box->min_corner.coords[node->split_dim] = tmp;
         }
-
     }
     else
     {
@@ -254,6 +515,7 @@ void build_KDTree (KDTree* tree, uint nelems, const Triangle** elems,
 {
     uint i, ei;
     SList lis;
+    KDTreeGrid grid;
 
     assert (nelems > 0);
     UFor( i, NDimensions )
@@ -280,13 +542,19 @@ void build_KDTree (KDTree* tree, uint nelems, const Triangle** elems,
             assert (inside_BoundingBox (&tree->box, &elems[ei]->pts[pi]));
     }
 
+    init_KDTreeGrid (&grid, nelems, selems);
+
+    UFor( i, NDimensions )
+        sort_indexed_reals (nelems, grid.intls[i], grid.coords[i]);
+
     init_SList (&lis);
     build_KDTreeNode (0, 0, &tree->box, nelems, elems, 0, selems, &lis);
 
     tree->nnodes = lis.nmembs;
     tree->nodes = AllocT( KDTreeNode, tree->nnodes );
-    acpy_SList (tree->nodes, &lis, sizeof (KDTreeNode));
-    cleanup_SList (&lis);
+    unroll_SList (tree->nodes, &lis, sizeof (KDTreeNode));
+
+    cleanup_KDTreeGrid (&grid);
 }
 
 uint find_KDTreeNode (uint* ret_parent,

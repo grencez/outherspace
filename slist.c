@@ -14,6 +14,8 @@ void cleanup_SList (SList* l)
 {
     SListNode* node;
     node = l->head;
+    l->head = 0;
+    l->tail = 0;
     while (node)
     {
         SListNode* tmp;
@@ -25,16 +27,22 @@ void cleanup_SList (SList* l)
     }
 }
 
-void acpy_SList (void* dst, const SList* src, size_t size)
+void unroll_SList (void* dst, SList* src, size_t size)
 {
     uint i = 0;
-    const SListNode* node;
+    SListNode* node;
     node = src->head;
+    src->head = 0;
+    src->tail = 0;
     while (node)
     {
+        SListNode* tmp;
         assert (node->car);
         array_set (dst, i++, node->car, size);
+        free (node->car);
+        tmp = node;
         node = node->cdr;
+        free (tmp);
     }
 }
 

@@ -36,6 +36,7 @@ void summ_Point (Point* dst, const Point* a, const Point* b);
 void scale_Point (Point* dst, const Point* a, real k);
 void zero_Point (Point* a);
 void copy_Point (Point* dst, const Point* src);
+void copy_BoundingBox (BoundingBox* dst, const BoundingBox* src);
 real magnitude_Point (const Point* a);
 void normalize_Point (Point* dst, const Point* a);
 void proj_Point (Point* dst, const Point* a, const Point* b);
@@ -53,6 +54,10 @@ bool hit_BoundingBox (Point* entrance,
                       const Point* origin, const Point* dir);
 void adjust_BoundingBox (BoundingBox* box, const Point* point);
 bool inside_BoundingBox (const BoundingBox* box, const Point* point);
+real surface_area_BoundingBox (const BoundingBox* box);
+void split_BoundingBox (BoundingBox* lo_box, BoundingBox* hi_box,
+                        const BoundingBox* box,
+                        uint split_dim, real split_pos);
 
 #include "space.c"
 #endif

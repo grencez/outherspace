@@ -1,6 +1,7 @@
 
 #include "space.h"
 
+#include <assert.h>
 #include <math.h>
 #include <string.h>
 
@@ -81,6 +82,11 @@ void zero_Point (Point* a)
 void copy_Point (Point* dst, const Point* src)
 {
     memcpy (dst, src, sizeof (Point));
+}
+
+void copy_BoundingBox (BoundingBox* dst, const BoundingBox* src)
+{
+    memcpy (dst, src, sizeof (BoundingBox));
 }
 
 void negate_Point (Point* dst, const Point* src)
@@ -341,5 +347,43 @@ bool inside_BoundingBox (const BoundingBox* box, const Point* point)
             inside = false;
     }
     return inside;
+}
+
+real surface_area_BoundingBox (const BoundingBox* box)
+{
+    Point delta;
+    real sum = 0;
+    uint i;
+
+    diff_Point (&delta, &box->max_corner, &box->min_corner);
+
+    UFor( i, NDimensions )
+    {
+        real prod = 1;
+        uint j;
+        UFor( j, NDimensions )
+        {
+            if (i != j)
+            {
+                prod *= delta.coords[j];
+            }
+        }
+        sum += prod;
+    }
+    return 2 * sum;
+}
+
+void split_BoundingBox (BoundingBox* lo_box, BoundingBox* hi_box,
+                        const BoundingBox* box,
+                        uint split_dim, real split_pos)
+{
+    assert (split_pos < box->max_corner.coords[split_dim]);
+    assert (split_pos > box->min_corner.coords[split_dim]);
+
+    copy_BoundingBox (lo_box, box);
+    copy_BoundingBox (hi_box, box);
+
+    lo_box->max_corner.coords[split_dim] = split_pos;
+    hi_box->min_corner.coords[split_dim] = split_pos;
 }
 

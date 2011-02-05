@@ -25,7 +25,7 @@ struct slist_struct
 
 void init_SList (SList* l);
 void cleanup_SList (SList* l);
-void acpy_SList (void* dst, const SList* src, size_t size);
+void unroll_SList (void* dst, SList* src, size_t size);
 
 void app_SList (SList* l, void* data);
 

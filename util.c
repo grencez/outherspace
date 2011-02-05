@@ -13,6 +13,11 @@ void array_set (void* arr, uint i, const void* e, size_t size)
     memcpy ((void*) ((size_t) arr + ((size_t) i * size)), e, size);
 }
 
+bool even_uint (uint a)
+{
+    return 0 == (a & 1);
+}
+
 tristate compare_real (real a, real b)
 {
     if (a > b)  return  1;
