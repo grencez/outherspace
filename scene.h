@@ -16,6 +16,7 @@ struct scene_struct
     uint nelems;
     Point* verts;
     SceneTriangle* elems;
+    BoundingBox box;
 };
 typedef struct scene_struct Scene;
 

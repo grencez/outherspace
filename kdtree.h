@@ -35,7 +35,6 @@ struct kd_tree_node_struct
 
 struct kd_tree_struct
 {
-    BoundingBox box;
     uint nnodes;
     KDTreeNode* nodes;
 };
@@ -49,8 +48,8 @@ void output_KDTree (FILE* out, const KDTree* tree,
 
 void cleanup_KDTree (KDTree* tree);
 
-void build_KDTree (KDTree* tree, uint nelems, const Triangle** elems,
-                   const Triangle* selems);
+void build_KDTree (KDTree* tree, uint nelems, const Triangle* elems,
+                   const BoundingBox* box);
 
 uint find_KDTreeNode (uint* ret_parent,
                       const Point* origin,

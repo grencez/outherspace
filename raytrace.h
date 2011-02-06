@@ -9,8 +9,7 @@
 struct ray_space_struct
 {
     uint nelems;
-    Triangle* selems;
-    const Triangle** elems;
+    Triangle* elems;
     Scene scene;
     KDTree tree;
 };

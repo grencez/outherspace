@@ -5,7 +5,7 @@
 #include <assert.h>
 #include <string.h>
 
-#define MaxKDTreeDepth 2*NDimensions
+#define MaxKDTreeDepth 50
     /* #define MaxKDTreeDepth 0 */
 
 
@@ -99,78 +99,19 @@ void cleanup_KDTree (KDTree* tree)
     }
 }
 
-    /* -1 strictly below, 0 in both, 1 strictly greater or equal */
-static
-    tristate
-splitting_plane (const Triangle* elem, uint split_dim, real split_pos)
-{
-    bool below = false;
-    bool above = false;
-    uint pi;
-    UFor( pi, NTrianglePoints )
-        if (elem->pts[pi].coords[split_dim] < split_pos)
-            below = true;
-        else
-            above = true;
-    if (below && above)  return 0;
-    if (below)           return -1;
-    if (above)           return 1;
-    assert (0);
-    return 0;
-}
-
-static 
-    void
-partition_split (uint nelems, const Triangle** elems,
-                 uint* nbelow, uint* nabove, const KDTreeNode* node)
-{
-    uint ei, l, r;
-    ei = 0;
-    l = 0;
-    r = nelems;
-
-    while (ei < r)
-    {
-        tristate pos;
-        pos = splitting_plane (elems[ei],
-                               node->split_dim, node->as.inner.split_pos);
-        if (pos < 0)
-        {
-            const Triangle* tmp;
-            tmp = elems[l];
-            elems[l] = elems[ei];
-            elems[ei] = tmp;
-            ++ l;
-            ++ ei;
-        }
-        if (pos > 0)
-        {
-            const Triangle* tmp;
-            -- r;
-            tmp = elems[r];
-            elems[r] = elems[ei];
-            elems[ei] = tmp;
-        }
-        if (pos == 0)
-        {
-            ++ ei;
-        }
-    }
-    *nbelow = r;
-    *nabove = nelems - l;
-}
-
 struct kdtree_grid_struct
 {
     uint nintls;
     uint* intls[NDimensions];
     real* coords[NDimensions];
+    BoundingBox box;
 };
 typedef struct kdtree_grid_struct KDTreeGrid;
 
 static
     void
-init_KDTreeGrid (KDTreeGrid* grid, uint nelems, const Triangle* elems)
+init_KDTreeGrid (KDTreeGrid* grid, uint nelems, const Triangle* elems,
+                 const BoundingBox* box)
 {
     uint i;
 
@@ -212,14 +153,18 @@ init_KDTreeGrid (KDTreeGrid* grid, uint nelems, const Triangle* elems)
             grid->coords[dim][ti+1] = max_coord;
         }
     }
+    copy_BoundingBox (&grid->box, box);
 }
 
 static
     void
 cleanup_KDTreeGrid (KDTreeGrid* grid)
 {
-    free (grid->intls[0]);
-    free (grid->coords[0]);
+    if (grid->nintls > 0)
+    {
+        free (grid->intls[0]);
+        free (grid->coords[0]);
+    }
 }
 
 static
@@ -244,22 +189,24 @@ split_KDTreeGrid (KDTreeGrid* logrid, KDTreeGrid* higrid,
     UFor( dim, NDimensions )
     {
         uint i, loidx = 0, hiidx = 0;
+        const uint* intls;
         uint* lointls;
         uint* hiintls;
-
-        logrid->intls[dim] = &logrid->intls[0][dim * logrid->nintls];
-        higrid->intls[dim] = &higrid->intls[0][dim * higrid->nintls];
 
         logrid->coords[dim] = grid->coords[dim];
         higrid->coords[dim] = grid->coords[dim];
 
+        logrid->intls[dim] = &logrid->intls[0][dim * logrid->nintls];
+        higrid->intls[dim] = &higrid->intls[0][dim * higrid->nintls];
+
+        intls = grid->intls[dim];
         lointls = logrid->intls[dim];
         hiintls = higrid->intls[dim];
 
         UFor( i, nintls )
         {
             uint ti, loti, hiti;
-            ti = lointls[i];
+            ti = intls[i];
             if (even_uint (ti))
             {
                 loti = ti;
@@ -271,8 +218,23 @@ split_KDTreeGrid (KDTreeGrid* logrid, KDTreeGrid* higrid,
                 hiti = ti;
             }
 
-            if (bounds[loti] < split_pos)  lointls[loidx++] = ti;
-            if (bounds[hiti] > split_pos)  hiintls[hiidx++] = ti;
+            if (bounds[loti] < split_pos)
+            {
+                assert (loidx < logrid->nintls);
+                lointls[loidx++] = ti;
+            }
+            if (bounds[hiti] > split_pos)
+            {
+                assert (hiidx < higrid->nintls);
+                hiintls[hiidx++] = ti;
+            }
+            /*
+            if (bounds[loti] == split_pos && bounds[hiti] == split_pos && ti == loti)
+            {
+                assert (loidx < logrid->nintls);
+                lointls[loidx++] = ti;
+            }
+            */
         }
 
         if (dim == 0)
@@ -290,35 +252,125 @@ split_KDTreeGrid (KDTreeGrid* logrid, KDTreeGrid* higrid,
             assert (hiidx == higrid->nintls);
         }
     }
+
+    split_BoundingBox (&logrid->box, &higrid->box, &grid->box,
+                       split_dim, split_pos);
+}
+
+static
+    bool
+minimal_unique (uint n, const uint* a)
+{
+    uint i;
+    bool* hits;
+    bool pred = true;
+
+    hits = AllocT( bool, n );
+
+    UFor( i, n )  hits[i] = false;
+    UFor( i, n )
+    {
+        if (a[i] < n)
+            hits[a[i]] = true;
+    }
+    UFor( i, n )
+    {
+        if (!hits[i])
+            pred = false;
+    }
+
+    if (hits)  free (hits);
+    return pred;
 }
 
 static
     void
-sort_indexed_reals (uint nmembs, uint* indices, real* membs)
+sort_intervals (uint nintls, uint* intls, const real* coords)
 {
     uint i;
-    UFor( i, nmembs )
+    assert (even_uint (nintls));
+    assert (minimal_unique (nintls, intls));
+    UFor( i, nintls )
     {
         uint j, ti;
-        ti = indices[i];
+        ti = intls[i];
         UFor( j, i )
         {
             uint tj;
-            tj = indices[j];
+            tj = intls[j];
 
-            if (membs[tj] > membs[ti])
+            if (coords[tj] > coords[ti])
             {
-                indices[i] = tj;
-                indices[j] = ti;
+                intls[i] = tj;
+                intls[j] = ti;
                 ti = tj;
+                assert (intls[i] != intls[j]);
             }
         }
     }
-    if (nmembs > 1)
+    if (nintls > 0)
     {
-        UFor( i, nmembs-1 )
-            assert (membs[indices[i]] <= membs[indices[i+1]]);
+        real v;
+        uint trac;
+        v = coords[intls[0]];
+        trac = 0;
+
+            /* For a single value, internals must end before new ones begin.*/
+        UFor( i, nintls )
+        {
+            uint ti;
+            ti = intls[i];
+            if (coords[ti] != v)
+            {
+                v = coords[ti];
+                trac = i;
+            }
+
+            if (!even_uint (ti))
+            {
+                if (trac != i)
+                {
+                    assert (even_uint (intls[trac]));
+                    intls[i] = intls[trac];
+                    intls[trac] = ti;
+                }
+                trac += 1;
+            }
+        }
     }
+    if (nintls > 0)
+    {
+        UFor( i, nintls-1 )
+        {
+            assert (coords[intls[i]] <= coords[intls[i+1]]);
+            if (coords[intls[i]] == coords[intls[i+1]])
+            {
+                if (!even_uint (intls[i+1]))
+                    assert (!even_uint (intls[i]));
+            }
+        }
+    }
+#if 0
+        /* Finally, if any intervals have zero width,
+         * assure the start comes before the end.
+         */
+    UFor( i, nintls )
+    {
+        uint ti;
+        ti = intls[i];
+        if (even_uint (ti))
+        {
+            if (coords[ti] == coords[ti+1])
+                intls[i] = ti+1;
+        }
+        else
+        {
+            if (coords[ti] == coords[ti-1])
+                intls[i] = ti-1;
+        }
+    }
+#endif
+    assert (minimal_unique (nintls, intls));
 }
 
 static
@@ -341,9 +393,8 @@ kdtree_cost_fn (uint split_dim, real split_pos,
 }
 
 static
-    bool
-determine_split (KDTreeGrid* logrid, KDTreeGrid* higrid,
-                 KDTreeGrid* grid, const BoundingBox* box)
+    uint
+determine_split (KDTreeGrid* logrid, KDTreeGrid* higrid, KDTreeGrid* grid)
 {
     const real cost_it = 1;  /* Cost of intersection test.*/
     uint nelems, nintls;
@@ -367,8 +418,8 @@ determine_split (KDTreeGrid* logrid, KDTreeGrid* higrid,
 
         nlo = 0;
         nhi = nelems;
-        lo_box = box->min_corner.coords[dim];
-        hi_box = box->max_corner.coords[dim];
+        lo_box = grid->box.min_corner.coords[dim];
+        hi_box = grid->box.max_corner.coords[dim];
         intls = grid->intls[dim];
         coords = grid->coords[dim];
 
@@ -376,30 +427,30 @@ determine_split (KDTreeGrid* logrid, KDTreeGrid* higrid,
         {
             uint ti;
             ti = intls[i];
-            if (coords[i] <= lo_box)
+            if (coords[ti] <= lo_box || coords[ti] >= hi_box)
             {
-                assert (even_uint (ti));
-                ++ nlo;
-            }
-            else if (coords[i] >= hi_box)
-            {
-                assert (!even_uint (ti));
-                -- nhi;
-            }
-            else
-            {
-                real cost;
                 if (even_uint (ti))
                 {
-                    cost = kdtree_cost_fn (dim, coords[ti], nlo, nhi, box);
+                    assert (nlo < nelems);
                     ++ nlo;
                 }
                 else
                 {
+                    assert (nhi > 0);
                     -- nhi;
-                    cost = kdtree_cost_fn (dim, coords[ti], nlo, nhi, box);
+                }
+            }
+            else
+            {
+                real cost;
+
+                if (!even_uint (ti))
+                {
+                    assert (nhi > 0);
+                    -- nhi;
                 }
 
+                cost = kdtree_cost_fn (dim, coords[ti], nlo, nhi, &grid->box);
                 if (cost < cost_split)
                 {
                     cost_split = cost;
@@ -408,42 +459,76 @@ determine_split (KDTreeGrid* logrid, KDTreeGrid* higrid,
                     nbelow = nlo;
                     nabove = nhi;
                 }
+
+                if (even_uint (ti))
+                {
+                    assert (nlo < nelems);
+                    ++ nlo;
+                }
             }
         }
+        assert (nlo == nelems);
+        assert (nhi == 0);
     }
 
-    if (cost_split > cost_nosplit)  return false;
+    if (cost_split > cost_nosplit)  return NDimensions;
 
         /* At this point, split_dim and split_pos are known.*/
     logrid->nintls = 2 * nbelow;
     higrid->nintls = 2 * nabove;
     split_KDTreeGrid (logrid, higrid, grid, split_dim, split_pos);
 
-    return true;
+    return split_dim;
 }
 
 static
     void
-build_KDTreeNode (uint node_idx,
-                  uint parent, BoundingBox* box,
-                  uint nelems, const Triangle** elems,
-                  uint depth, const Triangle* selems,
-                  SList* lis)
+build_KDTreeNode (uint node_idx, uint parent,
+                  KDTreeGrid* grid,
+                  uint depth, SList* lis)
 {
+    KDTreeGrid logrid, higrid;
     KDTreeNode* node;
     node = AllocT( KDTreeNode, 1 );
     app_SList (lis, node);
         /* printf ("%*sdepth=%u, nelems=%u\n", depth, "", depth, nelems); */
-    if (depth < MaxKDTreeDepth)
+
+    if (depth >= MaxKDTreeDepth)
     {
-        uint nbelow, nabove;
+        node->split_dim = NDimensions;
+    }
+    else
+    {
+        node->split_dim = determine_split (&logrid, &higrid, grid);
+    }
+
+    if (node->split_dim == NDimensions)
+    {
+        KDTreeLeaf* leaf;
+        leaf = &node->as.leaf;
+        copy_BoundingBox (&leaf->box, &grid->box);
+
+        assert (even_uint (grid->nintls));
+        leaf->nelems = grid->nintls / 2;
+
+        if (0 != leaf->nelems)
+        {
+            uint i, li = 0;
+            leaf->elems = AllocT( uint, leaf->nelems );
+            UFor( i, grid->nintls )
+            {
+                uint ti;
+                ti = grid->intls[0][i];
+                if (even_uint (ti))  leaf->elems[li++] = ti / 2;
+            }
+        }
+    }
+    else
+    {
         KDTreeInner* inner;
         inner = &node->as.inner;
-        node->split_dim = depth % NDimensions;
-            /* node->split_dim = depth % 2; */
-        inner->split_pos = 0.5 * (box->min_corner.coords[node->split_dim] +
-                                  box->max_corner.coords[node->split_dim]);
-        partition_split (nelems, elems, &nbelow, &nabove, node);
+        inner->parent = parent;
+        inner->split_pos = logrid.box.max_corner.coords[node->split_dim];
 
 #if 0
         {
@@ -452,7 +537,7 @@ build_KDTreeNode (uint node_idx,
             fprintf (out, "%*sdim:%u pos:%.1f  blw:%u abv:%u\n",
                      2*depth, "",
                      node->split_dim, inner->split_pos,
-                     nbelow, nabove);
+                     logrid->nintls/2, higrid->nintls/2);
             fprintf (out, "%*s", 2*depth+1, "");
             output_BoundingBox (out, box);
             UFor( i, nelems )
@@ -464,91 +549,42 @@ build_KDTreeNode (uint node_idx,
         }
 #endif
 
-        inner->parent = parent;
 
-        {
-            real tmp;
-            const Triangle** blw_elems;
+        inner->children[0] = lis->nmembs;
+        build_KDTreeNode (inner->children[0], node_idx,
+                          &logrid, 1+depth, lis);
+        inner->children[1] = lis->nmembs;
+        build_KDTreeNode (inner->children[1], node_idx,
+                          &higrid, 1+depth, lis);
 
-            blw_elems = (const Triangle**)
-                malloc (nbelow * sizeof (Triangle*));
-            memcpy (blw_elems, elems, nbelow * sizeof (Triangle*));
-
-            tmp = box->max_corner.coords[node->split_dim];
-            box->max_corner.coords[node->split_dim] = inner->split_pos;
-            inner->children[0] = lis->nmembs;
-            build_KDTreeNode (inner->children[0], node_idx,
-                              box, nbelow, blw_elems,
-                              1+depth, selems, lis);
-            box->max_corner.coords[node->split_dim] = tmp;
-
-            free (blw_elems);
-
-            tmp = box->min_corner.coords[node->split_dim];
-            box->min_corner.coords[node->split_dim] = inner->split_pos;
-            inner->children[1] = lis->nmembs;
-            build_KDTreeNode (inner->children[1], node_idx,
-                              box, nabove, &elems[nelems-nabove],
-                              1+depth, selems, lis);
-            box->min_corner.coords[node->split_dim] = tmp;
-        }
-    }
-    else
-    {
-        KDTreeLeaf* leaf;
-        leaf = &node->as.leaf;
-        node->split_dim = NDimensions;
-        memcpy (&leaf->box, box, sizeof (BoundingBox));
-        leaf->nelems = nelems;
-        if (0 != nelems)
-        {
-            uint i;
-            leaf->elems = AllocT( uint, nelems );
-            UFor( i, nelems )
-                leaf->elems[i] = index_of (elems[i], selems, sizeof (Triangle));
-        }
+        if (logrid.nintls > 0)  free (logrid.intls[0]);
+        if (higrid.nintls > 0)  free (higrid.intls[0]);
     }
 }
 
-void build_KDTree (KDTree* tree, uint nelems, const Triangle** elems,
-                   const Triangle* selems)
+void build_KDTree (KDTree* tree, uint nelems, const Triangle* elems,
+                   const BoundingBox* box)
 {
     uint i, ei;
     SList lis;
     KDTreeGrid grid;
 
     assert (nelems > 0);
-    UFor( i, NDimensions )
-    {
-        real x;
-        x = elems[0]->pts[0].coords[i];
-        tree->box.min_corner.coords[i] = x;
-        tree->box.max_corner.coords[i] = x;
-        tree->box.min_corner.coords[i] = 0;
-        tree->box.max_corner.coords[i] = 100;
-    }
 
     UFor( ei, nelems )
     {
         uint pi;
         UFor( pi, NTrianglePoints )
-            adjust_BoundingBox (&tree->box, &elems[ei]->pts[pi]);
+            assert (inside_BoundingBox (box, &elems[ei].pts[pi]));
     }
 
-    UFor( ei, nelems )
-    {
-        uint pi;
-        UFor( pi, NTrianglePoints )
-            assert (inside_BoundingBox (&tree->box, &elems[ei]->pts[pi]));
-    }
-
-    init_KDTreeGrid (&grid, nelems, selems);
+    init_KDTreeGrid (&grid, nelems, elems, box);
 
     UFor( i, NDimensions )
-        sort_indexed_reals (nelems, grid.intls[i], grid.coords[i]);
+        sort_intervals (grid.nintls, grid.intls[i], grid.coords[i]);
 
     init_SList (&lis);
-    build_KDTreeNode (0, 0, &tree->box, nelems, elems, 0, selems, &lis);
+    build_KDTreeNode (0, 0, &grid, 0, &lis);
 
     tree->nnodes = lis.nmembs;
     tree->nodes = AllocT( KDTreeNode, tree->nnodes );

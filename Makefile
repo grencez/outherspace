@@ -1,12 +1,14 @@
 
 
 CFLAGS = -g3
+#CFLAGS = -g -O2
+
 CFLAGS = -O3
+CFLAGS += -fopenmp
 #CFLAGS += -DNDEBUG
 
 CFLAGS += -ansi -pedantic
 CFLAGS += -Wall -Wextra
-CFLAGS += -fopenmp
 
 #CFLAGS += -funsafe-loop-optimizations
 #CFLAGS += -fstrict-aliasing

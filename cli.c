@@ -10,17 +10,29 @@ int main ()
     PointXfrm view_basis;
 
     out = stdout;
-    random_RaySpace (&space, 50);
-        /* random_RaySpace (&space, 2); */
-    
     zero_Point (&view_origin);
+
+#if 1
+    random_RaySpace (&space, 50);
+    
     view_origin.coords[0] = 50;
     view_origin.coords[1] = 50;
     view_origin.coords[2] = -70;
+#else
+    {
+        bool good = readin_wavefront (&space, "sample.obj");
+        if (!good)  return 1;
+    }
 
+    view_origin.coords[0] = 0;
+    view_origin.coords[1] = 0;
+    view_origin.coords[2] = -10;
+#endif
+
+    build_KDTree (&space.tree, space.nelems, space.elems, &space.scene.box);
     identity_PointXfrm (&view_basis);
 
-        /* output_KDTree (out, &space.tree, space.nelems, space.selems); */
+    output_KDTree (out, &space.tree, space.nelems, space.elems);
 
     {
         uint* hits;

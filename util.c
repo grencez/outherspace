@@ -1,6 +1,7 @@
 
 #include "util.h"
 
+#include <assert.h>
 #include <string.h>
 
 uint index_of (const void* e, const void* arr, size_t size)
@@ -37,5 +38,32 @@ tristate mul_signum (real a, real b)
     if (a == b)
         return 1;
     return -1;
+}
+
+char* strto_uint (uint* ret, const char* in)
+{
+    unsigned long v;
+    char* out = 0;
+
+    assert (ret);
+    assert (in);
+    v = strtoul (in, &out, 10);
+
+    if (v > Max_uint)  out = 0;
+    if (out)  *ret = (uint) v;
+    return out;
+}
+
+char* strto_real (real* ret, const char* in)
+{
+    double v;
+    char* out = 0;
+
+    assert (ret);
+    assert (in);
+    v = strtod (in, &out);
+
+    if (out)  *ret = (real) v;
+    return out;
 }
 

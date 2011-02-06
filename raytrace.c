@@ -13,7 +13,6 @@ void cleanup_RaySpace (RaySpace* space)
     if (space->nelems > 0)
     {
         free (space->elems);
-        free (space->selems);
     }
 }
 
@@ -212,10 +211,10 @@ uint cast_ray (const Point* origin,
     }
     else
     {
-        if (! hit_outer_BoundingBox (entrance, &tree->box, origin, dir))
+        box = &space->scene.box;
+        if (! hit_outer_BoundingBox (entrance, box, origin, dir))
             return space->scene.nelems;
         node_idx = 0;
-        box = &tree->box;
     }
 
     while (1)
@@ -239,7 +238,7 @@ uint cast_ray (const Point* origin,
                 Point hit;
                 real mag;
                 const Triangle* tri;
-                tri = &space->selems[leaf->elems[i]];
+                tri = &space->elems[leaf->elems[i]];
                     /* Triangle tri; */
                     /* elem_Scene (&tri, &space->scene, leaf->elems[i]); */
 
@@ -310,9 +309,6 @@ void rays_to_hits_fish (uint* hits, uint nrows, uint ncols,
     Point origin, tdir;
     real col_start, row_start;
     real col_delta, row_delta;
-    const KDTree* tree;
-
-    tree = &space->tree;
 
     row_start = - M_PI / 3;
     row_delta = 2 * M_PI / (3 * nrows);
@@ -330,7 +326,7 @@ void rays_to_hits_fish (uint* hits, uint nrows, uint ncols,
     tdir.coords[row_dim] = 0;
     tdir.coords[col_dim] = 0;
 
-    inside_box = inside_BoundingBox (&tree->box, &origin);
+    inside_box = inside_BoundingBox (&space->scene.box, &origin);
 
 #pragma omp parallel for
     UFor( row, nrows )
@@ -376,20 +372,20 @@ void rays_to_hits_perspective (uint* hits, uint nrows, uint ncols,
     Point origin, tdir;
     real col_start, row_start;
     real col_delta, row_delta;
-    const KDTree* tree;
+    const BoundingBox* box;
 
-    tree = &space->tree;
+    box = &space->scene.box;
 
-    row_start = tree->box.min_corner.coords[row_dim];
-    row_delta = (tree->box.max_corner.coords[row_dim] - row_start) / nrows;
+    row_start = space->scene.box.min_corner.coords[row_dim];
+    row_delta = (box->max_corner.coords[row_dim] - row_start) / nrows;
     row_start += row_delta / 2;
 
-    col_start = tree->box.min_corner.coords[col_dim];
-    col_delta = (tree->box.max_corner.coords[col_dim] - col_start) / ncols;
+    col_start = box->min_corner.coords[col_dim];
+    col_delta = (box->max_corner.coords[col_dim] - col_start) / ncols;
     col_start += col_delta / 2;
 
-    inside_box = (zpos > tree->box.min_corner.coords[dir_dim] &&
-                  zpos < tree->box.max_corner.coords[dir_dim]);
+    inside_box = (zpos > box->min_corner.coords[dir_dim] &&
+                  zpos < box->max_corner.coords[dir_dim]);
 
     origin.coords[dir_dim] = zpos;
     origin.coords[row_dim] = 50;
@@ -399,7 +395,7 @@ void rays_to_hits_perspective (uint* hits, uint nrows, uint ncols,
     tdir.coords[row_dim] = 0;
     tdir.coords[col_dim] = 0;
 
-    inside_box = inside_BoundingBox (&tree->box, &origin);
+    inside_box = inside_BoundingBox (box, &origin);
 
 #pragma omp parallel for
     UFor( row, nrows )
@@ -439,20 +435,20 @@ void rays_to_hits_plane (uint* hits, uint nrows, uint ncols,
     const uint col_dim = 0;
     real col_start, row_start;
     real col_delta, row_delta;
-    const KDTree* tree;
+    const BoundingBox* box;
 
-    tree = &space->tree;
+    box = &space->scene.box;
 
-    row_start = tree->box.min_corner.coords[row_dim];
-    row_delta = (tree->box.max_corner.coords[row_dim] - row_start) / nrows;
+    row_start = box->min_corner.coords[row_dim];
+    row_delta = (box->max_corner.coords[row_dim] - row_start) / nrows;
     row_start += row_delta / 2;
 
-    col_start = tree->box.min_corner.coords[col_dim];
-    col_delta = (tree->box.max_corner.coords[col_dim] - col_start) / ncols;
+    col_start = box->min_corner.coords[col_dim];
+    col_delta = (box->max_corner.coords[col_dim] - col_start) / ncols;
     col_start += col_delta / 2;
 
-    inside_box = (zpos > tree->box.min_corner.coords[dir_dim] &&
-                  zpos < tree->box.max_corner.coords[dir_dim]);
+    inside_box = (zpos > box->min_corner.coords[dir_dim] &&
+                  zpos < box->max_corner.coords[dir_dim]);
 
 #pragma omp parallel for
     UFor( row, nrows )
@@ -487,10 +483,10 @@ void rays_to_hits (uint* hits, uint nrows, uint ncols,
     uint row;
     bool inside_box;
     Point dir_start, row_delta, col_delta;
-    const KDTree* tree;
     const uint dir_dim = 2, row_dim = 1, col_dim = 0;
+    const BoundingBox* box;
 
-    tree = &space->tree;
+    box = &space->scene.box;
 
     {
         Point dstart, rdelta, cdelta;
@@ -516,7 +512,7 @@ void rays_to_hits (uint* hits, uint nrows, uint ncols,
         trxfrm_Point (&col_delta, view_basis, &cdelta);
     }
 
-    inside_box = inside_BoundingBox (&tree->box, origin);
+    inside_box = inside_BoundingBox (box, origin);
 
 #pragma omp parallel for
     UFor( row, nrows )

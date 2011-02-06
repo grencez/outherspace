@@ -324,6 +324,33 @@ bool hit_BoundingBox (Point* entrance,
     return true;
 }
 
+void init_BoundingBox (BoundingBox* box, uint npoints, const Point* points)
+{
+    uint i;
+
+    if (npoints == 0)
+    {
+        zero_Point (&box->min_corner);
+        zero_Point (&box->max_corner);
+    }
+    else
+    {
+        copy_Point (&box->min_corner, &points[0]);
+        copy_Point (&box->max_corner, &points[0]);
+    }
+
+    UFor( i, npoints )
+        adjust_BoundingBox (box, &points[i]);
+
+#if 0
+    UFor( i, NDimensions )
+    {
+        box->min_corner.coords[i] -= 120;
+        box->max_corner.coords[i] += 120;
+    }
+#endif
+}
+
 void adjust_BoundingBox (BoundingBox* box, const Point* point)
 {
     uint i;

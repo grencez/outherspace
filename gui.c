@@ -271,13 +271,27 @@ int main (int argc, char* argv[])
         /* GtkWidget *da; */
 
     zero_Point (&view_origin);
+
+#if 1
     view_origin.coords[0] = 50;
     view_origin.coords[1] = 50;
     view_origin.coords[2] = -1;
-    identity_PointXfrm (&view_basis);
 
     random_RaySpace (&space, 20);
-        /* random_RaySpace (&space, 2); */
+#else
+    {
+        bool good = readin_wavefront (&space, "sample.obj");
+        if (!good)  return 1;
+    }
+
+    view_origin.coords[0] = 0;
+    view_origin.coords[1] = 0;
+    view_origin.coords[2] = -10;
+#endif
+
+    build_KDTree (&space.tree, space.nelems, space.elems, &space.scene.box);
+    output_KDTree (stderr, &space.tree, space.nelems, space.elems);
+    identity_PointXfrm (&view_basis);
 
     gtk_init (&argc, &argv);
 

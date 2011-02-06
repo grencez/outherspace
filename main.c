@@ -1,5 +1,6 @@
 
 #include "main.h"
+#include "slist.h"
 
 #include <assert.h>
 #include <time.h>
@@ -35,7 +36,9 @@ Triangle* random_Triangles (uint nelems, const BoundingBox* box)
 void random_RaySpace (RaySpace* space, uint nelems)
 {
     uint i;
-    BoundingBox box;
+    BoundingBox* box;
+
+    box = &space->scene.box;
 
     {
         unsigned seed = 1294785237;
@@ -47,15 +50,14 @@ void random_RaySpace (RaySpace* space, uint nelems)
 
     UFor( i, NDimensions )
     {
-        box.min_corner.coords[i] = 0;
-        box.max_corner.coords[i] = 100;
+        box->min_corner.coords[i] = 0;
+        box->max_corner.coords[i] = 100;
     }
 
     space->nelems = nelems;
 
-    space->selems = random_Triangles (nelems, &box);
+    space->elems = random_Triangles (nelems, box);
 
-    space->elems = AllocT( const Triangle*, nelems );
     space->scene.nverts = NTrianglePoints * nelems;
     space->scene.nelems = nelems;
     space->scene.verts = AllocT( Point, space->scene.nverts );
@@ -64,17 +66,14 @@ void random_RaySpace (RaySpace* space, uint nelems)
     UFor( i, nelems )
     {
         uint pi, offset;
-        space->elems[i] = &space->selems[i];
         offset = i * NTrianglePoints;
         UFor( pi, NTrianglePoints )
         {
             copy_Point (&space->scene.verts[pi + offset],
-                        &space->selems[i].pts[pi]);
+                        &space->elems[i].pts[pi]);
             space->scene.elems[i].pts[pi] = pi + offset;
         }
     }
-
-    build_KDTree (&space->tree, nelems, space->elems, space->selems);
 }
 
 void output_PBM_image (const char* filename, uint nrows, uint ncols,
@@ -127,25 +126,117 @@ void output_PGM_image (const char* filename, uint nrows, uint ncols,
     fclose (out);
 }
 
-void readin_wavefront (RaySpace* space, const char* filename)
+bool readin_wavefront (RaySpace* space, const char* filename)
 {
-    FILE* in;
-    size_t size;
-    Scene* scene;
+    uint len = BUFSIZ;
     char buf[BUFSIZ];
+    bool good = true;
+    const char* line;
+    FILE* in;
+    SList vertlist, elemlist;
+    Scene* scene;
 
-    assert (0); /* don't call this function */
+    buf[len-1] = 0;
+
     scene = &space->scene;
 
     in = fopen (filename, "rb");
-    assert (in);
+    if (!in)  return false;
 
-    size = fread (buf, sizeof(char), size, in);
+    init_SList (&vertlist);
+    init_SList (&elemlist);
 
-    scene->nverts = 0;
-    scene->nelems = 0;
+    for (line = fgets (buf, len, in);
+         good && line;
+         line = fgets (buf, len, in))
+    {
+        uint i;
+        line = strpbrk (buf, "#fv");
+        if (!line)  continue;
+        if (line[0] == '#')  continue;
 
-
+        if (line[0] == 'v')
+        {
+            Point* vert;
+            vert = AllocT( Point, 1 );
+            app_SList (&vertlist, vert);
+            line = &line[1];
+            UFor( i, NDimensions )
+            {
+                line = strto_real (&vert->coords[i], line);
+                if (!line)
+                {
+                    good = false;
+                    break;
+                }
+            }
+        }
+        else
+        {
+            SceneTriangle* tri;
+            assert (line[0] == 'f');
+            tri = AllocT( SceneTriangle, 1 );
+            app_SList (&elemlist, tri);
+            line = &line[1];
+            UFor( i, NTrianglePoints )
+            {
+                line = strto_uint (&tri->pts[i], line);
+                if (!line)
+                {
+                    good = false;
+                    break;
+                }
+            }
+        }
+    }
     fclose (in);
+
+    if (!good)
+    {
+        cleanup_SList (&vertlist);
+        cleanup_SList (&elemlist);
+    }
+    else
+    {
+        uint ei;
+
+        scene->nverts = vertlist.nmembs;
+        scene->nelems = elemlist.nmembs;
+        scene->verts = AllocT( Point, vertlist.nmembs );
+        scene->elems = AllocT( SceneTriangle, elemlist.nmembs );
+        unroll_SList (scene->verts, &vertlist, sizeof (Point));
+        unroll_SList (scene->elems, &elemlist, sizeof (SceneTriangle));
+
+        space->nelems = scene->nelems;
+        space->elems = AllocT( Triangle, space->nelems );
+
+        UFor( ei, scene->nelems )
+        {
+            uint pi;
+            SceneTriangle* read_tri;
+            Triangle* tri;
+
+            read_tri = &scene->elems[ei];
+            tri = &space->elems[ei];
+
+            UFor( pi, NTrianglePoints )
+            {
+                uint vert_id;
+                vert_id = read_tri->pts[pi];
+                if (vert_id == 0 || vert_id > scene->nelems)
+                    good = false;
+                else
+                    copy_Point (&tri->pts[pi], &scene->verts[vert_id-1]);
+            }
+        }
+
+        if (!good)
+            free (space->elems);
+    }
+
+    if (good)
+        init_BoundingBox (&scene->box, scene->nverts, scene->verts);
+
+    return good;
 }
 
