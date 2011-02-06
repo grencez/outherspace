@@ -89,6 +89,23 @@ hit_tri (Point* hit,
     }
     return inbounds;
 }
+
+static
+    bool
+closer_hit (const Point* newhit, const Point* oldhit, const Point* dir)
+{
+    uint i;
+    UFor( i, NDimensions )
+    {
+        tristate sign;
+        sign = signum_real (dir->coords[i]);
+        if (sign != 0)
+            return sign == compare_real (oldhit->coords[i],
+                                         newhit->coords[i]);
+    }
+    return false;
+}
+
 #else
 
 
@@ -169,22 +186,6 @@ hit_tri (real* dist,
 #endif
 
 
-static
-    bool
-closer_hit (const Point* newhit, const Point* oldhit, const Point* dir)
-{
-    uint i;
-    UFor( i, NDimensions )
-    {
-        tristate sign;
-        sign = signum_real (dir->coords[i]);
-        if (sign != 0)
-            return sign == compare_real (oldhit->coords[i],
-                                         newhit->coords[i]);
-    }
-    return false;
-}
-
 uint cast_ray (const Point* origin,
                const Point* dir,
                const RaySpace* space,
@@ -192,15 +193,17 @@ uint cast_ray (const Point* origin,
 {
     Point salo_entrance;
     uint node_idx, parent = 0;
-
+    real hit_mag;
+    uint hit_idx;
     const BoundingBox* box;
     Point* entrance;
     const KDTree* tree;
-    uint elemIdx;
 
     entrance = &salo_entrance;
     tree = &space->tree;
-    elemIdx = space->scene.nelems;
+
+    hit_mag = Max_real;
+    hit_idx = space->scene.nelems;
 
     if (inside_box)
     {
@@ -226,7 +229,6 @@ uint cast_ray (const Point* origin,
         {
             uint i;
             const KDTreeLeaf* leaf;
-            Point close_hit;
 
             leaf = &node->as.leaf;
             box = &leaf->box;
@@ -235,7 +237,6 @@ uint cast_ray (const Point* origin,
 
             UFor( i, leaf->nelems )
             {
-                Point hit;
                 real mag;
                 const Triangle* tri;
                 tri = &space->elems[leaf->elems[i]];
@@ -244,36 +245,29 @@ uint cast_ray (const Point* origin,
 
                 if (!hit_tri (&mag, origin, dir, tri))  continue;
 
-                scale_Point (&hit, dir, mag);
-                summ_Point (&hit, &hit, origin);
 
-                if (!inside_BoundingBox (box, &hit))  continue;
-#if 0
-                if (!inside_BoundingBox (box, &hit))
+                if (mag < hit_mag)
                 {
-                    output_BoundingBox (stderr, box);
-                    fputs ("\n", stderr);
-                    output_Point (stderr, origin);
-                    fputs (" => ", stderr);
-                    output_Point (stderr, &hit);
-                    fputs ("\n", stderr);
-                }
-#endif
-                if (elemIdx != space->scene.nelems)
-                {
-                    if (closer_hit (&hit, &close_hit, dir))
-                    {
-                        elemIdx = leaf->elems[i];
-                        copy_Point (&close_hit, &hit);
-                    }
-                }
-                else
-                {
-                    elemIdx = leaf->elems[i];
-                    copy_Point (&close_hit, &hit);
+                    hit_mag = mag;
+                    hit_idx = leaf->elems[i];
                 }
             }
-            if (elemIdx != space->scene.nelems)  break;
+
+            if (hit_mag != Max_real)
+            {
+                Point hit;
+                scale_Point (&hit, dir, hit_mag);
+                summ_Point (&hit, &hit, origin);
+                if (inside_BoundingBox (box, &hit))  break;
+#if 0
+                output_BoundingBox (stderr, box);
+                fputs ("\n", stderr);
+                output_Point (stderr, origin);
+                fputs (" => ", stderr);
+                output_Point (stderr, &hit);
+                fputs ("\n", stderr);
+#endif
+            }
 
             node_idx = upnext_KDTreeNode (entrance, &parent,
                                           origin, dir, node_idx, tree->nodes);
@@ -295,7 +289,7 @@ uint cast_ray (const Point* origin,
                 node_idx = inner->children[1];
         }
     }
-    return elemIdx;
+    return hit_idx;
 }
 
 void rays_to_hits_fish (uint* hits, uint nrows, uint ncols,
