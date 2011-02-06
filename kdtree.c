@@ -171,7 +171,7 @@ static
     void
 split_KDTreeGrid (KDTreeGrid* logrid, KDTreeGrid* higrid,
                   KDTreeGrid* grid,
-                  uint split_dim, real split_pos)
+                  uint split_dim, real split_pos, bool split_low)
 {
     uint dim, nintls;
     const real* bounds;
@@ -218,39 +218,36 @@ split_KDTreeGrid (KDTreeGrid* logrid, KDTreeGrid* higrid,
                 hiti = ti;
             }
 
-            if (bounds[loti] < split_pos)
+            if (bounds[loti] == split_pos && bounds[hiti] == split_pos)
             {
-                assert (loidx < logrid->nintls);
-                lointls[loidx++] = ti;
+                if (split_low)
+                {
+                    assert (loidx < logrid->nintls);
+                    lointls[loidx++] = ti;
+                }
+                else
+                {
+                    assert (hiidx < higrid->nintls);
+                    hiintls[hiidx++] = ti;
+                }
             }
-            if (bounds[hiti] > split_pos)
+            else
             {
-                assert (hiidx < higrid->nintls);
-                hiintls[hiidx++] = ti;
+                if (bounds[loti] < split_pos)
+                {
+                    assert (loidx < logrid->nintls);
+                    lointls[loidx++] = ti;
+                }
+                if (bounds[hiti] > split_pos)
+                {
+                    assert (hiidx < higrid->nintls);
+                    hiintls[hiidx++] = ti;
+                }
             }
-            /*
-            if (bounds[loti] == split_pos && bounds[hiti] == split_pos && ti == loti)
-            {
-                assert (loidx < logrid->nintls);
-                lointls[loidx++] = ti;
-            }
-            */
         }
 
-        if (dim == 0)
-        {
-            assert (loidx <= logrid->nintls);
-            assert (hiidx <= higrid->nintls);
-            assert (even_uint (loidx));
-            assert (even_uint (hiidx));
-            if (loidx < logrid->nintls)  logrid->nintls = loidx;
-            if (hiidx < higrid->nintls)  higrid->nintls = hiidx;
-        }
-        else
-        {
-            assert (loidx == logrid->nintls);
-            assert (hiidx == higrid->nintls);
-        }
+        assert (loidx == logrid->nintls);
+        assert (hiidx == higrid->nintls);
     }
 
     split_BoundingBox (&logrid->box, &higrid->box, &grid->box,
@@ -283,6 +280,7 @@ minimal_unique (uint n, const uint* a)
     return pred;
 }
 
+
 static
     void
 sort_intervals (uint nintls, uint* intls, const real* coords)
@@ -308,70 +306,19 @@ sort_intervals (uint nintls, uint* intls, const real* coords)
             }
         }
     }
-    if (nintls > 0)
-    {
-        real v;
-        uint trac;
-        v = coords[intls[0]];
-        trac = 0;
-
-            /* For a single value, internals must end before new ones begin.*/
-        UFor( i, nintls )
-        {
-            uint ti;
-            ti = intls[i];
-            if (coords[ti] != v)
-            {
-                v = coords[ti];
-                trac = i;
-            }
-
-            if (!even_uint (ti))
-            {
-                if (trac != i)
-                {
-                    assert (even_uint (intls[trac]));
-                    intls[i] = intls[trac];
-                    intls[trac] = ti;
-                }
-                trac += 1;
-            }
-        }
-    }
+    assert (minimal_unique (nintls, intls));
     if (nintls > 0)
     {
         UFor( i, nintls-1 )
         {
-            assert (coords[intls[i]] <= coords[intls[i+1]]);
-            if (coords[intls[i]] == coords[intls[i+1]])
-            {
-                if (!even_uint (intls[i+1]))
-                    assert (!even_uint (intls[i]));
-            }
+            uint ti, tj;
+            ti = intls[i];
+            tj = intls[i+1];
+            assert (coords[ti] <= coords[tj]);
         }
     }
-#if 0
-        /* Finally, if any intervals have zero width,
-         * assure the start comes before the end.
-         */
-    UFor( i, nintls )
-    {
-        uint ti;
-        ti = intls[i];
-        if (even_uint (ti))
-        {
-            if (coords[ti] == coords[ti+1])
-                intls[i] = ti+1;
-        }
-        else
-        {
-            if (coords[ti] == coords[ti-1])
-                intls[i] = ti-1;
-        }
-    }
-#endif
-    assert (minimal_unique (nintls, intls));
 }
+
 
 static
     real
@@ -402,6 +349,7 @@ determine_split (KDTreeGrid* logrid, KDTreeGrid* higrid, KDTreeGrid* grid)
     real cost_split, cost_nosplit;
     uint nbelow, nabove, split_dim;
     real split_pos;
+    bool split_low;
 
     assert (even_uint (grid->nintls));
     nintls = grid->nintls;
@@ -415,6 +363,7 @@ determine_split (KDTreeGrid* logrid, KDTreeGrid* higrid, KDTreeGrid* grid)
         real lo_box, hi_box;
         const uint* intls;
         const real* coords;
+        uint nend = 0, nali = 0, nbeg = 0;
 
         nlo = 0;
         nhi = nelems;
@@ -427,44 +376,73 @@ determine_split (KDTreeGrid* logrid, KDTreeGrid* higrid, KDTreeGrid* grid)
         {
             uint ti;
             ti = intls[i];
-            if (coords[ti] <= lo_box || coords[ti] >= hi_box)
+            if (even_uint (ti))
             {
-                if (even_uint (ti))
-                {
-                    assert (nlo < nelems);
-                    ++ nlo;
-                }
-                else
-                {
-                    assert (nhi > 0);
-                    -- nhi;
-                }
+                if (coords[ti] == coords[ti+1])  nali += 1;
+                else                             nbeg += 1;
             }
             else
             {
-                real cost;
+                if (coords[ti] == coords[ti-1])  nali += 1;
+                else                             nend += 1;
+            }
 
-                if (!even_uint (ti))
+            if (i == nintls -1 || coords[ti] != coords[intls[i+1]])
+            {
+                bool eval_cost;
+                eval_cost = (coords[ti] > lo_box && coords[ti] < hi_box);
+
+                assert (nhi >= nend);
+                nhi -= nend;
+
+                if (eval_cost)
                 {
-                    assert (nhi > 0);
-                    -- nhi;
+                    real cost;
+                    cost = kdtree_cost_fn (dim, coords[ti], nlo, nhi,
+                                           &grid->box);
+
+                    if (cost < cost_split)
+                    {
+                        cost_split = cost;
+                        split_dim = dim;
+                        split_pos = coords[ti];
+                        split_low = false;
+                        nbelow = nlo;
+                        nabove = nhi;
+                    }
                 }
 
-                cost = kdtree_cost_fn (dim, coords[ti], nlo, nhi, &grid->box);
-                if (cost < cost_split)
+
+                if (nali > 0)
                 {
-                    cost_split = cost;
-                    split_dim = dim;
-                    split_pos = coords[ti];
-                    nbelow = nlo;
-                    nabove = nhi;
+                    assert (even_uint (nali));
+                    nali /= 2;
+
+                    assert (nhi >= nali);
+                    assert (nlo + nali <= nelems);
+                    nhi -= nali;
+                    nlo += nali;
+
+                    if (eval_cost)
+                    {
+                        real cost;
+                        cost = kdtree_cost_fn (dim, coords[ti], nlo, nhi,
+                                               &grid->box);
+                        if (cost < cost_split)
+                        {
+                            cost_split = cost;
+                            split_dim = dim;
+                            split_pos = coords[ti];
+                            split_low = true;
+                            nbelow = nlo;
+                            nabove = nhi;
+                        }
+                    }
                 }
 
-                if (even_uint (ti))
-                {
-                    assert (nlo < nelems);
-                    ++ nlo;
-                }
+                assert (nlo + nbeg <= nelems);
+                nlo += nbeg;
+                nend = 0; nali = 0; nbeg = 0;
             }
         }
         assert (nlo == nelems);
@@ -473,10 +451,10 @@ determine_split (KDTreeGrid* logrid, KDTreeGrid* higrid, KDTreeGrid* grid)
 
     if (cost_split > cost_nosplit)  return NDimensions;
 
-        /* At this point, split_dim and split_pos are known.*/
+        /* At this point, the split is known.*/
     logrid->nintls = 2 * nbelow;
     higrid->nintls = 2 * nabove;
-    split_KDTreeGrid (logrid, higrid, grid, split_dim, split_pos);
+    split_KDTreeGrid (logrid, higrid, grid, split_dim, split_pos, split_low);
 
     return split_dim;
 }
@@ -562,6 +540,41 @@ build_KDTreeNode (uint node_idx, uint parent,
     }
 }
 
+static
+    bool
+complete_KDTree (const KDTree* tree, uint nelems)
+{
+    uint i;
+    bool* contains;
+    bool pred = true;
+    contains = AllocT( bool, nelems );
+
+    UFor( i, nelems )  contains[i] = false;
+    UFor( i, tree->nnodes )
+    {
+        if (leaf_KDTreeNode (&tree->nodes[i]))
+        {
+            uint j;
+            const KDTreeLeaf* leaf;
+            leaf = &tree->nodes[i].as.leaf;
+            UFor( j, leaf->nelems )
+            {
+                assert (leaf->elems[j] < nelems);
+                contains[leaf->elems[j]] = true;
+            }
+        }
+    }
+
+    UFor( i, nelems )
+    {
+        if (!contains[i])
+            pred = false;
+    }
+
+    if (contains)  free (contains);
+    return pred;
+}
+
 void build_KDTree (KDTree* tree, uint nelems, const Triangle* elems,
                    const BoundingBox* box)
 {
@@ -591,6 +604,7 @@ void build_KDTree (KDTree* tree, uint nelems, const Triangle* elems,
     unroll_SList (tree->nodes, &lis, sizeof (KDTreeNode));
 
     cleanup_KDTreeGrid (&grid);
+    assert (complete_KDTree (tree, nelems));
 }
 
 uint find_KDTreeNode (uint* ret_parent,

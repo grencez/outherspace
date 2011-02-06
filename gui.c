@@ -47,8 +47,13 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
     if (step != 0)
     {
         Point diff;
+#if 0
         scale_Point (&diff, &view_basis.pts[NDimensions-1], scale * step);
         summ_Point (&view_origin, &view_origin, &diff);
+#else
+        scale_Point (&diff, &view_basis.pts[1], scale * step);
+        summ_Point (&view_origin, &view_origin, &diff);
+#endif
     }
     if (stride != 0)
     {
@@ -212,8 +217,21 @@ render_RaySpace (byte* data, const RaySpace* space,
 
         UFor( col, ncols )
         {
-            outline[col] = (0xFF000000 |
-                            (color_diff * (space->nelems - hitline[col])));
+            guint32 i, x, y;
+            x = color_diff * (space->nelems - hitline[col]);
+            y = 0xFF000000;
+
+            UFor( i, 3 )
+            {
+                guint32 j;
+                UFor( j, 8 )
+                {
+                    if (0 != (x & (1 << (i + 3*j))))
+                        y |= (1 << (8*i + j));
+                }
+            }
+
+            outline[col] = y;
         }
     }
 
@@ -280,7 +298,7 @@ int main (int argc, char* argv[])
     random_RaySpace (&space, 20);
 #else
     {
-        bool good = readin_wavefront (&space, "sample.obj");
+        bool good = readin_wavefront (&space, "teapot.obj");
         if (!good)  return 1;
     }
 
