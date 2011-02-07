@@ -1,4 +1,5 @@
 
+#ifndef __OPENCL_VERSION__
 #include "xfrm.h"
 #include <assert.h>
 #include <math.h>
@@ -17,15 +18,28 @@ void output_PointXfrm (FILE* out, const PointXfrm* xfrm)
     }
     fputc (']', out);
 }
+#endif  /* #ifndef __OPENCL_VERSION__ */
 
 void zero_PointXfrm (PointXfrm* xfrm)
 {
+#ifdef __OPENCL_VERSION__
+    uint i;
+    UFor( i, NDimensions )
+        zero_Point (&xfrm->pts[i]);
+#else
     memset (xfrm, 0, sizeof (PointXfrm));
+#endif
 }
 
 void copy_PointXfrm (PointXfrm* dst, const PointXfrm* src)
 {
+#ifdef __OPENCL_VERSION__
+    uint i;
+    UFor( i, NDimensions )
+        copy_Point (&dst->pts[i], &src->pts[i]);
+#else
     memcpy (dst, src, sizeof (PointXfrm));
+#endif
 }
 
 void identity_PointXfrm (PointXfrm* xfrm)

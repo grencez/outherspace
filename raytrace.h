@@ -1,10 +1,12 @@
 
 #ifndef RAYTRACE_H_
+#ifndef __OPENCL_VERSION__
 #define RAYTRACE_H_
 
 #include "kdtree.h"
 #include "scene.h"
 #include "xfrm.h"
+#endif  /* #ifndef __OPENCL_VERSION__ */
 
 struct ray_space_struct
 {
@@ -15,7 +17,6 @@ struct ray_space_struct
 };
 typedef struct ray_space_struct RaySpace;
 
-void cleanup_RaySpace (RaySpace* space);
 void rays_to_hits_fish (uint* hits, uint nrows, uint ncols,
                         const RaySpace* space, real zpos);
 void rays_to_hits_from_point (uint* hits, uint nrows, uint ncols,
@@ -27,6 +28,11 @@ void rays_to_hits (uint* hits, uint nrows, uint ncols,
                    const Point* origin,
                    const PointXfrm* view_basis);
 
+#ifndef __OPENCL_VERSION__
+void cleanup_RaySpace (RaySpace* space);
+
 #include "raytrace.c"
+#endif  /* #ifndef __OPENCL_VERSION__ */
+
 #endif
 

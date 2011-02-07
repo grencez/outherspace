@@ -1,27 +1,17 @@
 
 #ifndef UTIL_H_
+#ifndef __OPENCL_VERSION__
 #define UTIL_H_
 
 #include <float.h>
 #include <limits.h>
 #include <stdlib.h>
 
-#define UFor( i, bel )  for (i = 0; i < bel; ++i)
-
-#if 0
-typedef double real;
-#define Max_real DBL_MAX
-#define Min_real DBL_MIN
-#else
-typedef float real;
-#define Max_real FLT_MAX
-#define Min_real FLT_MIN
-#endif
+#define AllocT( Type, capacity ) \
+    (((capacity) == 0) ? (Type*) 0 : \
+     (Type*) malloc ((capacity) * sizeof (Type)))
 
 typedef unsigned uint;
-#define Max_uint UINT_MAX
-
-typedef char tristate;
 typedef unsigned char byte;
 
 #ifndef COMPILER_HAS_BOOL
@@ -30,19 +20,54 @@ typedef byte bool;
 #define false 0
 #endif
 
-#define AllocT( Type, capacity ) \
-    (((capacity) == 0) ? (Type*) 0 : \
-     (Type*) malloc ((capacity) * sizeof (Type)))
+#else  /* #ifndef __OPENCL_VERSION__ */
+#define assert (void)
+#define static
+#endif  /* #ifdef __OPENCL_VERSION__ */
 
-uint index_of (const void* e, const void* arr, size_t size);
-void array_set (void* arr, uint i, const void* e, size_t size);
+
+#define UFor( i, bel )  for (i = 0; i < bel; ++i)
+
+#if 0
+typedef double real;
+#define Max_real DBL_MAX
+#define Min_real DBL_MIN
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846d
+#endif
+
+#else
+typedef float real;
+#define Max_real FLT_MAX
+#define Min_real FLT_MIN
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846f
+#endif
+
+#endif
+
+#define Max_uint UINT_MAX
+
+typedef char tristate;
+
+/*
 bool even_uint (uint a);
 tristate compare_real (real a, real b);
 tristate signum_real (real a);
 tristate mul_signum (real a, real b);
+*/
+
+
+#ifndef __OPENCL_VERSION__
+uint index_of (const void* e, const void* arr, size_t size);
+void array_set (void* arr, uint i, const void* e, size_t size);
 char* strto_uint (uint* ret, const char* in);
 char* strto_real (real* ret, const char* in);
 
 #include "util.c"
+#endif  /* #ifndef __OPENCL_VERSION__ */
+
 #endif
 

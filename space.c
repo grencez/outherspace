@@ -1,4 +1,5 @@
 
+#ifndef __OPENCL_VERSION__
 #include "space.h"
 
 #include <assert.h>
@@ -41,6 +42,8 @@ void output_Triangle (FILE* out, const Triangle* elem)
     }
     fputc (']', out);
 }
+#endif  /* #ifndef __OPENCL_VERSION__ */
+
 
     /* a - b */
 void diff_Point (Point* dst, const Point* a, const Point* b)
@@ -76,17 +79,34 @@ void scale_Point (Point* dst, const Point* a, real k)
 
 void zero_Point (Point* a)
 {
+#ifdef __OPENCL_VERSION__
+    uint i;
+    UFor( i, NDimensions )
+        a->coords[i] = 0;
+#else
     memset (a, 0, sizeof (Point));
+#endif
 }
 
 void copy_Point (Point* dst, const Point* src)
 {
+#ifdef __OPENCL_VERSION__
+    uint i;
+    UFor( i, NDimensions )
+        dst->coords[i] = src->coords[i];
+#else
     memcpy (dst, src, sizeof (Point));
+#endif
 }
 
 void copy_BoundingBox (BoundingBox* dst, const BoundingBox* src)
 {
+#ifdef __OPENCL_VERSION__
+    copy_Point (&dst->min_corner, &src->min_corner);
+    copy_Point (&dst->max_corner, &src->max_corner);
+#else
     memcpy (dst, src, sizeof (BoundingBox));
+#endif
 }
 
 void negate_Point (Point* dst, const Point* src)
@@ -341,14 +361,6 @@ void init_BoundingBox (BoundingBox* box, uint npoints, const Point* points)
 
     UFor( i, npoints )
         adjust_BoundingBox (box, &points[i]);
-
-#if 0
-    UFor( i, NDimensions )
-    {
-        box->min_corner.coords[i] -= 120;
-        box->max_corner.coords[i] += 120;
-    }
-#endif
 }
 
 void adjust_BoundingBox (BoundingBox* box, const Point* point)

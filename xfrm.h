@@ -1,7 +1,9 @@
 
 #ifndef XFRM_H_
+#ifndef __OPENCL_VERSION__
 #define XFRM_H_
 #include "space.h"
+#endif  /* #ifndef __OPENCL_VERSION__ */
 
 struct point_xfrm_struct
 {
@@ -9,7 +11,6 @@ struct point_xfrm_struct
 };
 typedef struct point_xfrm_struct PointXfrm;
 
-void output_PointXfrm (FILE* out, const PointXfrm* xfrm);
 void zero_PointXfrm (PointXfrm* xfrm);
 void copy_PointXfrm (PointXfrm* dst, const PointXfrm* src);
 void identity_PointXfrm (PointXfrm* xfrm);
@@ -24,6 +25,11 @@ void to_basis_PointXfrm (PointXfrm* dst, const PointXfrm* xfrm,
 void orthonormalize_PointXfrm (PointXfrm* dst, const PointXfrm* A);
 void orthorotate_PointXfrm (PointXfrm* dst, const PointXfrm* A, uint dim);
 
+#ifndef __OPENCL_VERSION__
+void output_PointXfrm (FILE* out, const PointXfrm* xfrm);
+
 #include "xfrm.c"
+#endif  /* #ifndef __OPENCL_VERSION__ */
+
 #endif
 

@@ -1,8 +1,10 @@
 
 #ifndef SCENE_H_
+#ifndef __OPENCL_VERSION__
 #define SCENE_H_
 
 #include "space.h"
+#endif  /* #ifndef __OPENCL_VERSION__ */
 
 struct scene_triangle_struct
 {
@@ -20,10 +22,13 @@ struct scene_struct
 };
 typedef struct scene_struct Scene;
 
+#ifndef __OPENCL_VERSION__
 void cleanup_Scene (Scene* scene);
 void vert_Scene (Point* dst, const Scene* scene, uint idx);
 void elem_Scene (Triangle* dst, const Scene* scene, uint idx);
 
 #include "scene.c"
+#endif  /* #ifndef __OPENCL_VERSION__ */
+
 #endif
 

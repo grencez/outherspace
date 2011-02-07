@@ -1,8 +1,10 @@
 
 #ifndef KDTREE_H_
+#ifndef __OPENCL_VERSION__
 #define KDTREE_H_
 
 #include "scene.h"
+#endif  /* #ifndef __OPENCL_VERSION__ */
 
 struct kd_tree_leaf_struct;
 struct kd_tree_inner_struct;
@@ -43,14 +45,6 @@ typedef struct kd_tree_struct KDTree;
 
 bool leaf_KDTreeNode (const KDTreeNode* node);
 
-void output_KDTree (FILE* out, const KDTree* tree,
-                    uint nelems, const Triangle* elems);
-
-void cleanup_KDTree (KDTree* tree);
-
-void build_KDTree (KDTree* tree, uint nelems, const Triangle* elems,
-                   const BoundingBox* box);
-
 uint find_KDTreeNode (uint* ret_parent,
                       const Point* origin,
                       const KDTree* tree);
@@ -62,6 +56,17 @@ uint upnext_KDTreeNode (Point* entrance,
                         uint node,
                         const KDTreeNode* nodes);
 
+#ifndef __OPENCL_VERSION__
+void output_KDTree (FILE* out, const KDTree* tree,
+                    uint nelems, const Triangle* elems);
+
+void cleanup_KDTree (KDTree* tree);
+
+void build_KDTree (KDTree* tree, uint nelems, const Triangle* elems,
+                   const BoundingBox* box);
+
 #include "kdtree.c"
+#endif  /* #ifndef __OPENCL_VERSION__ */
+
 #endif
 

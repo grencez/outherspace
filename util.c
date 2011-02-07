@@ -1,4 +1,5 @@
 
+#ifndef __OPENCL_VERSION__
 #include "util.h"
 
 #include <assert.h>
@@ -12,32 +13,6 @@ uint index_of (const void* e, const void* arr, size_t size)
 void array_set (void* arr, uint i, const void* e, size_t size)
 {
     memcpy ((void*) ((size_t) arr + ((size_t) i * size)), e, size);
-}
-
-bool even_uint (uint a)
-{
-    return 0 == (a & 1);
-}
-
-tristate compare_real (real a, real b)
-{
-    if (a > b)  return  1;
-    if (a < b)  return -1;
-    return 0;
-}
-
-tristate signum_real (real a)
-{
-    return compare_real (a, 0);
-}
-
-tristate mul_signum (real a, real b)
-{
-    if (a == 0 || b == 0)
-        return 0;
-    if (a == b)
-        return 1;
-    return -1;
 }
 
 char* strto_uint (uint* ret, const char* in)
@@ -65,5 +40,33 @@ char* strto_real (real* ret, const char* in)
 
     if (out)  *ret = (real) v;
     return out;
+}
+#endif  /* #ifndef __OPENCL_VERSION__ */
+
+
+bool even_uint (uint a)
+{
+    return 0 == (a & 1);
+}
+
+tristate compare_real (real a, real b)
+{
+    if (a > b)  return  1;
+    if (a < b)  return -1;
+    return 0;
+}
+
+tristate signum_real (real a)
+{
+    return compare_real (a, 0);
+}
+
+tristate mul_signum (real a, real b)
+{
+    if (a == 0 || b == 0)
+        return 0;
+    if (a == b)
+        return 1;
+    return -1;
 }
 

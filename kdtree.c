@@ -1,4 +1,5 @@
 
+#ifndef __OPENCL_VERSION__
 #include "kdtree.h"
 #include "slist.h"
 
@@ -7,12 +8,6 @@
 
 #define MaxKDTreeDepth 50
     /* #define MaxKDTreeDepth 0 */
-
-
-bool leaf_KDTreeNode (const KDTreeNode* node)
-{
-    return node->split_dim == NDimensions;
-}
 
 static
     void
@@ -607,6 +602,14 @@ void build_KDTree (KDTree* tree, uint nelems, const Triangle* elems,
     assert (complete_KDTree (tree, nelems));
 }
 
+#endif  /* #ifndef __OPENCL_VERSION__ */
+
+bool leaf_KDTreeNode (const KDTreeNode* node)
+{
+    return node->split_dim == NDimensions;
+}
+
+
 uint find_KDTreeNode (uint* ret_parent,
                       const Point* origin,
                       const KDTree* tree)
@@ -630,6 +633,7 @@ uint find_KDTreeNode (uint* ret_parent,
     assert (leaf_KDTreeNode (node));
     return node_idx;
 }
+
 
 uint upnext_KDTreeNode (Point* entrance,
                         uint* ret_parent,

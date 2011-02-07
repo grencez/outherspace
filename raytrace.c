@@ -1,10 +1,14 @@
 
+#ifndef __OPENCL_VERSION__
 #include "raytrace.h"
 
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
+
+#ifdef _OPENMP
 #include <omp.h>
+#endif
 
 void cleanup_RaySpace (RaySpace* space)
 {
@@ -15,10 +19,7 @@ void cleanup_RaySpace (RaySpace* space)
         free (space->elems);
     }
 }
-
-#ifndef M_PI
-#define M_PI 3.14159265358979323846
-#endif
+#endif  /* #ifndef __OPENCL_VERSION__ */
 
 #if 0
 static
@@ -128,7 +129,8 @@ hit_tri (real* dist,
          const Point* origin, const Point* dir,
          const Triangle* elem)
 {
-    const real epsilon = 0.000001;
+        /* const real epsilon = (real) 0.000001; */
+    const real epsilon = 0;
     Point edge1, edge2, tvec, pvec, qvec;
     real det, inv_det;
     real u, v;
@@ -152,12 +154,12 @@ hit_tri (real* dist,
     if (det > epsilon)
     {
         u = dot_Point (&tvec, &pvec);
-        if (u < 0.0 || u > det)
+        if (u < 0 || u > det)
             return false;
 
             /* calculate V parameter and test bounds */
         v = dot_Point (dir, &qvec);
-        if (v < 0.0 || u + v > det)
+        if (v < 0 || u + v > det)
             return false;
 
     }
@@ -165,12 +167,12 @@ hit_tri (real* dist,
     {
             /* calculate U parameter and test bounds */
         u = dot_Point (&tvec, &pvec);
-        if (u > 0.0 || u < det)
+        if (u > 0 || u < det)
             return false;
 
             /* calculate V parameter and test bounds */
         v = dot_Point (dir, &qvec);
-        if (v > 0.0 || u + v < det)
+        if (v > 0 || u + v < det)
             return false;
     }
     else return false;  /* ray is parallel to the plane of the triangle */
@@ -363,7 +365,7 @@ void rays_to_hits_perspective (uint* hits, uint nrows, uint ncols,
     const uint dir_dim = 2;
     const uint row_dim = 1;
     const uint col_dim = 0;
-    Point origin, tdir;
+    Point origin;
     real col_start, row_start;
     real col_delta, row_delta;
     const BoundingBox* box;
@@ -385,10 +387,6 @@ void rays_to_hits_perspective (uint* hits, uint nrows, uint ncols,
     origin.coords[row_dim] = 50;
     origin.coords[col_dim] = 50;
     
-    tdir.coords[dir_dim] = 1;
-    tdir.coords[row_dim] = 0;
-    tdir.coords[col_dim] = 0;
-
     inside_box = inside_BoundingBox (box, &origin);
 
 #pragma omp parallel for
@@ -508,7 +506,8 @@ void rays_to_hits (uint* hits, uint nrows, uint ncols,
 
     inside_box = inside_BoundingBox (box, origin);
 
-#pragma omp parallel for
+        /* #pragma omp parallel for */
+#pragma omp parallel for schedule(dynamic)
     UFor( row, nrows )
     {
         uint col;

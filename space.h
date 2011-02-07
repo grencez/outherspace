@@ -1,9 +1,12 @@
 
 #ifndef SPACE_H_
+#ifndef __OPENCL_VERSION__
 #define SPACE_H_
 
 #include <stdio.h>
 #include "util.h"
+#endif  /* #ifndef __OPENCL_VERSION__ */
+
 
 #define NDimensions 3
 
@@ -27,9 +30,6 @@ struct bounding_box_struct
 };
 typedef struct bounding_box_struct BoundingBox;
 
-void output_Point (FILE* out, const Point* point);
-void output_BoundingBox (FILE* out, const BoundingBox* box);
-void output_Triangle (FILE* out, const Triangle* elem);
 void diff_Point (Point* dst, const Point* a, const Point* b);
 real dot_Point (const Point* a, const Point* b);
 void summ_Point (Point* dst, const Point* a, const Point* b);
@@ -60,6 +60,12 @@ void split_BoundingBox (BoundingBox* lo_box, BoundingBox* hi_box,
                         const BoundingBox* box,
                         uint split_dim, real split_pos);
 
+#ifndef __OPENCL_VERSION__
+void output_Point (FILE* out, const Point* point);
+void output_BoundingBox (FILE* out, const BoundingBox* box);
+void output_Triangle (FILE* out, const Triangle* elem);
 #include "space.c"
+#endif  /* #ifndef __OPENCL_VERSION__ */
+
 #endif
 
