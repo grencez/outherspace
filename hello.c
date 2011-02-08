@@ -68,9 +68,9 @@ compute_devices (uint* ret_ndevices,
     {
         cl_uint n;
         err = clGetDeviceIDs (platforms[i], CL_DEVICE_TYPE_ALL,
-                                 ndevices - device_offset,
-                                 &devices[device_offset],
-                                 &n);
+                              ndevices - device_offset,
+                              &devices[device_offset],
+                              &n);
         check_cl_status (err, "fetch devices");
         device_offset += n;
     }
@@ -135,7 +135,7 @@ load_program (cl_program* ret_program, cl_context context,
     check_cl_status (err, "create program");
 
     err = clBuildProgram (program, ndevices, devices, 0, 0, 0);
-    if (true || err != CL_SUCCESS)
+    if (err != CL_SUCCESS)
     {
         cl_build_status build_stat;
         UFor( i, ndevices )
@@ -147,21 +147,26 @@ load_program (cl_program* ret_program, cl_context context,
                                         &build_stat,
                                         0);
             check_cl_status (be, "build info");
-            if (true || build_stat != CL_BUILD_SUCCESS) {
-                char buf[BUFSIZ];
+            if (build_stat != CL_BUILD_SUCCESS) {
+                char* log;
                 size_t size;
                 FILE* out;
                 out = stderr;
                 be = clGetProgramBuildInfo (program, devices[i],
                                             CL_PROGRAM_BUILD_LOG,
-                                            (BUFSIZ -1) * sizeof (char),
-                                            buf,
-                                            &size);
+                                            0, 0, &size);
                 check_cl_status (be, "build log");
-                buf[size/sizeof(char)] = 0;
+                log = AllocT( char, 1+size/sizeof(char) );
+                log[size/sizeof(char)] = 0;
+
+                be = clGetProgramBuildInfo (program, devices[i],
+                                            CL_PROGRAM_BUILD_LOG,
+                                            size, log, &size);
+                check_cl_status (be, "build log");
                 fputs ("Failure building for device.\n", out);
-                fputs (buf, out);
+                fputs (log, out);
                 fputs ("\n", out);
+                if (log)  free (log);
             }
         }
     }
@@ -192,6 +197,7 @@ int main(int argc, char** argv)
     cl_device_id* devices;
     cl_context context;
     cl_command_queue* comqs;
+    const uint dev_idx = 0;
 
     cl_mem input, output;
     
@@ -230,7 +236,7 @@ int main(int argc, char** argv)
     check_cl_status (err, "alloc write mem");
     
         /* Write our data set into the input array in device memory.*/
-    err = clEnqueueWriteBuffer(comqs[0], input, CL_TRUE, 0, sizeof(real) * count, data, 0, NULL, NULL);
+    err = clEnqueueWriteBuffer(comqs[dev_idx], input, CL_TRUE, 0, sizeof(real) * count, data, 0,  0, 0);
     check_cl_status (err, "write source array");
 
         /* Set the arguments to our compute kernel.*/
@@ -240,19 +246,21 @@ int main(int argc, char** argv)
     check_cl_status (err, "set kernel arguments");
 
         /* Get the maximum work group size for executing the kernel on the device.*/
-    err = clGetKernelWorkGroupInfo(kernel, devices[0], CL_KERNEL_WORK_GROUP_SIZE, sizeof(local), &local, NULL);
+    err = clGetKernelWorkGroupInfo(kernel, devices[dev_idx],
+                                   CL_KERNEL_WORK_GROUP_SIZE,
+                                   sizeof(local), &local, 0);
     check_cl_status (err, "retrieve kernel work group info");
 
     global = count;
         /* err = clEnqueueNDRangeKernel(commands, kernel, 1, NULL, &global, &local, 0, NULL, NULL); */
-    err = clEnqueueNDRangeKernel (comqs[0], kernel, 1, 0, &global, 0, 0, 0, 0);
+    err = clEnqueueNDRangeKernel (comqs[dev_idx], kernel, 1, 0, &global, 0, 0, 0, 0);
     check_cl_status (err, "enqueue kernel");
 
         /* Wait for the command commands to get serviced before reading back results.*/
-    clFinish(comqs[0]);
+    clFinish(comqs[dev_idx]);
 
         /* Read back the results from the device to verify the output */
-    err = clEnqueueReadBuffer (comqs[0], output, CL_TRUE, 0, sizeof(real) * count, results, 0, NULL, NULL);
+    err = clEnqueueReadBuffer (comqs[dev_idx], output, CL_TRUE, 0, sizeof(real) * count, results, 0, NULL, NULL);
     check_cl_status (err, "read output array");
     
 #if 1
@@ -260,8 +268,10 @@ int main(int argc, char** argv)
     correct = 0;
     for(i = 0; i < count; i++)
     {
-        if(results[i] == data[i] * data[i])
+
+        if (results[i] == data[i] * data[i])
             correct++;
+            /* else printf ("\nexpect:%.15f\nresult:%.15f\n", results[i], data[i] * data[i]); */
     }
     
         /* Print a brief summary detailing the results.*/
@@ -273,7 +283,8 @@ int main(int argc, char** argv)
     clReleaseMemObject(output);
     clReleaseProgram(program);
     clReleaseKernel(kernel);
-    clReleaseCommandQueue(comqs[0]);
+    UFor( i, ndevices )
+        clReleaseCommandQueue(comqs[i]);
     clReleaseContext(context);
 
     free (data);

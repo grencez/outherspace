@@ -1,7 +1,7 @@
 
 __kernel
     void
-square (__constant float* input,
+square (__global float* input,
         __global float* output,
         const uint count)
 {
