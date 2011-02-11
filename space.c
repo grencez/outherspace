@@ -91,9 +91,7 @@ void zero_Point (Point* a)
 void copy_Point (Point* dst, const Point* src)
 {
 #ifdef __OPENCL_VERSION__
-    uint i;
-    UFor( i, NDimensions )
-        dst->coords[i] = src->coords[i];
+    *dst = *src;
 #else
     memcpy (dst, src, sizeof (Point));
 #endif
@@ -102,8 +100,7 @@ void copy_Point (Point* dst, const Point* src)
 void copy_BoundingBox (BoundingBox* dst, const BoundingBox* src)
 {
 #ifdef __OPENCL_VERSION__
-    copy_Point (&dst->min_corner, &src->min_corner);
-    copy_Point (&dst->max_corner, &src->max_corner);
+    *dst = *src;
 #else
     memcpy (dst, src, sizeof (BoundingBox));
 #endif
@@ -142,7 +139,7 @@ tristate facing_BoundingPlane (uint dim, real plane,
     /* Assume ray is coming from inside BoundingBox.*/
 bool hit_inner_BoundingPlane (Point* entrance,
                               uint dim, real plane,
-                              const BoundingBox* box,
+                              __global const BoundingBox* box,
                               const Point* origin, const Point* dir)
 {
     uint i;
@@ -211,7 +208,7 @@ bool hit_inner_BoundingPlane (Point* entrance,
 
     /* Assume ray is coming from outside BoundingBox.*/
 bool hit_outer_BoundingBox (Point* entrance,
-                            const BoundingBox* box,
+                            __global const BoundingBox* box,
                             const Point* origin, const Point* dir)
 {
     uint dim;
@@ -375,7 +372,7 @@ void adjust_BoundingBox (BoundingBox* box, const Point* point)
     }
 }
 
-bool inside_BoundingBox (const BoundingBox* box, const Point* point)
+bool inside_BoundingBox (__global const BoundingBox* box, const Point* point)
 {
     bool inside = true;
     uint i;

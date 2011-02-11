@@ -187,50 +187,51 @@ hit_tri (real* dist,
 }
 #endif
 
-
-uint cast_ray (const Point* origin,
-               const Point* dir,
-               const RaySpace* space,
-               bool inside_box)
+static
+    uint
+cast_ray (const Point* origin,
+          const Point* dir,
+          const uint nelems,
+          __global const Triangle* elems,
+          __global const uint* elemidcs,
+          __global const KDTreeNode* nodes,
+          __global const BoundingBox* box,
+          bool inside_box)
 {
     Point salo_entrance;
     uint node_idx, parent = 0;
     real hit_mag;
     uint hit_idx;
-    const BoundingBox* box;
     Point* entrance;
-    const KDTree* tree;
 
     entrance = &salo_entrance;
-    tree = &space->tree;
 
     hit_mag = Max_real;
-    hit_idx = space->scene.nelems;
+    hit_idx = nelems;
 
     if (inside_box)
     {
             /* Find the initial node.*/
-        node_idx = find_KDTreeNode (&parent, origin, tree);
-        box = &tree->nodes[node_idx].as.leaf.box;
+        node_idx = find_KDTreeNode (&parent, origin, nodes);
+        box = &nodes[node_idx].as.leaf.box;
         assert (inside_BoundingBox (box, origin));
     }
     else
     {
-        box = &space->scene.box;
         if (! hit_outer_BoundingBox (entrance, box, origin, dir))
-            return space->scene.nelems;
+            return nelems;
         node_idx = 0;
     }
 
     while (1)
     {
-        const KDTreeNode* node;
-        node = &tree->nodes[node_idx];
+        __global const KDTreeNode* node;
+        node = &nodes[node_idx];
 
         if (leaf_KDTreeNode (node))
         {
             uint i;
-            const KDTreeLeaf* leaf;
+            __global const KDTreeLeaf* leaf;
 
             leaf = &node->as.leaf;
             box = &leaf->box;
@@ -240,8 +241,15 @@ uint cast_ray (const Point* origin,
             UFor( i, leaf->nelems )
             {
                 real mag;
+                uint idx;
                 const Triangle* tri;
-                tri = &space->elems[leaf->elems[i]];
+                idx = elemidcs[leaf->elemidcs + i];
+#if __OPENCL_VERSION__
+                const Triangle stri = elems[idx];
+                tri = &stri;
+#else
+                tri = &elems[idx];
+#endif
                     /* Triangle tri; */
                     /* elem_Scene (&tri, &space->scene, leaf->elems[i]); */
 
@@ -251,7 +259,7 @@ uint cast_ray (const Point* origin,
                 if (mag < hit_mag)
                 {
                     hit_mag = mag;
-                    hit_idx = leaf->elems[i];
+                    hit_idx = idx;
                 }
             }
 
@@ -272,12 +280,12 @@ uint cast_ray (const Point* origin,
             }
 
             node_idx = upnext_KDTreeNode (entrance, &parent,
-                                          origin, dir, node_idx, tree->nodes);
+                                          origin, dir, node_idx, nodes);
             if (node_idx == parent)  break;
         }
         else
         {
-            const KDTreeInner* inner;
+            __global const KDTreeInner* inner;
             inner = &node->as.inner;
             parent = node_idx;
 
@@ -294,6 +302,7 @@ uint cast_ray (const Point* origin,
     return hit_idx;
 }
 
+#ifndef __OPENCL_VERSION__
 void rays_to_hits_fish (uint* hits, uint nrows, uint ncols,
                         const RaySpace* space, real zpos)
 {
@@ -352,7 +361,10 @@ void rays_to_hits_fish (uint* hits, uint nrows, uint ncols,
                                    - tdir.coords[col_dim] * sin (col_angle));
 
             normalize_Point (&dir, &dir);
-            hitline[col] = cast_ray (&origin, &dir, space, inside_box);
+            hitline[col] = cast_ray (&origin, &dir,
+                                     space->nelems, space->elems,
+                                     space->tree.elemidcs, space->tree.nodes,
+                                     &space->scene.box, inside_box);
         }
     }
 }
@@ -410,7 +422,10 @@ void rays_to_hits_perspective (uint* hits, uint nrows, uint ncols,
             diff_Point (&dir, &dir, &origin);
             normalize_Point (&dir, &dir);
 
-            hitline[col] = cast_ray (&origin, &dir, space, inside_box);
+            hitline[col] = cast_ray (&origin, &dir,
+                                     space->nelems, space->elems,
+                                     space->tree.elemidcs, space->tree.nodes,
+                                     &space->scene.box, inside_box);
 
                 /* if (row == 333 && col == 322)  puts (elem ? "hit" : "miss"); */
         }
@@ -462,10 +477,14 @@ void rays_to_hits_plane (uint* hits, uint nrows, uint ncols,
         UFor( col, ncols )
         {
             origin.coords[col_dim] = col_start + col * col_delta;
-            hitline[col] = cast_ray (&origin, &dir, space, inside_box);
+            hitline[col] = cast_ray (&origin, &dir,
+                                     space->nelems, space->elems,
+                                     space->tree.elemidcs, space->tree.nodes,
+                                     &space->scene.box, inside_box);
         }
     }
 }
+
 
 void rays_to_hits (uint* hits, uint nrows, uint ncols,
                    const RaySpace* space,
@@ -528,10 +547,54 @@ void rays_to_hits (uint* hits, uint nrows, uint ncols,
             summ_Point (&dir, &dir, &partial_dir);
             normalize_Point (&dir, &dir);
 
-            hitline[col] = cast_ray (origin, &dir, space, inside_box);
+            hitline[col] = cast_ray (origin, &dir,
+                                     space->nelems, space->elems,
+                                     space->tree.elemidcs, space->tree.nodes,
+                                     &space->scene.box, inside_box);
 
                 /* if (row == 333 && col == 322)  puts (elem ? "hit" : "miss"); */
         }
     }
 }
+
+void build_RayCastParams (RayCastParams* params,
+                          uint nrows, uint ncols,
+                          const RaySpace* space,
+                          const Point* origin,
+                          const PointXfrm* view_basis)
+{
+    const uint dir_dim = 2, row_dim = 1, col_dim = 0;
+    Point dstart, rdelta, cdelta;
+    real tcos;
+    tcos = cos (M_PI / 3); /* cos (view_angle / 2) */
+
+    zero_Point (&dstart);
+    zero_Point (&rdelta);
+    zero_Point (&cdelta);
+
+    dstart.coords[dir_dim] = 1;
+    dstart.coords[row_dim] = - tcos;
+    dstart.coords[col_dim] = - tcos;
+
+    rdelta.coords[row_dim] = -2 * dstart.coords[row_dim] / nrows;
+    cdelta.coords[col_dim] = -2 * dstart.coords[col_dim] / ncols;
+
+    dstart.coords[row_dim] -= dstart.coords[row_dim] / nrows;
+    dstart.coords[col_dim] -= dstart.coords[col_dim] / ncols;
+
+
+    copy_Point (&params->origin, origin);
+
+    trxfrm_Point (&params->dir_start, view_basis, &dstart);
+    trxfrm_Point (&params->dir_delta[row_dim], view_basis, &rdelta);
+    trxfrm_Point (&params->dir_delta[col_dim], view_basis, &cdelta);
+
+    copy_BoundingBox (&params->box, &space->scene.box);
+    params->nelems = space->nelems;
+    params->npixels[row_dim] = nrows;
+    params->npixels[col_dim] = ncols;
+    params->inside_box = inside_BoundingBox (&params->box, origin);
+}
+
+#endif  /* #ifndef __OPENCL_VERSION__ */
 

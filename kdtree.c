@@ -12,10 +12,10 @@
 static
     void
 output_KDTreeNode (FILE* out, uint node_idx,
-                   uint depth, const KDTreeNode* nodes)
+                   uint depth, const KDTree* tree)
 {
     const KDTreeNode* node;
-    node = &nodes[node_idx];
+    node = &tree->nodes[node_idx];
     fprintf (out, " %*s%-*u depth:%u   ",
              depth, "", depth+1,
              node_idx, depth);
@@ -28,7 +28,7 @@ output_KDTreeNode (FILE* out, uint node_idx,
         UFor( ei, leaf->nelems )
         {
             uint index;
-            index = leaf->elems[ei];
+            index = tree->elemidcs[leaf->elemidcs + ei];
             fprintf (out, " %u", index);
         }
         fputc ('\n', out);
@@ -43,7 +43,7 @@ output_KDTreeNode (FILE* out, uint node_idx,
                  node->split_dim, inner->split_pos);
         UFor( i, 2 )
             output_KDTreeNode (out, inner->children[i],
-                               1+depth, nodes);
+                               1+depth, tree);
     }
 }
 
@@ -59,28 +59,21 @@ void output_KDTree (FILE* out, const KDTree* tree,
         output_Triangle (out, &elems[i]);
     }
     fputs ("\n- Nodes -\n", out);
-    output_KDTreeNode (out, 0, 0, tree->nodes);
+    output_KDTreeNode (out, 0, 0, tree);
 
 }
 
 
-static void cleanup_KDTreeNode (uint node_idx, KDTreeNode* nodes)
+static void cleanup_KDTreeNode (uint node_idx, KDTree* tree)
 {
     KDTreeNode* node;
-    node = &nodes[node_idx];
-    if (leaf_KDTreeNode (node))
-    {
-        KDTreeLeaf* leaf;
-        leaf = &node->as.leaf;
-        if (0 != leaf->nelems)
-            free (leaf->elems);
-    }
-    else
+    node = &tree->nodes[node_idx];
+    if (!leaf_KDTreeNode (node))
     {
         KDTreeInner* inner;
         inner = &node->as.inner;
-        cleanup_KDTreeNode (inner->children[0], nodes);
-        cleanup_KDTreeNode (inner->children[1], nodes);
+        cleanup_KDTreeNode (inner->children[0], tree);
+        cleanup_KDTreeNode (inner->children[1], tree);
     }
 }
 
@@ -88,10 +81,11 @@ void cleanup_KDTree (KDTree* tree)
 {
     if (tree->nodes)
     {
-        cleanup_KDTreeNode (0, tree->nodes);
-
+        cleanup_KDTreeNode (0, tree);
         free (tree->nodes);
     }
+    if (tree->elemidcs)
+        free (tree->elemidcs);
 }
 
 struct kdtree_grid_struct
@@ -458,12 +452,13 @@ static
     void
 build_KDTreeNode (uint node_idx, uint parent,
                   KDTreeGrid* grid,
-                  uint depth, SList* lis)
+                  uint depth,
+                  SList* nodelist, SList* elemidxlist)
 {
     KDTreeGrid logrid, higrid;
     KDTreeNode* node;
     node = AllocT( KDTreeNode, 1 );
-    app_SList (lis, node);
+    app_SList (nodelist, node);
         /* printf ("%*sdepth=%u, nelems=%u\n", depth, "", depth, nelems); */
 
     if (depth >= MaxKDTreeDepth)
@@ -483,18 +478,25 @@ build_KDTreeNode (uint node_idx, uint parent,
 
         assert (even_uint (grid->nintls));
         leaf->nelems = grid->nintls / 2;
+        leaf->elemidcs = elemidxlist->nmembs;
 
         if (0 != leaf->nelems)
         {
-            uint i, li = 0;
-            leaf->elems = AllocT( uint, leaf->nelems );
+            uint i;
             UFor( i, grid->nintls )
             {
                 uint ti;
                 ti = grid->intls[0][i];
-                if (even_uint (ti))  leaf->elems[li++] = ti / 2;
+                if (even_uint (ti))
+                {
+                    uint* idx_ptr;
+                    idx_ptr = AllocT( uint, 1 );
+                    *idx_ptr = ti / 2;
+                    app_SList (elemidxlist, idx_ptr);
+                }
             }
         }
+        assert (leaf->elemidcs + leaf->nelems == elemidxlist->nmembs);
     }
     else
     {
@@ -523,12 +525,12 @@ build_KDTreeNode (uint node_idx, uint parent,
 #endif
 
 
-        inner->children[0] = lis->nmembs;
+        inner->children[0] = nodelist->nmembs;
         build_KDTreeNode (inner->children[0], node_idx,
-                          &logrid, 1+depth, lis);
-        inner->children[1] = lis->nmembs;
+                          &logrid, 1+depth, nodelist, elemidxlist);
+        inner->children[1] = nodelist->nmembs;
         build_KDTreeNode (inner->children[1], node_idx,
-                          &higrid, 1+depth, lis);
+                          &higrid, 1+depth, nodelist, elemidxlist);
 
         if (logrid.nintls > 0)  free (logrid.intls[0]);
         if (higrid.nintls > 0)  free (higrid.intls[0]);
@@ -554,8 +556,10 @@ complete_KDTree (const KDTree* tree, uint nelems)
             leaf = &tree->nodes[i].as.leaf;
             UFor( j, leaf->nelems )
             {
-                assert (leaf->elems[j] < nelems);
-                contains[leaf->elems[j]] = true;
+                uint idx;
+                idx = leaf->elemidcs + j;
+                assert (idx < nelems);
+                contains[idx] = true;
             }
         }
     }
@@ -574,7 +578,7 @@ void build_KDTree (KDTree* tree, uint nelems, const Triangle* elems,
                    const BoundingBox* box)
 {
     uint i, ei;
-    SList lis;
+    SList nodelist, elemidxlist;
     KDTreeGrid grid;
 
     assert (nelems > 0);
@@ -591,12 +595,18 @@ void build_KDTree (KDTree* tree, uint nelems, const Triangle* elems,
     UFor( i, NDimensions )
         sort_intervals (grid.nintls, grid.intls[i], grid.coords[i]);
 
-    init_SList (&lis);
-    build_KDTreeNode (0, 0, &grid, 0, &lis);
+    init_SList (&nodelist);
+    init_SList (&elemidxlist);
+    build_KDTreeNode (0, 0, &grid, 0, &nodelist, &elemidxlist);
 
-    tree->nnodes = lis.nmembs;
+    tree->nnodes = nodelist.nmembs;
+    tree->nelemidcs = elemidxlist.nmembs;
+
     tree->nodes = AllocT( KDTreeNode, tree->nnodes );
-    unroll_SList (tree->nodes, &lis, sizeof (KDTreeNode));
+    tree->elemidcs = AllocT( uint, tree->nelemidcs );
+
+    unroll_SList (tree->nodes, &nodelist, sizeof (KDTreeNode));
+    unroll_SList (tree->elemidcs, &elemidxlist, sizeof (uint));
 
     cleanup_KDTreeGrid (&grid);
     assert (complete_KDTree (tree, nelems));
@@ -604,7 +614,8 @@ void build_KDTree (KDTree* tree, uint nelems, const Triangle* elems,
 
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
-bool leaf_KDTreeNode (const KDTreeNode* node)
+
+bool leaf_KDTreeNode (__global const KDTreeNode* node)
 {
     return node->split_dim == NDimensions;
 }
@@ -612,22 +623,22 @@ bool leaf_KDTreeNode (const KDTreeNode* node)
 
 uint find_KDTreeNode (uint* ret_parent,
                       const Point* origin,
-                      const KDTree* tree)
+                      __global const KDTreeNode* nodes)
 {
-    const KDTreeNode* node;
+    __global const KDTreeNode* node;
     uint node_idx = 0, parent = 0;
-    assert (tree->nnodes > 0);
-    node = &tree->nodes[0];
+    assert (nodes);
+    node = &nodes[0];
     while (! leaf_KDTreeNode (node))
     {
-        const KDTreeInner* inner;
+        __global const KDTreeInner* inner;
         inner = &node->as.inner;
         parent = node_idx;
         if (origin->coords[node->split_dim] < inner->split_pos)
             node_idx = inner->children[0];
         else
             node_idx = inner->children[1];
-        node = &tree->nodes[node_idx];
+        node = &nodes[node_idx];
     }
     *ret_parent = parent;
     assert (leaf_KDTreeNode (node));
@@ -640,13 +651,13 @@ uint upnext_KDTreeNode (Point* entrance,
                         const Point* origin,
                         const Point* dir,
                         uint node_idx,
-                        const KDTreeNode* nodes)
+                        __global const KDTreeNode* nodes)
 {
-    const BoundingBox* box;
+    __global const BoundingBox* box;
     uint child_idx;
 
     {
-        const KDTreeNode* node;
+        __global const KDTreeNode* node;
         node = &nodes[node_idx];
         assert (leaf_KDTreeNode (node));
         box = &node->as.leaf.box;
@@ -661,8 +672,8 @@ uint upnext_KDTreeNode (Point* entrance,
          */
     while (node_idx != child_idx)
     {
-        const KDTreeNode* node;
-        const KDTreeInner* inner;
+        __global const KDTreeNode* node;
+        __global const KDTreeInner* inner;
         tristate facing;
         uint ni;
 

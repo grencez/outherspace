@@ -20,6 +20,8 @@ typedef byte bool;
 #define false 0
 #endif
 
+#define __global
+
 #else  /* #ifndef __OPENCL_VERSION__ */
 #define assert (void)
 #define static

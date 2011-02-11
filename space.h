@@ -44,17 +44,17 @@ tristate facing_BoundingPlane (uint dim, real plane,
                                const Point* origin, const Point* dir);
 bool hit_inner_BoundingPlane (Point* entrance,
                               uint dim, real plane,
-                              const BoundingBox* box,
+                              __global const BoundingBox* box,
                               const Point* origin, const Point* dir);
 bool hit_outer_BoundingBox (Point* entrance,
-                            const BoundingBox* box,
+                            __global const BoundingBox* box,
                             const Point* origin, const Point* dir);
 bool hit_BoundingBox (Point* entrance,
                       const BoundingBox* box,
                       const Point* origin, const Point* dir);
 void init_BoundingBox (BoundingBox* box, uint npoints, const Point* points);
 void adjust_BoundingBox (BoundingBox* box, const Point* point);
-bool inside_BoundingBox (const BoundingBox* box, const Point* point);
+bool inside_BoundingBox (__global const BoundingBox* box, const Point* point);
 real surface_area_BoundingBox (const BoundingBox* box);
 void split_BoundingBox (BoundingBox* lo_box, BoundingBox* hi_box,
                         const BoundingBox* box,

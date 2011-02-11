@@ -17,7 +17,7 @@ struct kd_tree_leaf_struct
 {
     uint nelems;
     BoundingBox box;
-    uint* elems;
+    uint elemidcs;
 };
 struct kd_tree_inner_struct
 {
@@ -38,23 +38,25 @@ struct kd_tree_node_struct
 struct kd_tree_struct
 {
     uint nnodes;
+    uint nelemidcs;
     KDTreeNode* nodes;
+    uint* elemidcs;
 };
 typedef struct kd_tree_struct KDTree;
 
 
-bool leaf_KDTreeNode (const KDTreeNode* node);
+bool leaf_KDTreeNode (__global const KDTreeNode* node);
 
 uint find_KDTreeNode (uint* ret_parent,
                       const Point* origin,
-                      const KDTree* tree);
+                      __global const KDTreeNode* nodes);
 
 uint upnext_KDTreeNode (Point* entrance,
                         uint* ret_parent,
                         const Point* origin,
                         const Point* dir,
                         uint node,
-                        const KDTreeNode* nodes);
+                        __global const KDTreeNode* nodes);
 
 #ifndef __OPENCL_VERSION__
 void output_KDTree (FILE* out, const KDTree* tree,

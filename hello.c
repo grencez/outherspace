@@ -1,5 +1,5 @@
 
-#include "util.h"
+#include "main.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -84,6 +84,13 @@ compute_devices (uint* ret_ndevices,
     comqs = AllocT( cl_command_queue, ndevices );
     UFor( i, ndevices )
     {
+        char buf[BUFSIZ];
+        err = clGetDeviceInfo (devices[i], CL_DRIVER_VERSION,
+                               BUFSIZ-1, buf, 0);
+        buf[BUFSIZ-1] = 0;
+        fputs (buf, stderr);
+        fputc ('\n', stderr);
+        check_cl_status (err, "platform");
             /* Create a command queue.*/
         comqs[i] = clCreateCommandQueue (context, devices[i], 0, &err);
         check_cl_status (err, "create command queue");
@@ -155,7 +162,7 @@ load_program (cl_program* ret_program, cl_context context,
                 be = clGetProgramBuildInfo (program, devices[i],
                                             CL_PROGRAM_BUILD_LOG,
                                             0, 0, &size);
-                check_cl_status (be, "build log");
+                check_cl_status (be, "build log size");
                 log = AllocT( char, 1+size/sizeof(char) );
                 log[size/sizeof(char)] = 0;
 
@@ -179,7 +186,9 @@ load_program (cl_program* ret_program, cl_context context,
     *ret_program = program;
 }
 
-int main(int argc, char** argv)
+static
+    void
+run_hello ()
 {
     int err;
       
@@ -204,9 +213,6 @@ int main(int argc, char** argv)
         /* Fill our data set with random float values.*/
     uint i;
 
-    (void) argc;
-    (void) argv;
-
     UFor( i, count )
         data[i] = rand() / (real)RAND_MAX;
     
@@ -226,7 +232,7 @@ int main(int argc, char** argv)
     }
 
         /* Create the compute kernel in the program we wish to run.*/
-    kernel = clCreateKernel (program, "square", &err);
+    kernel = clCreateKernel (program, "square_kernel", &err);
     check_cl_status (err, "create compute kernel");
 
         /* Create the input and output arrays in device memory for our calculation.*/
@@ -266,9 +272,8 @@ int main(int argc, char** argv)
 #if 1
         /* Validate our results.*/
     correct = 0;
-    for(i = 0; i < count; i++)
+    UFor( i, count )
     {
-
         if (results[i] == data[i] * data[i])
             correct++;
             /* else printf ("\nexpect:%.15f\nresult:%.15f\n", results[i], data[i] * data[i]); */
@@ -289,6 +294,194 @@ int main(int argc, char** argv)
 
     free (data);
     free (results);
+}
+
+static
+    void
+run_ray_cast ()
+{
+    int err;
+    uint i;
+
+    cl_program program;
+    size_t global_work_size[2];
+    cl_kernel kernel;
+    
+    uint ndevices = 0;
+    cl_device_id* devices;
+    cl_context context;
+    cl_command_queue* comqs;
+    const uint dev_idx = 0;
+
+    cl_mem ret_hits, inp_params, inp_elems, inp_elemidcs, inp_nodes;
+
+    RaySpace space;
+    Point view_origin;
+    PointXfrm view_basis;
+    RayCastParams params;
+
+    const uint nrows = 5000;
+    const uint ncols = 5000;
+    uint* hits;
+    size_t hits_size;
+
+    global_work_size[0] = nrows;
+    global_work_size[1] = ncols;
+
+
+    random_RaySpace (&space, 50);
+    
+    view_origin.coords[0] = 50;
+    view_origin.coords[1] = 50;
+    view_origin.coords[2] = -70;
+
+    build_KDTree (&space.tree, space.nelems, space.elems, &space.scene.box);
+    identity_PointXfrm (&view_basis);
+
+    hits = AllocT( uint, nrows * ncols );
+    hits_size = nrows * ncols * sizeof (uint);
+
+    build_RayCastParams (&params, nrows, ncols, &space,
+                         &view_origin, &view_basis);
+
+
+    compute_devices (&ndevices, &devices, &context, &comqs);
+    printf ("I have %u devices!\n", ndevices);
+
+    {
+        const char* fnames[] =
+        {
+            "util.h", "util.c", "space.h", "space.c",
+            "scene.h", "kdtree.h", "kdtree.c",
+            "xfrm.h", "xfrm.c", "raytrace.h", "raytrace.c",
+            "hello.cl"
+        };
+        const uint nfnames = sizeof(fnames) / sizeof(const char*);
+        load_program (&program, context, ndevices, devices, nfnames, fnames);
+    }
+
+        /* Create the compute kernel in the program we wish to run.*/
+    kernel = clCreateKernel (program, "ray_cast_kernel", &err);
+    check_cl_status (err, "create compute kernel");
+
+
+#if 1
+    ret_hits = clCreateBuffer (context,
+                               CL_MEM_WRITE_ONLY | CL_MEM_USE_HOST_PTR,
+                               hits_size, hits, &err);
+    check_cl_status (err, "alloc hits buffer");
+#else
+    ret_hits = clCreateBuffer (context, CL_MEM_WRITE_ONLY,
+                               hits_size, 0, &err);
+    check_cl_status (err, "alloc hits buffer");
+#endif
+
+    inp_params = clCreateBuffer (context,
+                                 CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                                 sizeof (RayCastParams),
+                                 &params, &err);
+    check_cl_status (err, "alloc params buffer");
+
+    inp_elems = clCreateBuffer (context,
+                                CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                                space.nelems * sizeof (Triangle),
+                                space.elems, &err);
+    check_cl_status (err, "alloc elems buffer");
+
+    inp_elemidcs = clCreateBuffer (context,
+                                   CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                                   space.tree.nelemidcs * sizeof (uint),
+                                   space.tree.elemidcs, &err);
+    check_cl_status (err, "alloc elemidcs buffer");
+
+    inp_nodes = clCreateBuffer (context,
+                                CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                                space.tree.nnodes * sizeof (KDTreeNode),
+                                space.tree.nodes, &err);
+    check_cl_status (err, "alloc nodes buffer");
+
+
+        /* Set the arguments to our compute kernel.*/
+    err  = clSetKernelArg (kernel, 0, sizeof(cl_mem), &ret_hits);
+    check_cl_status (err, "set kernel argument 0");
+
+    err = clSetKernelArg (kernel, 1, sizeof(cl_mem), &inp_params);
+    check_cl_status (err, "set kernel argument 1");
+
+    err = clSetKernelArg (kernel, 2, sizeof(cl_mem), &inp_elems);
+    check_cl_status (err, "set kernel argument 2");
+
+    err = clSetKernelArg (kernel, 3, sizeof(cl_mem), &inp_elemidcs);
+    check_cl_status (err, "set kernel argument 3");
+
+    err = clSetKernelArg (kernel, 4, sizeof(cl_mem), &inp_nodes);
+    check_cl_status (err, "set kernel argument 4");
+
+#if 1
+    UFor( i, 10 )
+    {
+        uint j;
+        UFor( j, 10 )
+        {
+            size_t work_offset[2];
+            size_t work_size[2];
+
+            work_size[0] = nrows / 10;
+            work_size[1] = ncols / 10;
+
+            work_offset[0] = i * work_size[0];
+            work_offset[1] = j * work_size[1];
+
+            err = clEnqueueNDRangeKernel (comqs[dev_idx], kernel, 2,
+                                          work_offset,
+                                          work_size, 0, 0, 0, 0);
+            check_cl_status (err, "enqueue kernel");
+            err = clFinish (comqs[dev_idx]);
+            check_cl_status (err, "finish kernel");
+        }
+    }
+#else
+    err = clEnqueueNDRangeKernel (comqs[dev_idx], kernel, 2, 0,
+                                  global_work_size, 0, 0, 0, 0);
+    check_cl_status (err, "enqueue kernel");
+
+        /* Wait for the command commands to get serviced before reading back results.*/
+    err = clFinish (comqs[dev_idx]);
+    check_cl_status (err, "finish kernel");
+#endif
+
+#if 0
+        /* Read back the results from the device to verify the output */
+    err = clEnqueueReadBuffer (comqs[dev_idx], ret_hits, CL_TRUE,
+                               0, hits_size, hits, 0, 0, 0);
+    check_cl_status (err, "read output hits");
+#endif
+
+
+        /* Shutdown and cleanup.*/
+    clReleaseMemObject (ret_hits);
+    clReleaseMemObject (inp_params);
+    clReleaseMemObject (inp_elems);
+    clReleaseMemObject (inp_elemidcs);
+    clReleaseMemObject (inp_nodes);
+    clReleaseProgram (program);
+    clReleaseKernel (kernel);
+    UFor( i, ndevices )
+        clReleaseCommandQueue (comqs[i]);
+    clReleaseContext (context);
+
+    if (devices)  free (devices);
+    if (comqs)  free (comqs);
+
+    output_PGM_image ("out.pgm", nrows, ncols, hits, space.nelems);
+    free (hits);
+    cleanup_RaySpace (&space);
+}
+
+int main ()
+{
+        /* run_hello (); */
+    run_ray_cast ();
     return 0;
 }
 
