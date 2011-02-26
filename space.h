@@ -2,9 +2,8 @@
 #ifndef SPACE_H_
 #ifndef __OPENCL_VERSION__
 #define SPACE_H_
-
-#include <stdio.h>
 #include "util.h"
+#include <stdio.h>
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
 
@@ -64,7 +63,9 @@ void split_BoundingBox (BoundingBox* lo_box, BoundingBox* hi_box,
 void output_Point (FILE* out, const Point* point);
 void output_BoundingBox (FILE* out, const BoundingBox* box);
 void output_Triangle (FILE* out, const Triangle* elem);
+#ifdef INCLUDE_SOURCE
 #include "space.c"
+#endif
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
 #endif

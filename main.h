@@ -10,6 +10,8 @@ void output_PGM_image (const char* filename, uint nrows, uint ncols,
                        const uint* hits, uint nelems);
 bool readin_wavefront (RaySpace* space, const char* filename);
 
+#ifdef INCLUDE_SOURCE
 #include "main.c"
+#endif
 #endif
 

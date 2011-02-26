@@ -48,8 +48,9 @@ void build_RayCastParams (RayCastParams* params,
                           const PointXfrm* view_basis);
 
 void cleanup_RaySpace (RaySpace* space);
-
+#ifdef INCLUDE_SOURCE
 #include "raytrace.c"
+#endif
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
 #endif

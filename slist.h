@@ -29,6 +29,8 @@ void unroll_SList (void* dst, SList* src, size_t size);
 
 void app_SList (SList* l, void* data);
 
+#ifdef INCLUDE_SOURCE
 #include "slist.c"
+#endif
 #endif
 

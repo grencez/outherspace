@@ -1,6 +1,7 @@
 
 #ifndef __OPENCL_VERSION__
 #include "xfrm.h"
+
 #include <assert.h>
 #include <math.h>
 #include <string.h>

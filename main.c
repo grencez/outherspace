@@ -3,6 +3,7 @@
 #include "slist.h"
 
 #include <assert.h>
+#include <string.h>
 #include <time.h>
 
 void random_Triangle (Triangle* elem, const BoundingBox* box)

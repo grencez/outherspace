@@ -3,7 +3,6 @@
 
 #include <assert.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <math.h>
 
@@ -12,6 +11,7 @@
 #else
 #include <CL/cl.h>
 #endif
+
 
 static
     void

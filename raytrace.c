@@ -1,9 +1,10 @@
 
 #ifndef __OPENCL_VERSION__
+
 #include "raytrace.h"
 
 #include <assert.h>
-#include <stdlib.h>
+#include <math.h>
 #include <string.h>
 
 #ifdef _OPENMP

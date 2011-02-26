@@ -66,8 +66,9 @@ void cleanup_KDTree (KDTree* tree);
 
 void build_KDTree (KDTree* tree, uint nelems, const Triangle* elems,
                    const BoundingBox* box);
-
+#ifdef INCLUDE_SOURCE
 #include "kdtree.c"
+#endif
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
 #endif

@@ -11,7 +11,7 @@
     (((capacity) == 0) ? (Type*) 0 : \
      (Type*) malloc ((capacity) * sizeof (Type)))
 
-typedef unsigned uint;
+typedef unsigned int uint;
 typedef unsigned char byte;
 
 #ifndef COMPILER_HAS_BOOL
@@ -19,6 +19,8 @@ typedef byte bool;
 #define true 1
 #define false 0
 #endif
+
+#define INCLUDE_SOURCE
 
 #define __global
 
@@ -54,12 +56,10 @@ typedef float real;
 
 typedef char tristate;
 
-/*
 bool even_uint (uint a);
 tristate compare_real (real a, real b);
 tristate signum_real (real a);
 tristate mul_signum (real a, real b);
-*/
 
 
 #ifndef __OPENCL_VERSION__
@@ -67,8 +67,9 @@ uint index_of (const void* e, const void* arr, size_t size);
 void array_set (void* arr, uint i, const void* e, size_t size);
 char* strto_uint (uint* ret, const char* in);
 char* strto_real (real* ret, const char* in);
-
+#ifdef INCLUDE_SOURCE
 #include "util.c"
+#endif
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
 #endif

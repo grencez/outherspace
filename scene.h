@@ -26,8 +26,9 @@ typedef struct scene_struct Scene;
 void cleanup_Scene (Scene* scene);
 void vert_Scene (Point* dst, const Scene* scene, uint idx);
 void elem_Scene (Triangle* dst, const Scene* scene, uint idx);
-
+#ifdef INCLUDE_SOURCE
 #include "scene.c"
+#endif
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
 #endif

@@ -574,6 +574,13 @@ complete_KDTree (const KDTree* tree, uint nelems)
     return pred;
 }
 
+static int uintcmp (const void* a, const void* b)
+{
+    if (*(uint*)a < *(uint*)b)  return -1;
+    if (*(uint*)a > *(uint*)b)  return  1;
+    return 0;
+}
+
 void build_KDTree (KDTree* tree, uint nelems, const Triangle* elems,
                    const BoundingBox* box)
 {
@@ -607,6 +614,17 @@ void build_KDTree (KDTree* tree, uint nelems, const Triangle* elems,
 
     unroll_SList (tree->nodes, &nodelist, sizeof (KDTreeNode));
     unroll_SList (tree->elemidcs, &elemidxlist, sizeof (uint));
+
+    UFor( i, tree->nnodes )
+    {
+        if (leaf_KDTreeNode (&tree->nodes[i]))
+        {
+            KDTreeLeaf* leaf;
+            leaf = &tree->nodes[i].as.leaf;
+            qsort (&tree->elemidcs[leaf->elemidcs], leaf->nelems,
+                   sizeof(uint), uintcmp);
+        }
+    }
 
     cleanup_KDTreeGrid (&grid);
     assert (complete_KDTree (tree, nelems));

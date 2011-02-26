@@ -1,24 +1,19 @@
 
 
 CFLAGS = -g3
-#CFLAGS = -g -O2
+CFLAGS = -g -O2
 
-CFLAGS = -O3
-CFLAGS += -fopenmp
-#CFLAGS += -DNDEBUG
+#CFLAGS = -s -O2
+#CFLAGS = -g -pg -O2
+
+CFLAGS = -O3 -DNDEBUG
+#CFLAGS += -fompenmp -combine -fwhole-program
 
 CFLAGS += -ansi -pedantic
 CFLAGS += -Wall -Wextra
 
-#CFLAGS += -funsafe-loop-optimizations
-#CFLAGS += -fstrict-aliasing
-#CFLAGS += -ftree-loop-linear
-#CFLAGS += -funsafe-math-optimizations
-#CFLAGS += -ftree-loop-im
-#CFLAGS += -march=native
-#CFLAGS += -ftree-loop-distribution
-#CFLAGS += -ftree-loop-ivcanon
-#CFLAGS += -fivopts
+#CFLAGS += -ffast-math
+#CFLAGS += -march=native -mtune=native
 
 LFLAGS += -lm
 
@@ -33,7 +28,7 @@ all: hello main gui
 
 OpenCLPath = /home/grencez/ati-stream-sdk-v2.3-lnx64
 OpenCLLibPath = $(OpenCLPath)/lib/x86_64
-hello: hello.c kdtree.c raytrace.c scene.c space.c util.c xfrm.c
+hello: hello.c kdtree.c raytrace.c scene.c slist.c space.c util.c xfrm.c
 	$(CC) $(CFLAGS) -I $(OpenCLPath)/include $< -o $@ -L $(OpenCLLibPath) -lOpenCL
 
 .PHONY: test-hello

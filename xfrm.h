@@ -27,8 +27,9 @@ void orthorotate_PointXfrm (PointXfrm* dst, const PointXfrm* A, uint dim);
 
 #ifndef __OPENCL_VERSION__
 void output_PointXfrm (FILE* out, const PointXfrm* xfrm);
-
+#ifdef INCLUDE_SOURCE
 #include "xfrm.c"
+#endif
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
 #endif
