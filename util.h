@@ -20,6 +20,12 @@ typedef byte bool;
 #define false 0
 #endif
 
+#define BENCHMARKING
+#ifdef BENCHMARKING
+#ifndef NDEBUG
+#define NDEBUG
+#endif
+#endif
 #define INCLUDE_SOURCE
 
 #define __global

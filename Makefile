@@ -23,7 +23,7 @@ LFLAGS += -lm
 #CC = g++
 #CFLAGS += -DCOMPILER_HAS_BOOL
 
-all: hello main gui
+all: hello cli gui
 	# Done!
 
 OpenCLPath = /home/grencez/ati-stream-sdk-v2.3-lnx64
@@ -35,7 +35,7 @@ hello: hello.c kdtree.c raytrace.c scene.c slist.c space.c util.c xfrm.c
 test-hello: hello
 	LD_LIBRARY_PATH=$(OpenCLLibPath) ./$<
 
-main: cli.c kdtree.c main.c raytrace.c scene.c slist.c space.c util.c xfrm.c
+cli: cli.c kdtree.c main.c raytrace.c scene.c slist.c space.c util.c xfrm.c
 	$(CC) $(CFLAGS) $< -o $@ $(LFLAGS)
 
 gui: gui.c kdtree.c main.c raytrace.c scene.c slist.c space.c util.c xfrm.c
@@ -43,11 +43,11 @@ gui: gui.c kdtree.c main.c raytrace.c scene.c slist.c space.c util.c xfrm.c
 		`pkg-config --libs gtk+-2.0`
 
 .PHONY: test
-test: main
-	#valgrind --track-origins=yes ./main
-	./main
+test: cli
+	#valgrind --track-origins=yes ./cli
+	./cli
 
 .PHONY: clean
 clean:
-	rm -f hello main gui
+	rm -f hello cli gui
 

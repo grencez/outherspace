@@ -36,8 +36,8 @@ int main ()
 
     {
         uint* hits;
-        const uint nrows = 5000;
-        const uint ncols = 5000;
+        const uint nrows = 2000;
+        const uint ncols = 2000;
         hits = AllocT( uint, nrows * ncols );
 #if 0
 #elif 0
@@ -48,8 +48,10 @@ int main ()
         rays_to_hits (hits, nrows, ncols,
                       &space, &view_origin, &view_basis);
 #endif
+#ifndef BENCHMARKING
         output_PBM_image ("out.pbm", nrows, ncols, hits, space.nelems);
         output_PGM_image ("out.pgm", nrows, ncols, hits, space.nelems);
+#endif /* BENCHMARKING */
         free (hits);
     }
 

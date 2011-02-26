@@ -254,13 +254,13 @@ cast_ray (const Point* origin,
                     /* Triangle tri; */
                     /* elem_Scene (&tri, &space->scene, leaf->elems[i]); */
 
-                if (!hit_tri (&mag, origin, dir, tri))  continue;
-
-
-                if (mag < hit_mag)
+                if (hit_tri (&mag, origin, dir, tri))
                 {
-                    hit_mag = mag;
-                    hit_idx = idx;
+                    if (mag < hit_mag)
+                    {
+                        hit_mag = mag;
+                        hit_idx = idx;
+                    }
                 }
             }
 
