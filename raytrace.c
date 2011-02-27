@@ -126,9 +126,9 @@ cross_Point (Point* dst, const Point* a, const Point* b)
     /* and one CROSS has been moved out from the if-else if-else */
 static
     bool
-hit_tri (real* dist,
-         const Point* origin, const Point* dir,
-         const Triangle* elem)
+hit_tri (real* restrict dist,
+         const Point* restrict origin, const Point* restrict dir,
+         const Triangle* restrict elem)
 {
         /* const real epsilon = (real) 0.000001; */
     const real epsilon = 0;
@@ -190,20 +190,20 @@ hit_tri (real* dist,
 
 static
     uint
-cast_ray (const Point* origin,
-          const Point* dir,
+cast_ray (const Point* restrict origin,
+          const Point* restrict dir,
           const uint nelems,
-          __global const Triangle* elems,
-          __global const uint* elemidcs,
-          __global const KDTreeNode* nodes,
-          __global const BoundingBox* box,
+          __global const Triangle* restrict elems,
+          __global const uint* restrict elemidcs,
+          __global const KDTreeNode* restrict nodes,
+          __global const BoundingBox* restrict box,
           bool inside_box)
 {
     Point salo_entrance;
     uint node_idx, parent = 0;
     real hit_mag;
     uint hit_idx;
-    Point* entrance;
+    Point* restrict entrance;
 
     entrance = &salo_entrance;
 
@@ -226,13 +226,13 @@ cast_ray (const Point* origin,
 
     while (1)
     {
-        __global const KDTreeNode* node;
+        __global const KDTreeNode* restrict node;
         node = &nodes[node_idx];
 
         if (leaf_KDTreeNode (node))
         {
             uint i;
-            __global const KDTreeLeaf* leaf;
+            __global const KDTreeLeaf* restrict leaf;
 
             leaf = &node->as.leaf;
             box = &leaf->box;
@@ -243,7 +243,7 @@ cast_ray (const Point* origin,
             {
                 real mag;
                 uint idx;
-                const Triangle* tri;
+                const Triangle* restrict tri;
                 idx = elemidcs[leaf->elemidcs + i];
 #if __OPENCL_VERSION__
                 const Triangle stri = elems[idx];
@@ -286,7 +286,7 @@ cast_ray (const Point* origin,
         }
         else
         {
-            __global const KDTreeInner* inner;
+            __global const KDTreeInner* restrict inner;
             inner = &node->as.inner;
             parent = node_idx;
 
@@ -488,15 +488,15 @@ void rays_to_hits_plane (uint* hits, uint nrows, uint ncols,
 
 
 void rays_to_hits (uint* hits, uint nrows, uint ncols,
-                   const RaySpace* space,
-                   const Point* origin,
-                   const PointXfrm* view_basis)
+                   const RaySpace* restrict space,
+                   const Point* restrict origin,
+                   const PointXfrm* restrict view_basis)
 {
     uint row;
     bool inside_box;
     Point dir_start, row_delta, col_delta;
     const uint dir_dim = 2, row_dim = 1, col_dim = 0;
-    const BoundingBox* box;
+    const BoundingBox* restrict box;
 
     box = &space->scene.box;
 

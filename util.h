@@ -20,7 +20,10 @@ typedef byte bool;
 #define false 0
 #endif
 
-#define BENCHMARKING
+#if __STDC_VERSION__ < 199901L
+#define restrict __restrict
+#endif
+
 #ifdef BENCHMARKING
 #ifndef NDEBUG
 #define NDEBUG
