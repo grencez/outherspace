@@ -256,8 +256,8 @@ minimal_unique (uint n, const uint* a)
     UFor( i, n )  hits[i] = false;
     UFor( i, n )
     {
-        if (a[i] < n)
-            hits[a[i]] = true;
+        assert (a[i] < n);
+        hits[a[i]] = true;
     }
     UFor( i, n )
     {
@@ -272,11 +272,56 @@ minimal_unique (uint n, const uint* a)
 
 static
     void
-sort_intervals (uint nintls, uint* intls, const real* coords)
+swap_uint (uint* x, uint* y)
+{
+    uint tmp = *x;
+    *x = *y;
+    *y = tmp;
+}
+
+
+static
+    uint
+partition_intervals (uint* intls, uint p, uint r, const real* coords)
+{
+    uint i, j;
+    real x;
+    i = p;
+    swap_uint (&intls[r], &intls[p+(r-p)/2]);
+    x = coords[intls[r]];
+    for (j = p; j < r; ++j)
+    {
+        if (coords[intls[j]] <= x)
+        {
+            swap_uint (&intls[i], &intls[j]);
+            ++i;
+        }
+    }
+    swap_uint (&intls[i], &intls[r]);
+    return i;
+}
+
+
+static
+    void
+quicksort_intervals (uint* intls, uint p, uint r, const real* coords)
+{
+    if (p < r)
+    {
+        uint q;
+        q = partition_intervals (intls, p, r, coords);
+        if (q > 0)
+            quicksort_intervals (intls, p, q -1, coords);
+        quicksort_intervals (intls, q +1, r, coords);
+    }
+}
+
+#if 0
+static
+    void
+bubblesort_intervals (uint nintls, uint* intls, const real* coords)
 {
     uint i;
-    assert (even_uint (nintls));
-    assert (minimal_unique (nintls, intls));
     UFor( i, nintls )
     {
         uint j, ti;
@@ -295,6 +340,21 @@ sort_intervals (uint nintls, uint* intls, const real* coords)
             }
         }
     }
+}
+#endif
+
+static
+    void
+sort_intervals (uint nintls, uint* intls, const real* coords)
+{
+    uint i;
+    assert (even_uint (nintls));
+    assert (minimal_unique (nintls, intls));
+#if 0
+    bubblesort_intervals (nintls, intls, coords);
+#else
+    quicksort_intervals (intls, 0, nintls-1, coords);
+#endif
     assert (minimal_unique (nintls, intls));
     if (nintls > 0)
     {
@@ -554,10 +614,11 @@ complete_KDTree (const KDTree* tree, uint nelems)
             uint j;
             const KDTreeLeaf* leaf;
             leaf = &tree->nodes[i].as.leaf;
+            assert (leaf->nelems + leaf->elemidcs <= tree->nelemidcs);
             UFor( j, leaf->nelems )
             {
                 uint idx;
-                idx = leaf->elemidcs + j;
+                idx = tree->elemidcs[leaf->elemidcs + j];
                 assert (idx < nelems);
                 contains[idx] = true;
             }
