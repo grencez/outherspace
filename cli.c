@@ -18,21 +18,31 @@ int main ()
     view_origin.coords[0] = 50;
     view_origin.coords[1] = 50;
     view_origin.coords[2] = -70;
+    identity_PointXfrm (&view_basis);
 #else
     {
-        bool good = readin_wavefront (&space, "sample.obj");
+        bool good = readin_wavefront (&space, "mba2.obj");
         if (!good)  return 1;
     }
 
     view_origin.coords[0] = 0;
-    view_origin.coords[1] = 0;
-    view_origin.coords[2] = -10;
+    view_origin.coords[1] = 10;
+    view_origin.coords[2] = -250;
+
+    {
+        PointXfrm tmp_basis;
+        identity_PointXfrm (&tmp_basis);
+        tmp_basis.pts[1].coords[2] = -0.5;  /* Tilt backwards a bit.*/
+        orthorotate_PointXfrm (&view_basis, &tmp_basis, 1);
+    }
+
 #endif
 
-    build_KDTree (&space.tree, space.nelems, space.elems, &space.scene.box);
-    identity_PointXfrm (&view_basis);
+        /* output_BoundingBox (out, &space.scene.box); */
 
-    output_KDTree (out, &space.tree, space.nelems, space.elems);
+    build_KDTree (&space.tree, space.nelems, space.elems, &space.scene.box);
+
+        /* output_KDTree (out, &space.tree, space.nelems, space.elems); */
 
     {
         uint* hits;
@@ -51,7 +61,7 @@ int main ()
 #ifndef BENCHMARKING
         output_PBM_image ("out.pbm", nrows, ncols, hits, space.nelems);
         output_PGM_image ("out.pgm", nrows, ncols, hits, space.nelems);
-#endif /* BENCHMARKING */
+#endif  /* #ifndef BENCHMARKING */
         free (hits);
     }
 
