@@ -25,9 +25,9 @@ void cleanup_RaySpace (RaySpace* space)
 #if 0
 static
     bool
-hit_tri (Point* hit,
-         const Point* origin, const Point* dir,
-         const Triangle* elem)
+hit_tri (real* restrict dist,
+         const Point* restrict origin, const Point* restrict dir,
+         const Triangle* restrict elem)
 {
     uint i, j, k;
     Triangle t;
@@ -55,15 +55,17 @@ hit_tri (Point* hit,
         k = (2+i) % NTrianglePoints;
         if (tdots[j] <= 0 && tdots[k] <= 0)
         {
-            tristate sign;
             real x;
             x = dirdot * dot_Point (&t.pts[i], &t.pts[i])
                 - trdots[i] * trdots[i];
-            sign = compare_real (x * tdots[i], tdots[j] * tdots[k]);
-            inbounds = sign <= 0;
+            inbounds = (x * tdots[i] <= tdots[j] * tdots[k]);
             break;
         }
     }
+
+    *dist = 50; /* TODO: this is no distance. */
+
+#if 0
     if (inbounds)
     {
         zero_Point (hit);
@@ -89,6 +91,7 @@ hit_tri (Point* hit,
             summ_Point (hit, hit, origin);
         }
     }
+#endif
     return inbounds;
 }
 
@@ -113,7 +116,9 @@ closer_hit (const Point* newhit, const Point* oldhit, const Point* dir)
 
 static
     void
-cross_Point (Point* dst, const Point* a, const Point* b)
+cross_Point (Point* restrict dst,
+             const Point* restrict a,
+             const Point* restrict b)
 {
     dst->coords[0] = a->coords[1] * b->coords[2] - a->coords[2] * b->coords[1];
     dst->coords[1] = a->coords[2] * b->coords[0] - a->coords[0] * b->coords[2];
@@ -121,9 +126,6 @@ cross_Point (Point* dst, const Point* a, const Point* b)
 }
 
 
-    /* code rewritten to do tests on the sign of the determinant */
-    /* the division is before the test of the sign of the det    */
-    /* and one CROSS has been moved out from the if-else if-else */
 static
     bool
 hit_tri (real* restrict dist,
@@ -136,29 +138,21 @@ hit_tri (real* restrict dist,
     real det, inv_det;
     real u, v;
 
-        /* find vectors for two edges sharing vert0 */
-    diff_Point (&edge1, &elem->pts[1], &elem->pts[0]);
-    diff_Point (&edge2, &elem->pts[2], &elem->pts[0]);
+    diff_Point (&tvec, origin, &elem->pts[0]);
 
-        /* begin calculating determinant - also used to calculate U parameter */
+    diff_Point (&edge2, &elem->pts[2], &elem->pts[0]);
     cross_Point (&pvec, dir, &edge2);
 
-        /* if determinant is near zero, ray lies in plane of triangle */
+    diff_Point (&edge1, &elem->pts[1], &elem->pts[0]);
+    u = dot_Point (&tvec, &pvec);
     det = dot_Point (&edge1, &pvec);
-
-        /* calculate distance from vert0 to ray origin */
-    diff_Point (&tvec, origin, &elem->pts[0]);
-    inv_det = 1 / det;
-
-    cross_Point (&qvec, &tvec, &edge1);
 
     if (det > epsilon)
     {
-        u = dot_Point (&tvec, &pvec);
         if (u < 0 || u > det)
             return false;
 
-            /* calculate V parameter and test bounds */
+        cross_Point (&qvec, &tvec, &edge1);
         v = dot_Point (dir, &qvec);
         if (v < 0 || u + v > det)
             return false;
@@ -166,24 +160,25 @@ hit_tri (real* restrict dist,
     }
     else if (det < -epsilon)
     {
-            /* calculate U parameter and test bounds */
-        u = dot_Point (&tvec, &pvec);
         if (u > 0 || u < det)
             return false;
 
-            /* calculate V parameter and test bounds */
+        cross_Point (&qvec, &tvec, &edge1);
         v = dot_Point (dir, &qvec);
         if (v > 0 || u + v < det)
             return false;
     }
-    else return false;  /* ray is parallel to the plane of the triangle */
+    else
+    {
+        return false;
+    }
 
+    inv_det = 1 / det;
     *dist = dot_Point (&edge2, &qvec) * inv_det;
 
         /* u *= inv_det; */
         /* v *= inv_det; */
 
-        /* Return false when the ray is behind the origin. */
     return *dist >= 0;
 }
 #endif

@@ -61,7 +61,7 @@ tristate signum_real (real a)
     return compare_real (a, 0);
 }
 
-tristate mul_signum (real a, real b)
+tristate mul_signum (tristate a, tristate b)
 {
     if (a == 0 || b == 0)
         return 0;

@@ -63,12 +63,12 @@ typedef float real;
 
 #define Max_uint UINT_MAX
 
-typedef char tristate;
+typedef int tristate;
 
 bool even_uint (uint a);
 tristate compare_real (real a, real b);
 tristate signum_real (real a);
-tristate mul_signum (real a, real b);
+tristate mul_signum (tristate a, tristate b);
 
 
 #ifndef __OPENCL_VERSION__

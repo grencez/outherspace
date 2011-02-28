@@ -4,14 +4,13 @@
 #CC = g++
 
 CONFIG = fastest
-#CONFIG = snappy
 #CONFIG = fastest noassert
 #CONFIG = benchmark snappy debug
 #CONFIG = benchmark fastest
 #CONFIG = benchmark snappy debug openmp
 #CONFIG = ultradebug
 
-#CONFIG += ansi
+CONFIG += ansi
 #CONFIG += c99
 
 
@@ -98,8 +97,8 @@ gui: gui.c kdtree.c main.c raytrace.c scene.c slist.c space.c util.c xfrm.c
 
 .PHONY: test
 test: cli
-	#valgrind --track-origins=yes ./cli
-	./cli
+	#valgrind --track-origins=yes ./$<
+	./$<
 
 .PHONY: clean
 clean:
