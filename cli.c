@@ -43,6 +43,7 @@ int main ()
     build_KDTree (&space.tree, space.nelems, space.elems, &space.scene.box);
 
         /* output_KDTree (out, &space.tree, space.nelems, space.elems); */
+        /* output_gv_KDTree (out, &space.tree); */
 
     {
         uint* hits;

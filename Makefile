@@ -3,10 +3,11 @@
 #CC = gcc
 #CC = g++
 
-CONFIG = fastest
-#CONFIG = fastest noassert
+CONFIG = fast
+#CONFIG = debug
+#CONFIG = fast noassert
 #CONFIG = benchmark snappy debug
-#CONFIG = benchmark fastest
+#CONFIG = benchmark fast
 #CONFIG = benchmark snappy debug openmp
 #CONFIG = ultradebug
 
@@ -27,11 +28,11 @@ CFLAGS += -Wall -Wextra
 
 ## Serious debugging is about to happen.
 ifneq (,$(findstring ultradebug,$(CONFIG)))
-	CONFIG = $(filter-out snappy fastest debug,$(CFLAGS))
+	CONFIG = $(filter-out snappy fast debug,$(CFLAGS))
 	CFLAGS += -g3
 endif
 ## Go really fast.
-ifneq (,$(findstring fastest,$(CONFIG)))
+ifneq (,$(findstring fast,$(CONFIG)))
 	CONFIG += openmp
 	CFLAGS += -O3
 	#CFLAGS += -ffast-math

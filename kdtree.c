@@ -63,6 +63,36 @@ void output_KDTree (FILE* out, const KDTree* tree,
 
 }
 
+static
+    void
+output_gv_KDTreeNode (FILE* out, uint node_idx, const KDTree* tree)
+{
+    const KDTreeNode* node;
+    node = &tree->nodes[node_idx];
+    if (!leaf_KDTreeNode (node))
+    {
+        uint i;
+        const KDTreeInner* inner;
+        inner = &node->as.inner;
+        UFor( i, 2 )
+        {
+            fprintf (out, "\"%u\" -> \"%u\";\n",
+                     node_idx, inner->children[i]);
+            output_gv_KDTreeNode (out, inner->children[i], tree);
+        }
+    }
+}
+
+void output_gv_KDTree (FILE* out, const KDTree* tree)
+{
+    fputs ("digraph kdtree {\n", out);
+    fputs ("node [color=lightblue2, style=filled];\n", out);
+    output_gv_KDTreeNode (out, 0, tree);
+    fputs ("}\n", out);
+
+}
+
+
 
 static void cleanup_KDTreeNode (uint node_idx, KDTree* tree)
 {

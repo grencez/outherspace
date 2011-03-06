@@ -7,6 +7,8 @@
 
 static Point view_origin;
 static PointXfrm view_basis;
+static uint view_nrows = 400;
+static uint view_ncols = 400;
 static uint mouse_coords[2];
 static uint mouse_diff[2];
 
@@ -33,44 +35,60 @@ static
     gboolean
 key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
 {
-    tristate step = 0;
-    tristate stride = 0;
+    Point diff;
+    tristate step = 0, roll = 0;
+    tristate x_stride = 0, y_stride = 0;
     const real scale = 5;
     (void) _data;
 
-    if (event->keyval == GDK_Up)    step =  1;
-    if (event->keyval == GDK_Down)  step = -1;
-    if (event->keyval == GDK_Right)  stride =  1;
-    if (event->keyval == GDK_Left)   stride = -1;
-    if (event->keyval == GDK_Escape)  gdk_pointer_ungrab (event->time);
+    if (event->state & GDK_SHIFT_MASK)
+    {
+        if (event->keyval == GDK_Up)    y_stride =  1;
+        if (event->keyval == GDK_Down)  y_stride = -1;
+        if (event->keyval == GDK_Right)  x_stride =  1;
+        if (event->keyval == GDK_Left)   x_stride = -1;
+    }
+    else
+    {
+        if (event->keyval == GDK_Up)    step =  1;
+        if (event->keyval == GDK_Down)  step = -1;
+        if (event->keyval == GDK_Right)  roll =  1;
+        if (event->keyval == GDK_Left)   roll = -1;
+        if (event->keyval == GDK_Escape)  gdk_pointer_ungrab (event->time);
+    }
 
     if (step != 0)
     {
-        Point diff;
-#if 0
         scale_Point (&diff, &view_basis.pts[NDimensions-1], scale * step);
         summ_Point (&view_origin, &view_origin, &diff);
-#else
-        scale_Point (&diff, &view_basis.pts[1], scale * step);
-        summ_Point (&view_origin, &view_origin, &diff);
-#endif
     }
-    if (stride != 0)
+    if (roll != 0)
     {
-        Point diff;
-        scale_Point (&diff, &view_basis.pts[0], scale * stride);
+        PointXfrm rotation, tmp;
+        rotation_PointXfrm (&rotation, 0, 1, roll * M_PI / 8);
+        xfrm_PointXfrm (&tmp, &rotation, &view_basis);
+        orthonormalize_PointXfrm (&view_basis, &tmp);
+    }
+    if (y_stride != 0)
+    {
+        scale_Point (&diff, &view_basis.pts[1], scale * y_stride);
         summ_Point (&view_origin, &view_origin, &diff);
-#if 0
-        PointXfrm tmp, rotation;
-        rotation_PointXfrm (&tmp, 2, 0, stride * M_PI / 8);
-        to_basis_PointXfrm (&rotation, &tmp, &view_basis);
+    }
+    if (x_stride != 0)
+    {
+#if 1
+        scale_Point (&diff, &view_basis.pts[0], scale * x_stride);
+        summ_Point (&view_origin, &view_origin, &diff);
+#else
+        PointXfrm rotation, tmp;
+        rotation_PointXfrm (&rotation, 0, 2, x_stride * M_PI / 8);
         xfrm_PointXfrm (&tmp, &rotation, &view_basis);
         orthonormalize_PointXfrm (&view_basis, &tmp);
 #endif
 
     }
 
-    if (step != 0 || stride != 0)
+    if (step != 0 || roll != 0 || x_stride != 0 || y_stride != 0)
     {
         FILE* out;
         out = stdout;
@@ -113,8 +131,16 @@ static gboolean grab_mouse_fn (GtkWidget* da,
     out = stdout;
 
     gdk_drawable_get_size (da->window, &width, &height);
-    x = (2 * event->x - width) / width;
-    y = (height - 2 * event->y) / height;
+
+    if (event->x < 0 || view_ncols < event->x ||
+        event->y < 0 || view_nrows < event->y)
+    {
+        puts ("Stay in the box hoser!\n");
+        return FALSE;
+    }
+
+    x = (2 * event->x - view_ncols) / view_ncols;
+    y = (view_ncols - 2 * event->y) / view_nrows;
 
     fprintf (out, "x:%f  y:%f\n", x, y);
 
@@ -194,30 +220,34 @@ render_RaySpace (byte* data, const RaySpace* space,
     uint* hits;
     guint32 color_diff;
     uint row, col;
-    hits = AllocT( uint, nrows * ncols );
-    fprintf (stderr, "nrows:%u  ncols:%u\n", nrows, ncols);
+
+    hits = AllocT( uint, view_nrows * view_ncols );
+    fprintf (stderr, "nrows:%u  ncols:%u\n", view_nrows, view_ncols);
 #if 0
 #elif 0
-    rays_to_hits_perspective (hits, nrows, ncols,
+    rays_to_hits_perspective (hits, view_nrows, view_ncols,
                               space, view_origin.coords[2]);
 #elif 1
-    rays_to_hits (hits, nrows, ncols,
+    rays_to_hits (hits, view_nrows, view_ncols,
                   space, &view_origin, &view_basis);
 #endif
 
     color_diff = (guint32) 0xFFFFFF / (guint32) space->nelems;
 
-    UFor( row, nrows )
+    UFor( row, view_nrows )
     {
         uint* hitline;
         guint32* outline;
+        if (row >= nrows)  break;
 
-        hitline = &hits[ncols * row];
+        hitline = &hits[view_ncols * row];
         outline = (guint32*) &data[stride * row];
 
-        UFor( col, ncols )
+        UFor( col, view_ncols )
         {
             guint32 i, x, y;
+            if (col >= ncols)  break;
+
             x = color_diff * (space->nelems - hitline[col]);
             y = 0xFF000000;
 
@@ -230,7 +260,6 @@ render_RaySpace (byte* data, const RaySpace* space,
                         y |= (1 << (8*i + j));
                 }
             }
-
             outline[col] = y;
         }
     }
@@ -290,26 +319,34 @@ int main (int argc, char* argv[])
 
     zero_Point (&view_origin);
 
-#if 1
+#if 0
+    random_RaySpace (&space, 20);
+    
     view_origin.coords[0] = 50;
     view_origin.coords[1] = 50;
-    view_origin.coords[2] = -1;
-
-    random_RaySpace (&space, 20);
+    view_origin.coords[2] = -70;
+    identity_PointXfrm (&view_basis);
 #else
     {
-        bool good = readin_wavefront (&space, "teapot.obj");
+        bool good = readin_wavefront (&space, "mba2.obj");
         if (!good)  return 1;
     }
 
     view_origin.coords[0] = 0;
-    view_origin.coords[1] = 0;
-    view_origin.coords[2] = -10;
+    view_origin.coords[1] = 10;
+    view_origin.coords[2] = -250;
+
+    {
+        PointXfrm tmp_basis;
+        identity_PointXfrm (&tmp_basis);
+        tmp_basis.pts[1].coords[2] = -0.5;  /* Tilt backwards a bit.*/
+        orthorotate_PointXfrm (&view_basis, &tmp_basis, 1);
+    }
+
 #endif
 
     build_KDTree (&space.tree, space.nelems, space.elems, &space.scene.box);
-    output_KDTree (stderr, &space.tree, space.nelems, space.elems);
-    identity_PointXfrm (&view_basis);
+        /* output_KDTree (stderr, &space.tree, space.nelems, space.elems); */
 
     gtk_init (&argc, &argv);
 
@@ -376,7 +413,7 @@ int main (int argc, char* argv[])
         /* gtk_widget_set_app_paintable (window, TRUE); */
     gtk_window_set_position (GTK_WINDOW(window), GTK_WIN_POS_CENTER);
     gtk_window_set_title (GTK_WINDOW(window), "lines");
-    gtk_window_set_default_size (GTK_WINDOW(window), 400, 300); 
+    gtk_window_set_default_size (GTK_WINDOW(window), view_ncols, view_nrows); 
 
     gtk_widget_show_all (window);
     gtk_main ();

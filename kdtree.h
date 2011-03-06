@@ -61,6 +61,7 @@ uint upnext_KDTreeNode (Point* entrance,
 #ifndef __OPENCL_VERSION__
 void output_KDTree (FILE* out, const KDTree* tree,
                     uint nelems, const Triangle* elems);
+void output_gv_KDTree (FILE* out, const KDTree* tree);
 
 void cleanup_KDTree (KDTree* tree);
 
