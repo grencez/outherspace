@@ -47,23 +47,28 @@ int main ()
 
     {
         uint* hits;
+        real* mags;
         const uint nrows = 2000;
         const uint ncols = 2000;
+        const real view_angle = 2 * M_PI / 3;
+
         hits = AllocT( uint, nrows * ncols );
+        mags = AllocT( real, nrows * ncols );
+
 #if 0
 #elif 0
-        rays_to_hits_perspective (hits, nrows, ncols,
-                                  &space,
+        rays_to_hits_perspective (hits, mags, nrows, ncols, &space,
                                   view_origin.coords[2]);
 #elif 1
-        rays_to_hits (hits, nrows, ncols,
-                      &space, &view_origin, &view_basis);
+        rays_to_hits (hits, mags, nrows, ncols,
+                      &space, &view_origin, &view_basis, view_angle);
 #endif
 #ifndef BENCHMARKING
         output_PBM_image ("out.pbm", nrows, ncols, hits, space.nelems);
         output_PGM_image ("out.pgm", nrows, ncols, hits, space.nelems);
 #endif  /* #ifndef BENCHMARKING */
         free (hits);
+        free (mags);
     }
 
     cleanup_RaySpace (&space);

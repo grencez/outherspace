@@ -318,7 +318,7 @@ run_ray_cast ()
     RaySpace space;
     Point view_origin;
     PointXfrm view_basis;
-    RayCastParams params;
+    MultiRayCastParams params;
 
     const uint nrows = 5000;
     const uint ncols = 5000;
@@ -341,8 +341,9 @@ run_ray_cast ()
     hits = AllocT( uint, nrows * ncols );
     hits_size = nrows * ncols * sizeof (uint);
 
-    build_RayCastParams (&params, nrows, ncols, &space,
-                         &view_origin, &view_basis);
+    build_MultiRayCastParams (&params, nrows, ncols, &space,
+                              &view_origin, &view_basis,
+                              2 * M_PI / 3);
 
 
     compute_devices (&ndevices, &devices, &context, &comqs);
@@ -378,7 +379,7 @@ run_ray_cast ()
 
     inp_params = clCreateBuffer (context,
                                  CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                                 sizeof (RayCastParams),
+                                 sizeof (MultiRayCastParams),
                                  &params, &err);
     check_cl_status (err, "alloc params buffer");
 
@@ -473,7 +474,9 @@ run_ray_cast ()
     if (devices)  free (devices);
     if (comqs)  free (comqs);
 
+#ifndef BENCHMARKING
     output_PGM_image ("out.pgm", nrows, ncols, hits, space.nelems);
+#endif
     free (hits);
     cleanup_RaySpace (&space);
 }

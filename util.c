@@ -25,6 +25,7 @@ char* strto_uint (uint* ret, const char* in)
     v = strtoul (in, &out, 10);
 
     if (v > Max_uint)  out = 0;
+    if (out == in)  out = 0;
     if (out)  *ret = (uint) v;
     return out;
 }
@@ -38,6 +39,7 @@ char* strto_real (real* ret, const char* in)
     assert (in);
     v = strtod (in, &out);
 
+    if (out == in)  out = 0;
     if (out)  *ret = (real) v;
     return out;
 }

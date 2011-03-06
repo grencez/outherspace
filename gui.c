@@ -11,6 +11,11 @@ static uint view_nrows = 400;
 static uint view_ncols = 400;
 static uint mouse_coords[2];
 static uint mouse_diff[2];
+static uint* ray_hits = 0;
+static real* ray_mags = 0;
+static real view_angle = 2 * M_PI / 3;
+static real view_light = 400;
+static bool needs_recast = true;
 
 static gboolean delete_event (GtkWidget* widget,
                               GdkEvent* event,
@@ -28,6 +33,8 @@ static void destroy_app (GtkWidget* widget,
 {
     (void) widget;
     (void) data;
+    if (ray_hits)  free (ray_hits);
+    if (ray_mags)  free (ray_mags);
     gtk_main_quit ();
 }
 
@@ -56,6 +63,24 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
         if (event->keyval == GDK_Left)   roll = -1;
         if (event->keyval == GDK_Escape)  gdk_pointer_ungrab (event->time);
     }
+
+    if (event->keyval == GDK_V)
+    {
+        view_angle += M_PI / 18;
+        while (view_angle > M_PI - .00001)
+            view_angle -= M_PI / 18;
+        needs_recast = true;
+    }
+    if (event->keyval == GDK_v)
+    {
+        view_angle -= M_PI / 18;
+        while (view_angle < .00001)
+            view_angle += M_PI / 18;
+        needs_recast = true;
+    }
+
+    if (event->keyval == GDK_L)  view_light += 10;
+    if (event->keyval == GDK_l)  view_light -= 10;
 
     if (step != 0)
     {
@@ -99,9 +124,9 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
         fputs (" basis:", out);
         output_PointXfrm (out, &view_basis);
         fputc ('\n', out);
-
-        gtk_widget_queue_draw (widget);
+        needs_recast = true;
     }
+    gtk_widget_queue_draw (widget);
 
     return TRUE;
 }
@@ -155,6 +180,7 @@ static gboolean grab_mouse_fn (GtkWidget* da,
     fputs (" basis:", out);
     output_PointXfrm (out, &view_basis);
     fputc ('\n', out);
+    needs_recast = true;
     gtk_widget_queue_draw (da);
 
 #if 0
@@ -217,22 +243,32 @@ static
 render_RaySpace (byte* data, const RaySpace* space,
                  uint nrows, uint ncols, uint stride)
 {
-    uint* hits;
     guint32 color_diff;
     uint row, col;
+    MultiRayCastParams params;
 
-    hits = AllocT( uint, view_nrows * view_ncols );
-    fprintf (stderr, "nrows:%u  ncols:%u\n", view_nrows, view_ncols);
+    if (needs_recast)
+    {
+        fprintf (stderr, "nrows:%u  ncols:%u\n", view_nrows, view_ncols);
 #if 0
 #elif 0
-    rays_to_hits_perspective (hits, view_nrows, view_ncols,
-                              space, view_origin.coords[2]);
+        rays_to_hits_perspective (ray_hits, ray_mags,
+                                  view_nrows, view_ncols,
+                                  space, view_origin.coords[2]);
 #elif 1
-    rays_to_hits (hits, view_nrows, view_ncols,
-                  space, &view_origin, &view_basis);
+        rays_to_hits (ray_hits, ray_mags, view_nrows, view_ncols,
+                      space, &view_origin, &view_basis,
+                      view_angle);
 #endif
+    }
+    needs_recast = false;
+
+    build_MultiRayCastParams (&params, view_nrows, view_ncols,
+                              space, &view_origin, &view_basis,
+                              view_angle);
 
     color_diff = (guint32) 0xFFFFFF / (guint32) space->nelems;
+#if 0
 
     UFor( row, view_nrows )
     {
@@ -240,7 +276,7 @@ render_RaySpace (byte* data, const RaySpace* space,
         guint32* outline;
         if (row >= nrows)  break;
 
-        hitline = &hits[view_ncols * row];
+        hitline = &ray_hits[view_ncols * row];
         outline = (guint32*) &data[stride * row];
 
         UFor( col, view_ncols )
@@ -263,8 +299,62 @@ render_RaySpace (byte* data, const RaySpace* space,
             outline[col] = y;
         }
     }
+#else
+    UFor( row, view_nrows )
+    {
+        uint* hitline;
+        real* magline;
+        guint32* outline;
+        if (row >= nrows)  break;
 
-    free (hits);
+        hitline = &ray_hits[view_ncols * row];
+        magline = &ray_mags[view_ncols * row];
+        outline = (guint32*) &data[stride * row];
+
+        UFor( col, view_ncols )
+        {
+            uint i;
+            guint32 x, y;
+            real scale;
+            if (col >= ncols)  break;
+
+            y = 0xFF000000;
+
+            scale = 1;
+
+            if (hitline[col] < space->nelems)
+            {
+                Point dir, u, v, tmp;
+                const Triangle* elem;
+                dir_from_MultiRayCastParams (&dir, row, col, &params);
+                elem = &space->elems[hitline[col]];
+
+                diff_Point (&u, &elem->pts[0], &elem->pts[1]);
+                diff_Point (&v, &elem->pts[0], &elem->pts[2]);
+
+                proj_Point (&tmp, &v, &u);
+                diff_Point (&v, &v, &tmp);
+
+                normalize_Point (&u, &u);
+                normalize_Point (&v, &v);
+
+                proj_Plane (&tmp, &dir, &u, &v);
+                scale *= dot_Point (&dir, &tmp);
+                if (scale < 0)  scale = -scale;
+            }
+            scale = 1 - scale;
+            if (scale < 0)  scale = 0;
+
+            x = (guint32) (scale * 0xFF);
+            UFor( i, 3 )
+            {
+                y |= x << 8*i;
+            }
+            outline[col] = y;
+        }
+
+    }
+#endif
 }
 #endif
 
@@ -319,7 +409,7 @@ int main (int argc, char* argv[])
 
     zero_Point (&view_origin);
 
-#if 0
+#if 1
     random_RaySpace (&space, 20);
     
     view_origin.coords[0] = 50;
@@ -414,6 +504,8 @@ int main (int argc, char* argv[])
     gtk_window_set_position (GTK_WINDOW(window), GTK_WIN_POS_CENTER);
     gtk_window_set_title (GTK_WINDOW(window), "lines");
     gtk_window_set_default_size (GTK_WINDOW(window), view_ncols, view_nrows); 
+    ray_hits = AllocT( uint, view_nrows * view_ncols );
+    ray_mags = AllocT( real, view_nrows * view_ncols );
 
     gtk_widget_show_all (window);
     gtk_main ();

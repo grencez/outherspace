@@ -129,6 +129,7 @@ void output_PGM_image (const char* filename, uint nrows, uint ncols,
 
 bool readin_wavefront (RaySpace* space, const char* filename)
 {
+    uint line_no = 0;
     uint len = BUFSIZ;
     char buf[BUFSIZ];
     bool good = true;
@@ -152,9 +153,10 @@ bool readin_wavefront (RaySpace* space, const char* filename)
          line = fgets (buf, len, in))
     {
         uint i;
-        line = strpbrk (buf, "#fv");
-        if (!line)  continue;
-        if (line[0] == '#')  continue;
+        line_no += 1;
+        i = strspn (line, " \t");
+        assert (i < len);
+        line = &line[i];
 
         if (line[0] == 'v')
         {
@@ -168,25 +170,33 @@ bool readin_wavefront (RaySpace* space, const char* filename)
                 if (!line)
                 {
                     good = false;
+                    fprintf (stderr, "Line:%u  Not enough coordinates!\n",
+                             line_no);
                     break;
                 }
             }
         }
-        else
+        else if (line[0] == 'f')
         {
-            SceneTriangle* tri;
-            assert (line[0] == 'f');
-            tri = AllocT( SceneTriangle, 1 );
-            app_SList (&elemlist, tri);
+            SceneTriangle tri;
+            good = false;
+
             line = &line[1];
-            UFor( i, NTrianglePoints )
+            if (line)  line = strto_uint (&tri.pts[0], line);
+            if (line)  line = strto_uint (&tri.pts[1], line);
+
+            if (line) while (true)
             {
-                line = strto_uint (&tri->pts[i], line);
-                if (!line)
-                {
-                    good = false;
-                    break;
-                }
+                SceneTriangle* tri_elt;
+                line = strto_uint (&tri.pts[2], line);
+                if (line)  good = true;
+                else       break;
+
+                tri_elt = AllocT( SceneTriangle, 1 );
+                copy_SceneTriangle (tri_elt, &tri);
+                app_SList (&elemlist, tri_elt);
+
+                tri.pts[1] = tri.pts[2];
             }
         }
     }
@@ -225,7 +235,10 @@ bool readin_wavefront (RaySpace* space, const char* filename)
                 uint vert_id;
                 vert_id = read_tri->pts[pi];
                 if (vert_id == 0 || vert_id > scene->nelems)
+                {
+                    fprintf (stderr, "Bad vertex: %u\n", vert_id);
                     good = false;
+                }
                 else
                     copy_Point (&tri->pts[pi], &scene->verts[vert_id-1]);
             }

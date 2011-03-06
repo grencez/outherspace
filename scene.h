@@ -23,6 +23,7 @@ struct scene_struct
 typedef struct scene_struct Scene;
 
 #ifndef __OPENCL_VERSION__
+void copy_SceneTriangle (SceneTriangle* dst, const SceneTriangle* src);
 void cleanup_Scene (Scene* scene);
 void vert_Scene (Point* dst, const Scene* scene, uint idx);
 void elem_Scene (Triangle* dst, const Scene* scene, uint idx);

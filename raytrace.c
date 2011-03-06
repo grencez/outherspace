@@ -22,6 +22,25 @@ void cleanup_RaySpace (RaySpace* space)
 }
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
+
+void dir_from_MultiRayCastParams (Point* dir, uint row, uint col,
+                                  const MultiRayCastParams* params)
+{
+    Point partial_dir;
+
+    copy_Point (dir, &params->dir_start);
+
+    partial_dir = params->dir_delta[1];
+    scale_Point (&partial_dir, &partial_dir, params->npixels[1] - row -1);
+    summ_Point (dir, dir, &partial_dir);
+
+    partial_dir = params->dir_delta[0];
+    scale_Point (&partial_dir, &partial_dir, col);
+    summ_Point (dir, dir, &partial_dir);
+    normalize_Point (dir, dir);
+}
+
+
 #if 0
 static
     bool
@@ -184,8 +203,9 @@ hit_tri (real* restrict dist,
 #endif
 
 static
-    uint
-cast_ray (const Point* restrict origin,
+    void
+cast_ray (uint* restrict ret_hit, real* restrict ret_mag,
+          const Point* restrict origin,
           const Point* restrict dir,
           const uint nelems,
           __global const Triangle* restrict elems,
@@ -215,7 +235,11 @@ cast_ray (const Point* restrict origin,
     else
     {
         if (! hit_outer_BoundingBox (entrance, box, origin, dir))
-            return nelems;
+        {
+            *ret_hit = nelems;
+            *ret_mag = Max_real;
+            return;
+        }
         node_idx = 0;
     }
 
@@ -295,11 +319,13 @@ cast_ray (const Point* restrict origin,
                 node_idx = inner->children[1];
         }
     }
-    return hit_idx;
+    *ret_hit = hit_idx;
+    *ret_mag = hit_mag;
 }
 
 #ifndef __OPENCL_VERSION__
-void rays_to_hits_fish (uint* hits, uint nrows, uint ncols,
+void rays_to_hits_fish (uint* hits, real* mags,
+                        uint nrows, uint ncols,
                         const RaySpace* space, real zpos)
 {
     uint row;
@@ -335,14 +361,17 @@ void rays_to_hits_fish (uint* hits, uint nrows, uint ncols,
         uint col;
         real row_angle;
         uint* hitline;
+        real* magline;
 
         hitline = &hits[row * ncols];
+        magline = &mags[row * ncols];
 
         row_angle = row_start + row_delta * (nrows - row -1);
 
         UFor( col, ncols )
         {
             Point dir;
+            uint hit; real mag;
             real col_angle;
             col_angle = col_start + col_delta * col;
 
@@ -357,15 +386,18 @@ void rays_to_hits_fish (uint* hits, uint nrows, uint ncols,
                                    - tdir.coords[col_dim] * sin (col_angle));
 
             normalize_Point (&dir, &dir);
-            hitline[col] = cast_ray (&origin, &dir,
-                                     space->nelems, space->elems,
-                                     space->tree.elemidcs, space->tree.nodes,
-                                     &space->scene.box, inside_box);
+            cast_ray (&hit, &mag, &origin, &dir,
+                      space->nelems, space->elems,
+                      space->tree.elemidcs, space->tree.nodes,
+                      &space->scene.box, inside_box);
+            hitline[col] = hit;
+            magline[col] = mag;
         }
     }
 }
 
-void rays_to_hits_perspective (uint* hits, uint nrows, uint ncols,
+void rays_to_hits_perspective (uint* hits, real* mags,
+                               uint nrows, uint ncols,
                                const RaySpace* space, real zpos)
 {
     uint row;
@@ -402,12 +434,15 @@ void rays_to_hits_perspective (uint* hits, uint nrows, uint ncols,
     {
         uint col;
         uint* hitline;
+        real* magline;
 
         hitline = &hits[row * ncols];
+        magline = &mags[row * ncols];
 
         UFor( col, ncols )
         {
             Point dir;
+            uint hit; real mag;
 
                 /* if (! (row == 333 && col == 322))  continue; */
 
@@ -418,17 +453,21 @@ void rays_to_hits_perspective (uint* hits, uint nrows, uint ncols,
             diff_Point (&dir, &dir, &origin);
             normalize_Point (&dir, &dir);
 
-            hitline[col] = cast_ray (&origin, &dir,
-                                     space->nelems, space->elems,
-                                     space->tree.elemidcs, space->tree.nodes,
-                                     &space->scene.box, inside_box);
+            cast_ray (&hit, &mag,
+                      &origin, &dir,
+                      space->nelems, space->elems,
+                      space->tree.elemidcs, space->tree.nodes,
+                      &space->scene.box, inside_box);
+            hitline[col] = hit;
+            magline[col] = mag;
 
                 /* if (row == 333 && col == 322)  puts (elem ? "hit" : "miss"); */
         }
     }
 }
 
-void rays_to_hits_plane (uint* hits, uint nrows, uint ncols,
+void rays_to_hits_plane (uint* hits, real* mags,
+                         uint nrows, uint ncols,
                          const RaySpace* space, real zpos)
 {
     uint row;
@@ -459,8 +498,10 @@ void rays_to_hits_plane (uint* hits, uint nrows, uint ncols,
         uint col;
         Point origin, dir;
         uint* hitline;
+        real* magline;
 
         hitline = &hits[row * ncols];
+        magline = &mags[row * ncols];
 
         dir.coords[dir_dim] = 1;
         dir.coords[row_dim] = 0;
@@ -472,20 +513,24 @@ void rays_to_hits_plane (uint* hits, uint nrows, uint ncols,
 
         UFor( col, ncols )
         {
+            uint hit; real mag;
             origin.coords[col_dim] = col_start + col * col_delta;
-            hitline[col] = cast_ray (&origin, &dir,
-                                     space->nelems, space->elems,
-                                     space->tree.elemidcs, space->tree.nodes,
-                                     &space->scene.box, inside_box);
+            cast_ray (&hit, &mag, &origin, &dir,
+                      space->nelems, space->elems,
+                      space->tree.elemidcs, space->tree.nodes,
+                      &space->scene.box, inside_box);
+            hitline[col] = hit;
+            magline[col] = mag;
         }
     }
 }
 
-
-void rays_to_hits (uint* hits, uint nrows, uint ncols,
+void rays_to_hits (uint* hits, real* mags,
+                   uint nrows, uint ncols,
                    const RaySpace* restrict space,
                    const Point* restrict origin,
-                   const PointXfrm* restrict view_basis)
+                   const PointXfrm* restrict view_basis,
+                   real view_angle)
 {
     uint row;
     bool inside_box;
@@ -498,7 +543,7 @@ void rays_to_hits (uint* hits, uint nrows, uint ncols,
     {
         Point dstart, rdelta, cdelta;
         real tcos;
-        tcos = cos (M_PI / 3); /* cos (view_angle / 2) */
+        tcos = cos (view_angle / 2);
 
         zero_Point (&dstart);
         zero_Point (&rdelta);
@@ -527,15 +572,18 @@ void rays_to_hits (uint* hits, uint nrows, uint ncols,
     {
         uint col;
         uint* hitline;
+        real* magline;
         Point partial_dir;
 
         hitline = &hits[row * ncols];
+        magline = &mags[row * ncols];
         scale_Point (&partial_dir, &row_delta, nrows - row -1);
         summ_Point (&partial_dir, &partial_dir, &dir_start);
 
         UFor( col, ncols )
         {
             Point dir;
+            uint hit; real mag;
 
                 /* if (! (row == 333 && col == 322))  continue; */
 
@@ -543,26 +591,30 @@ void rays_to_hits (uint* hits, uint nrows, uint ncols,
             summ_Point (&dir, &dir, &partial_dir);
             normalize_Point (&dir, &dir);
 
-            hitline[col] = cast_ray (origin, &dir,
-                                     space->nelems, space->elems,
-                                     space->tree.elemidcs, space->tree.nodes,
-                                     &space->scene.box, inside_box);
+            cast_ray (&hit, &mag, origin, &dir,
+                      space->nelems, space->elems,
+                      space->tree.elemidcs, space->tree.nodes,
+                      &space->scene.box, inside_box);
+            hitline[col] = hit;
+            magline[col] = mag;
 
                 /* if (row == 333 && col == 322)  puts (elem ? "hit" : "miss"); */
         }
     }
 }
 
-void build_RayCastParams (RayCastParams* params,
-                          uint nrows, uint ncols,
-                          const RaySpace* space,
-                          const Point* origin,
-                          const PointXfrm* view_basis)
+
+void build_MultiRayCastParams (MultiRayCastParams* params,
+                               uint nrows, uint ncols,
+                               const RaySpace* space,
+                               const Point* origin,
+                               const PointXfrm* view_basis,
+                               real view_angle)
 {
     const uint dir_dim = 2, row_dim = 1, col_dim = 0;
     Point dstart, rdelta, cdelta;
     real tcos;
-    tcos = cos (M_PI / 3); /* cos (view_angle / 2) */
+    tcos = cos (view_angle / 2);
 
     zero_Point (&dstart);
     zero_Point (&rdelta);

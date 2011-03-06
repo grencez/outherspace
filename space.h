@@ -39,6 +39,7 @@ void copy_BoundingBox (BoundingBox* dst, const BoundingBox* src);
 real magnitude_Point (const Point* a);
 void normalize_Point (Point* dst, const Point* a);
 void proj_Point (Point* dst, const Point* a, const Point* b);
+void proj_Plane (Point* dst, const Point* a, const Point* u, const Point* v);
 tristate facing_BoundingPlane (uint dim, real plane,
                                const Point* origin, const Point* dir);
 bool hit_inner_BoundingPlane (Point* entrance,

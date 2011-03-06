@@ -128,6 +128,14 @@ void proj_Point (Point* dst, const Point* a, const Point* b)
     scale_Point (dst, b, dot_Point (a, b) / dot_Point (b, b));
 }
 
+void proj_Plane (Point* dst, const Point* a, const Point* u, const Point* v)
+{
+    Point x, y;
+    proj_Point (&x, a, u);
+    proj_Point (&y, a, v);
+    summ_Point (dst, &x, &y);
+}
+
 tristate facing_BoundingPlane (uint dim, real plane,
                                const Point* origin, const Point* dir)
 {

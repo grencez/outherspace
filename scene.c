@@ -1,6 +1,11 @@
 
 #include "scene.h"
 
+void copy_SceneTriangle (SceneTriangle* dst, const SceneTriangle* src)
+{
+    memcpy (dst, src, sizeof (SceneTriangle));
+}
+
 void cleanup_Scene (Scene* scene)
 {
     if (scene->nverts > 0)  free (scene->verts);

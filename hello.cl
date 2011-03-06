@@ -12,13 +12,14 @@ square_kernel (__global float* input,
 __kernel
     void
 ray_cast_kernel (__write_only __global unsigned int* hits,
-                 __read_only __global const RayCastParams* params,
+                 __read_only __global const MultiRayCastParams* params,
                  __read_only __global const Triangle* elems,
                  __read_only __global const uint* elemidcs,
                  __read_only __global const KDTreeNode* nodes)
 {
     uint row, col;
     Point partial_dir, dir, origin;
+    uint hit; real mag;
 
     row = get_global_id(0);
     col = get_global_id(1);
@@ -37,10 +38,10 @@ ray_cast_kernel (__write_only __global unsigned int* hits,
 
     origin = params->origin;
 
-    hits[row * params->npixels[0] + col] =
-        cast_ray (&origin, &dir,
-                  params->nelems, elems,
-                  elemidcs, nodes,
-                  &params->box, params->inside_box);
+    cast_ray (&hit, &mag, &origin, &dir,
+              params->nelems, elems,
+              elemidcs, nodes,
+              &params->box, params->inside_box);
+    hits[row * params->npixels[0] + col] = hit;
 }
 
