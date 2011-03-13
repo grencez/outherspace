@@ -2,6 +2,7 @@
 #CC = clang
 #CC = gcc
 #CC = g++
+CC = mpicc
 
 CONFIG = fast
 #CONFIG = debug
@@ -11,8 +12,8 @@ CONFIG = fast
 #CONFIG = benchmark snappy debug openmp
 #CONFIG = ultradebug
 
-CONFIG += ansi
-#CONFIG += c99
+#CONFIG += ansi
+CONFIG += c99
 
 
 ifeq ($(CC),g++)
@@ -33,7 +34,7 @@ ifneq (,$(findstring ultradebug,$(CONFIG)))
 endif
 ## Go really fast.
 ifneq (,$(findstring fast,$(CONFIG)))
-	CONFIG += openmp
+	#CONFIG += openmp
 	CFLAGS += -O3
 	#CFLAGS += -ffast-math
 	#CFLAGS += -march=native -mtune=native
@@ -89,10 +90,10 @@ hello: hello.c kdtree.c raytrace.c scene.c slist.c space.c util.c xfrm.c
 test-hello: hello
 	LD_LIBRARY_PATH=$(OpenCLLibPath) ./$<
 
-cli: cli.c kdtree.c main.c raytrace.c scene.c slist.c space.c util.c xfrm.c
+cli: cli.c compute.c kdtree.c main.c raytrace.c scene.c slist.c space.c util.c xfrm.c
 	$(CC) $(CFLAGS) $< -o $@ $(LFLAGS)
 
-gui: gui.c kdtree.c main.c raytrace.c scene.c slist.c space.c util.c xfrm.c
+gui: gui.c compute.c kdtree.c main.c raytrace.c scene.c slist.c space.c util.c xfrm.c
 	$(CC) $(CFLAGS) `pkg-config --cflags gtk+-2.0` $< -o $@ \
 		`pkg-config --libs gtk+-2.0`
 

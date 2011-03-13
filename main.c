@@ -110,6 +110,12 @@ void output_PGM_image (const char* filename, uint nrows, uint ncols,
     FILE* out;
 
     out = fopen (filename, "w+");
+    if (!out)
+    {
+        fprintf (stderr, "Cannot open file for writing:%s\n", filename);
+        return;
+    }
+
     fputs ("P2\n", out);
     fprintf (out, "%u %u\n", ncols, nrows);
     fprintf (out, "%u\n", nelems);

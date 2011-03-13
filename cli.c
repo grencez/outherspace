@@ -1,4 +1,5 @@
 
+#include "compute.h"
 #include "main.h"
 #include <time.h>
 
@@ -8,6 +9,8 @@ int main ()
     RaySpace space;
     Point view_origin;
     PointXfrm view_basis;
+
+    init_compute ();
 
     out = stdout;
     zero_Point (&view_origin);
@@ -48,6 +51,7 @@ int main ()
     {
         uint* hits;
         real* mags;
+        bool write_image = true;
         const uint nrows = 2000;
         const uint ncols = 2000;
         const real view_angle = 2 * M_PI / 3;
@@ -55,24 +59,42 @@ int main ()
         hits = AllocT( uint, nrows * ncols );
         mags = AllocT( real, nrows * ncols );
 
+#ifdef BENCHMARKING
+        write_image = false;
+#endif
+
 #if 0
 #elif 0
         rays_to_hits_perspective (hits, mags, nrows, ncols, &space,
                                   view_origin.coords[2]);
-#elif 1
+#elif 0
         rays_to_hits (hits, mags, nrows, ncols,
                       &space, &view_origin, &view_basis, view_angle);
+#elif 1
+        if (rays_to_hits_computeloop (&space))
+        {
+            write_image = false;
+        }
+        else
+        {
+            compute_rays_to_hits (hits, mags, nrows, ncols, &space,
+                                  &view_origin, &view_basis, view_angle);
+            stop_computeloop ();
+        }
 #endif
-#ifndef BENCHMARKING
-        output_PBM_image ("out.pbm", nrows, ncols, hits, space.nelems);
-        output_PGM_image ("out.pgm", nrows, ncols, hits, space.nelems);
-#endif  /* #ifndef BENCHMARKING */
+
+        if (write_image)
+        {
+            output_PBM_image ("out.pbm", nrows, ncols, hits, space.nelems);
+            output_PGM_image ("out.pgm", nrows, ncols, hits, space.nelems);
+        }
         free (hits);
         free (mags);
     }
 
     cleanup_RaySpace (&space);
 
+    cleanup_compute ();
     return 0;
 }
 

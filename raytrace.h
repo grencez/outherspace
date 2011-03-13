@@ -42,6 +42,13 @@ void rays_to_hits_from_point (uint* hits, real* mags,
 void rays_to_hits_plane (uint* hits, real* mags,
                          uint nrows, uint ncols,
                          const RaySpace* space, real zpos);
+
+void setup_ray_pixel_deltas (Point* dir_start,
+                             Point* row_delta,
+                             Point* col_delta,
+                             uint nrows, uint ncols,
+                             const PointXfrm* view_basis,
+                             real view_angle);
 void rays_to_hits (uint* hits, real* mags,
                    uint nrows, uint ncols,
                    const RaySpace* space,

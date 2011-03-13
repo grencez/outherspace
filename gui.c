@@ -1,6 +1,11 @@
 
 #include "main.h"
 
+#define USE_MPI_RAYTRACE
+#ifdef USE_MPI_RAYTRACE
+#include "compute.h"
+#endif
+
 #include <math.h>
 #include <gtk/gtk.h>
 #include <gdk/gdkkeysyms.h>
@@ -250,8 +255,11 @@ render_RaySpace (byte* data, const RaySpace* space,
     if (needs_recast)
     {
         fprintf (stderr, "nrows:%u  ncols:%u\n", view_nrows, view_ncols);
+#ifdef USE_MPI_RAYTRACE
+        compute_rays_to_hits (ray_hits, ray_mags, view_nrows, view_ncols,
+                              space, &view_origin, &view_basis, view_angle);
+#else
 #if 0
-#elif 0
         rays_to_hits_perspective (ray_hits, ray_mags,
                                   view_nrows, view_ncols,
                                   space, view_origin.coords[2]);
@@ -259,6 +267,7 @@ render_RaySpace (byte* data, const RaySpace* space,
         rays_to_hits (ray_hits, ray_mags, view_nrows, view_ncols,
                       space, &view_origin, &view_basis,
                       view_angle);
+#endif
 #endif
     }
     needs_recast = false;
@@ -397,46 +406,15 @@ render_expose (GtkWidget* da,
 }
 
 
-int main (int argc, char* argv[])
+static
+    void
+gui_main (int argc, char* argv[], RaySpace* space)
 {
-    RaySpace space;
-
         /* GtkWidget is the storage type for widgets */
         /* GtkWidget *frame; */
     GtkWidget *window;
         /* GtkWidget *vbox; */
         /* GtkWidget *da; */
-
-    zero_Point (&view_origin);
-
-#if 1
-    random_RaySpace (&space, 20);
-    
-    view_origin.coords[0] = 50;
-    view_origin.coords[1] = 50;
-    view_origin.coords[2] = -70;
-    identity_PointXfrm (&view_basis);
-#else
-    {
-        bool good = readin_wavefront (&space, "mba2.obj");
-        if (!good)  return 1;
-    }
-
-    view_origin.coords[0] = 0;
-    view_origin.coords[1] = 10;
-    view_origin.coords[2] = -250;
-
-    {
-        PointXfrm tmp_basis;
-        identity_PointXfrm (&tmp_basis);
-        tmp_basis.pts[1].coords[2] = -0.5;  /* Tilt backwards a bit.*/
-        orthorotate_PointXfrm (&view_basis, &tmp_basis, 1);
-    }
-
-#endif
-
-    build_KDTree (&space.tree, space.nelems, space.elems, &space.scene.box);
-        /* output_KDTree (stderr, &space.tree, space.nelems, space.elems); */
 
     gtk_init (&argc, &argv);
 
@@ -448,7 +426,7 @@ int main (int argc, char* argv[])
     g_signal_connect (window, "destroy",
                       G_CALLBACK(destroy_app), NULL);
     g_signal_connect (window, "expose-event",
-                      G_CALLBACK(render_expose), &space);
+                      G_CALLBACK(render_expose), space);
     g_signal_connect (window, "key-press-event",
                       G_CALLBACK(key_press_fn), NULL);
     g_signal_connect (window, "button-press-event",
@@ -509,7 +487,64 @@ int main (int argc, char* argv[])
 
     gtk_widget_show_all (window);
     gtk_main ();
+}
 
+
+int main (int argc, char* argv[])
+{
+    int call_gui = true;
+    RaySpace space;
+
+#ifdef USE_MPI_RAYTRACE
+    init_compute ();
+#endif
+
+    zero_Point (&view_origin);
+
+#if 1
+    random_RaySpace (&space, 20);
+    
+    view_origin.coords[0] = 50;
+    view_origin.coords[1] = 50;
+    view_origin.coords[2] = -70;
+    identity_PointXfrm (&view_basis);
+#else
+    {
+        bool good = readin_wavefront (&space, "mba2.obj");
+        if (!good)  return 1;
+    }
+
+    view_origin.coords[0] = 0;
+    view_origin.coords[1] = 10;
+    view_origin.coords[2] = -250;
+
+    {
+        PointXfrm tmp_basis;
+        identity_PointXfrm (&tmp_basis);
+        tmp_basis.pts[1].coords[2] = -0.5;  /* Tilt backwards a bit.*/
+        orthorotate_PointXfrm (&view_basis, &tmp_basis, 1);
+    }
+
+#endif
+
+    build_KDTree (&space.tree, space.nelems, space.elems, &space.scene.box);
+        /* output_KDTree (stderr, &space.tree, space.nelems, space.elems); */
+
+#ifdef USE_MPI_RAYTRACE
+    call_gui = !rays_to_hits_computeloop (&space);
+#endif
+
+    if (call_gui)
+    {
+        gui_main (argc, argv, &space);
+#ifdef USE_MPI_RAYTRACE
+        stop_computeloop ();
+#endif
+    }
+
+#ifdef USE_MPI_RAYTRACE
+    cleanup_compute ();
+#endif
     return 0;
 }
 

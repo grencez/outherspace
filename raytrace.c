@@ -11,6 +11,12 @@
 #include <omp.h>
 #endif
 
+    /* #define  TrivialMpiRayTrace */
+#ifdef TrivialMpiRayTrace
+#include <mpi.h>
+#endif
+
+
 void cleanup_RaySpace (RaySpace* space)
 {
     cleanup_Scene (&space->scene);
@@ -525,6 +531,41 @@ void rays_to_hits_plane (uint* hits, real* mags,
     }
 }
 
+
+    void
+setup_ray_pixel_deltas (Point* restrict dir_start,
+                        Point* restrict row_delta,
+                        Point* restrict col_delta,
+                        uint nrows, uint ncols,
+                        const PointXfrm* restrict view_basis,
+                        real view_angle)
+                    
+{
+    const uint dir_dim = 2, row_dim = 1, col_dim = 0;
+    Point dstart, rdelta, cdelta;
+    real tcos;
+    tcos = cos (view_angle / 2);
+
+    zero_Point (&dstart);
+    zero_Point (&rdelta);
+    zero_Point (&cdelta);
+
+    dstart.coords[dir_dim] = 1;
+    dstart.coords[row_dim] = - tcos;
+    dstart.coords[col_dim] = - tcos;
+
+    rdelta.coords[row_dim] = -2 * dstart.coords[row_dim] / nrows;
+    cdelta.coords[col_dim] = -2 * dstart.coords[col_dim] / ncols;
+
+    dstart.coords[row_dim] -= dstart.coords[row_dim] / nrows;
+    dstart.coords[col_dim] -= dstart.coords[col_dim] / ncols;
+
+    trxfrm_Point (dir_start, view_basis, &dstart);
+    trxfrm_Point (row_delta, view_basis, &rdelta);
+    trxfrm_Point (col_delta, view_basis, &cdelta);
+}
+
+
 void rays_to_hits (uint* hits, real* mags,
                    uint nrows, uint ncols,
                    const RaySpace* restrict space,
@@ -532,43 +573,29 @@ void rays_to_hits (uint* hits, real* mags,
                    const PointXfrm* restrict view_basis,
                    real view_angle)
 {
+    uint nprocs, myrank;
     uint row;
     bool inside_box;
     Point dir_start, row_delta, col_delta;
-    const uint dir_dim = 2, row_dim = 1, col_dim = 0;
     const BoundingBox* restrict box;
 
+
+#ifdef TrivialMpiRayTrace
+    MPI_Comm_size (MPI_COMM_WORLD, (int*) &nprocs);
+    MPI_Comm_rank (MPI_COMM_WORLD, (int*) &myrank);
+#else
+    myrank = 0;
+    nprocs = 1;
+#endif
+
     box = &space->scene.box;
-
-    {
-        Point dstart, rdelta, cdelta;
-        real tcos;
-        tcos = cos (view_angle / 2);
-
-        zero_Point (&dstart);
-        zero_Point (&rdelta);
-        zero_Point (&cdelta);
-
-        dstart.coords[dir_dim] = 1;
-        dstart.coords[row_dim] = - tcos;
-        dstart.coords[col_dim] = - tcos;
-
-        rdelta.coords[row_dim] = -2 * dstart.coords[row_dim] / nrows;
-        cdelta.coords[col_dim] = -2 * dstart.coords[col_dim] / ncols;
-
-        dstart.coords[row_dim] -= dstart.coords[row_dim] / nrows;
-        dstart.coords[col_dim] -= dstart.coords[col_dim] / ncols;
-
-        trxfrm_Point (&dir_start, view_basis, &dstart);
-        trxfrm_Point (&row_delta, view_basis, &rdelta);
-        trxfrm_Point (&col_delta, view_basis, &cdelta);
-    }
+    setup_ray_pixel_deltas (&dir_start, &row_delta, &col_delta,
+                            nrows, ncols,
+                            view_basis, view_angle);
 
     inside_box = inside_BoundingBox (box, origin);
 
-        /* #pragma omp parallel for */
-#pragma omp parallel for schedule(dynamic)
-    UFor( row, nrows )
+    for (row = myrank; row < nrows; row += nprocs )
     {
         uint col;
         uint* hitline;
@@ -601,6 +628,37 @@ void rays_to_hits (uint* hits, real* mags,
                 /* if (row == 333 && col == 322)  puts (elem ? "hit" : "miss"); */
         }
     }
+
+#ifdef TrivialMpiRayTrace
+    if (myrank == 0)
+    {
+        uint i;
+        for (i = 1; i < nprocs; ++i)
+        {
+            for (row = i; row < nrows; row += nprocs)
+            {
+                MPI_Status status;
+                    /* fprintf (stderr, "Receiving hits from node %u for row %u!\n", i, row); */
+                MPI_Recv (&hits[ncols*row], ncols * sizeof(uint), MPI_BYTE,
+                          i, StdMsgTag, MPI_COMM_WORLD, &status);
+                    /* fprintf (stderr, "Receiving mags from node %u for row %u!\n", i, row); */
+                MPI_Recv (&mags[ncols*row], ncols * sizeof(real), MPI_BYTE,
+                          i, StdMsgTag, MPI_COMM_WORLD, &status);
+            }
+        }
+    }
+    else {
+        for (row = myrank; row < nrows; row += nprocs)
+        {
+                /* fprintf (stderr, "Node %u sending hits for row %u!\n", myrank, row); */
+            MPI_Send (&hits[ncols*row], ncols * sizeof(uint), MPI_BYTE,
+                      0, StdMsgTag, MPI_COMM_WORLD);
+                /* fprintf (stderr, "Node %u sending mags for row %u!\n", myrank, row); */
+            MPI_Send (&mags[ncols*row], ncols * sizeof(real), MPI_BYTE,
+                      0, StdMsgTag, MPI_COMM_WORLD);
+        }
+    }
+#endif
 }
 
 
@@ -611,31 +669,12 @@ void build_MultiRayCastParams (MultiRayCastParams* params,
                                const PointXfrm* view_basis,
                                real view_angle)
 {
-    const uint dir_dim = 2, row_dim = 1, col_dim = 0;
-    Point dstart, rdelta, cdelta;
-    real tcos;
-    tcos = cos (view_angle / 2);
-
-    zero_Point (&dstart);
-    zero_Point (&rdelta);
-    zero_Point (&cdelta);
-
-    dstart.coords[dir_dim] = 1;
-    dstart.coords[row_dim] = - tcos;
-    dstart.coords[col_dim] = - tcos;
-
-    rdelta.coords[row_dim] = -2 * dstart.coords[row_dim] / nrows;
-    cdelta.coords[col_dim] = -2 * dstart.coords[col_dim] / ncols;
-
-    dstart.coords[row_dim] -= dstart.coords[row_dim] / nrows;
-    dstart.coords[col_dim] -= dstart.coords[col_dim] / ncols;
-
-
-    copy_Point (&params->origin, origin);
-
-    trxfrm_Point (&params->dir_start, view_basis, &dstart);
-    trxfrm_Point (&params->dir_delta[row_dim], view_basis, &rdelta);
-    trxfrm_Point (&params->dir_delta[col_dim], view_basis, &cdelta);
+    const uint row_dim = 1, col_dim = 0;
+    setup_ray_pixel_deltas (&params->dir_start,
+                            &params->dir_delta[row_dim],
+                            &params->dir_delta[col_dim],
+                            nrows, ncols,
+                            view_basis, view_angle);
 
     copy_BoundingBox (&params->box, &space->scene.box);
     params->nelems = space->nelems;
