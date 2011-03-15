@@ -43,6 +43,7 @@ void compute_rays_to_hits (uint* hits, real* mags,
                            real view_angle)
 {
     uint i;
+    (void) space;
     UFor( i, nprocs -1 )
     {
         int proc;
@@ -418,3 +419,4 @@ rays_to_hits_balancer (uint* hits, real* mags,
     free (send_intl_reqs);
     free (recv_progress_reqs);
 }
+

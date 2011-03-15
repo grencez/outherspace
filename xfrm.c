@@ -133,6 +133,14 @@ void reflect_PointXfrm (PointXfrm* xfrm, uint j, uint k)
     copy_Point (&xfrm->pts[k], &rows[0]);
 }
 
+void swaprows_PointXfrm (PointXfrm* xfrm, uint j, uint k)
+{
+    Point tmp;
+    copy_Point (&tmp, &xfrm->pts[j]);
+    copy_Point (&xfrm->pts[j], &xfrm->pts[k]);
+    copy_Point (&xfrm->pts[k], &tmp);
+}
+
 void to_basis_PointXfrm (PointXfrm* dst, const PointXfrm* xfrm,
                          const PointXfrm* basis)
 {

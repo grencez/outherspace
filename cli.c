@@ -1,6 +1,10 @@
 
-#include "compute.h"
 #include "main.h"
+
+#ifdef DISTRIBUTE_COMPUTE
+#include "compute.h"
+#endif
+
 #include <time.h>
 
 int main ()
@@ -10,7 +14,9 @@ int main ()
     Point view_origin;
     PointXfrm view_basis;
 
+#ifdef DISTRIBUTE_COMPUTE
     init_compute ();
+#endif
 
     out = stdout;
     zero_Point (&view_origin);
@@ -63,14 +69,7 @@ int main ()
         write_image = false;
 #endif
 
-#if 0
-#elif 0
-        rays_to_hits_perspective (hits, mags, nrows, ncols, &space,
-                                  view_origin.coords[2]);
-#elif 0
-        rays_to_hits (hits, mags, nrows, ncols,
-                      &space, &view_origin, &view_basis, view_angle);
-#elif 1
+#ifdef DISTRIBUTE_COMPUTE
         if (rays_to_hits_computeloop (&space))
         {
             write_image = false;
@@ -81,6 +80,15 @@ int main ()
                                   &view_origin, &view_basis, view_angle);
             stop_computeloop ();
         }
+#else
+
+#if 0
+        rays_to_hits_perspective (hits, mags, nrows, ncols, &space,
+                                  view_origin.coords[2]);
+#else
+        rays_to_hits (hits, mags, nrows, ncols,
+                      &space, &view_origin, &view_basis, view_angle);
+#endif
 #endif
 
         if (write_image)
@@ -94,7 +102,9 @@ int main ()
 
     cleanup_RaySpace (&space);
 
+#ifdef DISTRIBUTE_COMPUTE
     cleanup_compute ();
+#endif
     return 0;
 }
 

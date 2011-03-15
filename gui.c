@@ -1,8 +1,7 @@
 
 #include "main.h"
 
-#define USE_MPI_RAYTRACE
-#ifdef USE_MPI_RAYTRACE
+#ifdef DISTRIBUTE_COMPUTE
 #include "compute.h"
 #endif
 
@@ -50,10 +49,18 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
     Point diff;
     tristate step = 0, roll = 0;
     tristate x_stride = 0, y_stride = 0;
+    tristate x_turn = 0, y_turn = 0;
     const real scale = 5;
     (void) _data;
 
-    if (event->state & GDK_SHIFT_MASK)
+    if (event->state & GDK_CONTROL_MASK)
+    {
+        if (event->keyval == GDK_Up)    y_turn =  1;
+        if (event->keyval == GDK_Down)  y_turn = -1;
+        if (event->keyval == GDK_Right)  x_turn =  1;
+        if (event->keyval == GDK_Left)   x_turn = -1;
+    }
+    else if (event->state & GDK_SHIFT_MASK)
     {
         if (event->keyval == GDK_Up)    y_stride =  1;
         if (event->keyval == GDK_Down)  y_stride = -1;
@@ -83,13 +90,49 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
             view_angle += M_PI / 18;
         needs_recast = true;
     }
+    if (event->keyval == GDK_d)
+    {
+            /* TODO NO? */
+        uint i, n;
+        assert (NDimensions >= 3);
+        n = NDimensions - 3;
+        UFor( i, n )
+            swaprows_PointXfrm (&view_basis, 2+i, 3+i);
+        needs_recast = true;
+    }
+    if (event->keyval == GDK_r)
+    {
+        negate_Point (&view_basis.pts[2], &view_basis.pts[2]);
+        needs_recast = true;
+    }
+
+    if (event->keyval == GDK_Z)
+    {
+        if (ray_hits)  free (ray_hits);
+        if (ray_mags)  free (ray_mags);
+        view_nrows += 100;
+        view_ncols += 100;
+        ray_hits = AllocT( uint, view_nrows * view_ncols );
+        ray_mags = AllocT( real, view_nrows * view_ncols );
+        needs_recast = true;
+    }
+    if (event->keyval == GDK_z)
+    {
+        assert (view_nrows == view_ncols);
+        if (view_nrows > 100)
+        {
+            view_nrows -= 100;
+            view_ncols -= 100;
+            needs_recast = true;
+        }
+    }
 
     if (event->keyval == GDK_L)  view_light += 10;
     if (event->keyval == GDK_l)  view_light -= 10;
 
     if (step != 0)
     {
-        scale_Point (&diff, &view_basis.pts[NDimensions-1], scale * step);
+        scale_Point (&diff, &view_basis.pts[2], scale * step);
         summ_Point (&view_origin, &view_origin, &diff);
     }
     if (roll != 0)
@@ -117,8 +160,28 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
 #endif
 
     }
+    if (y_turn != 0)
+    {
+        if (y_turn < 0)
+            negate_Point (&view_basis.pts[1], &view_basis.pts[1]);
+        else
+            negate_Point (&view_basis.pts[2], &view_basis.pts[2]);
+        swaprows_PointXfrm (&view_basis, 1, 2);
+        needs_recast = true;
+    }
+    if (x_turn != 0)
+    {
+        if (x_turn < 0)
+            negate_Point (&view_basis.pts[0], &view_basis.pts[0]);
+        else
+            negate_Point (&view_basis.pts[2], &view_basis.pts[2]);
+        swaprows_PointXfrm (&view_basis, 0, 2);
+        needs_recast = true;
+    }
 
-    if (step != 0 || roll != 0 || x_stride != 0 || y_stride != 0)
+    if (step != 0 || roll != 0 ||
+        x_stride != 0 || y_stride != 0 ||
+        x_turn != 0 || y_turn != 0)
     {
         FILE* out;
         out = stdout;
@@ -255,7 +318,7 @@ render_RaySpace (byte* data, const RaySpace* space,
     if (needs_recast)
     {
         fprintf (stderr, "nrows:%u  ncols:%u\n", view_nrows, view_ncols);
-#ifdef USE_MPI_RAYTRACE
+#ifdef DISTRIBUTE_COMPUTE
         compute_rays_to_hits (ray_hits, ray_mags, view_nrows, view_ncols,
                               space, &view_origin, &view_basis, view_angle);
 #else
@@ -495,7 +558,7 @@ int main (int argc, char* argv[])
     int call_gui = true;
     RaySpace space;
 
-#ifdef USE_MPI_RAYTRACE
+#ifdef DISTRIBUTE_COMPUTE
     init_compute ();
 #endif
 
@@ -507,7 +570,17 @@ int main (int argc, char* argv[])
     view_origin.coords[0] = 50;
     view_origin.coords[1] = 50;
     view_origin.coords[2] = -70;
+#if 0
     identity_PointXfrm (&view_basis);
+#else
+    {
+        PointXfrm tmp_basis;
+        identity_PointXfrm (&tmp_basis);
+        tmp_basis.pts[1].coords[2] = -0.5;  /* Tilt backwards a bit.*/
+            /* tmp_basis.pts[1].coords[3] = -0.3; */
+        orthorotate_PointXfrm (&view_basis, &tmp_basis, 1);
+    }
+#endif
 #else
     {
         bool good = readin_wavefront (&space, "mba2.obj");
@@ -530,19 +603,19 @@ int main (int argc, char* argv[])
     build_KDTree (&space.tree, space.nelems, space.elems, &space.scene.box);
         /* output_KDTree (stderr, &space.tree, space.nelems, space.elems); */
 
-#ifdef USE_MPI_RAYTRACE
+#ifdef DISTRIBUTE_COMPUTE
     call_gui = !rays_to_hits_computeloop (&space);
 #endif
 
     if (call_gui)
     {
         gui_main (argc, argv, &space);
-#ifdef USE_MPI_RAYTRACE
+#ifdef DISTRIBUTE_COMPUTE
         stop_computeloop ();
 #endif
     }
 
-#ifdef USE_MPI_RAYTRACE
+#ifdef DISTRIBUTE_COMPUTE
     cleanup_compute ();
 #endif
     return 0;

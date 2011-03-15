@@ -11,12 +11,20 @@ void random_Triangle (Triangle* elem, const BoundingBox* box)
     uint pi, ci;
     UFor( pi, NTrianglePoints )
     {
+#if 0
+        const int dim_cutoff = 3;
+#else
+        const uint dim_cutoff = NDimensions;
+#endif
         UFor( ci, NDimensions )
         {
             real x, lo, hi;
             lo = box->min_corner.coords[ci];
             hi = box->max_corner.coords[ci];
-            x = lo + (hi - lo) * ((real) rand () / RAND_MAX);
+            if (ci < dim_cutoff)
+                x = lo + (hi - lo) * ((real) rand () / RAND_MAX);
+            else
+                x = 0;
                 /* printf ("%f\n", x); */
             elem->pts[pi].coords[ci] = x;
         }
@@ -103,6 +111,7 @@ void output_PBM_image (const char* filename, uint nrows, uint ncols,
     fclose (out);
 }
 
+
 void output_PGM_image (const char* filename, uint nrows, uint ncols,
                        const uint* hits, uint nelems)
 {
@@ -132,6 +141,39 @@ void output_PGM_image (const char* filename, uint nrows, uint ncols,
     }
     fclose (out);
 }
+
+
+void output_PPM_image (const char* filename, uint nrows, uint ncols,
+                       const byte* pixels)
+{
+    uint row, i;
+    FILE* out;
+
+    out = fopen (filename, "w+");
+    if (!out)
+    {
+        fprintf (stderr, "Cannot open file for writing:%s\n", filename);
+        return;
+    }
+
+    fputs ("P3\n", out);
+    fprintf (out, "%u %u\n", ncols, nrows);
+    fputs ("255\n", out);
+
+    i = 0;
+    UFor( row, nrows )
+    {
+        uint col;
+        UFor( col, ncols )
+        {
+            fprintf (out, " %u %u %u", pixels[i], pixels[i+1], pixels[i+2]);
+            i += 3;
+        }
+        fputc ('\n', out);
+    }
+    fclose (out);
+}
+
 
 bool readin_wavefront (RaySpace* space, const char* filename)
 {

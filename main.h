@@ -8,6 +8,8 @@ void output_PBM_image (const char* filename, uint nrows, uint ncols,
                        const uint* hits, uint nelems);
 void output_PGM_image (const char* filename, uint nrows, uint ncols,
                        const uint* hits, uint nelems);
+void output_PPM_image (const char* filename, uint nrows, uint ncols,
+                       const byte* pixels);
 bool readin_wavefront (RaySpace* space, const char* filename);
 
 #ifdef INCLUDE_SOURCE

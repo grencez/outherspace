@@ -136,7 +136,7 @@ closer_hit (const Point* newhit, const Point* oldhit, const Point* dir)
     return false;
 }
 
-#else
+#elif 0
 
 
 static
@@ -200,6 +200,95 @@ hit_tri (real* restrict dist,
 
     inv_det = 1 / det;
     *dist = dot_Point (&edge2, &qvec) * inv_det;
+
+        /* u *= inv_det; */
+        /* v *= inv_det; */
+
+    return *dist >= 0;
+}
+
+#elif 1
+
+static void cross3 (real dst[3], const real a[3], const real b[3])
+{
+    dst[0] = a[1] * b[2] - a[2] * b[1];
+    dst[1] = a[2] * b[0] - a[0] * b[2];
+    dst[2] = a[0] * b[1] - a[1] * b[0];
+}
+
+
+static real dot3 (const real a[3], const real b[3])
+{
+    return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+}
+
+
+static
+    bool
+hit_tri (real* restrict dist,
+         const Point* restrict origin, const Point* restrict kd_dir,
+         const Triangle* restrict elem)
+{
+        /* const real epsilon = (real) 0.000001; */
+    const real epsilon = 0;
+    Point kd_edge1, kd_edge2, kd_tvec;
+    real dir[3], edge1[3], edge2[3], tvec[3], pvec[3], qvec[3];
+    real det, inv_det;
+    real u, v;
+
+    diff_Point (&kd_edge1, &elem->pts[1], &elem->pts[0]);
+    diff_Point (&kd_edge2, &elem->pts[2], &elem->pts[0]);
+    diff_Point (&kd_tvec,  origin,        &elem->pts[0]);
+
+    dir[0] = - dot_Point (kd_dir, kd_dir);
+    dir[1] =   dot_Point (kd_dir, &kd_edge1);
+    dir[2] =   dot_Point (kd_dir, &kd_edge2);
+
+    edge1[0] = - dir[1];
+    edge1[1] =   dot_Point (&kd_edge1, &kd_edge1);
+    edge1[2] =   dot_Point (&kd_edge1, &kd_edge2);
+
+    edge2[0] = - dir[2];
+    edge2[1] =   edge1[2];
+    edge2[2] =   dot_Point (&kd_edge2, &kd_edge2);
+
+    tvec[0] = - dot_Point (kd_dir,    &kd_tvec);
+    tvec[1] =   dot_Point (&kd_edge1, &kd_tvec);
+    tvec[2] =   dot_Point (&kd_edge2, &kd_tvec);
+
+    cross3 (pvec, dir, edge2);
+
+    u = dot3 (tvec, pvec);
+    det = dot3 (edge1, pvec);
+
+    if (det > epsilon)
+    {
+        if (u < 0 || u > det)
+            return false;
+
+        cross3 (qvec, tvec, edge1);
+        v = dot3 (dir, qvec);
+        if (v < 0 || u + v > det)
+            return false;
+
+    }
+    else if (det < -epsilon)
+    {
+        if (u > 0 || u < det)
+            return false;
+
+        cross3 (qvec, tvec, edge1);
+        v = dot3 (dir, qvec);
+        if (v > 0 || u + v < det)
+            return false;
+    }
+    else
+    {
+        return false;
+    }
+
+    inv_det = 1 / det;
+    *dist = dot3 (edge2, qvec) * inv_det;
 
         /* u *= inv_det; */
         /* v *= inv_det; */
@@ -361,7 +450,9 @@ void rays_to_hits_fish (uint* hits, real* mags,
 
     inside_box = inside_BoundingBox (&space->scene.box, &origin);
 
-#pragma omp parallel for
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic)
+#endif
     UFor( row, nrows )
     {
         uint col;
@@ -435,7 +526,9 @@ void rays_to_hits_perspective (uint* hits, real* mags,
     
     inside_box = inside_BoundingBox (box, &origin);
 
-#pragma omp parallel for
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic)
+#endif
     UFor( row, nrows )
     {
         uint col;
@@ -498,7 +591,9 @@ void rays_to_hits_plane (uint* hits, real* mags,
     inside_box = (zpos > box->min_corner.coords[dir_dim] &&
                   zpos < box->max_corner.coords[dir_dim]);
 
-#pragma omp parallel for
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic)
+#endif
     UFor( row, nrows )
     {
         uint col;
@@ -595,6 +690,9 @@ void rays_to_hits (uint* hits, real* mags,
 
     inside_box = inside_BoundingBox (box, origin);
 
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic)
+#endif
     for (row = myrank; row < nrows; row += nprocs )
     {
         uint col;

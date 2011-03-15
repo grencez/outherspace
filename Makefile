@@ -2,9 +2,10 @@
 #CC = clang
 #CC = gcc
 #CC = g++
-CC = mpicc
 
 CONFIG = fast
+#CONFIG = fast openmp
+#CONFIG = fast mpi
 #CONFIG = debug
 #CONFIG = fast noassert
 #CONFIG = benchmark snappy debug
@@ -12,8 +13,8 @@ CONFIG = fast
 #CONFIG = benchmark snappy debug openmp
 #CONFIG = ultradebug
 
-#CONFIG += ansi
-CONFIG += c99
+CONFIG += ansi
+#CONFIG += c99
 
 
 ifeq ($(CC),g++)
@@ -34,7 +35,6 @@ ifneq (,$(findstring ultradebug,$(CONFIG)))
 endif
 ## Go really fast.
 ifneq (,$(findstring fast,$(CONFIG)))
-	#CONFIG += openmp
 	CFLAGS += -O3
 	#CFLAGS += -ffast-math
 	#CFLAGS += -march=native -mtune=native
@@ -48,7 +48,7 @@ ifneq (,$(findstring debug,$(CONFIG)))
 	CFLAGS += -g
 endif
 
-## Enable benchmarking
+## Enable benchmarking.
 ifneq (,$(findstring benchmark,$(CONFIG)))
 	CFLAGS += -DBENCHMARKING
 endif
@@ -68,9 +68,14 @@ endif
 ifneq (,$(findstring ansi,$(CONFIG)))
 	CFLAGS += -ansi -pedantic
 endif
-## Allow parallelism
+## Allow parallelism.
 ifneq (,$(findstring openmp,$(CONFIG)))
 	CFLAGS += -fopenmp
+endif
+## Allow distributed parallelism.
+ifneq (,$(findstring mpi,$(CONFIG)))
+	CC = mpicc
+	CFLAGS += -DDISTRIBUTE_COMPUTE
 endif
 
 

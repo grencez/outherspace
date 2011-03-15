@@ -20,6 +20,7 @@ void xfrm_Point (Point* dst, const PointXfrm* xfrm, const Point* src);
 void xfrm_PointXfrm (PointXfrm* dst, const PointXfrm* A, const PointXfrm* B);
 void trxfrm_Point (Point* dst, const PointXfrm* xfrm, const Point* src);
 void reflect_PointXfrm (PointXfrm* xfrm, uint j, uint k);
+void swaprows_PointXfrm (PointXfrm* xfrm, uint j, uint k);
 void to_basis_PointXfrm (PointXfrm* dst, const PointXfrm* xfrm,
                          const PointXfrm* basis);
 void orthonormalize_PointXfrm (PointXfrm* dst, const PointXfrm* A);
