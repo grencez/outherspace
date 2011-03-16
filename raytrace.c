@@ -36,11 +36,11 @@ void dir_from_MultiRayCastParams (Point* dir, uint row, uint col,
 
     copy_Point (dir, &params->dir_start);
 
-    partial_dir = params->dir_delta[1];
-    scale_Point (&partial_dir, &partial_dir, params->npixels[1] - row -1);
+    partial_dir = params->dir_delta[0];
+    scale_Point (&partial_dir, &partial_dir, params->npixels[0] - row -1);
     summ_Point (dir, dir, &partial_dir);
 
-    partial_dir = params->dir_delta[0];
+    partial_dir = params->dir_delta[1];
     scale_Point (&partial_dir, &partial_dir, col);
     summ_Point (dir, dir, &partial_dir);
     normalize_Point (dir, dir);
@@ -421,34 +421,28 @@ cast_ray (uint* restrict ret_hit, real* restrict ret_mag,
 #ifndef __OPENCL_VERSION__
 void rays_to_hits_fish (uint* hits, real* mags,
                         uint nrows, uint ncols,
-                        const RaySpace* space, real zpos)
+                        const RaySpace* space,
+                        const Point* origin,
+                        const PointXfrm* view_basis,
+                        real view_angle)
 {
     uint row;
     bool inside_box;
+    const uint row_dim = 0;
+    const uint col_dim = 1;
     const uint dir_dim = 2;
-    const uint row_dim = 1;
-    const uint col_dim = 0;
-    Point origin, tdir;
     real col_start, row_start;
     real col_delta, row_delta;
 
-    row_start = - M_PI / 3;
-    row_delta = 2 * M_PI / (3 * nrows);
+    row_start = - view_angle / 2;
+    row_delta = view_angle / nrows;
     row_start += row_delta / 2;
 
-    col_start = - M_PI / 3;
-    col_delta = 2 * M_PI / (3 * ncols);
+    col_start = - view_angle / 2;
+    col_delta = view_angle / ncols;
     col_start += col_delta / 2;
 
-    origin.coords[dir_dim] = zpos;
-    origin.coords[row_dim] = 50;
-    origin.coords[col_dim] = 50;
-    
-    tdir.coords[dir_dim] = 1;
-    tdir.coords[row_dim] = 0;
-    tdir.coords[col_dim] = 0;
-
-    inside_box = inside_BoundingBox (&space->scene.box, &origin);
+    inside_box = inside_BoundingBox (&space->scene.box, origin);
 
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic)
@@ -467,11 +461,19 @@ void rays_to_hits_fish (uint* hits, real* mags,
 
         UFor( col, ncols )
         {
-            Point dir;
+            Point tdir, dir;
             uint hit; real mag;
             real col_angle;
             col_angle = col_start + col_delta * col;
 
+            dir.coords[row_dim] = sin (row_angle);
+            dir.coords[col_dim] = sin (col_angle);
+            dir.coords[dir_dim] = cos (row_angle) + cos (col_angle);
+
+            trxfrm_Point (&tdir, view_basis, &dir);
+
+
+#if 0
             dir.coords[row_dim] = (tdir.coords[row_dim] * (1 + cos (row_angle))
                                    + tdir.coords[dir_dim] * sin (row_angle));
 
@@ -481,9 +483,11 @@ void rays_to_hits_fish (uint* hits, real* mags,
             dir.coords[dir_dim] = (tdir.coords[dir_dim] * (cos (row_angle) + cos (col_angle))
                                    - tdir.coords[row_dim] * sin (row_angle)
                                    - tdir.coords[col_dim] * sin (col_angle));
+#endif
 
-            normalize_Point (&dir, &dir);
-            cast_ray (&hit, &mag, &origin, &dir,
+            normalize_Point (&dir, &tdir);
+
+            cast_ray (&hit, &mag, origin, &dir,
                       space->nelems, space->elems,
                       space->tree.elemidcs, space->tree.nodes,
                       &space->scene.box, inside_box);
@@ -499,9 +503,9 @@ void rays_to_hits_perspective (uint* hits, real* mags,
 {
     uint row;
     bool inside_box;
+    const uint row_dim = 0;
+    const uint col_dim = 1;
     const uint dir_dim = 2;
-    const uint row_dim = 1;
-    const uint col_dim = 0;
     Point origin;
     real col_start, row_start;
     real col_delta, row_delta;
@@ -571,9 +575,9 @@ void rays_to_hits_plane (uint* hits, real* mags,
 {
     uint row;
     bool inside_box;
+    const uint row_dim = 0;
+    const uint col_dim = 1;
     const uint dir_dim = 2;
-    const uint row_dim = 1;
-    const uint col_dim = 0;
     real col_start, row_start;
     real col_delta, row_delta;
     const BoundingBox* box;
@@ -636,18 +640,20 @@ setup_ray_pixel_deltas (Point* restrict dir_start,
                         real view_angle)
                     
 {
-    const uint dir_dim = 2, row_dim = 1, col_dim = 0;
+    const uint row_dim = 0;
+    const uint col_dim = 1;
+    const uint dir_dim = 2;
     Point dstart, rdelta, cdelta;
-    real tcos;
-    tcos = cos (view_angle / 2);
+    real halflen;
+    halflen = sin (view_angle / 2);
 
     zero_Point (&dstart);
     zero_Point (&rdelta);
     zero_Point (&cdelta);
 
+    dstart.coords[row_dim] = - halflen;
+    dstart.coords[col_dim] = - halflen;
     dstart.coords[dir_dim] = 1;
-    dstart.coords[row_dim] = - tcos;
-    dstart.coords[col_dim] = - tcos;
 
     rdelta.coords[row_dim] = -2 * dstart.coords[row_dim] / nrows;
     cdelta.coords[col_dim] = -2 * dstart.coords[col_dim] / ncols;
@@ -767,7 +773,8 @@ void build_MultiRayCastParams (MultiRayCastParams* params,
                                const PointXfrm* view_basis,
                                real view_angle)
 {
-    const uint row_dim = 1, col_dim = 0;
+    const uint row_dim = 0;
+    const uint col_dim = 1;
     setup_ray_pixel_deltas (&params->dir_start,
                             &params->dir_delta[row_dim],
                             &params->dir_delta[col_dim],

@@ -9,7 +9,7 @@ CONFIG = fast
 #CONFIG = debug
 #CONFIG = fast noassert
 #CONFIG = benchmark snappy debug
-#CONFIG = benchmark fast
+#CONFIG = benchmark fast openmp
 #CONFIG = benchmark snappy debug openmp
 #CONFIG = ultradebug
 

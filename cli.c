@@ -34,15 +34,16 @@ int main ()
         if (!good)  return 1;
     }
 
-    view_origin.coords[0] = 0;
-    view_origin.coords[1] = 10;
+    view_origin.coords[0] = 10;
+    view_origin.coords[1] = 0;
     view_origin.coords[2] = -250;
 
     {
         PointXfrm tmp_basis;
         identity_PointXfrm (&tmp_basis);
-        tmp_basis.pts[1].coords[2] = -0.5;  /* Tilt backwards a bit.*/
-        orthorotate_PointXfrm (&view_basis, &tmp_basis, 1);
+            /* Tilt backwards a bit.*/
+        tmp_basis.pts[0].coords[2] = -0.5;
+        orthorotate_PointXfrm (&view_basis, &tmp_basis, 0);
     }
 
 #endif

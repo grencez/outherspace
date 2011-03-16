@@ -26,11 +26,11 @@ ray_cast_kernel (__write_only __global unsigned int* hits,
 
     dir = params->dir_start;
 
-    partial_dir = params->dir_delta[1];
-    scale_Point (&partial_dir, &partial_dir, params->npixels[1] - row -1);
+    partial_dir = params->dir_delta[0];
+    scale_Point (&partial_dir, &partial_dir, params->npixels[0] - row -1);
     summ_Point (&dir, &dir, &partial_dir);
 
-    partial_dir = params->dir_delta[0];
+    partial_dir = params->dir_delta[1];
     scale_Point (&partial_dir, &partial_dir, col);
     summ_Point (&dir, &dir, &partial_dir);
 
@@ -42,6 +42,6 @@ ray_cast_kernel (__write_only __global unsigned int* hits,
               params->nelems, elems,
               elemidcs, nodes,
               &params->box, params->inside_box);
-    hits[row * params->npixels[0] + col] = hit;
+    hits[row * params->npixels[1] + col] = hit;
 }
 

@@ -12,7 +12,7 @@ void random_Triangle (Triangle* elem, const BoundingBox* box)
     UFor( pi, NTrianglePoints )
     {
 #if 0
-        const int dim_cutoff = 3;
+        const uint dim_cutoff = 3;
 #else
         const uint dim_cutoff = NDimensions;
 #endif

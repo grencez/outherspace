@@ -35,7 +35,10 @@ void dir_from_MultiRayCastParams (Point* dir, uint row, uint col,
 #ifndef __OPENCL_VERSION__
 void rays_to_hits_fish (uint* hits, real* mags,
                         uint nrows, uint ncols,
-                        const RaySpace* space, real zpos);
+                        const RaySpace* space,
+                        const Point* origin,
+                        const PointXfrm* view_basis,
+                        real view_angle);
 void rays_to_hits_from_point (uint* hits, real* mags,
                               uint nrows, uint ncols,
                               const RaySpace* space, real zpos);
