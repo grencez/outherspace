@@ -52,6 +52,7 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
     tristate turn = 0;
     tristate view_angle_change = 0;
     tristate resize = 0;
+    tristate view_light_change = 0;
     bool reflect = false;
     bool rotate_dir_dim = false;
     bool recast = true;
@@ -87,11 +88,21 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
     if (event->keyval == GDK_v)  view_angle_change = -1;
     if (event->keyval == GDK_Z)  resize =  1;
     if (event->keyval == GDK_z)  resize = -1;
-    if (event->keyval == GDK_L)  view_light += 10;
-    if (event->keyval == GDK_l)  view_light -= 10;
+    if (event->keyval == GDK_L)  view_light_change =  1;
+    if (event->keyval == GDK_l)  view_light_change = -1;
     if (event->keyval == GDK_r)  reflect = true;
     if (event->keyval == GDK_d)  rotate_dir_dim = true;
 
+    if (view_light_change)
+    {
+        real diff = 10;
+        if (view_light_change > 0)
+            view_light += diff;
+        else if (diff <= view_light)
+            view_light -= diff;;
+
+        fprintf (out, "view_light:%f\n", view_light);
+    }
 
     if (stride != 0)
     {
@@ -379,21 +390,29 @@ render_RaySpace (byte* data, const RaySpace* space,
 
         UFor( col, view_ncols )
         {
-            uint i;
-            guint32 x, y;
-            real scale;
+            guint8 red = 0, green = 0, blue = 0;
+            guint32 y;
+            uint hit;
+            real mag, scale;
             if (col >= ncols)  break;
 
             y = 0xFF000000;
 
             scale = 1;
 
-            if (hitline[col] < space->nelems)
+            hit = hitline[col];
+            mag = magline[col];
+
+                /* Note: Redundant first condition.*/
+            if (hit < space->nelems && mag < view_light)
             {
+                const uint nincs = 256;
+                uint val;
                 Point dir, u, v, tmp;
                 const Triangle* elem;
+
                 dir_from_MultiRayCastParams (&dir, row, col, &params);
-                elem = &space->elems[hitline[col]];
+                elem = &space->elems[hit];
 
                 diff_Point (&u, &elem->pts[0], &elem->pts[1]);
                 diff_Point (&v, &elem->pts[0], &elem->pts[2]);
@@ -407,15 +426,41 @@ render_RaySpace (byte* data, const RaySpace* space,
                 proj_Plane (&tmp, &dir, &u, &v);
                 scale *= dot_Point (&dir, &tmp);
                 if (scale < 0)  scale = -scale;
+                
+                    /* Distance color scale.*/
+                val = (uint) (5 * nincs * (mag / view_light));
+                if (val < nincs)
+                {
+                    red = nincs - 1;
+                    green = val - 0 * nincs;
+                }
+                else if (val < 2 * nincs)
+                {
+                    red = 2 * nincs - val - 1;
+                    green = nincs - 1;
+                }
+                else if (val < 3 * nincs)
+                {
+                    green = nincs - 1;
+                    blue = val - 2 * nincs;
+                }
+                else if (val < 4 * nincs)
+                {
+                    green = 4 * nincs - val - 1;
+                    blue = nincs - 1;
+                }
+                else if (val < 5 * nincs)
+                {
+                    blue = nincs - 1;
+                    red = val - 4 * nincs;
+                }
             }
             scale = 1 - scale;
             if (scale < 0)  scale = 0;
 
-            x = (guint32) (scale * 0xFF);
-            UFor( i, 3 )
-            {
-                y |= x << 8*i;
-            }
+            y |= (guint32) (scale * red)   << 16;
+            y |= (guint32) (scale * green) << 8;
+            y |= (guint32) (scale * blue)  << 0;
             outline[col] = y;
         }
 
@@ -591,6 +636,7 @@ int main (int argc, char* argv[])
         PointXfrm tmp_basis;
         identity_PointXfrm (&tmp_basis);
         tmp_basis.pts[1].coords[2] = -0.5;  /* Tilt backwards a bit.*/
+            /* tmp_basis.pts[1].coords[3] = -0.2; */
         orthorotate_PointXfrm (&view_basis, &tmp_basis, 1);
     }
 
