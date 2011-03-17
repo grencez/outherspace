@@ -497,7 +497,8 @@ void rays_to_hits_fish (uint* hits, real* mags,
     }
 }
 
-void rays_to_hits_perspective (uint* hits, real* mags,
+
+void rays_to_hits_fixed_plane (uint* hits, real* mags,
                                uint nrows, uint ncols,
                                const RaySpace* space, real zpos)
 {
@@ -569,31 +570,31 @@ void rays_to_hits_perspective (uint* hits, real* mags,
     }
 }
 
-void rays_to_hits_plane (uint* hits, real* mags,
-                         uint nrows, uint ncols,
-                         const RaySpace* space, real zpos)
+
+void rays_to_hits_parallel (uint* hits, real* mags,
+                            uint nrows, uint ncols,
+                            const RaySpace* restrict space,
+                            const Point* restrict origin,
+                            const PointXfrm* restrict view_basis,
+                            real view_width)
 {
     uint row;
-    bool inside_box;
     const uint row_dim = 0;
     const uint col_dim = 1;
     const uint dir_dim = 2;
     real col_start, row_start;
     real col_delta, row_delta;
+    const Point* restrict dir;
     const BoundingBox* box;
 
     box = &space->scene.box;
+    dir = &view_basis->pts[dir_dim];
 
-    row_start = box->min_corner.coords[row_dim];
-    row_delta = (box->max_corner.coords[row_dim] - row_start) / nrows;
-    row_start += row_delta / 2;
+    row_delta = view_width / nrows;
+    row_start = (- view_width + row_delta) / 2;
 
-    col_start = box->min_corner.coords[col_dim];
-    col_delta = (box->max_corner.coords[col_dim] - col_start) / ncols;
-    col_start += col_delta / 2;
-
-    inside_box = (zpos > box->min_corner.coords[dir_dim] &&
-                  zpos < box->max_corner.coords[dir_dim]);
+    col_delta = view_width / ncols;
+    col_start = (- view_width + col_delta) / 2;
 
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic)
@@ -601,26 +602,31 @@ void rays_to_hits_plane (uint* hits, real* mags,
     UFor( row, nrows )
     {
         uint col;
-        Point origin, dir;
+        Point partial_ray_origin;
         uint* hitline;
         real* magline;
 
         hitline = &hits[row * ncols];
         magline = &mags[row * ncols];
 
-        dir.coords[dir_dim] = 1;
-        dir.coords[row_dim] = 0;
-        dir.coords[col_dim] = 0;
-        normalize_Point (&dir, &dir);
-
-        origin.coords[dir_dim] = zpos;
-        origin.coords[row_dim] = row_start + (nrows - row -1) * row_delta;
+        scale_Point (&partial_ray_origin,
+                     &view_basis->pts[row_dim],
+                     row_start + row_delta * (nrows - row -1));
+        summ_Point (&partial_ray_origin, &partial_ray_origin, origin);
 
         UFor( col, ncols )
         {
+            bool inside_box;
+            Point ray_origin;
             uint hit; real mag;
-            origin.coords[col_dim] = col_start + col * col_delta;
-            cast_ray (&hit, &mag, &origin, &dir,
+
+            scale_Point (&ray_origin,
+                         &view_basis->pts[col_dim],
+                         col_start + col_delta * col);
+            summ_Point (&ray_origin, &ray_origin, &partial_ray_origin);
+            inside_box = inside_BoundingBox (box, &ray_origin);
+
+            cast_ray (&hit, &mag, &ray_origin, dir,
                       space->nelems, space->elems,
                       space->tree.elemidcs, space->tree.nodes,
                       &space->scene.box, inside_box);

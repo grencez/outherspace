@@ -332,6 +332,12 @@ render_RaySpace (byte* data, const RaySpace* space,
                            view_nrows, view_ncols,
                            space, &view_origin, &view_basis,
                            view_angle);
+#elif 0
+
+        rays_to_hits_parallel (ray_hits, ray_mags,
+                               view_nrows, view_ncols,
+                               space, &view_origin, &view_basis,
+                               100);
 #elif 1
         rays_to_hits (ray_hits, ray_mags, view_nrows, view_ncols,
                       space, &view_origin, &view_basis,
@@ -616,7 +622,7 @@ int main (int argc, char* argv[])
         PointXfrm tmp_basis;
         identity_PointXfrm (&tmp_basis);
             /* Tilt backwards a bit.*/
-        tmp_basis.pts[0].coords[2] = -0.5;
+            /* tmp_basis.pts[0].coords[2] = -0.5; */
             /* tmp_basis.pts[0].coords[3] = -0.3; */
             /* tmp_basis.pts[0].coords[4] = -0.1; */
         orthorotate_PointXfrm (&view_basis, &tmp_basis, 1);

@@ -39,19 +39,22 @@ void rays_to_hits_fish (uint* hits, real* mags,
                         const Point* origin,
                         const PointXfrm* view_basis,
                         real view_angle);
-void rays_to_hits_from_point (uint* hits, real* mags,
-                              uint nrows, uint ncols,
-                              const RaySpace* space, real zpos);
-void rays_to_hits_plane (uint* hits, real* mags,
-                         uint nrows, uint ncols,
-                         const RaySpace* space, real zpos);
+void rays_to_hits_fixed_plane (uint* hits, real* mags,
+                               uint nrows, uint ncols,
+                               const RaySpace* space, real zpos);
+void rays_to_hits_parallel (uint* hits, real* mags,
+                            uint nrows, uint ncols,
+                            const RaySpace* space,
+                            const Point* origin,
+                            const PointXfrm* view_basis,
+                            real view_angle);
 
 void setup_ray_pixel_deltas (Point* dir_start,
                              Point* row_delta,
                              Point* col_delta,
                              uint nrows, uint ncols,
                              const PointXfrm* view_basis,
-                             real view_angle);
+                             real view_width);
 void rays_to_hits (uint* hits, real* mags,
                    uint nrows, uint ncols,
                    const RaySpace* space,
