@@ -180,7 +180,7 @@ void rays_to_hits_computer (uint* restrict hits,
 
             hitline = &hits[row * ncols];
             magline = &mags[row * ncols];
-            scale_Point (&partial_dir, &row_delta, nrows - row -1);
+            scale_Point (&partial_dir, &row_delta, row);
             summ_Point (&partial_dir, &partial_dir, &dir_start);
 
             UFor( col, ncols )

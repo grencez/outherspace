@@ -18,7 +18,9 @@ static uint mouse_diff[2];
 static uint* ray_hits = 0;
 static real* ray_mags = 0;
 static real view_angle = 2 * M_PI / 3;
+static real view_width = 100;
 static real view_light = 400;
+static bool view_perspective = true;
 static bool needs_recast = true;
 
 static gboolean delete_event (GtkWidget* widget,
@@ -55,43 +57,63 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
     tristate view_light_change = 0;
     bool reflect = false;
     bool rotate_dir_dim = false;
+    bool change_cast_method = false;
     bool recast = true;
     const real scale = 5;
     FILE* out;
+    bool shift_mod, ctrl_mod;
 
     (void) _data;
     out = stdout;
 
-    if (event->state & GDK_SHIFT_MASK)
+    shift_mod = event->state & GDK_SHIFT_MASK;
+    ctrl_mod = event->state & GDK_CONTROL_MASK;
+
+    switch (event->keyval)
     {
-        if (event->keyval == GDK_Up)    { dim = 0;  stride =  1; }
-        if (event->keyval == GDK_Down)  { dim = 0;  stride = -1; }
-        if (event->keyval == GDK_Right) { dim = 1;  stride =  1; }
-        if (event->keyval == GDK_Left)  { dim = 1;  stride = -1; }
+        case GDK_Up:
+            if (shift_mod) { dim = 0;  stride = 1; }
+            else if (ctrl_mod) { dim = 0;  turn = 1; }
+            else { dim = DirDimension;  stride = 1; }
+            break;
+        case GDK_Down:
+            if (shift_mod) { dim = 0;  stride = -1; }
+            else if (ctrl_mod) { dim = 0;  turn = -1; }
+            else { dim = DirDimension;  stride = -1; }
+            break;
+        case GDK_Right:
+            if (shift_mod) { dim = 1;  stride = 1; }
+            else if (ctrl_mod) { dim = 1;  turn = 1; }
+            else { roll = -1; }
+            break;
+        case GDK_Left:
+            if (shift_mod) { dim = 1;  stride = -1; }
+            else if (ctrl_mod) { dim = 1;  turn = -1; }
+            else { roll = 1; }
+            break;
+        case GDK_Escape:
+            gdk_pointer_ungrab (event->time);  break;
+        case GDK_d:
+            rotate_dir_dim = true;  break;
+        case GDK_L:
+            view_light_change = 1;  break;
+        case GDK_l:
+            view_light_change = -1;  break;
+        case GDK_r:
+            reflect = true;  break;
+        case GDK_V:
+            view_angle_change = 1;  break;
+        case GDK_v:
+            if (ctrl_mod)  change_cast_method = true;
+            else  view_angle_change = -1;
+            break;
+        case GDK_Z:
+            resize = 1;  break;
+        case GDK_z:
+            resize = -1;  break;
+        default:
+            break;
     }
-    else if (event->state & GDK_CONTROL_MASK)
-    {
-        if (event->keyval == GDK_Up)    { dim = 0;  turn =  1; }
-        if (event->keyval == GDK_Down)  { dim = 0;  turn = -1; }
-        if (event->keyval == GDK_Right) { dim = 1;  turn =  1; }
-        if (event->keyval == GDK_Left)  { dim = 1;  turn = -1; }
-    }
-    else
-    {
-        if (event->keyval == GDK_Up)   { dim = 2;  stride =  1; }
-        if (event->keyval == GDK_Down) { dim = 2;  stride = -1; }
-        if (event->keyval == GDK_Right)  roll = -1;
-        if (event->keyval == GDK_Left)   roll =  1;
-        if (event->keyval == GDK_Escape)  gdk_pointer_ungrab (event->time);
-    }
-    if (event->keyval == GDK_V)  view_angle_change =  1;
-    if (event->keyval == GDK_v)  view_angle_change = -1;
-    if (event->keyval == GDK_Z)  resize =  1;
-    if (event->keyval == GDK_z)  resize = -1;
-    if (event->keyval == GDK_L)  view_light_change =  1;
-    if (event->keyval == GDK_l)  view_light_change = -1;
-    if (event->keyval == GDK_r)  reflect = true;
-    if (event->keyval == GDK_d)  rotate_dir_dim = true;
 
     if (view_light_change)
     {
@@ -129,10 +151,10 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
     {
         uint negdim;
         if (turn < 0)  negdim = dim;
-        else           negdim = 2;
+        else           negdim = DirDimension;
 
         negate_Point (&view_basis.pts[negdim], &view_basis.pts[negdim]);
-        swaprows_PointXfrm (&view_basis, dim, 2);
+        swaprows_PointXfrm (&view_basis, dim, DirDimension);
         needs_recast = true;
 
         fputs ("basis:", out);
@@ -141,14 +163,23 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
     }
     else if (view_angle_change != 0)
     {
-        const real epsilon = (real) (.00001);
-        const real diff = M_PI / 18;
-        if (view_angle_change > 0)  view_angle += diff;
-        else                        view_angle -= diff;
-        while (view_angle > M_PI - epsilon) view_angle -= diff;
-        while (view_angle <        epsilon) view_angle += diff;
-        
-        fprintf (out, "view_angle:%fpi\n", view_angle / M_PI);
+        if (view_perspective)
+        {
+            const real epsilon = (real) (.00001);
+            const real diff = M_PI / 18;
+            if (view_angle_change > 0)  view_angle += diff;
+            else                        view_angle -= diff;
+            while (view_angle > M_PI - epsilon) view_angle -= diff;
+            while (view_angle <        epsilon) view_angle += diff;
+            fprintf (out, "view_angle:%fpi\n", view_angle / M_PI);
+        }
+        else
+        {
+            const real diff = 50;
+            if (view_angle_change > 0)  view_width += diff;
+            else                        view_width -= diff;
+            fprintf (out, "view_width:%f\n", view_width);
+        }
     }
     else if (resize != 0)
     {
@@ -178,7 +209,8 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
     }
     else if (reflect)
     {
-        negate_Point (&view_basis.pts[2], &view_basis.pts[2]);
+        negate_Point (&view_basis.pts[NDimensions-1],
+                      &view_basis.pts[NDimensions-1]);
     }
     else if (rotate_dir_dim)
     {
@@ -188,6 +220,14 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
         n = NDimensions - 3;
         UFor( i, n )
             swaprows_PointXfrm (&view_basis, 2+i, 3+i);
+    }
+    else if (change_cast_method)
+    {
+        view_perspective = !view_perspective;
+        if (view_perspective)
+            fputs ("method:perspective\n", out);
+        else
+            fputs ("method:parallel\n", out);
     }
     else
     {
@@ -219,6 +259,7 @@ static gboolean grab_mouse_fn (GtkWidget* da,
     real vert, horz;
     PointXfrm tmp;
     Point dir;
+    const uint dir_dim = DirDimension;
     FILE* out;
 
     (void) edge;
@@ -244,9 +285,9 @@ static gboolean grab_mouse_fn (GtkWidget* da,
     zero_Point (&dir);
     dir.coords[0] = vert * cos (M_PI / 3);
     dir.coords[1] = horz * cos (M_PI / 3);
-    dir.coords[2] = 1;
-    trxfrm_Point (&tmp.pts[2], &view_basis, &dir);
-    orthorotate_PointXfrm (&view_basis, &tmp, 2);
+    dir.coords[dir_dim] = 1;
+    trxfrm_Point (&tmp.pts[dir_dim], &view_basis, &dir);
+    orthorotate_PointXfrm (&view_basis, &tmp, dir_dim);
 
     fputs ("basis:", out);
     output_PointXfrm (out, &view_basis);
@@ -326,22 +367,27 @@ render_RaySpace (byte* data, const RaySpace* space,
 #elif 0
         rays_to_hits_perspective (ray_hits, ray_mags,
                                   view_nrows, view_ncols,
-                                  space, view_origin.coords[2]);
+                                  space, view_origin.coords[DirDimension]);
 #elif 0
         rays_to_hits_fish (ray_hits, ray_mags,
                            view_nrows, view_ncols,
                            space, &view_origin, &view_basis,
                            view_angle);
-#elif 0
-
-        rays_to_hits_parallel (ray_hits, ray_mags,
-                               view_nrows, view_ncols,
-                               space, &view_origin, &view_basis,
-                               100);
 #elif 1
-        rays_to_hits (ray_hits, ray_mags, view_nrows, view_ncols,
-                      space, &view_origin, &view_basis,
-                      view_angle);
+
+        if (view_perspective)
+        {
+            rays_to_hits (ray_hits, ray_mags, view_nrows, view_ncols,
+                          space, &view_origin, &view_basis,
+                          view_angle);
+        }
+        else
+        {
+            rays_to_hits_parallel (ray_hits, ray_mags,
+                                   view_nrows, view_ncols,
+                                   space, &view_origin, &view_basis,
+                                   view_width);
+        }
 #endif
     }
     needs_recast = false;
@@ -360,7 +406,7 @@ render_RaySpace (byte* data, const RaySpace* space,
         if (row >= nrows)  break;
 
         hitline = &ray_hits[view_ncols * row];
-        outline = (guint32*) &data[stride * row];
+        outline = (guint32*) &data[stride * (view_nrows - row - 1)];
 
         UFor( col, view_ncols )
         {
@@ -392,7 +438,7 @@ render_RaySpace (byte* data, const RaySpace* space,
 
         hitline = &ray_hits[view_ncols * row];
         magline = &ray_mags[view_ncols * row];
-        outline = (guint32*) &data[stride * row];
+        outline = (guint32*) &data[stride * (view_nrows - row - 1)];
 
         UFor( col, view_ncols )
         {
@@ -421,7 +467,7 @@ render_RaySpace (byte* data, const RaySpace* space,
                 elem = &space->elems[hit];
 
                 diff_Point (&u, &elem->pts[0], &elem->pts[1]);
-                diff_Point (&v, &elem->pts[0], &elem->pts[2]);
+                diff_Point (&v, &elem->pts[0], &elem->pts[DirDimension]);
 
                 proj_Point (&tmp, &v, &u);
                 diff_Point (&v, &v, &tmp);
@@ -464,6 +510,7 @@ render_RaySpace (byte* data, const RaySpace* space,
             scale = 1 - scale;
             if (scale < 0)  scale = 0;
 
+                /* scale = 1; */
             y |= (guint32) (scale * red)   << 16;
             y |= (guint32) (scale * green) << 8;
             y |= (guint32) (scale * blue)  << 0;
@@ -614,7 +661,7 @@ int main (int argc, char* argv[])
     
     view_origin.coords[0] = 50;
     view_origin.coords[1] = 50;
-    view_origin.coords[2] = -70;
+    view_origin.coords[DirDimension] = -70;
 #if 0
     identity_PointXfrm (&view_basis);
 #else
@@ -636,14 +683,14 @@ int main (int argc, char* argv[])
 
     view_origin.coords[0] = 0;
     view_origin.coords[1] = 10;
-    view_origin.coords[2] = -250;
+    view_origin.coords[DirDimension] = -250;
 
     {
         PointXfrm tmp_basis;
         identity_PointXfrm (&tmp_basis);
-        tmp_basis.pts[1].coords[2] = -0.5;  /* Tilt backwards a bit.*/
+        tmp_basis.pts[0].coords[DirDimension] = -0.5;  /* Tilt backwards a bit.*/
             /* tmp_basis.pts[1].coords[3] = -0.2; */
-        orthorotate_PointXfrm (&view_basis, &tmp_basis, 1);
+        orthorotate_PointXfrm (&view_basis, &tmp_basis, 0);
     }
 
 #endif

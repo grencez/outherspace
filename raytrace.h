@@ -8,6 +8,8 @@
 #include "xfrm.h"
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
+#define DirDimension (NDimensions - 1)
+
 struct ray_space_struct
 {
     uint nelems;

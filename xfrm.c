@@ -82,6 +82,7 @@ void xfrm_Point (Point* dst, const PointXfrm* xfrm, const Point* src)
 void trxfrm_Point (Point* dst, const PointXfrm* xfrm, const Point* src)
 {
     uint i;
+    assert (dst != src);
     zero_Point (dst);
     UFor( i, NDimensions )
     {

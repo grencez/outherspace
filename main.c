@@ -88,20 +88,22 @@ void random_RaySpace (RaySpace* space, uint nelems)
 void output_PBM_image (const char* filename, uint nrows, uint ncols,
                        const uint* hits, uint nelems)
 {
-    uint row, i;
+    uint row;
     FILE* out;
 
     out = fopen (filename, "w+");
     fputs ("P1\n", out);
     fprintf (out, "%u %u\n", ncols, nrows);
 
-    i = 0;
     UFor( row, nrows )
     {
         uint col;
+        const uint* hitline;
+
+        hitline = &hits[nrows - row - 1];
         UFor( col, ncols )
         {
-            if (nelems != hits[i++])
+            if (nelems != hitline[col])
                 fputs (" 1", out);
             else
                 fputs (" 0", out);
@@ -115,7 +117,7 @@ void output_PBM_image (const char* filename, uint nrows, uint ncols,
 void output_PGM_image (const char* filename, uint nrows, uint ncols,
                        const uint* hits, uint nelems)
 {
-    uint row, i;
+    uint row;
     FILE* out;
 
     out = fopen (filename, "w+");
@@ -129,13 +131,15 @@ void output_PGM_image (const char* filename, uint nrows, uint ncols,
     fprintf (out, "%u %u\n", ncols, nrows);
     fprintf (out, "%u\n", nelems);
 
-    i = 0;
     UFor( row, nrows )
     {
         uint col;
+        const uint* hitline;
+
+        hitline = &hits[nrows - row - 1];
         UFor( col, ncols )
         {
-            fprintf (out, " %u", nelems - hits[i++]);
+            fprintf (out, " %u", nelems - hitline[col]);
         }
         fputc ('\n', out);
     }
@@ -146,7 +150,7 @@ void output_PGM_image (const char* filename, uint nrows, uint ncols,
 void output_PPM_image (const char* filename, uint nrows, uint ncols,
                        const byte* pixels)
 {
-    uint row, i;
+    uint row;
     FILE* out;
 
     out = fopen (filename, "w+");
@@ -160,14 +164,16 @@ void output_PPM_image (const char* filename, uint nrows, uint ncols,
     fprintf (out, "%u %u\n", ncols, nrows);
     fputs ("255\n", out);
 
-    i = 0;
     UFor( row, nrows )
     {
         uint col;
+        const byte* scanline;
+
+        scanline = &pixels[nrows - row - 1];
         UFor( col, ncols )
         {
-            fprintf (out, " %u %u %u", pixels[i], pixels[i+1], pixels[i+2]);
-            i += 3;
+            fprintf (out, " %u %u %u",
+                     pixels[3*col+0], pixels[3*col+1], pixels[3*col+2]);
         }
         fputc ('\n', out);
     }
@@ -282,7 +288,7 @@ bool readin_wavefront (RaySpace* space, const char* filename)
             {
                 uint vert_id;
                 vert_id = read_tri->pts[pi];
-                if (vert_id == 0 || vert_id > scene->nelems)
+                if (vert_id == 0 || vert_id > scene->nverts)
                 {
                     fprintf (stderr, "Bad vertex: %u\n", vert_id);
                     good = false;

@@ -16,6 +16,8 @@
 #include <mpi.h>
 #endif
 
+#define DISREGARD_BOUNDING_BOX
+
 
 void cleanup_RaySpace (RaySpace* space)
 {
@@ -37,7 +39,7 @@ void dir_from_MultiRayCastParams (Point* dir, uint row, uint col,
     copy_Point (dir, &params->dir_start);
 
     partial_dir = params->dir_delta[0];
-    scale_Point (&partial_dir, &partial_dir, params->npixels[0] - row -1);
+    scale_Point (&partial_dir, &partial_dir, row);
     summ_Point (dir, dir, &partial_dir);
 
     partial_dir = params->dir_delta[1];
@@ -136,7 +138,7 @@ closer_hit (const Point* newhit, const Point* oldhit, const Point* dir)
     return false;
 }
 
-#elif 0
+#elif 1
 
 
 static
@@ -145,9 +147,12 @@ cross_Point (Point* restrict dst,
              const Point* restrict a,
              const Point* restrict b)
 {
+    uint i;
     dst->coords[0] = a->coords[1] * b->coords[2] - a->coords[2] * b->coords[1];
     dst->coords[1] = a->coords[2] * b->coords[0] - a->coords[0] * b->coords[2];
     dst->coords[2] = a->coords[0] * b->coords[1] - a->coords[1] * b->coords[0];
+    for (i = 3; i < NDimensions; ++i)
+        dst->coords[i] = 0;
 }
 
 
@@ -222,6 +227,87 @@ static real dot3 (const real a[3], const real b[3])
     return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 }
 
+static
+    bool
+hit_tri_proj (real* restrict dist,
+              const Point* restrict origin,
+              const Point* restrict kd_dir,
+              const Triangle* restrict elem,
+              const PointXfrm* restrict view_basis)
+{
+        /* const real epsilon = (real) 0.000001; */
+    const real epsilon = 0;
+    Point tmp_diff, tmp_proj;
+    real dir[3], edge1[3], edge2[3], tvec[3], pvec[3], qvec[3];
+    real det, inv_det;
+    PointXfrm ray_basis;
+    real u, v;
+
+    copy_PointXfrm (&ray_basis, view_basis);
+    copy_Point (&ray_basis.pts[2], kd_dir);
+
+    trxfrm_Point (&tmp_proj, &ray_basis, kd_dir);
+    dir[0] = tmp_proj.coords[0];
+    dir[1] = tmp_proj.coords[1];
+    dir[2] = tmp_proj.coords[2];
+
+    diff_Point (&tmp_diff, &elem->pts[1], &elem->pts[0]);
+    trxfrm_Point (&tmp_proj, &ray_basis, &tmp_diff);
+    edge1[0] = tmp_proj.coords[0];
+    edge1[1] = tmp_proj.coords[1];
+    edge1[2] = tmp_proj.coords[2];
+
+    diff_Point (&tmp_diff, &elem->pts[2], &elem->pts[0]);
+    trxfrm_Point (&tmp_proj, &ray_basis, &tmp_diff);
+    edge2[0] = tmp_proj.coords[0];
+    edge2[1] = tmp_proj.coords[1];
+    edge2[2] = tmp_proj.coords[2];
+
+    diff_Point (&tmp_diff, origin, &elem->pts[0]);
+    trxfrm_Point (&tmp_proj, &ray_basis, &tmp_diff);
+    tvec[0] = tmp_proj.coords[0];
+    tvec[1] = tmp_proj.coords[1];
+    tvec[2] = tmp_proj.coords[2];
+
+    cross3 (pvec, dir, edge2);
+
+    u = dot3 (tvec, pvec);
+    det = dot3 (edge1, pvec);
+
+    if (det > epsilon)
+    {
+        if (u < 0 || u > det)
+            return false;
+
+        cross3 (qvec, tvec, edge1);
+        v = dot3 (dir, qvec);
+        if (v < 0 || u + v > det)
+            return false;
+
+    }
+    else if (det < -epsilon)
+    {
+        if (u > 0 || u < det)
+            return false;
+
+        cross3 (qvec, tvec, edge1);
+        v = dot3 (dir, qvec);
+        if (v > 0 || u + v < det)
+            return false;
+    }
+    else
+    {
+        return false;
+    }
+
+    inv_det = 1 / det;
+    *dist = dot3 (edge2, qvec) * inv_det;
+
+        /* u *= inv_det; */
+        /* v *= inv_det; */
+
+    return *dist >= 0;
+}
 
 static
     bool
@@ -295,7 +381,42 @@ hit_tri (real* restrict dist,
 
     return *dist >= 0;
 }
+
 #endif
+
+static
+    void
+cast_ray_simple (uint* restrict ret_hit, real* restrict ret_mag,
+                 const Point* restrict origin,
+                 const Point* restrict dir,
+                 uint nelems,
+                 const Triangle* restrict elems,
+                 const PointXfrm* view_basis)
+{
+    uint i;
+    uint hit_idx;
+    real hit_mag;
+
+    (void) view_basis;
+
+    hit_idx = nelems;
+    hit_mag = Max_real;
+
+    UFor( i, nelems )
+    {
+        real mag;
+        if (hit_tri (&mag, origin, dir, &elems[i]))
+        {
+            if (mag < hit_mag)
+            {
+                hit_mag = mag;
+                hit_idx = i;
+            }
+        }
+    }
+    *ret_hit = hit_idx;
+    *ret_mag = hit_mag;
+}
 
 static
     void
@@ -311,8 +432,8 @@ cast_ray (uint* restrict ret_hit, real* restrict ret_mag,
 {
     Point salo_entrance;
     uint node_idx, parent = 0;
-    real hit_mag;
     uint hit_idx;
+    real hit_mag;
     Point* restrict entrance;
 
     entrance = &salo_entrance;
@@ -430,7 +551,7 @@ void rays_to_hits_fish (uint* hits, real* mags,
     bool inside_box;
     const uint row_dim = 0;
     const uint col_dim = 1;
-    const uint dir_dim = 2;
+    const uint dir_dim = DirDimension;
     real col_start, row_start;
     real col_delta, row_delta;
 
@@ -457,7 +578,7 @@ void rays_to_hits_fish (uint* hits, real* mags,
         hitline = &hits[row * ncols];
         magline = &mags[row * ncols];
 
-        row_angle = row_start + row_delta * (nrows - row -1);
+        row_angle = row_start + row_delta * row;
 
         UFor( col, ncols )
         {
@@ -506,7 +627,7 @@ void rays_to_hits_fixed_plane (uint* hits, real* mags,
     bool inside_box;
     const uint row_dim = 0;
     const uint col_dim = 1;
-    const uint dir_dim = 2;
+    const uint dir_dim = DirDimension;
     Point origin;
     real col_start, row_start;
     real col_delta, row_delta;
@@ -551,7 +672,7 @@ void rays_to_hits_fixed_plane (uint* hits, real* mags,
                 /* if (! (row == 333 && col == 322))  continue; */
 
             dir.coords[dir_dim] = 0;
-            dir.coords[row_dim] = row_start + (nrows - row -1) * row_delta;
+            dir.coords[row_dim] = row_start + row * row_delta;
             dir.coords[col_dim] = col_start + col * col_delta;
 
             diff_Point (&dir, &dir, &origin);
@@ -581,7 +702,7 @@ void rays_to_hits_parallel (uint* hits, real* mags,
     uint row;
     const uint row_dim = 0;
     const uint col_dim = 1;
-    const uint dir_dim = 2;
+    const uint dir_dim = DirDimension;
     real col_start, row_start;
     real col_delta, row_delta;
     const Point* restrict dir;
@@ -611,7 +732,7 @@ void rays_to_hits_parallel (uint* hits, real* mags,
 
         scale_Point (&partial_ray_origin,
                      &view_basis->pts[row_dim],
-                     row_start + row_delta * (nrows - row -1));
+                     row_start + row_delta * row);
         summ_Point (&partial_ray_origin, &partial_ray_origin, origin);
 
         UFor( col, ncols )
@@ -626,10 +747,16 @@ void rays_to_hits_parallel (uint* hits, real* mags,
             summ_Point (&ray_origin, &ray_origin, &partial_ray_origin);
             inside_box = inside_BoundingBox (box, &ray_origin);
 
+#ifdef DISREGARD_BOUNDING_BOX
+            cast_ray_simple (&hit, &mag, origin, dir,
+                             space->nelems, space->elems, view_basis);
+#else
             cast_ray (&hit, &mag, &ray_origin, dir,
                       space->nelems, space->elems,
                       space->tree.elemidcs, space->tree.nodes,
                       &space->scene.box, inside_box);
+#endif
+
             hitline[col] = hit;
             magline[col] = mag;
         }
@@ -648,7 +775,7 @@ setup_ray_pixel_deltas (Point* restrict dir_start,
 {
     const uint row_dim = 0;
     const uint col_dim = 1;
-    const uint dir_dim = 2;
+    const uint dir_dim = DirDimension;
     Point dstart, rdelta, cdelta;
     real halflen;
     halflen = sin (view_angle / 2);
@@ -714,7 +841,7 @@ void rays_to_hits (uint* hits, real* mags,
 
         hitline = &hits[row * ncols];
         magline = &mags[row * ncols];
-        scale_Point (&partial_dir, &row_delta, nrows - row -1);
+        scale_Point (&partial_dir, &row_delta, row);
         summ_Point (&partial_dir, &partial_dir, &dir_start);
 
         UFor( col, ncols )
@@ -728,10 +855,15 @@ void rays_to_hits (uint* hits, real* mags,
             summ_Point (&dir, &dir, &partial_dir);
             normalize_Point (&dir, &dir);
 
+#ifdef DISREGARD_BOUNDING_BOX
+            cast_ray_simple (&hit, &mag, origin, &dir,
+                             space->nelems, space->elems, view_basis);
+#else
             cast_ray (&hit, &mag, origin, &dir,
                       space->nelems, space->elems,
                       space->tree.elemidcs, space->tree.nodes,
                       &space->scene.box, inside_box);
+#endif
             hitline[col] = hit;
             magline[col] = mag;
 
