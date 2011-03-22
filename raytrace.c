@@ -16,8 +16,7 @@
 #include <mpi.h>
 #endif
 
-#define DISREGARD_BOUNDING_BOX
-
+    /* #define DISREGARD_BOUNDING_BOX */
 
 void cleanup_RaySpace (RaySpace* space)
 {
@@ -95,17 +94,18 @@ hit_tri (real* restrict dist,
 #if 0
     if (inbounds)
     {
-        zero_Point (hit);
+        Point hit;
+        zero_Point (&hit);
         UFor( i, NTrianglePoints )
         {
             Point p;
             scale_Point (&p, dir, trdots[i]);
-            summ_Point (hit, hit, &p);
+            summ_Point (&hit, &hit, &p);
         }
 
         UFor( i, NDimensions )
         {
-            if (signum_real (hit->coords[i]) != signum_real (dir->coords[i]))
+            if (signum_real (hit.coords[i]) != signum_real (dir->coords[i]))
             {
                 inbounds = false;
                 break;
@@ -114,8 +114,8 @@ hit_tri (real* restrict dist,
 
         if (inbounds)
         {
-            scale_Point (hit, hit, 1 / (3 * dirdot));
-            summ_Point (hit, hit, origin);
+            scale_Point (&hit, &hit, 1 / (3 * dirdot));
+            summ_Point (&hit, &hit, origin);
         }
     }
 #endif
@@ -147,12 +147,14 @@ cross_Point (Point* restrict dst,
              const Point* restrict a,
              const Point* restrict b)
 {
-    uint i;
+        /* uint i; */
     dst->coords[0] = a->coords[1] * b->coords[2] - a->coords[2] * b->coords[1];
     dst->coords[1] = a->coords[2] * b->coords[0] - a->coords[0] * b->coords[2];
     dst->coords[2] = a->coords[0] * b->coords[1] - a->coords[1] * b->coords[0];
+    /*
     for (i = 3; i < NDimensions; ++i)
         dst->coords[i] = 0;
+        */
 }
 
 

@@ -23,10 +23,10 @@ int main ()
 
 #if 1
     random_RaySpace (&space, 50);
-    
+
     view_origin.coords[0] = 50;
     view_origin.coords[1] = 50;
-    view_origin.coords[2] = -70;
+    view_origin.coords[DirDimension] = -70;
     identity_PointXfrm (&view_basis);
 #else
     {
@@ -36,13 +36,13 @@ int main ()
 
     view_origin.coords[0] = 10;
     view_origin.coords[1] = 0;
-    view_origin.coords[2] = -250;
+    view_origin.coords[DirDimension] = -250;
 
     {
         PointXfrm tmp_basis;
         identity_PointXfrm (&tmp_basis);
             /* Tilt backwards a bit.*/
-        tmp_basis.pts[0].coords[2] = -0.5;
+        tmp_basis.pts[0].coords[DirDimension] = -0.5;
         orthorotate_PointXfrm (&view_basis, &tmp_basis, 0);
     }
 
@@ -61,7 +61,7 @@ int main ()
         bool write_image = true;
         const uint nrows = 2000;
         const uint ncols = 2000;
-        const real view_angle = 2 * M_PI / 3;
+        const real view_angle = M_PI / 3;
 
         hits = AllocT( uint, nrows * ncols );
         mags = AllocT( real, nrows * ncols );

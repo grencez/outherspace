@@ -7,7 +7,7 @@
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
 
-#define NDimensions 4
+#define NDimensions 3
 
 struct point_struct
 {

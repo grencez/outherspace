@@ -100,7 +100,7 @@ void output_PBM_image (const char* filename, uint nrows, uint ncols,
         uint col;
         const uint* hitline;
 
-        hitline = &hits[nrows - row - 1];
+        hitline = &hits[(nrows - row - 1) * ncols];
         UFor( col, ncols )
         {
             if (nelems != hitline[col])
@@ -136,7 +136,7 @@ void output_PGM_image (const char* filename, uint nrows, uint ncols,
         uint col;
         const uint* hitline;
 
-        hitline = &hits[nrows - row - 1];
+        hitline = &hits[(nrows - row - 1) * ncols];
         UFor( col, ncols )
         {
             fprintf (out, " %u", nelems - hitline[col]);
