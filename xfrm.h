@@ -26,6 +26,11 @@ void to_basis_PointXfrm (PointXfrm* dst, const PointXfrm* xfrm,
 void orthonormalize_PointXfrm (PointXfrm* dst, const PointXfrm* A);
 void orthorotate_PointXfrm (PointXfrm* dst, const PointXfrm* A, uint dim);
 
+real det2_PointXfrm (const PointXfrm* xfrm,
+                     uint ri, uint rj, uint ci, uint cj);
+real det3_PointXfrm (const PointXfrm* xfrm,
+                     uint ri, uint rj, uint rk,
+                     uint ci, uint cj, uint ck);
 void row_minors_PointXfrm (Point* dst, const PointXfrm* xfrm, uint row);
 
 #ifndef __OPENCL_VERSION__

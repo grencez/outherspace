@@ -74,8 +74,12 @@ real relative_error (real expect, real result);
 tristate signum_real (real a);
 tristate mul_signum (tristate a, tristate b);
 
+#ifdef NDEBUG
+#define AssertEqual_real( expect, result )
+#else
 #define AssertEqual_real( expect, result ) \
     assert (Epsilon_real >= fabs (relative_error (expect, result)))
+#endif
 
 #ifndef __OPENCL_VERSION__
 uint index_of (const void* e, const void* arr, size_t size);

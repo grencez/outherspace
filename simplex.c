@@ -55,36 +55,28 @@ void barycentric_Plane (Plane* dst, const Plane* plane, const Point* point)
 
 void init_BarySimplex (BarySimplex* elem, const PointXfrm* raw)
 {
+    uint i;
     PointXfrm surf;
     Plane* plane;
 
-    diff_Point (&surf.pts[1], &raw->pts[1], &raw->pts[0]);
-    diff_Point (&surf.pts[2], &raw->pts[2], &raw->pts[0]);
+    UFor( i, NDimensions-1 )
+        diff_Point (&surf.pts[1+i], &raw->pts[1+i], &raw->pts[0]);
 
     plane = &elem->plane;
-
     row_minors_PointXfrm (&plane->normal, &surf, 0);
     plane->normal.coords[1] = - plane->normal.coords[1];
     init_Plane (plane, &plane->normal, &raw->pts[0]);
-
-    AssertEqual_real( 0, dot_Point (&plane->normal, &surf.pts[1]) );
-    AssertEqual_real( 0, dot_Point (&plane->normal, &surf.pts[2]) );
-
     copy_Point (&surf.pts[0], &plane->normal);
 
-    plane = &elem->barys[0];
-
-    row_minors_PointXfrm (&plane->normal, &surf, 1);
-    plane->normal.coords[1] = - plane->normal.coords[1];
-    init_Plane (plane, &plane->normal, &raw->pts[0]);
-    barycentric_Plane (plane, plane, &raw->pts[1]);
-
-    plane = &elem->barys[1];
-
-    row_minors_PointXfrm (&plane->normal, &surf, 2);
-    plane->normal.coords[1] = - plane->normal.coords[1];
-    init_Plane (plane, &plane->normal, &raw->pts[0]);
-    barycentric_Plane (plane, plane, &raw->pts[2]);
+    UFor( i, NDimensions-1 )
+    {
+        AssertEqual_real( 0, dot_Point (&surf.pts[0], &surf.pts[i+1]) );
+        plane = &elem->barys[i];
+        row_minors_PointXfrm (&plane->normal, &surf, 1+i);
+        plane->normal.coords[1] = - plane->normal.coords[1];
+        init_Plane (plane, &plane->normal, &raw->pts[0]);
+        barycentric_Plane (plane, plane, &raw->pts[1+i]);
+    }
 }
 
 
@@ -93,20 +85,42 @@ bool hit_BarySimplex (real* restrict ret_dist,
                       const Point* restrict dir,
                       const BarySimplex* restrict elem)
 {
-    real dist, u, v;
+    uint i;
+    real dist, dot, bcoord_sum;
+    real bcoords[NDimensions-1];
     Point isect;
 
-    dist = (distance_Plane (&elem->plane, origin)
-            / - dot_Point (&elem->plane.normal, dir));
-    if (dist < 0)  return false;
+    dist = distance_Plane (&elem->plane, origin);
+    dot = dot_Point (&elem->plane.normal, dir);
+
+    if (dot < 0)
+    {
+        if (dist < 0)  return false;
+        dot = - dot;
+    }
+    else if (dot > 0)
+    {
+        if (dist > 0)  return false;
+        dist = - dist;
+    }
+    else
+    {
+        return false;
+    }
+    
+    dist *= 1 / dot;
     
     scale_Point (&isect, dir, dist);
     summ_Point (&isect, &isect, origin);
     
-    u = distance_Plane (&elem->barys[0], &isect);
-    if (u < 0 || u > 1)  return false;
-    v = distance_Plane (&elem->barys[1], &isect);
-    if (v < 0 || u + v > 1)  return false;
+    bcoord_sum = 0;
+    UFor( i, NDimensions-1 )
+    {
+        bcoords[i] = distance_Plane (&elem->barys[i], &isect);
+        if (bcoords[i] < 0)  return false;
+        bcoord_sum += bcoords[i];
+        if (bcoord_sum > 1)  return false;
+    }
 
     *ret_dist = dist;
     return true;

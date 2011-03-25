@@ -52,6 +52,9 @@ tri_to_BarySimplex (BarySimplex* simplex, const Triangle* tri)
     UFor( pi, NTrianglePoints )
         copy_Point (&raw.pts[pi], &tri->pts[pi]);
         
+    for (pi = NTrianglePoints; pi < NDimensions; ++pi)
+        zero_Point (&raw.pts[pi]);
+
     init_BarySimplex (simplex, &raw);
 }
 

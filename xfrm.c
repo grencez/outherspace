@@ -219,23 +219,59 @@ void orthorotate_PointXfrm (PointXfrm* dst, const PointXfrm* A, uint dim)
     }
 }
 
+real det2_PointXfrm (const PointXfrm* xfrm,
+                     uint ri, uint rj, uint ci, uint cj)
+{
+    return (xfrm->pts[ri].coords[ci] * xfrm->pts[rj].coords[cj] -
+            xfrm->pts[ri].coords[cj] * xfrm->pts[rj].coords[ci]);
+}
+
+real det3_PointXfrm (const PointXfrm* xfrm,
+                     uint ri, uint rj, uint rk,
+                     uint ci, uint cj, uint ck)
+{
+    real a[3][3];
+    a[0][0] = xfrm->pts[ri].coords[ci];
+    a[0][1] = xfrm->pts[ri].coords[cj];
+    a[0][2] = xfrm->pts[ri].coords[ck];
+    a[1][0] = xfrm->pts[rj].coords[ci];
+    a[1][1] = xfrm->pts[rj].coords[cj];
+    a[1][2] = xfrm->pts[rj].coords[ck];
+    a[2][0] = xfrm->pts[rk].coords[ci];
+    a[2][1] = xfrm->pts[rk].coords[cj];
+    a[2][2] = xfrm->pts[rk].coords[ck];
+    return (+ a[0][0]*a[1][1]*a[2][2]
+            + a[0][1]*a[1][2]*a[2][0]
+            + a[0][2]*a[1][0]*a[2][1]
+            - a[2][0]*a[1][1]*a[0][2]
+            - a[2][1]*a[1][2]*a[0][0]
+            - a[2][2]*a[1][0]*a[0][1]);
+}
 
 void row_minors_PointXfrm (Point* dst, const PointXfrm* xfrm, uint row)
 {
+#if NDimensions == 3
     uint i, j;
-    assert (row < 3);
     if      (row == 0) { i = 1; j = 2; }
     else if (row == 1) { i = 0; j = 2; }
     else               { i = 0; j = 1; }
 
-    dst->coords[0] = (xfrm->pts[i].coords[1] * xfrm->pts[j].coords[2] -
-                      xfrm->pts[i].coords[2] * xfrm->pts[j].coords[1]);
+    dst->coords[0] = det2_PointXfrm (xfrm, i, j, 1, 2);
+    dst->coords[1] = det2_PointXfrm (xfrm, i, j, 0, 2);
+    dst->coords[2] = det2_PointXfrm (xfrm, i, j, 0, 1);
+#elif NDimensions == 4
+    uint i, j, k;
+    if      (row == 0) { i = 1; j = 2; k = 3; }
+    else if (row == 1) { i = 0; j = 2; k = 3; }
+    else if (row == 2) { i = 0; j = 1; k = 3; }
+    else               { i = 0; j = 1; k = 2; }
 
-    dst->coords[1] = (xfrm->pts[i].coords[0] * xfrm->pts[j].coords[2] -
-                      xfrm->pts[i].coords[2] * xfrm->pts[j].coords[0]);
-
-    dst->coords[2] = (xfrm->pts[i].coords[0] * xfrm->pts[j].coords[1] -
-                      xfrm->pts[i].coords[1] * xfrm->pts[j].coords[0]);
-
+    dst->coords[0] = det3_PointXfrm (xfrm, i, j, k, 1, 2, 3);
+    dst->coords[1] = det3_PointXfrm (xfrm, i, j, k, 0, 2, 3);
+    dst->coords[2] = det3_PointXfrm (xfrm, i, j, k, 0, 1, 3);
+    dst->coords[3] = det3_PointXfrm (xfrm, i, j, k, 0, 1, 2);
+#else
+    assert (0);
+#endif
 }
 

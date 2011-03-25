@@ -276,15 +276,15 @@ static gboolean grab_mouse_fn (GtkWidget* da,
     }
 
         /* Our X is vertical and Y is horizontal.*/
-    vert = (view_ncols - 2 * event->y) / view_nrows;
+    vert = (view_nrows - 2 * event->y) / view_nrows;
     horz = (2 * event->x - view_ncols) / view_ncols;
 
         /* fprintf (out, "vert:%f  horz:%f\n", vert, horz); */
 
     copy_PointXfrm (&tmp, &view_basis);
     zero_Point (&dir);
-    dir.coords[0] = vert * cos (M_PI / 3);
-    dir.coords[1] = horz * cos (M_PI / 3);
+    dir.coords[0] = vert * sin (view_angle / 2);
+    dir.coords[1] = horz * sin (view_angle / 2);
     dir.coords[dir_dim] = 1;
     trxfrm_Point (&tmp.pts[dir_dim], &view_basis, &dir);
     orthorotate_PointXfrm (&view_basis, &tmp, dir_dim);
