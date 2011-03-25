@@ -58,6 +58,21 @@ tristate compare_real (real a, real b)
     return 0;
 }
 
+real absolute_error (real expect, real result)
+{
+    return result - expect;
+}
+
+real relative_error (real expect, real result)
+{
+    real err;
+    err = absolute_error (expect, result);
+    if (- Epsilon_real < err && err < Epsilon_real)
+        return err;
+    else
+        return err / expect;
+}
+
 tristate signum_real (real a)
 {
     return compare_real (a, 0);

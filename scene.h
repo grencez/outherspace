@@ -3,7 +3,7 @@
 #ifndef __OPENCL_VERSION__
 #define SCENE_H_
 
-#include "space.h"
+#include "simplex.h"
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
 struct scene_triangle_struct

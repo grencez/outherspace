@@ -460,23 +460,13 @@ render_RaySpace (byte* data, const RaySpace* space,
             {
                 const uint nincs = 256;
                 uint val;
-                Point dir, u, v, tmp;
-                const Triangle* elem;
+                Point dir, tmp;
 
                 dir_from_MultiRayCastParams (&dir, row, col, &params);
-                elem = &space->elems[hit];
 
-                diff_Point (&u, &elem->pts[0], &elem->pts[1]);
-                diff_Point (&v, &elem->pts[0], &elem->pts[DirDimension]);
-
-                proj_Point (&tmp, &v, &u);
-                diff_Point (&v, &v, &tmp);
-
-                normalize_Point (&u, &u);
-                normalize_Point (&v, &v);
-
-                proj_Plane (&tmp, &dir, &u, &v);
+                proj_Plane (&tmp, &dir, &space->simplices[hit].plane);
                 scale *= dot_Point (&dir, &tmp);
+
                 if (scale < 0)  scale = -scale;
                 
                     /* Distance color scale.*/
@@ -510,6 +500,7 @@ render_RaySpace (byte* data, const RaySpace* space,
             scale = 1 - scale;
             if (scale < 0)  scale = 0;
 
+                /* Disable shading.*/
                 /* scale = 1; */
             y |= (guint32) (scale * red)   << 16;
             y |= (guint32) (scale * green) << 8;

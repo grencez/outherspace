@@ -17,6 +17,7 @@
 #endif
 
     /* #define DISREGARD_BOUNDING_BOX */
+    /* #define USE_BARYCENTRIC_RAYTRACE */
 
 void cleanup_RaySpace (RaySpace* space)
 {
@@ -25,6 +26,7 @@ void cleanup_RaySpace (RaySpace* space)
     if (space->nelems > 0)
     {
         free (space->elems);
+        free (space->simplices);
     }
 }
 #endif  /* #ifndef __OPENCL_VERSION__ */
@@ -386,6 +388,41 @@ hit_tri (real* restrict dist,
 
 #endif
 
+#ifdef USE_BARYCENTRIC_RAYTRACE
+static
+    void
+cast_ray_simple (uint* restrict ret_hit, real* restrict ret_mag,
+                 const Point* restrict origin,
+                 const Point* restrict dir,
+                 uint nelems,
+                 const BarySimplex* restrict elems,
+                 const PointXfrm* view_basis)
+{
+    uint i;
+    uint hit_idx;
+    real hit_mag;
+
+    (void) view_basis;
+
+    hit_idx = nelems;
+    hit_mag = Max_real;
+
+    UFor( i, nelems )
+    {
+        real mag;
+        if (hit_BarySimplex (&mag, origin, dir, &elems[i]))
+        {
+            if (mag < hit_mag)
+            {
+                hit_mag = mag;
+                hit_idx = i;
+            }
+        }
+    }
+    *ret_hit = hit_idx;
+    *ret_mag = hit_mag;
+}
+#else
 static
     void
 cast_ray_simple (uint* restrict ret_hit, real* restrict ret_mag,
@@ -419,6 +456,7 @@ cast_ray_simple (uint* restrict ret_hit, real* restrict ret_mag,
     *ret_hit = hit_idx;
     *ret_mag = hit_mag;
 }
+#endif
 
 static
     void
@@ -749,6 +787,10 @@ void rays_to_hits_parallel (uint* hits, real* mags,
             summ_Point (&ray_origin, &ray_origin, &partial_ray_origin);
             inside_box = inside_BoundingBox (box, &ray_origin);
 
+#ifdef USE_BARYCENTRIC_RAYTRACE
+            cast_ray_simple (&hit, &mag, origin, dir,
+                             space->nelems, space->simplices, view_basis);
+#else
 #ifdef DISREGARD_BOUNDING_BOX
             cast_ray_simple (&hit, &mag, origin, dir,
                              space->nelems, space->elems, view_basis);
@@ -757,6 +799,7 @@ void rays_to_hits_parallel (uint* hits, real* mags,
                       space->nelems, space->elems,
                       space->tree.elemidcs, space->tree.nodes,
                       &space->scene.box, inside_box);
+#endif
 #endif
 
             hitline[col] = hit;
@@ -801,7 +844,6 @@ setup_ray_pixel_deltas (Point* restrict dir_start,
     trxfrm_Point (col_delta, view_basis, &cdelta);
 }
 
-
 void rays_to_hits (uint* hits, real* mags,
                    uint nrows, uint ncols,
                    const RaySpace* restrict space,
@@ -814,7 +856,6 @@ void rays_to_hits (uint* hits, real* mags,
     bool inside_box;
     Point dir_start, row_delta, col_delta;
     const BoundingBox* restrict box;
-
 
 #ifdef TrivialMpiRayTrace
     MPI_Comm_size (MPI_COMM_WORLD, (int*) &nprocs);
@@ -851,12 +892,22 @@ void rays_to_hits (uint* hits, real* mags,
             Point dir;
             uint hit; real mag;
 
-                /* if (! (row == 333 && col == 322))  continue; */
+#if 0
+            if (! (row == 10 && col == 10))
+            {
+                hitline[col] = space->nelems;
+                continue;
+            }
+#endif
 
             scale_Point (&dir, &col_delta, col);
             summ_Point (&dir, &dir, &partial_dir);
             normalize_Point (&dir, &dir);
 
+#ifdef USE_BARYCENTRIC_RAYTRACE
+            cast_ray_simple (&hit, &mag, origin, &dir,
+                             space->nelems, space->simplices, view_basis);
+#else
 #ifdef DISREGARD_BOUNDING_BOX
             cast_ray_simple (&hit, &mag, origin, &dir,
                              space->nelems, space->elems, view_basis);
@@ -865,6 +916,7 @@ void rays_to_hits (uint* hits, real* mags,
                       space->nelems, space->elems,
                       space->tree.elemidcs, space->tree.nodes,
                       &space->scene.box, inside_box);
+#endif
 #endif
             hitline[col] = hit;
             magline[col] = mag;

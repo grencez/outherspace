@@ -26,6 +26,8 @@ void to_basis_PointXfrm (PointXfrm* dst, const PointXfrm* xfrm,
 void orthonormalize_PointXfrm (PointXfrm* dst, const PointXfrm* A);
 void orthorotate_PointXfrm (PointXfrm* dst, const PointXfrm* A, uint dim);
 
+void row_minors_PointXfrm (Point* dst, const PointXfrm* xfrm, uint row);
+
 #ifndef __OPENCL_VERSION__
 void output_PointXfrm (FILE* out, const PointXfrm* xfrm);
 #ifdef INCLUDE_SOURCE

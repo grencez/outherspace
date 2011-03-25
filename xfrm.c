@@ -219,3 +219,23 @@ void orthorotate_PointXfrm (PointXfrm* dst, const PointXfrm* A, uint dim)
     }
 }
 
+
+void row_minors_PointXfrm (Point* dst, const PointXfrm* xfrm, uint row)
+{
+    uint i, j;
+    assert (row < 3);
+    if      (row == 0) { i = 1; j = 2; }
+    else if (row == 1) { i = 0; j = 2; }
+    else               { i = 0; j = 1; }
+
+    dst->coords[0] = (xfrm->pts[i].coords[1] * xfrm->pts[j].coords[2] -
+                      xfrm->pts[i].coords[2] * xfrm->pts[j].coords[1]);
+
+    dst->coords[1] = (xfrm->pts[i].coords[0] * xfrm->pts[j].coords[2] -
+                      xfrm->pts[i].coords[2] * xfrm->pts[j].coords[0]);
+
+    dst->coords[2] = (xfrm->pts[i].coords[0] * xfrm->pts[j].coords[1] -
+                      xfrm->pts[i].coords[1] * xfrm->pts[j].coords[0]);
+
+}
+

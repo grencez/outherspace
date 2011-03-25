@@ -28,20 +28,6 @@ void output_BoundingBox (FILE* out, const BoundingBox* box)
     fputs (" to ", out);
     output_Point (out, &box->max_corner);
 }
-
-void output_Triangle (FILE* out, const Triangle* elem)
-{
-    uint pi;
-    const char* delim = "";
-    fputc ('[', out);
-    UFor( pi, NTrianglePoints )
-    {
-        fputs (delim, out);
-        output_Point (out, &elem->pts[pi]);
-        delim = " ";
-    }
-    fputc (']', out);
-}
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
 
@@ -126,14 +112,6 @@ void normalize_Point (Point* dst, const Point* a)
 void proj_Point (Point* dst, const Point* a, const Point* b)
 {
     scale_Point (dst, b, dot_Point (a, b) / dot_Point (b, b));
-}
-
-void proj_Plane (Point* dst, const Point* a, const Point* u, const Point* v)
-{
-    Point x, y;
-    proj_Point (&x, a, u);
-    proj_Point (&y, a, v);
-    summ_Point (dst, &x, &y);
 }
 
 tristate facing_BoundingPlane (uint dim, real plane,

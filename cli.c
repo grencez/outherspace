@@ -91,9 +91,13 @@ int main ()
                       &space, &view_origin, &view_basis, view_angle);
 #endif
 #endif
-
         if (write_image)
         {
+            uint i;
+            UFor( i, nrows * ncols )
+            {
+                    /* if (hits[i] < space.nelems) fputs ("HAVE HIT!\n", stderr); */
+            }
             output_PBM_image ("out.pbm", nrows, ncols, hits, space.nelems);
             output_PGM_image ("out.pgm", nrows, ncols, hits, space.nelems);
         }

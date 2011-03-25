@@ -5,6 +5,7 @@
 
 #include "kdtree.h"
 #include "scene.h"
+#include "simplex.h"
 #include "xfrm.h"
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
@@ -14,6 +15,7 @@ struct ray_space_struct
 {
     uint nelems;
     Triangle* elems;
+    BarySimplex* simplices;
     Scene scene;
     KDTree tree;
 };

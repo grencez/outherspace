@@ -42,6 +42,20 @@ Triangle* random_Triangles (uint nelems, const BoundingBox* box)
     return elems;
 }
 
+
+static
+    void
+tri_to_BarySimplex (BarySimplex* simplex, const Triangle* tri)
+{
+    PointXfrm raw;
+    uint pi;
+    UFor( pi, NTrianglePoints )
+        copy_Point (&raw.pts[pi], &tri->pts[pi]);
+        
+    init_BarySimplex (simplex, &raw);
+}
+
+
 void random_RaySpace (RaySpace* space, uint nelems)
 {
     uint i;
@@ -70,7 +84,7 @@ void random_RaySpace (RaySpace* space, uint nelems)
     space->scene.nverts = NTrianglePoints * nelems;
     space->scene.nelems = nelems;
     space->scene.verts = AllocT( Point, space->scene.nverts );
-    space->scene.elems = AllocT( SceneTriangle, space->scene.nelems );
+    space->scene.elems = AllocT( SceneTriangle, nelems );
 
     UFor( i, nelems )
     {
@@ -83,6 +97,9 @@ void random_RaySpace (RaySpace* space, uint nelems)
             space->scene.elems[i].pts[pi] = pi + offset;
         }
     }
+    space->simplices = AllocT( BarySimplex, nelems );
+    UFor( i, nelems )
+        tri_to_BarySimplex (&space->simplices[i], &space->elems[i]);
 }
 
 void output_PBM_image (const char* filename, uint nrows, uint ncols,
@@ -296,14 +313,21 @@ bool readin_wavefront (RaySpace* space, const char* filename)
                 else
                     copy_Point (&tri->pts[pi], &scene->verts[vert_id-1]);
             }
+            
         }
 
-        if (!good)
+        if (good)
+        {
+            space->simplices = AllocT( BarySimplex, space->nelems );
+            UFor( ei, scene->nelems )
+                tri_to_BarySimplex (&space->simplices[ei], &space->elems[ei]);
+            init_BoundingBox (&scene->box, scene->nverts, scene->verts);
+        }
+        else
+        {
             free (space->elems);
+        }
     }
-
-    if (good)
-        init_BoundingBox (&scene->box, scene->nverts, scene->verts);
 
     return good;
 }

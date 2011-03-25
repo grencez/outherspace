@@ -4,6 +4,7 @@
 #define KDTREE_H_
 
 #include "scene.h"
+#include "simplex.h"
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
 struct kd_tree_leaf_struct;

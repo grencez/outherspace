@@ -87,7 +87,7 @@ all: hello cli gui
 
 OpenCLPath = /home/grencez/ati-stream-sdk-v2.3-lnx64
 OpenCLLibPath = $(OpenCLPath)/lib/x86_64
-hello: hello.c kdtree.c raytrace.c scene.c slist.c space.c util.c xfrm.c
+hello: hello.c kdtree.c raytrace.c scene.c simplex.c slist.c space.c util.c xfrm.c
 	$(CC) $(CFLAGS) -I $(OpenCLPath)/include $< -o $@ \
 		-L $(OpenCLLibPath) -lOpenCL $(LFLAGS)
 
@@ -95,10 +95,10 @@ hello: hello.c kdtree.c raytrace.c scene.c slist.c space.c util.c xfrm.c
 test-hello: hello
 	LD_LIBRARY_PATH=$(OpenCLLibPath) ./$<
 
-cli: cli.c compute.c kdtree.c main.c raytrace.c scene.c slist.c space.c util.c xfrm.c
+cli: cli.c compute.c kdtree.c main.c raytrace.c simplex.c scene.c slist.c space.c util.c xfrm.c
 	$(CC) $(CFLAGS) $< -o $@ $(LFLAGS)
 
-gui: gui.c compute.c kdtree.c main.c raytrace.c scene.c slist.c space.c util.c xfrm.c
+gui: gui.c compute.c kdtree.c main.c raytrace.c scene.c simplex.c slist.c space.c util.c xfrm.c
 	$(CC) $(CFLAGS) `pkg-config --cflags gtk+-2.0` $< -o $@ \
 		`pkg-config --libs gtk+-2.0`
 

@@ -45,6 +45,7 @@ typedef byte bool;
 typedef double real;
 #define Max_real DBL_MAX
 #define Min_real DBL_MIN
+#define Epsilon_real (100*DBL_EPSILON)
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -54,6 +55,7 @@ typedef double real;
 typedef float real;
 #define Max_real FLT_MAX
 #define Min_real FLT_MIN
+#define Epsilon_real (100*FLT_EPSILON)
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846f
@@ -67,9 +69,13 @@ typedef int tristate;
 
 bool even_uint (uint a);
 tristate compare_real (real a, real b);
+real absolute_error (real expect, real result);
+real relative_error (real expect, real result);
 tristate signum_real (real a);
 tristate mul_signum (tristate a, tristate b);
 
+#define AssertEqual_real( expect, result ) \
+    assert (Epsilon_real >= fabs (relative_error (expect, result)))
 
 #ifndef __OPENCL_VERSION__
 uint index_of (const void* e, const void* arr, size_t size);
