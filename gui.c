@@ -745,7 +745,7 @@ int main (int argc, char* argv[])
 
     zero_Point (&view_origin);
 
-#if 0
+#if 1
     random_RaySpace (&space, 20);
     
     view_origin.coords[0] = 50;

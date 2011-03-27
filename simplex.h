@@ -5,19 +5,19 @@
 #include "xfrm.h"
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
-struct plane_struct
-{
-    real offset;
-    Point normal;
-};
-typedef struct plane_struct Plane;
-
 #define NTrianglePoints 3
 struct triangle_struct
 {
     Point pts[NTrianglePoints];
 };
 typedef struct triangle_struct Triangle;
+
+struct plane_struct
+{
+    real offset;
+    Point normal;
+};
+typedef struct plane_struct Plane;
 
 struct bary_simplex_struct
 {
@@ -26,10 +26,26 @@ struct bary_simplex_struct
 };
 typedef struct bary_simplex_struct BarySimplex;
 
+
+bool hit_Triangle (real* restrict ret_dist,
+                   const Point* restrict origin,
+                   const Point* restrict dir,
+                   const Triangle* restrict elem);
+bool hit_proj_Triangle (real* restrict dist,
+                        const Point* restrict origin,
+                        const Point* restrict kd_dir,
+                        const Triangle* restrict elem,
+                        const PointXfrm* restrict view_basis);
+bool hit_weak_Triangle (real* restrict dist,
+                        const Point* restrict origin,
+                        const Point* restrict kd_dir,
+                        const Triangle* restrict elem);
+
 void init_Plane (Plane* plane, const Point* normal, const Point* point);
 real distance_Plane (const Plane* plane, const Point* point);
 void proj_Plane (Point* dst, const Point* a, const Plane* plane);
 void barycentric_Plane (Plane* dst, const Plane* plane, const Point* point);
+
 void init_BarySimplex (BarySimplex* elem, const PointXfrm* raw);
 bool hit_BarySimplex (real* restrict ret_dist,
                       const Point* restrict origin,

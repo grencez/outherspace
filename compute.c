@@ -3,6 +3,8 @@
 #include "raytrace.h"
 #include <mpi.h>
 
+    /* #define DebugMpiRayTrace */
+
 static uint nprocs = 0;
 
 void init_compute ()
@@ -29,8 +31,6 @@ void stop_computeloop ()
     }
 }
 
-
-    /* #define DebugMpiRayTrace */
 
 static void rays_to_hits_balancer (uint* hits, real* mags,
                                    uint nrows, uint ncols);
