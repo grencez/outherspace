@@ -5,6 +5,7 @@
 
 CONFIG = fast
 #CONFIG = fast openmp
+#CONFIG = fast openmp noassert
 #CONFIG = fast mpi
 #CONFIG = debug
 #CONFIG = fast noassert
@@ -99,8 +100,11 @@ cli: cli.c compute.c kdtree.c main.c raytrace.c simplex.c scene.c slist.c space.
 	$(CC) $(CFLAGS) $< -o $@ $(LFLAGS)
 
 gui: gui.c compute.c kdtree.c main.c raytrace.c scene.c simplex.c slist.c space.c util.c xfrm.c
-	$(CC) $(CFLAGS) `pkg-config --cflags gtk+-2.0` $< -o $@ \
-		`pkg-config --libs gtk+-2.0`
+	$(CC) $(CFLAGS) `pkg-config --cflags gtk+-2.0` \
+		`sdl-config --cflags` \
+		$< -o $@ \
+		`pkg-config --libs gtk+-2.0` \
+		`sdl-config --libs`
 
 .PHONY: test
 test: cli

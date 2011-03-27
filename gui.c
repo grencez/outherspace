@@ -8,6 +8,7 @@
 #include <math.h>
 #include <gtk/gtk.h>
 #include <gdk/gdkkeysyms.h>
+#include <SDL.h>
 
 static Point view_origin;
 static PointXfrm view_basis;
@@ -21,7 +22,11 @@ static real view_angle = 2 * M_PI / 3;
 static real view_width = 100;
 static real view_light = 400;
 static bool view_perspective = true;
+static bool use_shading = true;
+static bool use_color_distance = false;
 static bool needs_recast = true;
+static Point current_velocity;
+static SDL_Joystick* joystick_handle; 
 
 static gboolean delete_event (GtkWidget* widget,
                               GdkEvent* event,
@@ -241,6 +246,92 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
     return TRUE;
 }
 
+
+static
+    void
+set_rotate_view (real vert, real horz)
+{
+    Point dir;
+    PointXfrm tmp;
+    const uint dir_dim = DirDimension;
+    copy_PointXfrm (&tmp, &view_basis);
+    zero_Point (&dir);
+    dir.coords[0] = vert * sin (view_angle / 2);
+    dir.coords[1] = horz * sin (view_angle / 2);
+    dir.coords[dir_dim] = 1;
+    trxfrm_Point (&tmp.pts[dir_dim], &view_basis, &dir);
+    orthorotate_PointXfrm (&view_basis, &tmp, dir_dim);
+}
+
+
+static gboolean poll_joystick (gpointer widget)
+{
+    const bool flight_style = false;
+    int x, y;
+    tristate stride = 0;
+    real vert, horz, roll;
+
+    SDL_JoystickUpdate ();
+    x = SDL_JoystickGetAxis (joystick_handle, 1);
+    y = SDL_JoystickGetAxis (joystick_handle, 0);
+    if (x > 0 && x <  3000)  x = 0;
+    if (x < 0 && x > -3000)  x = 0;
+    if (y > 0 && y <  3000)  y = 0;
+    if (y < 0 && y > -3000)  y = 0;
+
+    vert = (real) x / 327670;
+    horz = (real) y / 327670;
+    if (flight_style)
+    {
+        roll = horz;
+        horz = 0;
+    }
+    else
+    {
+        vert = - vert;
+    }
+
+    set_rotate_view (vert, horz);
+
+    if (flight_style)
+    {
+        PointXfrm rotation, tmp;
+        rotation_PointXfrm (&rotation, 0, 1, - roll * M_PI / 5);
+        xfrm_PointXfrm (&tmp, &rotation, &view_basis);
+        orthonormalize_PointXfrm (&view_basis, &tmp);
+    }
+
+    if (0 != SDL_JoystickGetButton (joystick_handle, 2))  stride =  1;
+    if (0 != SDL_JoystickGetButton (joystick_handle, 3))  stride = -1;
+
+    if (stride != 0)
+    {
+        Point diff;
+        scale_Point (&diff, &view_basis.pts[DirDimension], stride * 5);
+        summ_Point (&view_origin, &view_origin, &diff);
+    }
+
+        /* fprintf (stderr, "x:%d  y:%d\n", x, y); */
+    if (false)
+    {
+        int nbuttons;
+        int i;
+        nbuttons = SDL_JoystickNumButtons (joystick_handle);
+        for (i = 0; i < nbuttons; ++i)
+        {
+            uint state;
+            state = SDL_JoystickGetButton (joystick_handle, i);
+            fprintf (stderr, "button %d has state %u\n", i, state);
+        }
+    }
+
+    gtk_widget_queue_draw ((GtkWidget*) widget);
+    needs_recast = true;
+
+    return TRUE;
+}
+
+
 #if 0
 static gboolean move_mouse_fn (GtkWidget* widget,
                                GdkEventButton* event,
@@ -257,9 +348,6 @@ static gboolean grab_mouse_fn (GtkWidget* da,
         /* GdkCursor* cursor; */
     int width, height;
     real vert, horz;
-    PointXfrm tmp;
-    Point dir;
-    const uint dir_dim = DirDimension;
     FILE* out;
 
     (void) edge;
@@ -281,13 +369,7 @@ static gboolean grab_mouse_fn (GtkWidget* da,
 
         /* fprintf (out, "vert:%f  horz:%f\n", vert, horz); */
 
-    copy_PointXfrm (&tmp, &view_basis);
-    zero_Point (&dir);
-    dir.coords[0] = vert * sin (view_angle / 2);
-    dir.coords[1] = horz * sin (view_angle / 2);
-    dir.coords[dir_dim] = 1;
-    trxfrm_Point (&tmp.pts[dir_dim], &view_basis, &dir);
-    orthorotate_PointXfrm (&view_basis, &tmp, dir_dim);
+    set_rotate_view (vert, horz);
 
     fputs ("basis:", out);
     output_PointXfrm (out, &view_basis);
@@ -442,69 +524,78 @@ render_RaySpace (byte* data, const RaySpace* space,
 
         UFor( col, view_ncols )
         {
-            guint8 red = 0, green = 0, blue = 0;
             guint32 y;
             uint hit;
-            real mag, scale;
+            real mag;
             if (col >= ncols)  break;
 
             y = 0xFF000000;
 
-            scale = 1;
 
             hit = hitline[col];
             mag = magline[col];
 
                 /* Note: Redundant first condition.*/
-            if (hit < space->nelems && mag < view_light)
+            if (hit < space->nelems)
             {
+                guint8 red = 0xFF, green = 0xFF, blue = 0xFF;
+                real scale = 1;
                 const uint nincs = 256;
-                uint val;
                 Point dir, tmp;
 
-                dir_from_MultiRayCastParams (&dir, row, col, &params);
+                if (use_shading)
+                {
+                    dir_from_MultiRayCastParams (&dir, row, col, &params);
 
-                proj_Plane (&tmp, &dir, &space->simplices[hit].plane);
-                scale *= dot_Point (&dir, &tmp);
+                    proj_Plane (&tmp, &dir, &space->simplices[hit].plane);
+                    scale *= dot_Point (&dir, &tmp);
 
-                if (scale < 0)  scale = -scale;
+                    if (scale < 0)  scale = -scale;
+                    scale = 1 - scale;
+                    if (scale < 0)  scale = 0;
+                    scale = 0.3 + .7 * scale;
+                    if (scale > 1)  scale = 1;
+                }
                 
-                    /* Distance color scale.*/
-                val = (uint) (5 * nincs * (mag / view_light));
-                if (val < nincs)
+                if (use_color_distance && mag < view_light)
                 {
-                    red = nincs - 1;
-                    green = val - 0 * nincs;
+                    uint val;
+                    red = 0;
+                    green = 0;
+                    blue = 0;
+                        /* Distance color scale.*/
+                    val = (uint) (5 * nincs * (mag / view_light));
+                    if (val < nincs)
+                    {
+                        red = nincs - 1;
+                        green = val - 0 * nincs;
+                    }
+                    else if (val < 2 * nincs)
+                    {
+                        red = 2 * nincs - val - 1;
+                        green = nincs - 1;
+                    }
+                    else if (val < 3 * nincs)
+                    {
+                        green = nincs - 1;
+                        blue = val - 2 * nincs;
+                    }
+                    else if (val < 4 * nincs)
+                    {
+                        green = 4 * nincs - val - 1;
+                        blue = nincs - 1;
+                    }
+                    else if (val < 5 * nincs)
+                    {
+                        blue = nincs - 1;
+                        red = val - 4 * nincs;
+                    }
                 }
-                else if (val < 2 * nincs)
-                {
-                    red = 2 * nincs - val - 1;
-                    green = nincs - 1;
-                }
-                else if (val < 3 * nincs)
-                {
-                    green = nincs - 1;
-                    blue = val - 2 * nincs;
-                }
-                else if (val < 4 * nincs)
-                {
-                    green = 4 * nincs - val - 1;
-                    blue = nincs - 1;
-                }
-                else if (val < 5 * nincs)
-                {
-                    blue = nincs - 1;
-                    red = val - 4 * nincs;
-                }
+                y |= (guint32) (scale * red)   << 16;
+                y |= (guint32) (scale * green) << 8;
+                y |= (guint32) (scale * blue)  << 0;
             }
-            scale = 1 - scale;
-            if (scale < 0)  scale = 0;
 
-                /* Disable shading.*/
-                /* scale = 1; */
-            y |= (guint32) (scale * red)   << 16;
-            y |= (guint32) (scale * green) << 8;
-            y |= (guint32) (scale * blue)  << 0;
             outline[col] = y;
         }
 
@@ -562,6 +653,12 @@ gui_main (int argc, char* argv[], RaySpace* space)
         /* GtkWidget *vbox; */
         /* GtkWidget *da; */
 
+    SDL_InitSubSystem (SDL_INIT_JOYSTICK);
+    joystick_handle = SDL_JoystickOpen (0);
+    SDL_JoystickEventState (SDL_QUERY);
+    fprintf (stderr, "Joystick has %d buttons!\n",
+             SDL_JoystickNumButtons (joystick_handle));
+
     gtk_init (&argc, &argv);
 
     window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
@@ -577,6 +674,7 @@ gui_main (int argc, char* argv[], RaySpace* space)
                       G_CALLBACK(key_press_fn), NULL);
     g_signal_connect (window, "button-press-event",
                       G_CALLBACK(grab_mouse_fn), NULL);
+    g_timeout_add (1000 / 60, &poll_joystick, window);
 
 
 #if 0
@@ -647,7 +745,7 @@ int main (int argc, char* argv[])
 
     zero_Point (&view_origin);
 
-#if 1
+#if 0
     random_RaySpace (&space, 20);
     
     view_origin.coords[0] = 50;
