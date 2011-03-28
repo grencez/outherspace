@@ -7,9 +7,14 @@
 #include <limits.h>
 #include <stdlib.h>
 
+
 #define AllocT( Type, capacity ) \
     (((capacity) == 0) ? (Type*) 0 : \
      (Type*) malloc ((capacity) * sizeof (Type)))
+
+#define ResizeT( Type, arr, capacity ) \
+    ((arr) = realloc (arr, (capacity) * sizeof (Type)))
+
 
 typedef unsigned int uint;
 typedef unsigned char byte;

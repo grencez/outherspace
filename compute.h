@@ -17,8 +17,7 @@ void cleanup_compute ();
 
 void stop_computeloop ();
 
-void compute_rays_to_hits (uint* hits, real* mags,
-                           uint nrows, uint ncols,
+void compute_rays_to_hits (RayImage* image,
                            const RaySpace* restrict space,
                            const Point* restrict origin,
                            const PointXfrm* restrict view_basis,

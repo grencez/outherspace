@@ -76,14 +76,14 @@ endif
 ## Allow distributed parallelism.
 ifneq (,$(findstring mpi,$(CONFIG)))
 	CC = mpicc
-	CFLAGS += -DDISTRIBUTE_COMPUTE
+	CFLAGS += -DDistribCompute
 endif
 
 
 
 LFLAGS += -lm
 
-all: hello cli gui
+all: cli gui hello
 	# Done!
 
 OpenCLPath = /home/grencez/ati-stream-sdk-v2.3-lnx64

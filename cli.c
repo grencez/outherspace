@@ -1,7 +1,7 @@
 
 #include "main.h"
 
-#ifdef DISTRIBUTE_COMPUTE
+#ifdef DistribCompute
 #include "compute.h"
 #endif
 
@@ -14,7 +14,7 @@ int main ()
     Point view_origin;
     PointXfrm view_basis;
 
-#ifdef DISTRIBUTE_COMPUTE
+#ifdef DistribCompute
     init_compute ();
 #endif
 
@@ -56,58 +56,58 @@ int main ()
         /* output_gv_KDTree (out, &space.tree); */
 
     {
-        uint* hits;
-        real* mags;
+        RayImage image;
         bool write_image = true;
         const uint nrows = 2000;
         const uint ncols = 2000;
         const real view_angle = M_PI / 3;
 
-        hits = AllocT( uint, nrows * ncols );
-        mags = AllocT( real, nrows * ncols );
+        init_RayImage (&image);
+        image.hits = AllocT( uint, nrows * ncols );
+        image.mags = AllocT( real, nrows * ncols );
+            /* image.pixels = AllocT( byte, nrows * 3 * ncols ); */
+        image.nrows = nrows;
+        image.ncols = ncols;
 
 #ifdef BENCHMARKING
         write_image = false;
 #endif
 
-#ifdef DISTRIBUTE_COMPUTE
+#ifdef DistribCompute
         if (rays_to_hits_computeloop (&space))
         {
             write_image = false;
         }
         else
         {
-            compute_rays_to_hits (hits, mags, nrows, ncols, &space,
+            compute_rays_to_hits (&image, &space,
                                   &view_origin, &view_basis, view_angle);
             stop_computeloop ();
         }
 #else
-
-#if 0
-        rays_to_hits_perspective (hits, mags, nrows, ncols, &space,
-                                  view_origin.coords[2]);
-#else
-        rays_to_hits (hits, mags, nrows, ncols,
-                      &space, &view_origin, &view_basis, view_angle);
-#endif
+        rays_to_hits (&image, &space, &view_origin, &view_basis, view_angle);
 #endif
         if (write_image)
         {
-            uint i;
-            UFor( i, nrows * ncols )
+            if (image.hits)
             {
-                    /* if (hits[i] < space.nelems) fputs ("HAVE HIT!\n", stderr); */
+                output_PBM_image ("out.pbm", nrows, ncols,
+                                  image.hits, space.nelems);
+                output_PGM_image ("out.pgm", nrows, ncols,
+                                  image.hits, space.nelems);
             }
-            output_PBM_image ("out.pbm", nrows, ncols, hits, space.nelems);
-            output_PGM_image ("out.pgm", nrows, ncols, hits, space.nelems);
+            if (image.pixels)
+            {
+                output_PPM_image ("out.ppm", nrows, ncols,
+                                  image.pixels);
+            }
         }
-        free (hits);
-        free (mags);
+        cleanup_RayImage (&image);
     }
 
     cleanup_RaySpace (&space);
 
-#ifdef DISTRIBUTE_COMPUTE
+#ifdef DistribCompute
     cleanup_compute ();
 #endif
     return 0;

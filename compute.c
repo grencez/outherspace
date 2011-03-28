@@ -32,11 +32,9 @@ void stop_computeloop ()
 }
 
 
-static void rays_to_hits_balancer (uint* hits, real* mags,
-                                   uint nrows, uint ncols);
+static void rays_to_hits_balancer (RayImage* image);
 
-void compute_rays_to_hits (uint* hits, real* mags,
-                           uint nrows, uint ncols,
+void compute_rays_to_hits (RayImage* image,
                            const RaySpace* restrict space,
                            const Point* restrict origin,
                            const PointXfrm* restrict view_basis,
@@ -49,9 +47,7 @@ void compute_rays_to_hits (uint* hits, real* mags,
         int proc;
         proc = 1+i;
         MPI_Send (0, 0, MPI_INT, proc, StartComputeMsgTag, MPI_COMM_WORLD);
-        MPI_Send (&nrows, 1, MPI_UNSIGNED,
-                  proc, StdMsgTag, MPI_COMM_WORLD);
-        MPI_Send (&ncols, 1, MPI_UNSIGNED,
+        MPI_Send (image, 1 * sizeof (RayImage), MPI_BYTE,
                   proc, StdMsgTag, MPI_COMM_WORLD);
         MPI_Send ((void*) origin, 1 * sizeof (Point), MPI_BYTE,
                   proc, StdMsgTag, MPI_COMM_WORLD);
@@ -60,12 +56,11 @@ void compute_rays_to_hits (uint* hits, real* mags,
         MPI_Send (&view_angle, 1 * sizeof (real), MPI_BYTE,
                   proc, StdMsgTag, MPI_COMM_WORLD);
     }
-    rays_to_hits_balancer (hits, mags, nrows, ncols);
+    rays_to_hits_balancer (image);
 }
 
 
-static void rays_to_hits_computer (uint* hits, real* mags,
-                                   uint nrows, uint ncols,
+static void rays_to_hits_computer (RayImage* restrict image,
                                    const RaySpace* restrict space,
                                    const Point* restrict origin,
                                    const PointXfrm* restrict view_basis,
@@ -73,10 +68,7 @@ static void rays_to_hits_computer (uint* hits, real* mags,
 
 bool rays_to_hits_computeloop (const RaySpace* restrict space)
 {
-    uint proc;
-    uint prev_nrows = 0, prev_ncols = 0;
-    uint* hits = 0;
-    real* mags = 0;
+    uint proc = 0;
     MPI_Comm_rank (MPI_COMM_WORLD, (int*) &proc);
 
     if (proc == 0)  return false;
@@ -84,7 +76,7 @@ bool rays_to_hits_computeloop (const RaySpace* restrict space)
     while (true)
     {
         MPI_Status status;
-        uint nrows, ncols;
+        RayImage image;
         Point origin;
         PointXfrm view_basis;
         real view_angle;
@@ -97,9 +89,7 @@ bool rays_to_hits_computeloop (const RaySpace* restrict space)
             break;
         }
 
-        MPI_Recv (&nrows, 1, MPI_UNSIGNED,
-                  0, StdMsgTag, MPI_COMM_WORLD, &status);
-        MPI_Recv (&ncols, 1, MPI_UNSIGNED,
+        MPI_Recv (&image, 1 * sizeof (RayImage), MPI_BYTE,
                   0, StdMsgTag, MPI_COMM_WORLD, &status);
         MPI_Recv (&origin, 1 * sizeof (Point), MPI_BYTE,
                   0, StdMsgTag, MPI_COMM_WORLD, &status);
@@ -108,29 +98,21 @@ bool rays_to_hits_computeloop (const RaySpace* restrict space)
         MPI_Recv (&view_angle, 1 * sizeof (real), MPI_BYTE,
                   0, StdMsgTag, MPI_COMM_WORLD, &status);
 
-        if (prev_nrows != nrows || prev_ncols != ncols)
-        {
-            if (hits)  free (hits);
-            if (mags)  free (mags);
-            hits = AllocT( uint, nrows * ncols );
-            mags = AllocT( real, nrows * ncols );
-        }
-
-        rays_to_hits_computer (hits, mags,
-                               nrows, ncols, space,
+        if (image.hits)  image.hits = AllocT( uint, 1 );
+        if (image.mags)  image.mags = AllocT( real, 1 );
+        if (image.pixels)  image.pixels = AllocT( byte, 1 );
+        resize_RayImage (&image);
+        rays_to_hits_computer (&image, space,
                                &origin, &view_basis, view_angle,
                                proc);
+        cleanup_RayImage (&image);
     }
-    if (hits)  free (hits);
-    if (mags)  free (mags);
     return true;
 }
 
 
 
-void rays_to_hits_computer (uint* restrict hits,
-                            real* restrict mags,
-                            uint nrows, uint ncols,
+void rays_to_hits_computer (RayImage* restrict image,
                             const RaySpace* restrict space,
                             const Point* restrict origin,
                             const PointXfrm* restrict view_basis,
@@ -138,11 +120,21 @@ void rays_to_hits_computer (uint* restrict hits,
 {
     MPI_Status status;
     uint i, row_off, row_nul;
+    uint nrows, ncols;
     uint intl[2];
     MPI_Request recv_intl_req;
     bool inside_box;
     Point dir_start, row_delta, col_delta;
     const BoundingBox* restrict box;
+    uint nrows_computed = 0;
+    uint* rows_computed;
+
+#ifndef DebugMpiRayTrace
+    (void) proc;
+#endif
+
+    nrows = image->nrows;
+    ncols = image->ncols;
 
     box = &space->scene.box;
     inside_box = inside_BoundingBox (box, origin);
@@ -151,8 +143,7 @@ void rays_to_hits_computer (uint* restrict hits,
                             nrows, ncols,
                             view_basis, view_angle);
     
-    UFor( i, nrows )
-        hits[i * ncols] = space->nelems+1;
+    rows_computed = AllocT( uint, nrows );
 
     MPI_Recv (intl, 2, MPI_UNSIGNED, 0, StdMsgTag, MPI_COMM_WORLD, &status);
 #ifdef DebugMpiRayTrace
@@ -171,34 +162,13 @@ void rays_to_hits_computer (uint* restrict hits,
 #endif
         UFor( i, row_nul )
         {
-            uint row, col;
-            uint* hitline;
-            real* magline;
-            Point partial_dir;
-
+            uint row;
             row = row_off + i;
-
-            hitline = &hits[row * ncols];
-            magline = &mags[row * ncols];
-            scale_Point (&partial_dir, &row_delta, row);
-            summ_Point (&partial_dir, &partial_dir, &dir_start);
-
-            UFor( col, ncols )
-            {
-                Point dir;
-                uint hit; real mag;
-
-                scale_Point (&dir, &col_delta, col);
-                summ_Point (&dir, &dir, &partial_dir);
-                normalize_Point (&dir, &dir);
-
-                cast_ray (&hit, &mag, origin, &dir,
-                          space->nelems, space->elems,
-                          space->tree.elemidcs, space->tree.nodes,
-                          &space->scene.box, inside_box);
-                hitline[col] = hit;
-                magline[col] = mag;
-            }
+            rows_computed[nrows_computed++] = row;
+            rays_to_hits_row (image, row,
+                              space, origin, view_basis,
+                              &dir_start, &row_delta, &col_delta,
+                              inside_box);
         }
 
         MPI_Wait (&recv_intl_req, &status);
@@ -211,37 +181,51 @@ void rays_to_hits_computer (uint* restrict hits,
             MPI_Send (0, 0, MPI_INT, 0, StdMsgTag, MPI_COMM_WORLD);
     }
 
-    fprintf (stderr, "Process %d: done!\n", proc);
-
-    UFor( i, nrows )
-    {
-        if (hits[i * ncols] <= space->nelems)
-        {
 #ifdef DebugMpiRayTrace
-            fprintf (stderr, "Process %d: Sending row:%u\n", proc, i);
+    fprintf (stderr, "Process %d: done!\n", proc);
 #endif
-            MPI_Send (&hits[i * ncols], ncols * sizeof(uint), MPI_BYTE,
+
+    UFor( i, nrows_computed )
+    {
+        uint row;
+        row = rows_computed[i];
+#ifdef DebugMpiRayTrace
+        fprintf (stderr, "Process %d: Sending row:%u\n", proc, row);
+#endif
+        if (image->hits)
+            MPI_Send (&image->hits[row * ncols],
+                      ncols * sizeof(uint), MPI_BYTE,
                       0, StdMsgTag, MPI_COMM_WORLD);
-            MPI_Send (&mags[i * ncols], ncols * sizeof(real), MPI_BYTE,
+        if (image->mags)
+            MPI_Send (&image->mags[row * ncols],
+                      ncols * sizeof(real), MPI_BYTE,
                       0, StdMsgTag, MPI_COMM_WORLD);
-        }
+        if (image->pixels)
+            MPI_Send (&image->pixels[row * 3 * ncols],
+                      3 * ncols * sizeof(byte), MPI_BYTE,
+                      0, StdMsgTag, MPI_COMM_WORLD);
     }
+
+    if (rows_computed)  free (rows_computed);
 }
 
 
 
     void
-rays_to_hits_balancer (uint* hits, real* mags,
-                       uint nrows, uint ncols)
+rays_to_hits_balancer (RayImage* image)
 {
     uint nrows_per_workunit;
     uint i, row;
+    uint nrows, ncols;
 
     int* row_computers;
     uint* intls;
     MPI_Request* send_intl_reqs;
     MPI_Request* recv_progress_reqs;
     MPI_Status status;
+
+    nrows = image->nrows;
+    ncols = image->ncols;
 
     nrows_per_workunit = 1 + nrows / (10 * nprocs);
 
@@ -391,25 +375,33 @@ rays_to_hits_balancer (uint* hits, real* mags,
         MPI_Waitany (nprocs-1, recv_progress_reqs, (int*) &i, &status);
     }
 
+#ifdef DebugMpiRayTrace
     fputs ("DONE!\n", stderr);
+#endif
+
     UFor( i, nprocs-1)
     {
         int proc;
         proc = 1+i;
         UFor( row, nrows )
         {
-                /* int proc; */
-                /* proc = row_computers[row]; */
-                /* assert (proc > 0); */
 #ifdef DebugMpiRayTrace
             fprintf (stderr, "    Getting row:%u from process:%d\n", row, proc);
 #endif
             if (proc == row_computers[row])
             {
-                MPI_Recv (&hits[row * ncols], ncols * sizeof(uint), MPI_BYTE,
-                          proc, StdMsgTag, MPI_COMM_WORLD, &status);
-                MPI_Recv (&mags[row * ncols], ncols * sizeof(real), MPI_BYTE,
-                          proc, StdMsgTag, MPI_COMM_WORLD, &status);
+                if (image->hits)
+                    MPI_Recv (&image->hits[row * ncols],
+                              ncols * sizeof(uint), MPI_BYTE,
+                              proc, StdMsgTag, MPI_COMM_WORLD, &status);
+                if (image->mags)
+                    MPI_Recv (&image->mags[row * ncols],
+                              ncols * sizeof(real), MPI_BYTE,
+                              proc, StdMsgTag, MPI_COMM_WORLD, &status);
+                if (image->pixels)
+                    MPI_Recv (&image->pixels[row * 3 * ncols],
+                              3 * ncols * sizeof(byte), MPI_BYTE,
+                              proc, StdMsgTag, MPI_COMM_WORLD, &status);
             }
         }
     }

@@ -1,7 +1,7 @@
 
 #include "main.h"
 
-#ifdef DISTRIBUTE_COMPUTE
+#ifdef DistribCompute
 #include "compute.h"
 #endif
 
@@ -10,20 +10,19 @@
 #include <gdk/gdkkeysyms.h>
 #include <SDL.h>
 
+static const bool RenderDrawsPattern = false;
+static const bool ForceFauxFishEye = false;
+
 static Point view_origin;
 static PointXfrm view_basis;
 static uint view_nrows = 400;
 static uint view_ncols = 400;
 static uint mouse_coords[2];
 static uint mouse_diff[2];
-static uint* ray_hits = 0;
-static real* ray_mags = 0;
+static RayImage ray_image;
 static real view_angle = 2 * M_PI / 3;
 static real view_width = 100;
-static real view_light = 400;
 static bool view_perspective = true;
-static bool use_shading = true;
-static bool use_color_distance = false;
 static bool needs_recast = true;
 static Point current_velocity;
 static SDL_Joystick* joystick_handle; 
@@ -44,8 +43,7 @@ static void destroy_app (GtkWidget* widget,
 {
     (void) widget;
     (void) data;
-    if (ray_hits)  free (ray_hits);
-    if (ray_mags)  free (ray_mags);
+    cleanup_RayImage (&ray_image);
     gtk_main_quit ();
 }
 
@@ -63,6 +61,7 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
     bool reflect = false;
     bool rotate_dir_dim = false;
     bool change_cast_method = false;
+    bool print_view_code = false;
     bool recast = true;
     const real scale = 5;
     FILE* out;
@@ -104,6 +103,8 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
             view_light_change = 1;  break;
         case GDK_l:
             view_light_change = -1;  break;
+        case GDK_P:
+            print_view_code = true;  break;
         case GDK_r:
             reflect = true;  break;
         case GDK_V:
@@ -124,11 +125,11 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
     {
         real diff = 10;
         if (view_light_change > 0)
-            view_light += diff;
-        else if (diff <= view_light)
-            view_light -= diff;;
+            ray_image.view_light += diff;
+        else if (diff <= ray_image.view_light)
+            ray_image.view_light -= diff;;
 
-        fprintf (out, "view_light:%f\n", view_light);
+        fprintf (out, "view_light:%f\n", ray_image.view_light);
     }
 
     if (stride != 0)
@@ -206,10 +207,9 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
         }
         if (recast)
         {
-            if (ray_hits)  free (ray_hits);
-            if (ray_mags)  free (ray_mags);
-            ray_hits = AllocT( uint, view_nrows * view_ncols );
-            ray_mags = AllocT( real, view_nrows * view_ncols );
+            ray_image.nrows = view_nrows;
+            ray_image.ncols = view_ncols;
+            resize_RayImage (&ray_image);
         }
     }
     else if (reflect)
@@ -233,6 +233,22 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
             fputs ("method:perspective\n", out);
         else
             fputs ("method:parallel\n", out);
+    }
+    else if (print_view_code)
+    {
+        uint i;
+        fprintf (out, "view_angle = (real) %15f;\n", view_angle);
+        UFor( i, NDimensions )
+        {
+            uint j;
+            fprintf (out, "view_origin.coords[%u] = (real) %15f;\n",
+                     i, view_origin.coords[i]);
+            UFor( j, NDimensions )
+            {
+                fprintf (out, "view_basis.pts[%u].coords[%u] = (real) %15f;\n",
+                         i, j, view_basis.pts[i].coords[j]);
+            }
+        }
     }
     else
     {
@@ -397,8 +413,6 @@ static gboolean grab_mouse_fn (GtkWidget* da,
     return FALSE;
 }
 
-#if 0
-#elif 0
 static
     void
 render_pattern (byte* data, void* state, int height, int width, int stride)
@@ -430,59 +444,61 @@ render_pattern (byte* data, void* state, int height, int width, int stride)
     }
 }
 
-#elif 1
 
 static
     void
 render_RaySpace (byte* data, const RaySpace* space,
                  uint nrows, uint ncols, uint stride)
 {
-    guint32 color_diff;
-    uint row, col;
-    MultiRayCastParams params;
+    uint row;
 
     if (needs_recast)
     {
-#if defined(DISTRIBUTE_COMPUTE)
-        compute_rays_to_hits (ray_hits, ray_mags, view_nrows, view_ncols,
+#ifdef DistribCompute
+        compute_rays_to_hits (&ray_image,
                               space, &view_origin, &view_basis, view_angle);
-#elif 0
-        rays_to_hits_perspective (ray_hits, ray_mags,
-                                  view_nrows, view_ncols,
-                                  space, view_origin.coords[DirDimension]);
-#elif 0
-        rays_to_hits_fish (ray_hits, ray_mags,
-                           view_nrows, view_ncols,
-                           space, &view_origin, &view_basis,
-                           view_angle);
-#elif 1
-
-        if (view_perspective)
-        {
-            rays_to_hits (ray_hits, ray_mags, view_nrows, view_ncols,
-                          space, &view_origin, &view_basis,
-                          view_angle);
-        }
+#else
+        if (ForceFauxFishEye)
+            rays_to_hits_fish (&ray_image, space,
+                               &view_origin, &view_basis, view_angle);
+        else if (view_perspective)
+            rays_to_hits (&ray_image, space,
+                          &view_origin, &view_basis, view_angle);
         else
-        {
-            rays_to_hits_parallel (ray_hits, ray_mags,
-                                   view_nrows, view_ncols,
-                                   space, &view_origin, &view_basis,
-                                   view_width);
-        }
+            rays_to_hits_parallel (&ray_image, space,
+                                   &view_origin, &view_basis, view_width);
 #endif
     }
     needs_recast = false;
 
-    build_MultiRayCastParams (&params, view_nrows, view_ncols,
-                              space, &view_origin, &view_basis,
-                              view_angle);
-
-    color_diff = (guint32) 0xFFFFFF / (guint32) space->nelems;
-#if 0
+    assert (ray_image.pixels);
 
     UFor( row, view_nrows )
     {
+        uint col;
+        const byte* pixline;
+        guint32* outline;
+        if (row >= nrows)  break;
+
+        pixline = &ray_image.pixels[row * 3 * view_ncols];
+        outline = (guint32*) &data[stride * (view_nrows - row - 1)];
+
+        UFor( col, view_ncols )
+        {
+            if (col >= ncols)  break;
+            outline[col] =
+                ((guint32) 0xFF             << 24) |
+                ((guint32) pixline[3*col+0] << 16) |
+                ((guint32) pixline[3*col+1] <<  8) |
+                ((guint32) pixline[3*col+2] <<  0);
+        }
+    }
+
+#if 0
+    UFor( row, view_nrows )
+    {
+        guint32 color_diff;
+        color_diff = (guint32) 0xFFFFFF / (guint32) space->nelems;
         uint* hitline;
         guint32* outline;
         if (row >= nrows)  break;
@@ -510,99 +526,9 @@ render_RaySpace (byte* data, const RaySpace* space,
             outline[col] = y;
         }
     }
-#else
-    UFor( row, view_nrows )
-    {
-        uint* hitline;
-        real* magline;
-        guint32* outline;
-        if (row >= nrows)  break;
-
-        hitline = &ray_hits[view_ncols * row];
-        magline = &ray_mags[view_ncols * row];
-        outline = (guint32*) &data[stride * (view_nrows - row - 1)];
-
-        UFor( col, view_ncols )
-        {
-            guint32 y;
-            uint hit;
-            real mag;
-            if (col >= ncols)  break;
-
-            y = 0xFF000000;
-
-
-            hit = hitline[col];
-            mag = magline[col];
-
-                /* Note: Redundant first condition.*/
-            if (hit < space->nelems)
-            {
-                guint8 red = 0xFF, green = 0xFF, blue = 0xFF;
-                real scale = 1;
-                const uint nincs = 256;
-                Point dir, tmp;
-
-                if (use_shading)
-                {
-                    dir_from_MultiRayCastParams (&dir, row, col, &params);
-
-                    proj_Plane (&tmp, &dir, &space->simplices[hit].plane);
-                    scale *= dot_Point (&dir, &tmp);
-
-                    if (scale < 0)  scale = -scale;
-                    scale = 1 - scale;
-                    if (scale < 0)  scale = 0;
-                    scale = 0.3 + .7 * scale;
-                    if (scale > 1)  scale = 1;
-                }
-                
-                if (use_color_distance && mag < view_light)
-                {
-                    uint val;
-                    red = 0;
-                    green = 0;
-                    blue = 0;
-                        /* Distance color scale.*/
-                    val = (uint) (5 * nincs * (mag / view_light));
-                    if (val < nincs)
-                    {
-                        red = nincs - 1;
-                        green = val - 0 * nincs;
-                    }
-                    else if (val < 2 * nincs)
-                    {
-                        red = 2 * nincs - val - 1;
-                        green = nincs - 1;
-                    }
-                    else if (val < 3 * nincs)
-                    {
-                        green = nincs - 1;
-                        blue = val - 2 * nincs;
-                    }
-                    else if (val < 4 * nincs)
-                    {
-                        green = 4 * nincs - val - 1;
-                        blue = nincs - 1;
-                    }
-                    else if (val < 5 * nincs)
-                    {
-                        blue = nincs - 1;
-                        red = val - 4 * nincs;
-                    }
-                }
-                y |= (guint32) (scale * red)   << 16;
-                y |= (guint32) (scale * green) << 8;
-                y |= (guint32) (scale * blue)  << 0;
-            }
-
-            outline[col] = y;
-        }
-
-    }
 #endif
 }
-#endif
+
 
 static
     gboolean
@@ -624,13 +550,11 @@ render_expose (GtkWidget* da,
     stride = cairo_image_surface_get_stride (surface);
     data = cairo_image_surface_get_data (surface);
 
-#if 0
-#elif 0
-    render_pattern (data, (void*) state, height, width, stride);
-#elif 1
-    render_RaySpace (data, (RaySpace*) state,
-                     (uint) height, (uint) width, (uint) stride);
-#endif
+    if (RenderDrawsPattern)
+        render_pattern (data, (void*) state, height, width, stride);
+    else
+        render_RaySpace (data, (RaySpace*) state,
+                         (uint) height, (uint) width, (uint) stride);
 
     cairo_surface_mark_dirty (surface);
     cr = gdk_cairo_create (da->window);
@@ -726,8 +650,6 @@ gui_main (int argc, char* argv[], RaySpace* space)
     gtk_window_set_position (GTK_WINDOW(window), GTK_WIN_POS_CENTER);
     gtk_window_set_title (GTK_WINDOW(window), "lines");
     gtk_window_set_default_size (GTK_WINDOW(window), view_ncols, view_nrows); 
-    ray_hits = AllocT( uint, view_nrows * view_ncols );
-    ray_mags = AllocT( real, view_nrows * view_ncols );
 
     gtk_widget_show_all (window);
     gtk_main ();
@@ -739,7 +661,7 @@ int main (int argc, char* argv[])
     int call_gui = true;
     RaySpace space;
 
-#ifdef DISTRIBUTE_COMPUTE
+#ifdef DistribCompute
     init_compute ();
 #endif
 
@@ -787,19 +709,29 @@ int main (int argc, char* argv[])
     build_KDTree (&space.tree, space.nelems, space.elems, &space.scene.box);
         /* output_KDTree (stderr, &space.tree, space.nelems, space.elems); */
 
-#ifdef DISTRIBUTE_COMPUTE
+#ifdef DistribCompute
     call_gui = !rays_to_hits_computeloop (&space);
 #endif
 
     if (call_gui)
     {
+        init_RayImage (&ray_image);
+        ray_image.nrows = view_nrows;
+        ray_image.ncols = view_ncols;
+            /* ray_image.hits = AllocT( uint, 1 ); */
+            /* ray_image.mags = AllocT( real, 1 ); */
+        ray_image.pixels = AllocT( byte, 1 );
+        resize_RayImage (&ray_image);
+        ray_image.view_light = 400;
+            /* ray_image.color_distance_on = true; */
+
         gui_main (argc, argv, &space);
-#ifdef DISTRIBUTE_COMPUTE
+#ifdef DistribCompute
         stop_computeloop ();
 #endif
     }
 
-#ifdef DISTRIBUTE_COMPUTE
+#ifdef DistribCompute
     cleanup_compute ();
 #endif
     return 0;

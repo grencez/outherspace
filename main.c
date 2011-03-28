@@ -187,13 +187,13 @@ void output_PPM_image (const char* filename, uint nrows, uint ncols,
     UFor( row, nrows )
     {
         uint col;
-        const byte* scanline;
+        const byte* pixline;
 
-        scanline = &pixels[nrows - row - 1];
+        pixline = &pixels[(nrows - row - 1) * 3 * ncols];
         UFor( col, ncols )
         {
             fprintf (out, " %u %u %u",
-                     pixels[3*col+0], pixels[3*col+1], pixels[3*col+2]);
+                     pixline[3*col+0], pixline[3*col+1], pixline[3*col+2]);
         }
         fputc ('\n', out);
     }
