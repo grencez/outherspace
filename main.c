@@ -88,6 +88,7 @@ void random_RaySpace (RaySpace* space, uint nelems)
     space->scene.nelems = nelems;
     space->scene.verts = AllocT( Point, space->scene.nverts );
     space->scene.elems = AllocT( SceneTriangle, nelems );
+    space->nobjects = 0;
 
     UFor( i, nelems )
     {

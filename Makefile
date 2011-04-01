@@ -4,7 +4,7 @@
 #CC = g++
 
 CONFIG = fast
-#CONFIG = fast openmp
+CONFIG = fast openmp
 #CONFIG = fast openmp noassert
 #CONFIG = fast mpi
 #CONFIG = debug

@@ -10,9 +10,13 @@
 struct kd_tree_leaf_struct;
 struct kd_tree_inner_struct;
 struct kd_tree_node_struct;
+struct kd_tree_struct;
+struct kdtree_grid_struct;
 typedef struct kd_tree_leaf_struct  KDTreeLeaf;
 typedef struct kd_tree_inner_struct KDTreeInner;
 typedef struct kd_tree_node_struct  KDTreeNode;
+typedef struct kd_tree_struct KDTree;
+typedef struct kdtree_grid_struct KDTreeGrid;
 
 struct kd_tree_leaf_struct
 {
@@ -43,7 +47,14 @@ struct kd_tree_struct
     KDTreeNode* nodes;
     uint* elemidcs;
 };
-typedef struct kd_tree_struct KDTree;
+
+struct kdtree_grid_struct
+{
+    uint nintls;
+    uint* intls[NDimensions];
+    real* coords[NDimensions];
+    BoundingBox box;
+};
 
 
 bool leaf_KDTreeNode (__global const KDTreeNode* node);
@@ -66,8 +77,13 @@ void output_gv_KDTree (FILE* out, const KDTree* tree);
 
 void cleanup_KDTree (KDTree* tree);
 
-void build_KDTree (KDTree* tree, uint nelems, const Triangle* elems,
-                   const BoundingBox* box);
+void
+init_Triangle_KDTreeGrid (KDTreeGrid* grid,
+                          uint nelems, const Triangle* elems,
+                          const BoundingBox* box);
+void
+build_KDTree (KDTree* tree, KDTreeGrid* grid);
+
 #ifdef INCLUDE_SOURCE
 #include "kdtree.c"
 #endif

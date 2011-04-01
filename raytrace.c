@@ -24,6 +24,16 @@ computer_triv_sync_mpi_RayImage (const RayImage* image,
                                  uint myrank, uint nprocs);
 #endif
 
+void init_RaySpace (RaySpace* space)
+{
+    space->scene.nverts = 0;
+    space->scene.nelems = 0;
+    space->nelems = 0;
+    space->tree.nnodes = 0;
+    space->nobjects = 0;
+    space->object_tree.nnodes = 0;
+}
+
 void cleanup_RaySpace (RaySpace* space)
 {
     cleanup_Scene (&space->scene);
@@ -32,6 +42,30 @@ void cleanup_RaySpace (RaySpace* space)
     {
         free (space->elems);
         free (space->simplices);
+    }
+    if (space->nobjects > 0)
+    {
+        free (space->objects);
+    }
+}
+
+void partition_RaySpace (RaySpace* space)
+{
+    KDTreeGrid grid;
+    uint i;
+
+    init_Triangle_KDTreeGrid (&grid, space->nelems, space->elems,
+                              &space->scene.box);
+    build_KDTree (&space->tree, &grid);
+    cleanup_KDTreeGrid (&grid);
+
+    UFor( i, space->nobjects )
+    {
+        init_Triangle_KDTreeGrid (&grid, space->objects[i].space.nelems,
+                                  space->objects[i].space.elems,
+                                  &space->objects[i].space.scene.box);
+        build_KDTree (&space->objects[i].space.tree, &grid);
+        cleanup_KDTreeGrid (&grid);
     }
 }
 
@@ -353,6 +387,92 @@ cast_ray (uint* restrict ret_hit, real* restrict ret_mag,
     *ret_mag = hit_mag;
 }
 
+
+static
+    void
+cast_record (uint* hitline,
+             real* magline,
+             byte* pixline,
+             uint col,
+             const RaySpace* restrict space,
+             const RayImage* restrict image,
+             const PointXfrm* restrict view_basis,
+             const Point* restrict origin,
+             const Point* restrict dir,
+             bool inside_box)
+{
+    uint hit;
+    real mag;
+    uint i;
+    const BarySimplex* hit_simplex = 0;
+
+    if (KDTreeRayTrace)
+        cast_ray (&hit, &mag, origin, dir,
+                  space->nelems, space->elems,
+                  space->tree.elemidcs, space->tree.nodes,
+                  &space->scene.box, inside_box);
+    else if (BarycentricRayTrace)
+        cast_ray_simple_barycentric (&hit, &mag, origin, dir,
+                                     space->nelems, space->simplices);
+    else
+        cast_ray_simple (&hit, &mag, origin, dir,
+                         space->nelems, space->elems, view_basis);
+
+    if (hit < space->nelems)  hit_simplex = &space->simplices[hit];
+
+    UFor( i, space->nobjects )
+    {
+        Point diff, rel_origin, rel_dir;
+        const RaySpaceObject* object;
+        uint tmp_hit;
+        real tmp_mag;
+        PointXfrm rel_basis;
+        bool rel_inside_box;
+
+        object = &space->objects[i];
+
+        diff_Point (&diff, origin, &object->centroid);
+        trxfrm_Point (&rel_origin, &object->orientation, &diff);
+        summ_Point (&diff, &object->space.scene.box.min_corner, 
+                    &object->space.scene.box.max_corner);
+        scale_Point (&diff, &diff, 0.5);
+        summ_Point (&rel_origin, &rel_origin, &diff);
+
+        trxfrm_Point (&rel_dir, &object->orientation, dir);
+
+        rel_inside_box =
+            inside_BoundingBox (&object->space.scene.box, &rel_origin);
+
+        xfrm_PointXfrm (&rel_basis, view_basis, &object->orientation);
+        
+        cast_record (&tmp_hit, &tmp_mag, 0, 0,
+                     &object->space, image, &rel_basis,
+                     &rel_origin, &rel_dir, rel_inside_box);
+
+        if (tmp_mag < mag)
+        {
+            hit = tmp_hit;
+            mag = tmp_mag;
+            hit_simplex = &object->space.simplices[hit];
+        }
+    }
+
+    if (hitline)  hitline[col] = hit;
+    if (magline)  magline[col] = mag;
+    if (pixline)
+    {
+        byte red, green, blue;
+            /* const BarySimplex* simplex = 0; */
+            /* if (hit < space->nelems)  simplex = &space->simplices[hit]; */
+        fill_pixel (&red, &green, &blue,
+                    mag, image, dir, hit_simplex);
+        pixline[3*col+0] = red;
+        pixline[3*col+1] = green;
+        pixline[3*col+2] = blue;
+    }
+}
+
+
 #ifndef __OPENCL_VERSION__
     void
 rays_to_hits_fish (RayImage* image,
@@ -403,7 +523,6 @@ rays_to_hits_fish (RayImage* image,
         UFor( col, ncols )
         {
             Point tdir, dir;
-            uint hit; real mag;
             real col_angle;
             col_angle = col_start + col_delta * col;
 
@@ -428,24 +547,9 @@ rays_to_hits_fish (RayImage* image,
 
             normalize_Point (&dir, &tdir);
 
-            cast_ray (&hit, &mag, origin, &dir,
-                      space->nelems, space->elems,
-                      space->tree.elemidcs, space->tree.nodes,
-                      &space->scene.box, inside_box);
-
-            if (hitline)  hitline[col] = hit;
-            if (magline)  magline[col] = mag;
-            if (pixline)
-            {
-                byte red, green, blue;
-                const BarySimplex* simplex = 0;
-                if (hit < space->nelems)  simplex = &space->simplices[hit];
-                fill_pixel (&red, &green, &blue,
-                            mag, image, &dir, simplex);
-                pixline[3*col+0] = red;
-                pixline[3*col+1] = green;
-                pixline[3*col+2] = blue;
-            }
+            cast_record (hitline, magline, pixline, col,
+                         space, image, view_basis,
+                         origin, &dir, inside_box);
         }
     }
 }
@@ -578,7 +682,6 @@ rays_to_hits_parallel (RayImage* restrict image,
         {
             bool inside_box;
             Point ray_origin;
-            uint hit; real mag;
 
             scale_Point (&ray_origin,
                          &view_basis->pts[col_dim],
@@ -586,31 +689,9 @@ rays_to_hits_parallel (RayImage* restrict image,
             summ_Point (&ray_origin, &ray_origin, &partial_ray_origin);
             inside_box = inside_BoundingBox (box, &ray_origin);
 
-            if (KDTreeRayTrace)
-                cast_ray (&hit, &mag, &ray_origin, dir,
-                          space->nelems, space->elems,
-                          space->tree.elemidcs, space->tree.nodes,
-                          &space->scene.box, inside_box);
-            else if (BarycentricRayTrace)
-                cast_ray_simple_barycentric (&hit, &mag, origin, dir,
-                                             space->nelems, space->simplices);
-            else
-                cast_ray_simple (&hit, &mag, origin, dir,
-                                 space->nelems, space->elems, view_basis);
-
-            if (hitline)  hitline[col] = hit;
-            if (magline)  magline[col] = mag;
-            if (pixline)
-            {
-                byte red, green, blue;
-                const BarySimplex* simplex = 0;
-                if (hit < space->nelems)  simplex = &space->simplices[hit];
-                fill_pixel (&red, &green, &blue,
-                            mag, image, dir, simplex);
-                pixline[3*col+0] = red;
-                pixline[3*col+1] = green;
-                pixline[3*col+2] = blue;
-            }
+            cast_record (hitline, magline, pixline, col,
+                         space, image, view_basis,
+                         origin, dir, inside_box);
         }
     }
 }
@@ -728,8 +809,6 @@ rays_to_hits_row (RayImage* image, uint row,
     UFor( col, ncols )
     {
         Point dir;
-        uint hit;  real mag;
-
 
 #if 0
         if (! (row == 10 && col == 10))
@@ -743,31 +822,9 @@ rays_to_hits_row (RayImage* image, uint row,
         summ_Point (&dir, &dir, &partial_dir);
         normalize_Point (&dir, &dir);
 
-        if (KDTreeRayTrace)
-            cast_ray (&hit, &mag, origin, &dir,
-                      space->nelems, space->elems,
-                      space->tree.elemidcs, space->tree.nodes,
-                      &space->scene.box, inside_box);
-        else if (BarycentricRayTrace)
-            cast_ray_simple_barycentric (&hit, &mag, origin, &dir,
-                                         space->nelems, space->simplices);
-        else
-            cast_ray_simple (&hit, &mag, origin, &dir,
-                             space->nelems, space->elems, view_basis);
-
-        if (hitline)  hitline[col] = hit;
-        if (magline)  magline[col] = mag;
-        if (pixline)
-        {
-            byte red, green, blue;
-            const BarySimplex* simplex = 0;
-            if (hit < space->nelems)  simplex = &space->simplices[hit];
-            fill_pixel (&red, &green, &blue,
-                        mag, image, &dir, simplex);
-            pixline[3*col+0] = red;
-            pixline[3*col+1] = green;
-            pixline[3*col+2] = blue;
-        }
+        cast_record (hitline, magline, pixline, col,
+                     space, image, view_basis,
+                     origin, &dir, inside_box);
 
             /* if (row == 333 && col == 322)  puts (elem ? "hit" : "miss"); */
     }

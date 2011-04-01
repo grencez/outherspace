@@ -19,6 +19,7 @@ int main ()
 #endif
 
     out = stdout;
+    init_RaySpace (&space);
     zero_Point (&view_origin);
 
 #if 1
@@ -30,7 +31,7 @@ int main ()
     identity_PointXfrm (&view_basis);
 #else
     {
-        bool good = readin_wavefront (&space, "mba2.obj");
+        bool good = readin_wavefront (&space, "track_1.obj");
         if (!good)  return 1;
     }
 
@@ -46,13 +47,22 @@ int main ()
         orthorotate_PointXfrm (&view_basis, &tmp_basis, 0);
     }
 
+
+    space.nobjects = 1;
+    space.objects = AllocT( RaySpaceObject, space.nobjects );
+    init_RaySpace (&space.objects[0].space);
+    {
+        bool good = readin_wavefront (&space.objects[0].space, "machine_1.obj");
+        if (!good)  return 1;
+    }
+    zero_Point (&space.objects[0].centroid);
+    identity_PointXfrm (&space.objects[0].orientation);
 #endif
 
         /* output_BoundingBox (out, &space.scene.box); */
 
-    build_KDTree (&space.tree, space.nelems, space.elems, &space.scene.box);
-
-        /* output_KDTree (out, &space.tree, space.nelems, space.elems); */
+    partition_RaySpace (&space);
+        /* output_KDTree (stderr, &space.tree, space.nelems, space.elems); */
         /* output_gv_KDTree (out, &space.tree); */
 
     {

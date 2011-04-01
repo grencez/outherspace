@@ -118,21 +118,20 @@ void cleanup_KDTree (KDTree* tree)
         free (tree->elemidcs);
 }
 
-struct kdtree_grid_struct
-{
-    uint nintls;
-    uint* intls[NDimensions];
-    real* coords[NDimensions];
-    BoundingBox box;
-};
-typedef struct kdtree_grid_struct KDTreeGrid;
-
-static
     void
-init_KDTreeGrid (KDTreeGrid* grid, uint nelems, const Triangle* elems,
-                 const BoundingBox* box)
+init_Triangle_KDTreeGrid (KDTreeGrid* grid,
+                          uint nelems, const Triangle* elems,
+                          const BoundingBox* box)
 {
     uint i;
+
+    assert (nelems > 0);
+    UFor( i, nelems )
+    {
+        uint pi;
+        UFor( pi, NTrianglePoints )
+            assert (inside_BoundingBox (box, &elems[i].pts[pi]));
+    }
 
     grid->nintls = 2 * nelems;
     grid->intls[0] = AllocT( uint, NDimensions * grid->nintls );
@@ -672,30 +671,17 @@ static int uintcmp (const void* a, const void* b)
     return 0;
 }
 
-void build_KDTree (KDTree* tree, uint nelems, const Triangle* elems,
-                   const BoundingBox* box)
+    void
+build_KDTree (KDTree* tree, KDTreeGrid* grid)
 {
-    uint i, ei;
+    uint i;
     SList nodelist, elemidxlist;
-    KDTreeGrid grid;
-
-    assert (nelems > 0);
-
-    UFor( ei, nelems )
-    {
-        uint pi;
-        UFor( pi, NTrianglePoints )
-            assert (inside_BoundingBox (box, &elems[ei].pts[pi]));
-    }
-
-    init_KDTreeGrid (&grid, nelems, elems, box);
 
     UFor( i, NDimensions )
-        sort_intervals (grid.nintls, grid.intls[i], grid.coords[i]);
-
+        sort_intervals (grid->nintls, grid->intls[i], grid->coords[i]);
     init_SList (&nodelist);
     init_SList (&elemidxlist);
-    build_KDTreeNode (0, 0, &grid, 0, &nodelist, &elemidxlist);
+    build_KDTreeNode (0, 0, grid, 0, &nodelist, &elemidxlist);
 
     tree->nnodes = nodelist.nmembs;
     tree->nelemidcs = elemidxlist.nmembs;
@@ -717,8 +703,7 @@ void build_KDTree (KDTree* tree, uint nelems, const Triangle* elems,
         }
     }
 
-    cleanup_KDTreeGrid (&grid);
-    assert (complete_KDTree (tree, nelems));
+    assert (complete_KDTree (tree, grid->nintls / 2));
 }
 
 #endif  /* #ifndef __OPENCL_VERSION__ */

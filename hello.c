@@ -335,7 +335,7 @@ run_ray_cast ()
     view_origin.coords[1] = 50;
     view_origin.coords[2] = -70;
 
-    build_KDTree (&space.tree, space.nelems, space.elems, &space.scene.box);
+    partition_RaySpace (&space);
     identity_PointXfrm (&view_basis);
 
     hits = AllocT( uint, nrows * ncols );

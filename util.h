@@ -60,7 +60,7 @@ typedef double real;
 typedef float real;
 #define Max_real FLT_MAX
 #define Min_real FLT_MIN
-#define Epsilon_real (100*FLT_EPSILON)
+#define Epsilon_real (1000*FLT_EPSILON)
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846f

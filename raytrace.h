@@ -11,6 +11,15 @@
 
 #define DirDimension (NDimensions - 1)
 
+struct ray_space_struct;
+struct ray_space_object_struct;
+struct ray_image_struct;
+struct multi_ray_cast_params_struct;
+typedef struct ray_space_struct RaySpace;
+typedef struct ray_space_object_struct RaySpaceObject;
+typedef struct ray_image_struct RayImage;
+typedef struct multi_ray_cast_params_struct MultiRayCastParams;
+
 struct ray_space_struct
 {
     uint nelems;
@@ -18,8 +27,18 @@ struct ray_space_struct
     BarySimplex* simplices;
     Scene scene;
     KDTree tree;
+    uint nobjects;
+    RaySpaceObject* objects;
+    KDTree object_tree;
 };
-typedef struct ray_space_struct RaySpace;
+
+struct ray_space_object_struct
+{
+    real radius;
+    Point centroid;
+    PointXfrm orientation;
+    RaySpace space;
+};
 
 struct ray_image_struct
 {
@@ -32,7 +51,6 @@ struct ray_image_struct
     bool shading_on;
     bool color_distance_on;
 };
-typedef struct ray_image_struct RayImage;
 
 struct multi_ray_cast_params_struct
 {
@@ -44,7 +62,6 @@ struct multi_ray_cast_params_struct
     uint npixels[2];
     bool inside_box;
 };
-typedef struct multi_ray_cast_params_struct MultiRayCastParams;
 
 void dir_from_MultiRayCastParams (Point* dir, uint row, uint col,
                                   const MultiRayCastParams* params);
@@ -113,7 +130,9 @@ void build_MultiRayCastParams (MultiRayCastParams* params,
                                const PointXfrm* view_basis,
                                real view_angle);
 
+void init_RaySpace (RaySpace* space);
 void cleanup_RaySpace (RaySpace* space);
+void partition_RaySpace (RaySpace* space);
 void init_RayImage (RayImage* image);
 void resize_RayImage (RayImage* image);
 void cleanup_RayImage (RayImage* image);

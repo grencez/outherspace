@@ -658,26 +658,26 @@ gui_main (int argc, char* argv[], RaySpace* space)
 
 int main (int argc, char* argv[])
 {
-    int call_gui = true;
+    const bool use_random_scene = true;
+    bool call_gui = true;
     RaySpace space;
 
 #ifdef DistribCompute
     init_compute ();
 #endif
 
+    init_RaySpace (&space);
     zero_Point (&view_origin);
 
-#if 1
-    random_RaySpace (&space, 20);
-    
-    view_origin.coords[0] = 50;
-    view_origin.coords[1] = 50;
-    view_origin.coords[DirDimension] = -70;
-#if 0
-    identity_PointXfrm (&view_basis);
-#else
+    if (use_random_scene)
     {
         PointXfrm tmp_basis;
+        random_RaySpace (&space, 20);
+
+        view_origin.coords[0] = 50;
+        view_origin.coords[1] = 50;
+        view_origin.coords[DirDimension] = -70;
+
         identity_PointXfrm (&tmp_basis);
             /* Tilt backwards a bit.*/
             /* tmp_basis.pts[0].coords[2] = -0.5; */
@@ -685,29 +685,33 @@ int main (int argc, char* argv[])
             /* tmp_basis.pts[0].coords[4] = -0.1; */
         orthorotate_PointXfrm (&view_basis, &tmp_basis, 1);
     }
-#endif
-#else
+    else
     {
-        bool good = readin_wavefront (&space, "mba2.obj");
+        uint i;
+        bool good;
+        good = readin_wavefront (&space, "track_1.obj");
         if (!good)  return 1;
+
+        view_origin.coords[0] = 0;
+        view_origin.coords[1] = 0;
+        view_origin.coords[DirDimension] = -10;
+        identity_PointXfrm (&view_basis);
+
+        space.nobjects = 50;
+        space.objects = AllocT( RaySpaceObject, space.nobjects );
+        UFor( i, space.nobjects )
+        {
+            bool good;
+            init_RaySpace (&space.objects[i].space);
+            good = readin_wavefront (&space.objects[i].space, "machine_1.obj");
+            if (!good)  return 1;
+            zero_Point (&space.objects[i].centroid);
+            space.objects[i].centroid.coords[DirDimension] = 75 * i;
+            identity_PointXfrm (&space.objects[i].orientation);
+        }
     }
 
-    view_origin.coords[0] = 0;
-    view_origin.coords[1] = 10;
-    view_origin.coords[DirDimension] = -250;
-
-    {
-        PointXfrm tmp_basis;
-        identity_PointXfrm (&tmp_basis);
-        tmp_basis.pts[0].coords[DirDimension] = -0.5;  /* Tilt backwards a bit.*/
-            /* tmp_basis.pts[1].coords[3] = -0.2; */
-        orthorotate_PointXfrm (&view_basis, &tmp_basis, 0);
-    }
-
-#endif
-
-    build_KDTree (&space.tree, space.nelems, space.elems, &space.scene.box);
-        /* output_KDTree (stderr, &space.tree, space.nelems, space.elems); */
+    partition_RaySpace (&space);
 
 #ifdef DistribCompute
     call_gui = !rays_to_hits_computeloop (&space);
