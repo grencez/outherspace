@@ -91,6 +91,73 @@ void resize_RayImage (RayImage* image)
     if (image->pixels)  ResizeT( byte, image->pixels, 3 * npixels );
 }
 
+void downsample_RayImage (RayImage* image, uint inv)
+{
+    uint row, i_nrows, i_ncols, o_nrows, o_ncols;
+    uint inv2;
+    byte* o_pixline;
+    byte* o_fracline;
+
+    i_nrows = image->nrows;
+    i_ncols = image->ncols;
+
+    o_nrows = i_nrows / inv;
+    o_ncols = i_ncols / inv;
+
+    inv2 = inv * inv;
+    
+    o_pixline = AllocT( byte, 3 * (1 + o_ncols) );
+    o_fracline = AllocT( byte, 3 * (1 + o_ncols) );
+
+    memset (o_pixline, 0, 3 * o_ncols * sizeof(byte));
+    memset (o_fracline, 0, 3 * o_ncols * sizeof(byte));
+
+    UFor( row, i_nrows )
+    {
+        uint col;
+        byte* i_pixline = 0;
+
+        if (image->pixels)
+            i_pixline = &image->pixels[row * 3 * i_ncols];
+
+        UFor( col, i_ncols )
+        {
+            if (i_pixline)
+            {
+                uint i, o_off;
+                o_off = 3 * (col / inv);
+                UFor( i, 3 )
+                {
+                    uint x, y;
+                    x = i_pixline[3*col+i];
+                    y = (x % inv2) + o_fracline[o_off+i];
+                    x = (x / inv2) + (y / inv2);
+                    y = (y % inv2);
+                    o_pixline[o_off+i] += x;
+                    o_fracline[o_off+i] = y;
+                }
+            }
+        }
+
+        if ((row + 1) % inv == 0)
+        {
+            memcpy (&image->pixels[(row/inv) * 3 * o_ncols],
+                    o_pixline,
+                    3 * o_ncols * sizeof(byte));
+
+            memset (o_pixline,  0, 3 * o_ncols * sizeof(byte));
+            memset (o_fracline, 0, 3 * o_ncols * sizeof(byte));
+        }
+    }
+
+    free (o_pixline);
+    free (o_fracline);
+
+    image->nrows = o_nrows;
+    image->ncols = o_ncols;
+    resize_RayImage (image);
+}
+
 void cleanup_RayImage (RayImage* image)
 {
     if (image->hits)  free (image->hits);
@@ -405,6 +472,7 @@ cast_record (uint* hitline,
     real mag;
     uint i;
     const BarySimplex* hit_simplex = 0;
+    Point hit_dir;
 
     if (KDTreeRayTrace)
         cast_ray (&hit, &mag, origin, dir,
@@ -418,7 +486,11 @@ cast_record (uint* hitline,
         cast_ray_simple (&hit, &mag, origin, dir,
                          space->nelems, space->elems, view_basis);
 
-    if (hit < space->nelems)  hit_simplex = &space->simplices[hit];
+    if (hit < space->nelems)
+    {
+        hit_simplex = &space->simplices[hit];
+        copy_Point (&hit_dir, dir);
+    }
 
     UFor( i, space->nobjects )
     {
@@ -432,13 +504,13 @@ cast_record (uint* hitline,
         object = &space->objects[i];
 
         diff_Point (&diff, origin, &object->centroid);
-        trxfrm_Point (&rel_origin, &object->orientation, &diff);
+        xfrm_Point (&rel_origin, &object->orientation, &diff);
         summ_Point (&diff, &object->space.scene.box.min_corner, 
                     &object->space.scene.box.max_corner);
         scale_Point (&diff, &diff, 0.5);
         summ_Point (&rel_origin, &rel_origin, &diff);
 
-        trxfrm_Point (&rel_dir, &object->orientation, dir);
+        xfrm_Point (&rel_dir, &object->orientation, dir);
 
         rel_inside_box =
             inside_BoundingBox (&object->space.scene.box, &rel_origin);
@@ -454,6 +526,7 @@ cast_record (uint* hitline,
             hit = tmp_hit;
             mag = tmp_mag;
             hit_simplex = &object->space.simplices[hit];
+            copy_Point (&hit_dir, &rel_dir);
         }
     }
 
@@ -465,7 +538,7 @@ cast_record (uint* hitline,
             /* const BarySimplex* simplex = 0; */
             /* if (hit < space->nelems)  simplex = &space->simplices[hit]; */
         fill_pixel (&red, &green, &blue,
-                    mag, image, dir, hit_simplex);
+                    mag, image, &hit_dir, hit_simplex);
         pixline[3*col+0] = red;
         pixline[3*col+1] = green;
         pixline[3*col+2] = blue;
@@ -691,7 +764,7 @@ rays_to_hits_parallel (RayImage* restrict image,
 
             cast_record (hitline, magline, pixline, col,
                          space, image, view_basis,
-                         origin, dir, inside_box);
+                         &ray_origin, dir, inside_box);
         }
     }
 }

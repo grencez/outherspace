@@ -135,6 +135,7 @@ void cleanup_RaySpace (RaySpace* space);
 void partition_RaySpace (RaySpace* space);
 void init_RayImage (RayImage* image);
 void resize_RayImage (RayImage* image);
+void downsample_RayImage (RayImage* image, uint inv);
 void cleanup_RayImage (RayImage* image);
 #ifdef INCLUDE_SOURCE
 #include "raytrace.c"

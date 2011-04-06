@@ -23,6 +23,7 @@ void reflect_PointXfrm (PointXfrm* xfrm, uint j, uint k);
 void swaprows_PointXfrm (PointXfrm* xfrm, uint j, uint k);
 void to_basis_PointXfrm (PointXfrm* dst, const PointXfrm* xfrm,
                          const PointXfrm* basis);
+void transpose_PointXfrm (PointXfrm* dst, const PointXfrm* xfrm);
 void orthonormalize_PointXfrm (PointXfrm* dst, const PointXfrm* A);
 void orthorotate_PointXfrm (PointXfrm* dst, const PointXfrm* A, uint dim);
 

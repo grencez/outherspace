@@ -3,6 +3,12 @@
 #include "raytrace.h"
 #include <mpi.h>
 
+    /* #define CompressBigCompute */
+
+#ifdef CompressBigCompute
+#include <zlib.h>
+#endif
+
     /* #define DebugMpiRayTrace */
 
 static uint nprocs = 0;
@@ -57,6 +63,93 @@ void compute_rays_to_hits (RayImage* image,
                   proc, StdMsgTag, MPI_COMM_WORLD);
     }
     rays_to_hits_balancer (image);
+}
+
+
+static
+    void
+big_compute_send (uint nbytes, byte* bytes, uint proc)
+{
+#ifdef CompressBigCompute
+    byte buf[BUFSIZ];
+    z_stream strm;
+    uint i = 0;
+
+    strm.zalloc = Z_NULL;
+    strm.zfree = Z_NULL;
+    strm.opaque = Z_NULL;
+    deflateInit(&strm, Z_DEFAULT_COMPRESSION);
+
+    strm.avail_in = nbytes;
+    strm.next_in = bytes;
+
+    while (i < nbytes)
+    {
+        uint n;
+        strm.avail_out = BUFSIZ;
+        strm.next_out = buf;
+        deflate (&strm, Z_FINISH);
+
+        n = BUFSIZ - strm.avail_out;
+        MPI_Send (&n, 1, MPI_UNSIGNED,
+                  proc, StdMsgTag, MPI_COMM_WORLD);
+        MPI_Send (buf, n, MPI_BYTE,
+                  proc, StdMsgTag, MPI_COMM_WORLD);
+        i += n;
+    }
+
+    deflateEnd(&strm);
+#else
+    MPI_Send (bytes, nbytes, MPI_BYTE,
+              proc, StdMsgTag, MPI_COMM_WORLD);
+#endif
+}
+
+
+static
+    void
+big_compute_recv (uint nbytes, byte* bytes, uint proc)
+{
+    MPI_Status status;
+#ifdef CompressBigCompute
+    byte buf[BUFSIZ];
+    z_stream strm;
+    uint i = 0;
+
+    strm.zalloc = Z_NULL;
+    strm.zfree = Z_NULL;
+    strm.opaque = Z_NULL;
+    strm.avail_in = 0;
+    strm.next_in = Z_NULL;
+    inflateInit(&strm);
+
+    strm.avail_out = nbytes;
+    strm.next_out = bytes;
+
+    while (i < nbytes)
+    {
+        uint n;
+        MPI_Recv (&n, 1, MPI_UNSIGNED, proc, StdMsgTag,
+                  MPI_COMM_WORLD, &status);
+
+        assert (n < BUFSIZ);
+
+        MPI_Recv (buf, n, MPI_BYTE,
+                  proc, StdMsgTag, MPI_COMM_WORLD, &status);
+
+        strm.avail_in = n;
+        strm.next_in = buf;
+
+        inflate(&strm, Z_NO_FLUSH);
+
+        i += n;
+    }
+
+    inflateEnd(&strm);
+#else
+    MPI_Recv (bytes, nbytes, MPI_BYTE,
+              proc, StdMsgTag, MPI_COMM_WORLD, &status);
+#endif
 }
 
 
@@ -201,9 +294,7 @@ void rays_to_hits_computer (RayImage* restrict image,
                       ncols * sizeof(real), MPI_BYTE,
                       0, StdMsgTag, MPI_COMM_WORLD);
         if (image->pixels)
-            MPI_Send (&image->pixels[row * 3 * ncols],
-                      3 * ncols * sizeof(byte), MPI_BYTE,
-                      0, StdMsgTag, MPI_COMM_WORLD);
+            big_compute_send (3 * ncols, &image->pixels[row * 3 * ncols], 0);
     }
 
     if (rows_computed)  free (rows_computed);
@@ -399,9 +490,9 @@ rays_to_hits_balancer (RayImage* image)
                               ncols * sizeof(real), MPI_BYTE,
                               proc, StdMsgTag, MPI_COMM_WORLD, &status);
                 if (image->pixels)
-                    MPI_Recv (&image->pixels[row * 3 * ncols],
-                              3 * ncols * sizeof(byte), MPI_BYTE,
-                              proc, StdMsgTag, MPI_COMM_WORLD, &status);
+                    big_compute_recv (3 * ncols,
+                                      &image->pixels[row * 3 * ncols],
+                                      proc);
             }
         }
     }

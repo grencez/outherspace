@@ -50,7 +50,7 @@ typedef byte bool;
 typedef double real;
 #define Max_real DBL_MAX
 #define Min_real DBL_MIN
-#define Epsilon_real (100*DBL_EPSILON)
+#define Epsilon_real DBL_EPSILON
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -60,7 +60,7 @@ typedef double real;
 typedef float real;
 #define Max_real FLT_MAX
 #define Min_real FLT_MIN
-#define Epsilon_real (1000*FLT_EPSILON)
+#define Epsilon_real FLT_EPSILON
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846f
@@ -74,16 +74,17 @@ typedef int tristate;
 
 bool even_uint (uint a);
 tristate compare_real (real a, real b);
+real match_real (real a, real b);
 real absolute_error (real expect, real result);
-real relative_error (real expect, real result);
+real relative_error (real expect, real result, real large);
 tristate signum_real (real a);
 tristate mul_signum (tristate a, tristate b);
 
 #ifdef NDEBUG
-#define AssertEqual_real( expect, result )
+#define AssertApprox( expect, result, large, mul )
 #else
-#define AssertEqual_real( expect, result ) \
-    assert (Epsilon_real >= fabs (relative_error (expect, result)))
+#define AssertApprox( expect, result, large, mul ) \
+    assert (mul*Epsilon_real >= fabs (relative_error (expect, result, large)))
 #endif
 
 #ifndef __OPENCL_VERSION__
@@ -91,6 +92,7 @@ uint index_of (const void* e, const void* arr, size_t size);
 void array_set (void* arr, uint i, const void* e, size_t size);
 char* strto_uint (uint* ret, const char* in);
 char* strto_real (real* ret, const char* in);
+real monotime ();
 #ifdef INCLUDE_SOURCE
 #include "util.c"
 #endif

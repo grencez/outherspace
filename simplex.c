@@ -280,12 +280,20 @@ void proj_Plane (Point* dst, const Point* u, const Plane* plane)
 
 void barycentric_Plane (Plane* dst, const Plane* plane, const Point* point)
 {
+        /* NOTE: The given point must be relative to the plane!
+         * Obtain this by subtracting any point on the plane.
+         */
+#if 1
     real inv;
-    inv = 1 / distance_Plane (plane, point);
+    inv = 1 / dot_Point (&plane->normal, point);
     dst->offset = plane->offset * inv;
     scale_Point (&dst->normal, &plane->normal, inv);
-
-    AssertEqual_real( 1, distance_Plane (dst, point) );
+#else
+    real mag;
+    mag = dot_Point (&plane->normal, point);
+    dst->offset = plane->offset / mag;
+    scale_Point (&dst->normal, &plane->normal, 1 / mag);
+#endif
 }
 
 
@@ -306,12 +314,16 @@ void init_BarySimplex (BarySimplex* elem, const PointXfrm* raw)
 
     UFor( i, NDimensions-1 )
     {
-        AssertEqual_real( 0, dot_Point (&surf.pts[0], &surf.pts[i+1]) );
+        AssertApprox( 0, dot_Point (&surf.pts[0], &surf.pts[i+1]), 1, 1e2 );
+
         plane = &elem->barys[i];
         row_minors_PointXfrm (&plane->normal, &surf, 1+i);
         plane->normal.coords[1] = - plane->normal.coords[1];
         init_Plane (plane, &plane->normal, &raw->pts[0]);
-        barycentric_Plane (plane, plane, &raw->pts[1+i]);
+        barycentric_Plane (plane, plane, &surf.pts[1+i]);
+
+        AssertApprox( 1, distance_Plane (plane, &raw->pts[1+i]),
+                      plane->offset, 5e2 );
     }
 }
 

@@ -6,11 +6,11 @@
 CONFIG = fast
 CONFIG = fast openmp
 #CONFIG = fast openmp noassert
+#CONFIG = fast openmp benchmark
 #CONFIG = fast mpi
 #CONFIG = debug
 #CONFIG = fast noassert
 #CONFIG = benchmark snappy debug
-#CONFIG = benchmark fast openmp
 #CONFIG = benchmark snappy debug openmp
 #CONFIG = ultradebug
 
@@ -80,15 +80,17 @@ ifneq (,$(findstring mpi,$(CONFIG)))
 endif
 
 
+CSources = kdtree.c raytrace.c scene.c simplex.c slist.c space.c util.c xfrm.c
 
-LFLAGS += -lm
+
+LFLAGS += -lm -lz
 
 all: cli gui hello
 	# Done!
 
 OpenCLPath = /home/grencez/ati-stream-sdk-v2.3-lnx64
 OpenCLLibPath = $(OpenCLPath)/lib/x86_64
-hello: hello.c kdtree.c raytrace.c scene.c simplex.c slist.c space.c util.c xfrm.c
+hello: hello.c $(CSources)
 	$(CC) $(CFLAGS) -I $(OpenCLPath)/include $< -o $@ \
 		-L $(OpenCLLibPath) -lOpenCL $(LFLAGS)
 
@@ -96,10 +98,10 @@ hello: hello.c kdtree.c raytrace.c scene.c simplex.c slist.c space.c util.c xfrm
 test-hello: hello
 	LD_LIBRARY_PATH=$(OpenCLLibPath) ./$<
 
-cli: cli.c compute.c kdtree.c main.c raytrace.c simplex.c scene.c slist.c space.c util.c xfrm.c
+cli: cli.c compute.c main.c $(CSources)
 	$(CC) $(CFLAGS) $< -o $@ $(LFLAGS)
 
-gui: gui.c compute.c kdtree.c main.c raytrace.c scene.c simplex.c slist.c space.c util.c xfrm.c
+gui: gui.c compute.c motion.c $(CSources)
 	$(CC) $(CFLAGS) `pkg-config --cflags gtk+-2.0` \
 		`sdl-config --cflags` \
 		$< -o $@ \

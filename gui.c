@@ -1,5 +1,6 @@
 
 #include "main.h"
+#include "motion.h"
 
 #ifdef DistribCompute
 #include "compute.h"
@@ -10,9 +11,14 @@
 #include <gdk/gdkkeysyms.h>
 #include <SDL.h>
 
+#define NRacers 10
+
 static const bool RenderDrawsPattern = false;
 static const bool ForceFauxFishEye = false;
 
+static ObjectMotion racer_motions[NRacers];
+
+static real prev_time;
 static Point view_origin;
 static PointXfrm view_basis;
 static uint view_nrows = 400;
@@ -24,7 +30,6 @@ static real view_angle = 2 * M_PI / 3;
 static real view_width = 100;
 static bool view_perspective = true;
 static bool needs_recast = true;
-static Point current_velocity;
 static SDL_Joystick* joystick_handle; 
 
 static gboolean delete_event (GtkWidget* widget,
@@ -237,15 +242,15 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
     else if (print_view_code)
     {
         uint i;
-        fprintf (out, "view_angle = (real) %15f;\n", view_angle);
+        fprintf (out, "view_angle = (real) %15g;\n", view_angle);
         UFor( i, NDimensions )
         {
             uint j;
-            fprintf (out, "view_origin.coords[%u] = (real) %15f;\n",
+            fprintf (out, "view_origin.coords[%u] = (real) %15g;\n",
                      i, view_origin.coords[i]);
             UFor( j, NDimensions )
             {
-                fprintf (out, "view_basis.pts[%u].coords[%u] = (real) %15f;\n",
+                fprintf (out, "view_basis.pts[%u].coords[%u] = (real) %15g;\n",
                          i, j, view_basis.pts[i].coords[j]);
             }
         }
@@ -282,14 +287,19 @@ set_rotate_view (real vert, real horz)
 
 static gboolean poll_joystick (gpointer widget)
 {
-    const bool flight_style = false;
+    const bool flight_style = true;
     int x, y;
     tristate stride = 0;
     real vert, horz, roll;
 
     SDL_JoystickUpdate ();
+
+    if (0 != SDL_JoystickGetButton (joystick_handle, 2))  stride =  1;
+    if (0 != SDL_JoystickGetButton (joystick_handle, 3))  stride = -1;
+
     x = SDL_JoystickGetAxis (joystick_handle, 1);
     y = SDL_JoystickGetAxis (joystick_handle, 0);
+
     if (x > 0 && x <  3000)  x = 0;
     if (x < 0 && x > -3000)  x = 0;
     if (y > 0 && y <  3000)  y = 0;
@@ -307,6 +317,7 @@ static gboolean poll_joystick (gpointer widget)
         vert = - vert;
     }
 
+#if 1
     set_rotate_view (vert, horz);
 
     if (flight_style)
@@ -317,15 +328,24 @@ static gboolean poll_joystick (gpointer widget)
         orthonormalize_PointXfrm (&view_basis, &tmp);
     }
 
-    if (0 != SDL_JoystickGetButton (joystick_handle, 2))  stride =  1;
-    if (0 != SDL_JoystickGetButton (joystick_handle, 3))  stride = -1;
-
     if (stride != 0)
     {
         Point diff;
         scale_Point (&diff, &view_basis.pts[DirDimension], stride * 5);
         summ_Point (&view_origin, &view_origin, &diff);
     }
+#else
+    rotate_object (&racer_motions[0], 0, 2,
+                   - vert * M_PI / 3);
+    rotate_object (&racer_motions[0], 1, 2,
+                   - horz * M_PI / 3);
+    if (flight_style)
+    {
+        rotate_object (&racer_motions[0], 0, 1, roll * M_PI / 3);
+    }
+
+    racer_motions[0].accel = 5 * stride;
+#endif
 
         /* fprintf (stderr, "x:%d  y:%d\n", x, y); */
     if (false)
@@ -454,6 +474,63 @@ render_RaySpace (byte* data, const RaySpace* space,
 
     if (needs_recast)
     {
+        uint i;
+        real time, dt;
+
+        time = monotime ();
+        dt = time - prev_time;
+
+        fprintf (stderr, "FPS:%f\n", 1 / dt);
+
+#if 0
+        UFor( i, space->nobjects )
+        {
+            uint j;
+            ObjectMotion* motion;
+            motion = &racer_motions[i];
+
+                /* space->objects[i].centroid.coords[0] = 50 * sin (time + i); */
+                /* space->objects[i].centroid.coords[1] = 50 * cos (time + i); */
+
+
+                /* rotate_object (motion, 0, 1, .5); */
+            UFor( j, 5 )
+            {
+                    /* rotate_object (motion, 0, 2, .5); */
+                    /* rotate_object (motion, 0, 1, .7); */
+                    /* rotate_object (motion, 0, 1, .7); */
+                    /* motion->accel = 10; */
+                    /* motion->veloc.coords[0] = 10 * sin (time + i); */
+                    /* motion->veloc.coords[1] = 10 * cos (time + i); */
+                move_object (&space->objects[i], motion, dt, true);
+            }
+            zero_rotations (motion);
+        }
+
+        {
+            Point tmp;
+            PointXfrm basis;
+            const ObjectMotion* motion;
+            const RaySpaceObject* object;
+            motion = &racer_motions[0];
+            object = &space->objects[0];
+            scale_Point (&tmp, &object->orientation.pts[DirDimension],
+                         1 + magnitude_Point (&motion->veloc));
+            summ_Point (&tmp, &tmp, &motion->veloc);
+                /* summ_Point (&tmp, &motion->veloc, &object->orientation.pts[DirDimension]); */
+
+            normalize_Point (&tmp, &tmp);
+            copy_PointXfrm (&basis, &object->orientation);
+            copy_Point (&basis.pts[DirDimension], &tmp);
+            orthorotate_PointXfrm (&view_basis, &basis, DirDimension);
+
+            scale_Point (&view_origin, &tmp, -130);
+            scale_Point (&tmp, &object->orientation.pts[0], 70);
+            summ_Point (&view_origin, &view_origin, &tmp);
+            summ_Point (&view_origin, &view_origin, &object->centroid);
+        }
+#endif
+
 #ifdef DistribCompute
         compute_rays_to_hits (&ray_image,
                               space, &view_origin, &view_basis, view_angle);
@@ -468,6 +545,7 @@ render_RaySpace (byte* data, const RaySpace* space,
             rays_to_hits_parallel (&ray_image, space,
                                    &view_origin, &view_basis, view_width);
 #endif
+        prev_time = time;
     }
     needs_recast = false;
 
@@ -478,7 +556,7 @@ render_RaySpace (byte* data, const RaySpace* space,
         uint col;
         const byte* pixline;
         guint32* outline;
-        if (row >= nrows)  break;
+        if (view_nrows - row - 1 >= nrows)  continue;
 
         pixline = &ray_image.pixels[row * 3 * view_ncols];
         outline = (guint32*) &data[stride * (view_nrows - row - 1)];
@@ -697,7 +775,7 @@ int main (int argc, char* argv[])
         view_origin.coords[DirDimension] = -10;
         identity_PointXfrm (&view_basis);
 
-        space.nobjects = 50;
+        space.nobjects = NRacers;
         space.objects = AllocT( RaySpaceObject, space.nobjects );
         UFor( i, space.nobjects )
         {
@@ -706,8 +784,9 @@ int main (int argc, char* argv[])
             good = readin_wavefront (&space.objects[i].space, "machine_1.obj");
             if (!good)  return 1;
             zero_Point (&space.objects[i].centroid);
-            space.objects[i].centroid.coords[DirDimension] = 75 * i;
+            space.objects[i].centroid.coords[0] = 75 * i + 300;
             identity_PointXfrm (&space.objects[i].orientation);
+            init_ObjectMotion (&racer_motions[i]);
         }
     }
 
@@ -726,9 +805,10 @@ int main (int argc, char* argv[])
             /* ray_image.mags = AllocT( real, 1 ); */
         ray_image.pixels = AllocT( byte, 1 );
         resize_RayImage (&ray_image);
-        ray_image.view_light = 400;
-            /* ray_image.color_distance_on = true; */
+        ray_image.view_light = 0;
+        ray_image.color_distance_on = true;
 
+        prev_time = monotime ();
         gui_main (argc, argv, &space);
 #ifdef DistribCompute
         stop_computeloop ();

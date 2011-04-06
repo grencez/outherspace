@@ -71,6 +71,7 @@ int main ()
         const uint nrows = 2000;
         const uint ncols = 2000;
         const real view_angle = M_PI / 3;
+        real t0;
 
         init_RayImage (&image);
         image.hits = AllocT( uint, nrows * ncols );
@@ -90,25 +91,52 @@ int main ()
         }
         else
         {
-            compute_rays_to_hits (&image, &space,
-                                  &view_origin, &view_basis, view_angle);
+            uint i;
+            UFor( i, 10 )
+            {
+                t0 = monotime ();
+                compute_rays_to_hits (&image, &space,
+                                      &view_origin, &view_basis, view_angle);
+                printf ("sec:%f\n", monotime () - t0);
+            }
+
             stop_computeloop ();
         }
 #else
+        t0 = monotime ();
         rays_to_hits (&image, &space, &view_origin, &view_basis, view_angle);
+        printf ("sec:%f\n", monotime () - t0);
 #endif
+
         if (write_image)
         {
+                /* downsample_RayImage (&image, 9); */
             if (image.hits)
             {
-                output_PBM_image ("out.pbm", nrows, ncols,
+                output_PBM_image ("out.pbm", image.nrows, image.ncols,
                                   image.hits, space.nelems);
-                output_PGM_image ("out.pgm", nrows, ncols,
+                output_PGM_image ("out.pgm", image.nrows, image.ncols,
                                   image.hits, space.nelems);
             }
             if (image.pixels)
             {
-                output_PPM_image ("out.ppm", nrows, ncols,
+                const bool write_binary = false;
+                if (write_binary)
+                {
+                    FILE* out;
+                    size_t nbytes, nwrote;
+                    nbytes = 3 * image.nrows * image.ncols;
+                    nwrote = nbytes + 1;
+                    out = fopen ("out.bin", "w+");
+                    if (out)
+                        nwrote = fwrite (image.pixels, 1, nbytes, out);
+                    if (nwrote != nbytes)
+                        fputs ("Failed to write binary file, out.bin!\n",
+                               stderr);
+                    fclose (out);
+                }
+
+                output_PPM_image ("out.ppm", image.nrows, image.ncols,
                                   image.pixels);
             }
         }

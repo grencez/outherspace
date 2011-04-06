@@ -5,6 +5,12 @@
 #include <assert.h>
 #include <string.h>
 
+#ifdef _OPENMP
+#include <omp.h>
+#else
+#include <time.h>
+#endif
+
 uint index_of (const void* e, const void* arr, size_t size)
 {
     return ((size_t) e - (size_t) arr) / size;
@@ -43,6 +49,15 @@ char* strto_real (real* ret, const char* in)
     if (out)  *ret = (real) v;
     return out;
 }
+
+real monotime ()
+{
+#ifdef _OPENMP
+    return (real) omp_get_wtime ();
+#else
+    return ((real) clock ()) / CLOCKS_PER_SEC;
+#endif
+}
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
 
@@ -58,19 +73,34 @@ tristate compare_real (real a, real b)
     return 0;
 }
 
+real match_real (real a, real b)
+{
+    if (a < 0)
+    {
+        if (b > 0)  b = - b;
+        if (a < b)  b = a;
+    }
+    else
+    {
+        if (b < 0)  b = - b;
+        if (a > b)  b = a;
+    }
+    return b;
+}
+
 real absolute_error (real expect, real result)
 {
     return result - expect;
 }
 
-real relative_error (real expect, real result)
+real relative_error (real expect, real result, real large)
 {
     real err;
     err = absolute_error (expect, result);
     if (- Epsilon_real < err && err < Epsilon_real)
         return err;
-    else
-        return err / expect;
+
+    return err / match_real (expect, large);
 }
 
 tristate signum_real (real a)

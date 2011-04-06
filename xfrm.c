@@ -159,6 +159,23 @@ void to_basis_PointXfrm (PointXfrm* dst, const PointXfrm* xfrm,
     }
 }
 
+void transpose_PointXfrm (PointXfrm* dst, const PointXfrm* xfrm)
+{
+    uint i;
+    UFor( i, NDimensions )
+    {
+        uint j;
+        UFor( j, i )
+        {
+            real x, y;
+            x = xfrm->pts[i].coords[j];
+            y = xfrm->pts[j].coords[i];
+            dst->pts[i].coords[j] = y;
+            dst->pts[j].coords[i] = x;
+        }
+    }
+}
+
 void orthonormalize_PointXfrm (PointXfrm* dst, const PointXfrm* A)
 {
     uint i;
