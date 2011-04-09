@@ -80,7 +80,15 @@ ifneq (,$(findstring mpi,$(CONFIG)))
 endif
 
 
-CSources = kdtree.c raytrace.c scene.c simplex.c slist.c space.c util.c xfrm.c
+CSources = kdtree.c \
+		   scene.c \
+		   simplex.c \
+		   slist.c \
+		   space.c \
+		   raytrace.c \
+		   util.c \
+		   wavefront-file.c \
+		   xfrm.c
 
 
 LFLAGS += -lm -lz

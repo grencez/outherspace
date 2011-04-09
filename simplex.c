@@ -314,7 +314,8 @@ void init_BarySimplex (BarySimplex* elem, const PointXfrm* raw)
 
     UFor( i, NDimensions-1 )
     {
-        AssertApprox( 0, dot_Point (&surf.pts[0], &surf.pts[i+1]), 1, 1e2 );
+        AssertApprox( 0, dot_Point (&surf.pts[0], &surf.pts[i+1]),
+                      magnitude_Point (&surf.pts[i+1]), 1e1 );
 
         plane = &elem->barys[i];
         row_minors_PointXfrm (&plane->normal, &surf, 1+i);

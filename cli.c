@@ -1,5 +1,6 @@
 
 #include "main.h"
+#include "wavefront-file.h"
 
 #ifdef DistribCompute
 #include "compute.h"

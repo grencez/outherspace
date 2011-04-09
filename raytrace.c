@@ -457,49 +457,49 @@ cast_ray (uint* restrict ret_hit, real* restrict ret_mag,
 
 static
     void
-cast_record (uint* hitline,
-             real* magline,
-             byte* pixline,
-             uint col,
-             const RaySpace* restrict space,
-             const RayImage* restrict image,
-             const PointXfrm* restrict view_basis,
-             const Point* restrict origin,
-             const Point* restrict dir,
-             bool inside_box)
+cast_recurse (uint* ret_hit,
+              real* ret_mag,
+              const RaySpace** ret_space,
+              Point* ret_dir,
+              const RaySpace* restrict space,
+              const RayImage* restrict image,
+              const PointXfrm* restrict view_basis,
+              const Point* restrict origin,
+              const Point* restrict dir,
+              bool inside_box)
 {
-    uint hit;
-    real mag;
-    uint i;
-    const BarySimplex* hit_simplex = 0;
+    uint hit_idx;
+    real hit_mag;
     Point hit_dir;
+    const RaySpace* hit_space;
+    uint i;
+
+    hit_space = space;
+    copy_Point (&hit_dir, dir);
 
     if (KDTreeRayTrace)
-        cast_ray (&hit, &mag, origin, dir,
+        cast_ray (&hit_idx, &hit_mag, origin, dir,
                   space->nelems, space->elems,
                   space->tree.elemidcs, space->tree.nodes,
                   &space->scene.box, inside_box);
     else if (BarycentricRayTrace)
-        cast_ray_simple_barycentric (&hit, &mag, origin, dir,
+        cast_ray_simple_barycentric (&hit_idx, &hit_mag, origin, dir,
                                      space->nelems, space->simplices);
     else
-        cast_ray_simple (&hit, &mag, origin, dir,
+        cast_ray_simple (&hit_idx, &hit_mag, origin, dir,
                          space->nelems, space->elems, view_basis);
-
-    if (hit < space->nelems)
-    {
-        hit_simplex = &space->simplices[hit];
-        copy_Point (&hit_dir, dir);
-    }
 
     UFor( i, space->nobjects )
     {
         Point diff, rel_origin, rel_dir;
         const RaySpaceObject* object;
-        uint tmp_hit;
-        real tmp_mag;
         PointXfrm rel_basis;
         bool rel_inside_box;
+            /* Returns from ray cast.*/
+        uint tmp_hit;
+        real tmp_mag;
+        Point tmp_dir;
+        const RaySpace* tmp_space;
 
         object = &space->objects[i];
 
@@ -517,28 +517,57 @@ cast_record (uint* hitline,
 
         xfrm_PointXfrm (&rel_basis, view_basis, &object->orientation);
         
-        cast_record (&tmp_hit, &tmp_mag, 0, 0,
+        cast_recurse (&tmp_hit, &tmp_mag, &tmp_space, &tmp_dir,
                      &object->space, image, &rel_basis,
                      &rel_origin, &rel_dir, rel_inside_box);
 
-        if (tmp_mag < mag)
+        if (tmp_mag < hit_mag)
         {
-            hit = tmp_hit;
-            mag = tmp_mag;
-            hit_simplex = &object->space.simplices[hit];
-            copy_Point (&hit_dir, &rel_dir);
+            hit_idx = tmp_hit;
+            hit_mag = tmp_mag;
+            hit_space = tmp_space;
+            copy_Point (&hit_dir, &tmp_dir);
         }
     }
 
-    if (hitline)  hitline[col] = hit;
-    if (magline)  magline[col] = mag;
+    *ret_hit = hit_idx;
+    *ret_mag = hit_mag;
+    *ret_space = hit_space;
+    copy_Point (ret_dir, &hit_dir);
+}
+              
+
+static
+    void
+cast_record (uint* hitline,
+             real* magline,
+             byte* pixline,
+             uint col,
+             const RaySpace* restrict space,
+             const RayImage* restrict image,
+             const PointXfrm* restrict view_basis,
+             const Point* restrict origin,
+             const Point* restrict dir,
+             bool inside_box)
+{
+    uint hit_idx;
+    real hit_mag;
+    const RaySpace* hit_space;
+    Point hit_dir;
+
+    cast_recurse (&hit_idx, &hit_mag, &hit_space, &hit_dir,
+                  space, image, view_basis, origin, dir, inside_box);
+
+    if (hitline)  hitline[col] = hit_idx;
+    if (magline)  magline[col] = hit_mag;
     if (pixline)
     {
         byte red, green, blue;
-            /* const BarySimplex* simplex = 0; */
-            /* if (hit < space->nelems)  simplex = &space->simplices[hit]; */
+        const BarySimplex* simplex = 0;
+        if (hit_idx < hit_space->nelems)
+            simplex = &hit_space->simplices[hit_idx];
         fill_pixel (&red, &green, &blue,
-                    mag, image, &hit_dir, hit_simplex);
+                    hit_mag, image, &hit_dir, simplex);
         pixline[3*col+0] = red;
         pixline[3*col+1] = green;
         pixline[3*col+2] = blue;
