@@ -82,9 +82,12 @@ tristate mul_signum (tristate a, tristate b);
 
 #ifdef NDEBUG
 #define AssertApprox( expect, result, large, mul )
+#define AssertStatus( stat, msg )
 #else
 #define AssertApprox( expect, result, large, mul ) \
     assert (mul*Epsilon_real >= fabs (relative_error (expect, result, large)))
+#define AssertStatus( stat, msg ) \
+    assert_status (stat, msg, __FILE__, __LINE__)
 #endif
 
 #ifndef __OPENCL_VERSION__
@@ -93,6 +96,7 @@ void array_set (void* arr, uint i, const void* e, size_t size);
 char* strto_uint (uint* ret, const char* in);
 char* strto_real (real* ret, const char* in);
 real monotime ();
+void assert_status (int stat, const char* msg, const char* file, int line);
 #ifdef INCLUDE_SOURCE
 #include "util.c"
 #endif

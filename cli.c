@@ -8,7 +8,7 @@
 
 #include <time.h>
 
-int main ()
+int main (int argc, char** argv)
 {
     FILE* out;
     RaySpace space;
@@ -16,7 +16,10 @@ int main ()
     PointXfrm view_basis;
 
 #ifdef DistribCompute
-    init_compute ();
+    init_compute (&argc, &argv);
+#else
+    (void) argc;
+    (void) argv;
 #endif
 
     out = stdout;
@@ -85,7 +88,19 @@ int main ()
         write_image = false;
 #endif
 
+        t0 = monotime ();
 #ifdef DistribCompute
+#if 0
+        {
+            int myrank;
+            MPI_Comm_rank (MPI_COMM_WORLD, &myrank);
+            if (myrank != 0)  write_image = false;
+            rays_to_hits (&image, &space, &view_origin,
+                          &view_basis, view_angle);
+            if (myrank == 0)
+                printf ("sec:%f\n", monotime () - t0);
+        }
+#else
         if (rays_to_hits_computeloop (&space))
         {
             write_image = false;
@@ -93,7 +108,7 @@ int main ()
         else
         {
             uint i;
-            UFor( i, 10 )
+            UFor( i, 1 )
             {
                 t0 = monotime ();
                 compute_rays_to_hits (&image, &space,
@@ -103,8 +118,8 @@ int main ()
 
             stop_computeloop ();
         }
+#endif
 #else
-        t0 = monotime ();
         rays_to_hits (&image, &space, &view_origin, &view_basis, view_angle);
         printf ("sec:%f\n", monotime () - t0);
 #endif
@@ -136,9 +151,11 @@ int main ()
                                stderr);
                     fclose (out);
                 }
-
-                output_PPM_image ("out.ppm", image.nrows, image.ncols,
-                                  image.pixels);
+                else
+                {
+                    output_PPM_image ("out.ppm", image.nrows, image.ncols,
+                                      image.pixels);
+                }
             }
         }
         cleanup_RayImage (&image);

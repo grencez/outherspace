@@ -12,7 +12,7 @@ enum compute_msg_tag_enum
 };
 typedef enum compute_msg_tag_enum ComputeMsgTag;
 
-void init_compute ();
+void init_compute (int* argc, char*** argv);
 void cleanup_compute ();
 
 void stop_computeloop ();

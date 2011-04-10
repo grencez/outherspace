@@ -8,6 +8,7 @@ CONFIG = fast openmp
 #CONFIG = fast openmp noassert
 #CONFIG = fast openmp benchmark
 #CONFIG = fast mpi
+#CONFIG = mpi debug
 #CONFIG = debug
 #CONFIG = fast noassert
 #CONFIG = benchmark snappy debug
@@ -16,6 +17,10 @@ CONFIG = fast openmp
 
 CONFIG += ansi
 #CONFIG += c99
+
+
+#LD_PRELOAD=$(pfx)/lib/valgrind/libmpiwrap-x86-linux.so \
+#	mpirun -np 3 valgrind ./cli 2>&1 | tee out
 
 
 ifeq ($(CC),g++)
@@ -31,7 +36,7 @@ CFLAGS += -Wall -Wextra
 
 ## Serious debugging is about to happen.
 ifneq (,$(findstring ultradebug,$(CONFIG)))
-	CONFIG = $(filter-out snappy fast debug,$(CFLAGS))
+	CONFIG := $(filter-out snappy fast debug,$(CONFIG))
 	CFLAGS += -g3
 endif
 ## Go really fast.
@@ -76,7 +81,8 @@ endif
 ## Allow distributed parallelism.
 ifneq (,$(findstring mpi,$(CONFIG)))
 	CC = mpicc
-	CFLAGS += -DDistribCompute
+	CFLAGS += -DDistribCompute -DCompressBigCompute
+	LFLAGS += -lz
 endif
 
 
@@ -91,7 +97,7 @@ CSources = kdtree.c \
 		   xfrm.c
 
 
-LFLAGS += -lm -lz
+LFLAGS += -lm
 
 all: cli gui hello
 	# Done!

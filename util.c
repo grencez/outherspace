@@ -3,7 +3,12 @@
 #include "util.h"
 
 #include <assert.h>
+#include <stdio.h>
 #include <string.h>
+
+#ifdef DistribCompute
+#include <mpi.h>
+#endif
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -52,11 +57,37 @@ char* strto_real (real* ret, const char* in)
 
 real monotime ()
 {
-#ifdef _OPENMP
+#if defined(DistribCompute)
+    static double t0 = -1;
+    if (t0 < 0)
+    {
+        t0 = MPI_Wtime ();
+        return 0;
+    }
+    else
+    {
+        return (real) (MPI_Wtime () - t0);
+    }
+#elif defined(_OPENMP)
     return (real) omp_get_wtime ();
 #else
     return ((real) clock ()) / CLOCKS_PER_SEC;
 #endif
+}
+
+void assert_status (int stat, const char* msg, const char* file, int line)
+{
+    if (stat != 0)
+    {
+#ifdef DistribCompute
+        int proc;
+        MPI_Comm_rank (MPI_COMM_WORLD, &proc);
+        fprintf (stderr, "Process %d assertion failure! ", proc);
+#endif
+        fprintf (stderr, "%s:%d - Bad status: %d - %s\n",
+                 file, line, stat, msg);
+    }
+    assert (stat == 0);
 }
 #endif  /* #ifndef __OPENCL_VERSION__ */
 

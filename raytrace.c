@@ -869,7 +869,7 @@ rays_to_hits (RayImage* restrict image,
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic)
 #endif
-    for (row = myrank; row < nrows; row += nprocs )
+    for (row = myrank; row < nrows; row += nprocs)
     {
         rays_to_hits_row (image, row, space, origin, view_basis,
                           &dir_start, &row_delta, &col_delta,
@@ -956,7 +956,7 @@ balancer_triv_sync_mpi_RayImage (RayImage* image, uint nprocs)
                           i, 1, MPI_COMM_WORLD, &status);
             if (image->pixels)
                 MPI_Recv (&image->pixels[row*3*ncols],
-                          ncols * sizeof(real), MPI_BYTE,
+                          3 * ncols, MPI_BYTE,
                           i, 1, MPI_COMM_WORLD, &status);
         }
     }
@@ -981,7 +981,7 @@ computer_triv_sync_mpi_RayImage (const RayImage* image,
                       0, 1, MPI_COMM_WORLD);
         if (image->pixels)
             MPI_Send (&image->pixels[row*3*ncols],
-                      ncols * sizeof(real), MPI_BYTE,
+                      3 * ncols, MPI_BYTE,
                       0, 1, MPI_COMM_WORLD);
     }
 }

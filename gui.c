@@ -742,7 +742,7 @@ int main (int argc, char* argv[])
     RaySpace space;
 
 #ifdef DistribCompute
-    init_compute ();
+    init_compute (&argc, &argv);
 #endif
 
     init_RaySpace (&space);
