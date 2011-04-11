@@ -161,7 +161,7 @@ big_compute_send (uint nbytes, byte* bytes, uint proc)
 #endif
         }
         ret = MPI_Isend (buf, n, MPI_BYTE,
-                         proc, StdMsgTag, MPI_COMM_WORLD, req);
+                         proc, flip, MPI_COMM_WORLD, req);
         AssertStatus( ret, "" );
 #ifdef DebugMpiRayTrace
         dbgout_compute ("-> %u flip_bufs[%u][:%u]", proc, flip, n);
@@ -190,7 +190,7 @@ big_compute_send (uint nbytes, byte* bytes, uint proc)
 #endif
     }
 
-    ret = MPI_Send (0, 0, MPI_BYTE, proc, StdMsgTag, MPI_COMM_WORLD);
+    ret = MPI_Send (0, 0, MPI_BYTE, proc, flip, MPI_COMM_WORLD);
     AssertStatus( ret, "Sync sender" );
 #ifdef DebugMpiRayTrace
     dbgout_compute ("|> %u flip_bufs[%u][:0]", proc, flip);
@@ -225,7 +225,7 @@ big_compute_recv (uint nbytes, byte* bytes, uint proc)
     strm.next_out = bytes;
 
     MPI_Irecv (flip_bufs[flip], CompressBufferSize, MPI_BYTE,
-               proc, StdMsgTag, MPI_COMM_WORLD,
+               proc, flip, MPI_COMM_WORLD,
                &flip_reqs[flip]);
 #ifdef DebugMpiRayTrace
     dbgout_compute ("<- %u flip_bufs[%u][:n]", proc, flip);
@@ -239,7 +239,7 @@ big_compute_recv (uint nbytes, byte* bytes, uint proc)
         uint n;
 
         MPI_Irecv (flip_bufs[flip], CompressBufferSize, MPI_BYTE,
-                   proc, StdMsgTag, MPI_COMM_WORLD,
+                   proc, flip, MPI_COMM_WORLD,
                    &flip_reqs[flip]);
 #ifdef DebugMpiRayTrace
         dbgout_compute ("<- %u flip_bufs[%u][:n]", proc, flip);
@@ -266,13 +266,15 @@ big_compute_recv (uint nbytes, byte* bytes, uint proc)
         dbgout_compute ("inflate ret:%d", ret);
         dbgout_compute ("avail_out:%d", strm.avail_out);
 #endif
+        assert (ret >= 0);
         if (ret == Z_STREAM_END)  break;
     }
 
     assert (strm.total_out == nbytes);
 
     flip = (flip + 1) % 2;
-    MPI_Wait (&flip_reqs[flip], &status);
+    ret = MPI_Wait (&flip_reqs[flip], &status);
+    AssertStatus( ret, "" );
 #ifdef DebugMpiRayTrace
     dbgout_compute ("<| %u flip_bufs[%u][:0]", proc, flip);
 #endif
@@ -415,23 +417,35 @@ void rays_to_hits_computer (RayImage* restrict image,
     dbgout_compute ("done!");
 #endif
 
-    UFor( i, nrows_computed )
+    i = 0;
+    while (i < nrows_computed )
     {
-        uint row;
+        uint row, n;
         row = rows_computed[i];
+        n = 1;
+
+        ++ i;
+        while (i < nrows_computed && rows_computed[i] - row == n)
+        {
+            ++ i;
+            ++ n;
+        }
+
 #ifdef DebugMpiRayTrace
-        dbgout_compute ("Sending row:%u", row);
+        dbgout_compute ("Sending rows:%u-%u", row, row + n - 1);
 #endif
         if (image->hits)
-            big_compute_send (ncols * sizeof(uint),
-                              (byte*) &image->hits[row * 3 * ncols],
+            big_compute_send (n * ncols * sizeof(uint),
+                              (byte*) &image->hits[row * ncols],
                               0);
         if (image->mags)
-            big_compute_send (ncols * sizeof(real),
-                              (byte*) &image->mags[row * 3 * ncols],
+            big_compute_send (n * ncols * sizeof(real),
+                              (byte*) &image->mags[row * ncols],
                               0);
         if (image->pixels)
-            big_compute_send (3 * ncols, &image->pixels[row * 3 * ncols], 0);
+            big_compute_send (n * 3 * ncols,
+                              &image->pixels[row * 3 * ncols],
+                              0);
     }
 
     if (rows_computed)  free (rows_computed);
@@ -620,29 +634,40 @@ rays_to_hits_balancer (RayImage* image)
     dbgout_compute ("DONE!");
 #endif
 
-    UFor( i, nprocs-1)
+    UFor( i, nprocs-1 )
     {
         int proc;
         proc = 1+i;
-        UFor( row, nrows )
+        row = 0;
+        while (row < nrows)
         {
-            if (proc == row_computers[row])
+            while (row < nrows && proc != row_computers[row])
+                ++ row;
+
+            if (row < nrows)
             {
+                uint n = 1;
+
+                while (row + n < nrows && proc == row_computers[row + n])
+                    ++ n;
+
 #ifdef DebugMpiRayTrace
-                dbgout_compute ("Getting row:%u from process:%d", row, proc);
+                dbgout_compute ("Getting rows:%u-%u from process:%d",
+                                row, row + n - 1, proc);
 #endif
                 if (image->hits)
-                    big_compute_recv (ncols * sizeof(uint),
+                    big_compute_recv (n * ncols * sizeof(uint),
                                       (byte*) &image->hits[row * ncols],
                                       proc);
                 if (image->mags)
-                    big_compute_recv (ncols * sizeof(real),
+                    big_compute_recv (n * ncols * sizeof(real),
                                       (byte*) &image->mags[row * ncols],
                                       proc);
                 if (image->pixels)
-                    big_compute_recv (3 * ncols,
+                    big_compute_recv (n * 3 * ncols,
                                       &image->pixels[row * 3 * ncols],
                                       proc);
+                row += n;
             }
         }
     }
