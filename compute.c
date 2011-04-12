@@ -386,11 +386,14 @@ void rays_to_hits_computer (RayImage* restrict image,
 
     while (row_nul > 0)
     {
+        real t0, dt;
+
         MPI_Irecv (intl, 2, MPI_UNSIGNED,
                    0, StdMsgTag, MPI_COMM_WORLD, &recv_intl_req);
 #ifdef DebugMpiRayTrace
         dbgout_compute ("<- 0 intl(? ?)");
 #endif
+        t0 = monotime ();
         UFor( i, row_nul )
         {
             uint row;
@@ -401,6 +404,7 @@ void rays_to_hits_computer (RayImage* restrict image,
                               &dir_start, &row_delta, &col_delta,
                               inside_box);
         }
+        dt = monotime () - t0;
 
         MPI_Wait (&recv_intl_req, &status);
         AssertStatus( status.MPI_ERROR, "" );
@@ -410,7 +414,7 @@ void rays_to_hits_computer (RayImage* restrict image,
         row_off = intl[0];
         row_nul = intl[1];
         if (row_nul > 0)
-            MPI_Send (0, 0, MPI_INT, 0, StdMsgTag, MPI_COMM_WORLD);
+            MPI_Send (&dt, 1, MPI_real, 0, StdMsgTag, MPI_COMM_WORLD);
     }
 
 #ifdef DebugMpiRayTrace
@@ -456,13 +460,27 @@ void rays_to_hits_computer (RayImage* restrict image,
     void
 rays_to_hits_balancer (RayImage* image)
 {
+    struct compute_struct
+    {
+        uint intl[2];
+        uint ncomplete; /* Completed rows.*/
+        uint npending;
+        real dt;
+        real compute_time;
+    };
+    typedef struct compute_struct Compute;
     uint nrows_per_workunit;
     uint i, row;
     uint nrows, ncols;
     int ret;
+    Compute* cpts;
+    uint ncomplete = 0;
+    real compute_time = Epsilon_real;
+    real t0;
+    real kcoeff;
+    uint ncomputers;
 
     int* row_computers;
-    uint* intls;
     MPI_Request* send_intl_reqs;
     MPI_Request* recv_progress_reqs;
     MPI_Status status;
@@ -470,15 +488,20 @@ rays_to_hits_balancer (RayImage* image)
     nrows = image->nrows;
     ncols = image->ncols;
 
-    nrows_per_workunit = 1 + nrows / (10 * nprocs);
+    ncomputers = nprocs - 1;
+        /* Do you believe in magic coefficients? */
+    kcoeff = (real) ncomputers * (ncomputers - 1) / 2;
+    nrows_per_workunit = 1 + (uint) ((real) nrows / (10 * ncomputers));
 
     row_computers = AllocT( int, nrows );
-    intls = AllocT( uint, 2*(nprocs-1) );
-    send_intl_reqs = AllocT( MPI_Request, nprocs-1 );
-    recv_progress_reqs = AllocT( MPI_Request, nprocs-1 );
+    cpts = AllocT( Compute, ncomputers );
+    send_intl_reqs = AllocT( MPI_Request, ncomputers );
+    recv_progress_reqs = AllocT( MPI_Request, ncomputers );
+
+    t0 = monotime ();
 
     row = 0;
-    UFor( i, nprocs-1 )
+    UFor( i, ncomputers )
     {
         int proc;
         uint j, row_off, row_nul;
@@ -490,24 +513,26 @@ rays_to_hits_balancer (RayImage* image)
         if (row > nrows)  row = nrows;
         row_nul = row - row_off;
 
-        intls[2*i  ] = row_off;
-        intls[2*i+1] = row_nul;
+        cpts[i].intl[0] = row_off;
+        cpts[i].intl[1] = row_nul;
+        cpts[i].ncomplete = 0;
+        cpts[i].npending = nrows_per_workunit;
 
         UFor( j, row_nul )
             row_computers[row_off + j] = proc;
 
-        MPI_Isend (&intls[2*i], 2, MPI_UNSIGNED,
+        MPI_Isend (cpts[i].intl, 2, MPI_UNSIGNED,
                    proc, StdMsgTag, MPI_COMM_WORLD, &send_intl_reqs[i]);
 #ifdef DebugMpiRayTrace
-        dbgout_compute ("-> %d intls(%u %u)", proc, row_off, row_nul);
+        dbgout_compute ("-> %d intl(%u %u)", proc, row_off, row_nul);
 #endif
     }
 
-    UFor( i, nprocs-1 )
+    UFor( i, ncomputers )
     {
         ret = MPI_Wait (&send_intl_reqs[i], &status);
         AssertStatus( ret, "Wait on the first batch of sends" );
-        if (intls[2*i+1] == 0)
+        if (cpts[i].intl[1] == 0)
         {
             send_intl_reqs[i] = MPI_REQUEST_NULL;
             recv_progress_reqs[i] = MPI_REQUEST_NULL;
@@ -520,26 +545,33 @@ rays_to_hits_balancer (RayImage* image)
             proc = 1+i;
 
             row_off = row;
-            row += nrows_per_workunit;
-            if (row > nrows)  row = nrows;
-            row_nul = row - row_off;
+            row_nul = nrows_per_workunit;
+            row += row_nul;
+            if (row > nrows)
+            {
+                row = nrows;
+                row_nul = row - row_off;
+            }
 
-            intls[2*i  ] = row_off;
-            intls[2*i+1] = row_nul;
+            cpts[i].intl[0] = row_off;
+            cpts[i].intl[1] = row_nul;
+            cpts[i].ncomplete += cpts[i].npending;
+            cpts[i].npending = row_nul;
+            cpts[i].compute_time = Epsilon_real;
 
             UFor( j, row_nul )
                 row_computers[row_off + j] = proc;
 
-            MPI_Irecv (0, 0, MPI_INT,
+            MPI_Irecv (&cpts[i].dt, 1, MPI_real,
                        proc, StdMsgTag, MPI_COMM_WORLD,
                        &recv_progress_reqs[i]);
 #ifdef DebugMpiRayTrace
             dbgout_compute ("<- %d progress", proc);
 #endif
-            MPI_Isend (&intls[2*i], 2, MPI_UNSIGNED,
+            MPI_Isend (cpts[i].intl, 2, MPI_UNSIGNED,
                        proc, StdMsgTag, MPI_COMM_WORLD, &send_intl_reqs[i]);
 #ifdef DebugMpiRayTrace
-            dbgout_compute ("-> %d intls(%u %u)", proc, row_off, row_nul);
+            dbgout_compute ("-> %d intl(%u %u)", proc, row_off, row_nul);
 #endif
         }
     }
@@ -548,43 +580,59 @@ rays_to_hits_balancer (RayImage* image)
     {
         int proc;
         uint j, row_off, row_nul;
+        real dt;
 
-        ret = MPI_Waitany (nprocs-1, recv_progress_reqs, (int*) &i, &status);
+        ret = MPI_Waitany (ncomputers, recv_progress_reqs, (int*) &i, &status);
         AssertStatus( ret, "" );
         proc = i+1;
 #ifdef DebugMpiRayTrace
         dbgout_compute ("<| %d progress", proc);
 #endif
-        row_off = intls[2*i  ];
-        row_nul = intls[2*i+1];
+        row_off = cpts[i].intl[0];
+        row_nul = cpts[i].intl[1];
+        dt = cpts[i].dt;
+        
+        ncomplete += row_nul;
+        compute_time += dt;
+        cpts[i].compute_time += dt;
 
         ret = MPI_Wait (&send_intl_reqs[i], &status);
         AssertStatus( ret, "" );
 #ifdef DebugMpiRayTrace
-        dbgout_compute ("|> %d intls(%u %u)", proc, row_off, row_nul);
+        dbgout_compute ("|> %d intl(%u %u)", proc, row_off, row_nul);
 #endif
 
         row_off = row;
-        row += nrows_per_workunit;
-        if (row > nrows)  row = nrows;
-        row_nul = row - row_off;
+        row_nul = 1 + (uint)
+            ((real) (nrows - row) *
+             (cpts[i].ncomplete * compute_time) /
+             (ncomplete * cpts[i].compute_time * kcoeff));
 
-        intls[2*i  ] = row_off;
-        intls[2*i+1] = row_nul;
+        row += row_nul;
+        if (row > nrows)
+        {
+            row = nrows;
+            row_nul = row - row_off;
+        }
+
+        cpts[i].intl[0] = row_off;
+        cpts[i].intl[1] = row_nul;
+        cpts[i].ncomplete += cpts[i].npending;
+        cpts[i].npending = row_nul;
 
         UFor( j, row_nul )
             row_computers[row_off + j] = proc;
 
-        MPI_Irecv (0, 0, MPI_BYTE,
+        MPI_Irecv (&cpts[i].dt, 1, MPI_real,
                    proc, StdMsgTag, MPI_COMM_WORLD,
                    &recv_progress_reqs[i]);
 #ifdef DebugMpiRayTrace
         dbgout_compute ("<- %d progress", proc);
 #endif
-        MPI_Isend (&intls[2*i], 2, MPI_UNSIGNED,
+        MPI_Isend (cpts[i].intl, 2, MPI_UNSIGNED,
                    proc, StdMsgTag, MPI_COMM_WORLD, &send_intl_reqs[i]);
 #ifdef DebugMpiRayTrace
-        dbgout_compute ("-> %d intls(%u %u)", proc, row_off, row_nul);
+        dbgout_compute ("-> %d intl(%u %u)", proc, row_off, row_nul);
 #endif
     }
 
@@ -592,39 +640,36 @@ rays_to_hits_balancer (RayImage* image)
     dbgout_compute ("Wrapping up!");
 #endif
 
-    ret = MPI_Waitall (nprocs-1, recv_progress_reqs, MPI_STATUSES_IGNORE);
+    ret = MPI_Waitall (ncomputers, recv_progress_reqs, MPI_STATUSES_IGNORE);
     AssertStatus( ret, "" );
-    ret = MPI_Waitall (nprocs-1, send_intl_reqs, MPI_STATUSES_IGNORE);
+    ret = MPI_Waitall (ncomputers, send_intl_reqs, MPI_STATUSES_IGNORE);
     AssertStatus( ret, "" );
-    UFor( i, nprocs-1 )
+    UFor( i, ncomputers )
     {
         int proc;
-        uint row_off, row_nul;
-
         proc = i+1;
-        row_off = intls[2*i  ];
-        row_nul = intls[2*i+1];
 
 #ifdef DebugMpiRayTrace
         dbgout_compute ("|> %d progress", proc);
-        dbgout_compute ("|> %d intls(%u %u)", proc, row_off, row_nul);
+        dbgout_compute ("|> %d intl(%u %u)", proc,
+                        cpts[i].intl[0], cpts[i].intl[1]);
 #endif
 
-        if (row_nul == 0)
+        if (cpts[i].intl[1] == 0)
         {
             send_intl_reqs[i] = MPI_REQUEST_NULL;
         }
         else
         {
-            intls[2*i  ] = nrows;
-            intls[2*i+1] = 0;
-            MPI_Isend (&intls[2*i], 2, MPI_UNSIGNED,
+            cpts[i].intl[0] = nrows;
+            cpts[i].intl[1] = 0;
+            MPI_Isend (cpts[i].intl, 2, MPI_UNSIGNED,
                        proc, StdMsgTag, MPI_COMM_WORLD, &send_intl_reqs[i]);
         }
     }
-    ret = MPI_Waitall (nprocs-1, send_intl_reqs, MPI_STATUSES_IGNORE);
+    ret = MPI_Waitall (ncomputers, send_intl_reqs, MPI_STATUSES_IGNORE);
     AssertStatus( ret, "" );
-    UFor( i, nprocs-1 )
+    UFor( i, ncomputers )
     {
         recv_progress_reqs[i] = MPI_REQUEST_NULL;
         send_intl_reqs[i] = MPI_REQUEST_NULL;
@@ -634,7 +679,7 @@ rays_to_hits_balancer (RayImage* image)
     dbgout_compute ("DONE!");
 #endif
 
-    UFor( i, nprocs-1 )
+    UFor( i, ncomputers )
     {
         int proc;
         proc = 1+i;
@@ -673,7 +718,7 @@ rays_to_hits_balancer (RayImage* image)
     }
 
     free (row_computers);
-    free (intls);
+    free (cpts);
     free (send_intl_reqs);
     free (recv_progress_reqs);
 }

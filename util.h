@@ -56,6 +56,10 @@ typedef double real;
 #define M_PI 3.14159265358979323846
 #endif
 
+#ifdef DistribCompute
+#define MPI_real MPI_DOUBLE
+#endif
+
 #else
 typedef float real;
 #define Max_real FLT_MAX
@@ -64,6 +68,10 @@ typedef float real;
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846f
+#endif
+
+#ifdef DistribCompute
+#define MPI_real MPI_FLOAT
 #endif
 
 #endif
