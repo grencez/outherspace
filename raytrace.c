@@ -26,8 +26,7 @@ computer_triv_sync_mpi_RayImage (const RayImage* image,
 
 void init_RaySpace (RaySpace* space)
 {
-    space->scene.nverts = 0;
-    space->scene.nelems = 0;
+    init_Scene (&space->scene);
     space->nelems = 0;
     space->tree.nnodes = 0;
     space->nobjects = 0;
@@ -190,10 +189,12 @@ fill_pixel (byte* ret_red, byte* ret_green, byte* ret_blue,
             real mag,
             const RayImage* image,
             const Point* dir,
-            const BarySimplex* simplex)
+            const BarySimplex* simplex,
+            const Material* material)
 {
     const uint nincs = 256;
-    byte red, green, blue;
+    byte rgb[3];
+    uint i;
 
     if (!simplex)
     {
@@ -203,48 +204,43 @@ fill_pixel (byte* ret_red, byte* ret_green, byte* ret_blue,
         return;
     }
 
-    red = nincs-1;
-    green = nincs-1;
-    blue = nincs-1;
+    UFor( i, 3 )  rgb[i] = nincs-1;
 
     if (image->color_distance_on && mag < image->view_light)
     {
         uint val;
-        red = 0;
-        green = 0;
-        blue = 0;
+        UFor( i, 3 )  rgb[i] = 0;
             /* Distance color scale.*/
         val = (uint) (5 * nincs * (mag / image->view_light));
         if (val < nincs)
         {
-            red = nincs - 1;
-            green = val - 0 * nincs;
+            rgb[0] = nincs - 1;
+            rgb[1] = val - 0 * nincs;
         }
         else if (val < 2 * nincs)
         {
-            red = 2 * nincs - val - 1;
-            green = nincs - 1;
+            rgb[0] =  2 * nincs - val - 1;
+            rgb[1] =  nincs - 1;
         }
         else if (val < 3 * nincs)
         {
-            green = nincs - 1;
-            blue = val - 2 * nincs;
+            rgb[1] = nincs - 1;
+            rgb[2] = val - 2 * nincs;
         }
         else if (val < 4 * nincs)
         {
-            green = 4 * nincs - val - 1;
-            blue = nincs - 1;
+            rgb[1] = 4 * nincs - val - 1;
+            rgb[2] = nincs - 1;
         }
         else if (val < 5 * nincs)
         {
-            blue = nincs - 1;
-            red = val - 4 * nincs;
+            rgb[2] = nincs - 1;
+            rgb[0] = val - 4 * nincs;
         }
     }
 
     if (image->shading_on)
     {
-        const real min_scale = 0.3;
         real scale;
         Point tmp;
 
@@ -254,17 +250,30 @@ fill_pixel (byte* ret_red, byte* ret_green, byte* ret_blue,
         if (scale < 0)  scale = -scale;
         scale = 1 - scale;
         if (scale < 0)  scale = 0;
-        scale = min_scale + (1 - min_scale) * scale;
-        if (scale > 1)  scale = 1;
-        
-        red = (byte) (scale * red);
-        green = (byte) (scale * green);
-        blue = (byte) (scale * blue);
+
+        UFor( i, 3 )
+        {
+            real ambient = 0.2;
+            real diffuse = 1;
+            real tscale;
+            if (material)
+            {
+                ambient = material->ambient[i];
+                diffuse = material->diffuse[i];
+            }
+
+            diffuse *= 1 - ambient;
+
+            tscale = ambient + diffuse * scale;
+            if (tscale > 1)  tscale = 1;
+
+            rgb[i] = (byte) (tscale * rgb[i]);
+        }
     }
                 
-    *ret_red = red;
-    *ret_green = green;
-    *ret_blue = blue;
+    *ret_red = rgb[0];
+    *ret_green = rgb[1];
+    *ret_blue = rgb[2];
 }
 
 
@@ -564,10 +573,17 @@ cast_record (uint* hitline,
     {
         byte red, green, blue;
         const BarySimplex* simplex = 0;
+        const Material* material = 0;
         if (hit_idx < hit_space->nelems)
+        {
+            uint i;
             simplex = &hit_space->simplices[hit_idx];
+            i = hit_space->scene.elems[hit_idx].material;
+            if (i != Max_uint)
+                material = &hit_space->scene.matls[i];
+        }
         fill_pixel (&red, &green, &blue,
-                    hit_mag, image, &hit_dir, simplex);
+                    hit_mag, image, &hit_dir, simplex, material);
         pixline[3*col+0] = red;
         pixline[3*col+1] = green;
         pixline[3*col+2] = blue;

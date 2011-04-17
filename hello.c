@@ -1,5 +1,6 @@
 
 #include "main.h"
+#include "testcase.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -312,6 +313,7 @@ run_ray_cast ()
     cl_context context;
     cl_command_queue* comqs;
     const uint dev_idx = 0;
+    real view_angle = 2 * M_PI / 3;
 
     cl_mem ret_hits, inp_params, inp_elems, inp_elemidcs, inp_nodes;
 
@@ -328,12 +330,7 @@ run_ray_cast ()
     global_work_size[0] = nrows;
     global_work_size[1] = ncols;
 
-
-    random_RaySpace (&space, 50);
-    
-    view_origin.coords[0] = 50;
-    view_origin.coords[1] = 50;
-    view_origin.coords[2] = -70;
+    setup_testcase_triangles (&space, &view_origin, &view_angle);
 
     partition_RaySpace (&space);
     identity_PointXfrm (&view_basis);
@@ -343,7 +340,7 @@ run_ray_cast ()
 
     build_MultiRayCastParams (&params, nrows, ncols, &space,
                               &view_origin, &view_basis,
-                              2 * M_PI / 3);
+                              view_angle);
 
 
     compute_devices (&ndevices, &devices, &context, &comqs);

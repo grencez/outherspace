@@ -13,7 +13,7 @@
      (Type*) malloc ((capacity) * sizeof (Type)))
 
 #define ResizeT( Type, arr, capacity ) \
-    ((arr) = realloc (arr, (capacity) * sizeof (Type)))
+    ((arr) = (Type*) realloc (arr, (capacity) * sizeof (Type)))
 
 
 typedef unsigned int uint;

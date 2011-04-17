@@ -4,26 +4,32 @@
 #define SCENE_H_
 
 #include "simplex.h"
+#include "material.h"
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
-struct scene_triangle_struct
+struct scene_element_struct
 {
     uint pts[NTrianglePoints];
+    uint material;
 };
-typedef struct scene_triangle_struct SceneTriangle;
+typedef struct scene_element_struct SceneElement;
 
 struct scene_struct
 {
     uint nverts;
     uint nelems;
+    uint nmatls;
     Point* verts;
-    SceneTriangle* elems;
+    SceneElement* elems;
+    Material* matls;
     BoundingBox box;
 };
 typedef struct scene_struct Scene;
 
 #ifndef __OPENCL_VERSION__
-void copy_SceneTriangle (SceneTriangle* dst, const SceneTriangle* src);
+void init_Scene (Scene* scene);
+void init_SceneElement (SceneElement* elem);
+void copy_SceneElement (SceneElement* dst, const SceneElement* src);
 void cleanup_Scene (Scene* scene);
 void vert_Scene (Point* dst, const Scene* scene, uint idx);
 void elem_Scene (Triangle* dst, const Scene* scene, uint idx);

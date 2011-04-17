@@ -15,8 +15,16 @@
 
 static uint nprocs = 0;
 
-static
-void dbgout_compute (const char* format, ...);
+static void
+dbgout_compute (const char* format, ...);
+
+static uint
+simple_checksum (uint nbytes, const byte* bytes);
+static void
+big_compute_send (uint nbytes, byte* bytes, uint proc);
+static void
+big_compute_recv (uint nbytes, byte* bytes, uint proc);
+
 
 void init_compute (int* argc, char*** argv)
 {
@@ -112,7 +120,29 @@ void compute_rays_to_hits (RayImage* image,
 }
 
 
+    uint
+simple_checksum (uint nbytes, const byte* bytes)
+{
+    uint i;
+    uint x = 0;
+    UFor( i, nbytes )
+        x += bytes[i];
+    return x;
+}
+
 static
+    void
+output_bytes (FILE* out, uint nbytes, const byte* bytes)
+{
+    uint i;
+    char buf[2 * CompressBufferSize + 1];
+    UFor( i, nbytes )
+        sprintf (&buf[2*i], "%02x", bytes[i]);
+
+    buf[2*nbytes] = '\n';
+    fwrite (buf, (2 * nbytes + 1) * sizeof(char), 1, out);
+}
+
     void
 big_compute_send (uint nbytes, byte* bytes, uint proc)
 {
@@ -144,14 +174,6 @@ big_compute_send (uint nbytes, byte* bytes, uint proc)
         buf = flip_bufs[flip];
         req = &flip_reqs[flip];
 
-        strm.avail_out = CompressBufferSize;
-        strm.next_out = buf;
-        ret = deflate (&strm, Z_FINISH);
-        assert (ret != Z_STREAM_ERROR);
-
-        n = CompressBufferSize - strm.avail_out;
-        if (n == 0)  break;
-
         if (flush)
         {
             ret = MPI_Wait (req, &status);
@@ -160,11 +182,22 @@ big_compute_send (uint nbytes, byte* bytes, uint proc)
             dbgout_compute ("|> %u flip_bufs[%u][:n]", proc, flip);
 #endif
         }
+
+        strm.avail_out = CompressBufferSize;
+        strm.next_out = buf;
+        ret = deflate (&strm, Z_FINISH);
+        assert (ret != Z_STREAM_ERROR);
+
+        n = CompressBufferSize - strm.avail_out;
+        if (n == 0)  break;
+
         ret = MPI_Isend (buf, n, MPI_BYTE,
                          proc, flip, MPI_COMM_WORLD, req);
         AssertStatus( ret, "" );
 #ifdef DebugMpiRayTrace
-        dbgout_compute ("-> %u flip_bufs[%u][:%u]", proc, flip, n);
+        dbgout_compute ("-> %u flip_bufs[%u][:%u]  checksum:%u",
+                        proc, flip, n, simple_checksum (n, buf));
+            /* output_bytes (stderr, n, buf); */
 #endif
 
         flip = (flip + 1) % 2;
@@ -205,7 +238,6 @@ big_compute_send (uint nbytes, byte* bytes, uint proc)
 }
 
 
-static
     void
 big_compute_recv (uint nbytes, byte* bytes, uint proc)
 {
@@ -253,7 +285,9 @@ big_compute_recv (uint nbytes, byte* bytes, uint proc)
 
         MPI_Get_count (&status, MPI_BYTE, (int*) &n);
 #ifdef DebugMpiRayTrace
-        dbgout_compute ("<| %u flip_bufs[%u][:%u]", proc, flip, n);
+        dbgout_compute ("<| %u flip_bufs[%u][:%u]  checksum:%u",
+                        proc, flip, n, simple_checksum (n, buf));
+            /* output_bytes (stderr, n, buf); */
 #endif
         assert (n <= CompressBufferSize);
         assert (n > 0);

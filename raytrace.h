@@ -70,7 +70,8 @@ fill_pixel (byte* ret_red, byte* ret_green, byte* ret_blue,
             real mag,
             const RayImage* image,
             const Point* dir,
-            const BarySimplex* simplex);
+            const BarySimplex* simplex,
+            const Material* material);
 void
 cast_ray (uint* restrict ret_hit,
           real* restrict ret_mag,

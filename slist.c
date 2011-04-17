@@ -72,3 +72,35 @@ void app_SList (SList* l, void* data)
     assert (!l->tail->cdr);
 }
 
+    void*
+aref_SList (SList* l, uint i)
+{
+    uint ctr;
+    SListNode* node;
+    assert (i < l->nmembs);
+    node = l->head;
+
+    UFor( ctr, i )
+    {
+        assert (node);
+        node = node->cdr;
+    }
+    assert (node);
+    return node->car;
+}
+
+    uint
+search_SList (SList* l, const void* item,
+              bool (*f) (const void*, const void*))
+{
+    uint i;
+    SListNode* node;
+    node = l->head;
+    UFor( i, l->nmembs )
+    {
+        if (f (item, node->car))  return i;
+        node = node->cdr;
+    }
+    return Max_uint;
+}
+

@@ -1,7 +1,6 @@
 
 #CC = clang
 #CC = gcc
-#CC = g++
 
 CONFIG = fast
 CONFIG = fast openmp
@@ -15,6 +14,7 @@ CONFIG = fast openmp
 #CONFIG = benchmark snappy debug openmp
 #CONFIG = ultradebug
 
+#CONFIG += c++
 CONFIG += ansi
 #CONFIG += c99
 
@@ -64,6 +64,7 @@ ifneq (,$(findstring noassert,$(CONFIG)))
 endif
 ## Do we have bool type?
 ifneq (,$(findstring c++,$(CONFIG)))
+	CC = $(CXX)
 	CFLAGS += -DCOMPILER_HAS_BOOL
 endif
 ## Use the C99 standard.
@@ -80,18 +81,24 @@ ifneq (,$(findstring openmp,$(CONFIG)))
 endif
 ## Allow distributed parallelism.
 ifneq (,$(findstring mpi,$(CONFIG)))
-	CC = mpicc
+	ifneq (,$(findstring c++,$(CONFIG)))
+		CC = mpicxx
+	else
+		CC = mpicc
+	endif
 	CFLAGS += -DDistribCompute -DCompressBigCompute
 	LFLAGS += -lz
 endif
 
 
 CSources = kdtree.c \
+		   material.c \
+		   raytrace.c \
 		   scene.c \
 		   simplex.c \
 		   slist.c \
 		   space.c \
-		   raytrace.c \
+		   testcase.c \
 		   util.c \
 		   wavefront-file.c \
 		   xfrm.c

@@ -1,6 +1,7 @@
 
 #include "main.h"
 #include "motion.h"
+#include "testcase.h"
 #include "wavefront-file.h"
 
 #ifdef DistribCompute
@@ -243,15 +244,15 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
     else if (print_view_code)
     {
         uint i;
-        fprintf (out, "view_angle = (real) %15g;\n", view_angle);
+        fprintf (out, "*view_angle = (real) %15g;\n", view_angle);
         UFor( i, NDimensions )
         {
             uint j;
-            fprintf (out, "view_origin.coords[%u] = (real) %15g;\n",
+            fprintf (out, "view_origin->coords[%u] = (real) %15g;\n",
                      i, view_origin.coords[i]);
             UFor( j, NDimensions )
             {
-                fprintf (out, "view_basis.pts[%u].coords[%u] = (real) %15g;\n",
+                fprintf (out, "view_basis->pts[%u].coords[%u] = (real) %15g;\n",
                          i, j, view_basis.pts[i].coords[j]);
             }
         }
@@ -737,6 +738,7 @@ gui_main (int argc, char* argv[], RaySpace* space)
 
 int main (int argc, char* argv[])
 {
+    bool good = true;
     const bool use_random_scene = true;
     bool call_gui = true;
     RaySpace space;
@@ -746,16 +748,13 @@ int main (int argc, char* argv[])
 #endif
 
     init_RaySpace (&space);
+    identity_PointXfrm (&view_basis);
     zero_Point (&view_origin);
 
     if (use_random_scene)
     {
         PointXfrm tmp_basis;
-        random_RaySpace (&space, 20);
-
-        view_origin.coords[0] = 50;
-        view_origin.coords[1] = 50;
-        view_origin.coords[DirDimension] = -70;
+        good = setup_testcase_triangles (&space, &view_origin, &view_angle);
 
         identity_PointXfrm (&tmp_basis);
             /* Tilt backwards a bit.*/
@@ -766,29 +765,15 @@ int main (int argc, char* argv[])
     }
     else
     {
-        uint i;
-        bool good;
-        good = readin_wavefront (&space, "track_1.obj");
-        if (!good)  return 1;
+        good = setup_testcase_track (&space,
+                                     &view_origin, &view_basis,
+                                     &view_angle);
+    }
 
-        view_origin.coords[0] = 0;
-        view_origin.coords[1] = 0;
-        view_origin.coords[DirDimension] = -10;
-        identity_PointXfrm (&view_basis);
-
-        space.nobjects = NRacers;
-        space.objects = AllocT( RaySpaceObject, space.nobjects );
-        UFor( i, space.nobjects )
-        {
-            bool good;
-            init_RaySpace (&space.objects[i].space);
-            good = readin_wavefront (&space.objects[i].space, "machine_1.obj");
-            if (!good)  return 1;
-            zero_Point (&space.objects[i].centroid);
-            space.objects[i].centroid.coords[0] = 75 * i + 300;
-            identity_PointXfrm (&space.objects[i].orientation);
-            init_ObjectMotion (&racer_motions[i]);
-        }
+    if (!good)
+    {
+        fputs ("Setup failed!\n", stderr);
+        return 1;
     }
 
     partition_RaySpace (&space);
