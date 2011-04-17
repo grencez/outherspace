@@ -65,13 +65,15 @@ struct multi_ray_cast_params_struct
 
 void dir_from_MultiRayCastParams (Point* dir, uint row, uint col,
                                   const MultiRayCastParams* params);
-void
+    void
 fill_pixel (byte* ret_red, byte* ret_green, byte* ret_blue,
+            uint hit_idx,
             real mag,
             const RayImage* image,
+            const Point* origin,
             const Point* dir,
             const BarySimplex* simplex,
-            const Material* material);
+            const Scene* scene);
 void
 cast_ray (uint* restrict ret_hit,
           real* restrict ret_mag,

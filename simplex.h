@@ -19,6 +19,12 @@ struct plane_struct
 };
 typedef struct plane_struct Plane;
 
+struct bary_point_struct
+{
+    real coords[NDimensions-1];
+};
+typedef struct bary_point_struct BaryPoint;
+
 struct bary_simplex_struct
 {
     Plane plane;
@@ -27,10 +33,11 @@ struct bary_simplex_struct
 typedef struct bary_simplex_struct BarySimplex;
 
 
-bool hit_Triangle (real* restrict ret_dist,
-                   const Point* restrict origin,
-                   const Point* restrict dir,
-                   const Triangle* restrict elem);
+bool
+hit_Triangle (real* restrict ret_dist,
+              const Point* restrict origin,
+              const Point* restrict dir,
+              const Triangle* restrict elem);
 bool hit_proj_Triangle (real* restrict dist,
                         const Point* restrict origin,
                         const Point* restrict kd_dir,
@@ -47,10 +54,11 @@ void proj_Plane (Point* dst, const Point* a, const Plane* plane);
 void barycentric_Plane (Plane* dst, const Plane* plane, const Point* point);
 
 void init_BarySimplex (BarySimplex* elem, const PointXfrm* raw);
-bool hit_BarySimplex (real* restrict ret_dist,
-                      const Point* restrict origin,
-                      const Point* restrict dir,
-                      const BarySimplex* restrict elem);
+bool
+hit_BarySimplex (real* restrict ret_dist,
+                 const Point* restrict origin,
+                 const Point* restrict dir,
+                 const BarySimplex* restrict elem);
 
 void
 tri_to_BarySimplex (BarySimplex* simplex, const Triangle* tri);

@@ -35,10 +35,11 @@ cross_Point (Point* restrict dst,
 }
 
 
-bool hit_Triangle (real* restrict ret_dist,
-                   const Point* restrict origin,
-                   const Point* restrict dir,
-                   const Triangle* restrict elem)
+    bool
+hit_Triangle (real* restrict ret_dist,
+              const Point* restrict origin,
+              const Point* restrict dir,
+              const Triangle* restrict elem)
 {
         /* const real epsilon = (real) 0.000001; */
     const real epsilon = 0;
@@ -329,14 +330,15 @@ void init_BarySimplex (BarySimplex* elem, const PointXfrm* raw)
 }
 
 
-bool hit_BarySimplex (real* restrict ret_dist,
-                      const Point* restrict origin,
-                      const Point* restrict dir,
-                      const BarySimplex* restrict elem)
+    bool
+hit_BarySimplex (real* restrict ret_dist,
+                 const Point* restrict origin,
+                 const Point* restrict dir,
+                 const BarySimplex* restrict elem)
 {
     uint i;
     real dist, dot, bcoord_sum;
-    real bcoords[NDimensions-1];
+    BaryPoint bpoint;
     Point isect;
 
     dist = distance_Plane (&elem->plane, origin);
@@ -357,21 +359,54 @@ bool hit_BarySimplex (real* restrict ret_dist,
         return false;
     }
     
+#define NewMethod
+
+#ifdef NewMethod
+    scale_Point (&isect, dir, dist);
+    {
+        Point tmp;
+        scale_Point (&tmp, origin, dot);
+        summ_Point (&isect, &isect, &tmp);
+    }
+#else
     dist *= 1 / dot;
-    
     scale_Point (&isect, dir, dist);
     summ_Point (&isect, &isect, origin);
+#endif
     
     bcoord_sum = 0;
     UFor( i, NDimensions-1 )
     {
-        bcoords[i] = distance_Plane (&elem->barys[i], &isect);
-        if (bcoords[i] < 0)  return false;
-        bcoord_sum += bcoords[i];
+#ifdef NewMethod
+        bpoint.coords[i] =
+            dot_Point (&elem->barys[i].normal, &isect)
+            + elem->barys[i].offset * dot;
+#else
+        bpoint.coords[i] = distance_Plane (&elem->barys[i], &isect);
+#endif
+        if (bpoint.coords[i] < 0)  return false;
+        bcoord_sum += bpoint.coords[i];
+#ifdef NewMethod
+        if (bcoord_sum > dot)  return false;
+#else
         if (bcoord_sum > 1)  return false;
+#endif
     }
 
+#ifdef NewMethod
+    dot = 1 / dot;
+#if 0
+    UFor( i, NDimensions-1 )
+        ret_bpoint->coords[i] = bpoint.coords[i] * dot;
+#endif
+    *ret_dist = dist * dot;
+#else
+#if 0
+    UFor( i, NDimensions-1 )
+        ret_bpoint->coords[i] = bpoint.coords[i];
+#endif
     *ret_dist = dist;
+#endif
     return true;
 }
 

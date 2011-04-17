@@ -3,7 +3,7 @@
 #include "util.h"
 
 #include <assert.h>
-#include <stdio.h>
+#include <ctype.h>
 #include <string.h>
 
 #ifdef DistribCompute
@@ -53,6 +53,44 @@ char* strto_real (real* ret, const char* in)
     if (out == in)  out = 0;
     if (out)  *ret = (real) v;
     return out;
+}
+
+const char* strskip_ws (const char* line)
+{
+    uint i;
+    i = strspn (line, " \t\v\r\n");
+    return &line[i];
+}
+
+void strstrip_eol (char* line)
+{
+    uint i;
+    i = strcspn (line, "\r\n");
+    line[i] = '\0';
+}
+
+uint readin_whitesep (char* buf, FILE* in, uint capacity, uint len)
+{
+    assert (capacity > len);
+    if (capacity-1 != len)
+        memmove (buf, &buf[len], (capacity - len - 1) * sizeof(char));
+    len = capacity - len - 1;
+    len += fread (&buf[len], sizeof(char), capacity - len - 1, in);
+    assert (len < capacity);
+    buf[len] = '\0';
+
+    if (len == 0)  return 0;
+
+        /* Could have partial data, step back.*/
+    if (!isspace (buf[len]))
+        while (len > 0 && !isspace (buf[len-1]))
+            len -= 1;
+
+        /* Skip trailing space.*/
+    while (len > 0 && isspace (buf[len-1]))
+        len -= 1;
+
+    return len;
 }
 
 real monotime ()

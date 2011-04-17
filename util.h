@@ -6,6 +6,7 @@
 #include <float.h>
 #include <limits.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 
 #define AllocT( Type, capacity ) \
@@ -103,6 +104,9 @@ uint index_of (const void* e, const void* arr, size_t size);
 void array_set (void* arr, uint i, const void* e, size_t size);
 char* strto_uint (uint* ret, const char* in);
 char* strto_real (real* ret, const char* in);
+const char* strskip_ws (const char* line);
+void strstrip_eol (char* line);
+uint readin_whitesep (char* buf, FILE* in, uint capacity, uint len);
 real monotime ();
 void assert_status (int stat, const char* msg, const char* file, int line);
 #ifdef INCLUDE_SOURCE

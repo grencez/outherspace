@@ -1,5 +1,5 @@
 
-#include "main.h"
+#include "pnm-image.h"
 #include "testcase.h"
 
 #include <assert.h>

@@ -5,6 +5,14 @@
 
 #define NColors 3
 
+struct texture_struct
+{
+    uint nrows;
+    uint ncols;
+    byte* pixels;
+};
+typedef struct texture_struct Texture;
+
 struct material_struct
 {
     real ambient[NColors]; /* Ka */
@@ -14,11 +22,14 @@ struct material_struct
     real alpha; /* d */
     real shininess; /* Ns */
     bool illumination;
-        /* TODO Texture map! */
+    uint ambient_texture;
+    uint diffuse_texture;
 };
 typedef struct material_struct Material;
     
 void init_Material (Material* mat);
+void
+map_Texture (byte* colors, const Texture* texture, const BaryPoint* p);
 
 #ifdef INCLUDE_SOURCE
 #include "material.c"

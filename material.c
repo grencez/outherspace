@@ -1,6 +1,8 @@
 
 #include "material.h"
 
+#include "simplex.h"
+
 void init_Material (Material* mat)
 {
     uint i;
@@ -15,5 +17,30 @@ void init_Material (Material* mat)
     mat->alpha = 1;
     mat->shininess = 0;
     mat->illumination = 1;
+    mat->ambient_texture = Max_uint;
+    mat->diffuse_texture = Max_uint;
+}
+
+    void
+map_Texture (byte* colors, const Texture* texture, const BaryPoint* p)
+{
+    uint i, row, col;
+    const byte* pixels;
+    row = texture->nrows * p->coords[1];
+    col = texture->ncols * p->coords[0];
+    if (row >= texture->nrows)
+    {
+        fprintf (stderr, "Passed nrows by:%u\n", row - texture->nrows);
+        row = texture->nrows - 1;
+    }
+    if (col >= texture->ncols)
+    {
+        fprintf (stderr, "Passed nrows by:%u\n", col - texture->ncols);
+        col = texture->ncols - 1;
+    }
+
+    pixels = &texture->pixels[NColors * (col + row * texture->ncols)];
+    UFor( i, NColors )
+        colors[i] = pixels[i];
 }
 

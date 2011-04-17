@@ -186,14 +186,18 @@ void dir_from_MultiRayCastParams (Point* dir, uint row, uint col,
 
     void
 fill_pixel (byte* ret_red, byte* ret_green, byte* ret_blue,
+            uint hit_idx,
             real mag,
             const RayImage* image,
+            const Point* origin,
             const Point* dir,
             const BarySimplex* simplex,
-            const Material* material)
+            const Scene* scene)
 {
     const uint nincs = 256;
     byte rgb[3];
+    const SceneElement* elem;
+    const Material* material = 0;
     uint i;
 
     if (!simplex)
@@ -203,6 +207,10 @@ fill_pixel (byte* ret_red, byte* ret_green, byte* ret_blue,
         *ret_blue = 0;
         return;
     }
+
+    elem = &scene->elems[hit_idx];
+    if (elem->material != Max_uint)
+        material = &scene->matls[elem->material];
 
     UFor( i, 3 )  rgb[i] = nincs-1;
 
@@ -237,6 +245,42 @@ fill_pixel (byte* ret_red, byte* ret_green, byte* ret_blue,
             rgb[2] = nincs - 1;
             rgb[0] = val - 4 * nincs;
         }
+    }
+
+        /* Texture mapping.*/
+    if (material && material->ambient_texture != Max_uint)
+    {
+        const Texture* ambient_texture;
+        Point isect, bpoint;
+        BaryPoint texpoint;
+
+        ambient_texture = &scene->txtrs[material->ambient_texture];
+
+        scale_Point (&isect, dir, mag);
+        summ_Point (&isect, &isect, origin);
+
+        bpoint.coords[0] = 1;
+        UFor( i, NDimensions-1 )
+        {
+            bpoint.coords[i+1] = distance_Plane (&simplex->barys[i], &isect);
+            bpoint.coords[0] -= bpoint.coords[i+1];
+            texpoint.coords[i] = 0;
+        }
+
+        UFor( i, NDimensions )
+        {
+            uint j;
+            const BaryPoint* tmp;
+
+            tmp = &scene->txpts[elem->txpts[i]];
+
+            UFor( j, NDimensions-1 )
+            {
+                texpoint.coords[j] += bpoint.coords[i] * tmp->coords[j];
+            }
+        }
+
+        map_Texture (rgb, ambient_texture, &texpoint);
     }
 
     if (image->shading_on)
@@ -469,6 +513,7 @@ static
 cast_recurse (uint* ret_hit,
               real* ret_mag,
               const RaySpace** ret_space,
+              Point* ret_origin,
               Point* ret_dir,
               const RaySpace* restrict space,
               const RayImage* restrict image,
@@ -479,12 +524,11 @@ cast_recurse (uint* ret_hit,
 {
     uint hit_idx;
     real hit_mag;
-    Point hit_dir;
+    Point hit_origin, hit_dir;
     const RaySpace* hit_space;
     uint i;
 
     hit_space = space;
-    copy_Point (&hit_dir, dir);
 
     if (KDTreeRayTrace)
         cast_ray (&hit_idx, &hit_mag, origin, dir,
@@ -498,6 +542,12 @@ cast_recurse (uint* ret_hit,
         cast_ray_simple (&hit_idx, &hit_mag, origin, dir,
                          space->nelems, space->elems, view_basis);
 
+    if (hit_idx < hit_space->nelems)
+    {
+        copy_Point (&hit_origin, origin);
+        copy_Point (&hit_dir, dir);
+    }
+
     UFor( i, space->nobjects )
     {
         Point diff, rel_origin, rel_dir;
@@ -507,7 +557,7 @@ cast_recurse (uint* ret_hit,
             /* Returns from ray cast.*/
         uint tmp_hit;
         real tmp_mag;
-        Point tmp_dir;
+        Point tmp_origin, tmp_dir;
         const RaySpace* tmp_space;
 
         object = &space->objects[i];
@@ -526,15 +576,17 @@ cast_recurse (uint* ret_hit,
 
         xfrm_PointXfrm (&rel_basis, view_basis, &object->orientation);
         
-        cast_recurse (&tmp_hit, &tmp_mag, &tmp_space, &tmp_dir,
-                     &object->space, image, &rel_basis,
-                     &rel_origin, &rel_dir, rel_inside_box);
+        cast_recurse (&tmp_hit, &tmp_mag, &tmp_space,
+                      &tmp_origin, &tmp_dir,
+                      &object->space, image, &rel_basis,
+                      &rel_origin, &rel_dir, rel_inside_box);
 
         if (tmp_mag < hit_mag)
         {
             hit_idx = tmp_hit;
             hit_mag = tmp_mag;
             hit_space = tmp_space;
+            copy_Point (&hit_origin, &tmp_origin);
             copy_Point (&hit_dir, &tmp_dir);
         }
     }
@@ -542,7 +594,11 @@ cast_recurse (uint* ret_hit,
     *ret_hit = hit_idx;
     *ret_mag = hit_mag;
     *ret_space = hit_space;
-    copy_Point (ret_dir, &hit_dir);
+    if (hit_idx < hit_space->nelems)
+    {
+        copy_Point (ret_origin, &hit_origin);
+        copy_Point (ret_dir, &hit_dir);
+    }
 }
               
 
@@ -562,9 +618,11 @@ cast_record (uint* hitline,
     uint hit_idx;
     real hit_mag;
     const RaySpace* hit_space;
+    Point hit_origin;
     Point hit_dir;
 
-    cast_recurse (&hit_idx, &hit_mag, &hit_space, &hit_dir,
+    cast_recurse (&hit_idx, &hit_mag, &hit_space,
+                  &hit_origin, &hit_dir,
                   space, image, view_basis, origin, dir, inside_box);
 
     if (hitline)  hitline[col] = hit_idx;
@@ -573,17 +631,11 @@ cast_record (uint* hitline,
     {
         byte red, green, blue;
         const BarySimplex* simplex = 0;
-        const Material* material = 0;
         if (hit_idx < hit_space->nelems)
-        {
-            uint i;
             simplex = &hit_space->simplices[hit_idx];
-            i = hit_space->scene.elems[hit_idx].material;
-            if (i != Max_uint)
-                material = &hit_space->scene.matls[i];
-        }
         fill_pixel (&red, &green, &blue,
-                    hit_mag, image, &hit_dir, simplex, material);
+                    hit_idx, hit_mag, image, &hit_origin, &hit_dir,
+                    simplex, &hit_space->scene);
         pixline[3*col+0] = red;
         pixline[3*col+1] = green;
         pixline[3*col+2] = blue;

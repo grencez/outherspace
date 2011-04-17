@@ -1,6 +1,8 @@
 
-#include "slist.h"
 #include "wavefront-file.h"
+
+#include "pnm-image.h"
+#include "slist.h"
 
 #include <assert.h>
 #include <string.h>
@@ -10,7 +12,15 @@ streql (const void* a, const void* b);
 static bool
 strto_real_colors (real* a, const char* line);
 static bool
-readin_materials (SList* matlist, SList* namelist, const char* filename);
+readin_materials (SList* matlist, SList* namelist,
+                  SList* texlist, SList* texnamelist,
+                  const char* filename);
+
+static const char*
+parse_face_field (uint* v, uint* vt, uint* vn, const char* line);
+
+static uint
+parse_texture (SList* texlist, SList* texnamelist, const char* filename);
 
     bool
 streql (const void* a, const void* b)
@@ -21,12 +31,14 @@ streql (const void* a, const void* b)
 bool readin_wavefront (RaySpace* space, const char* filename)
 {
     uint line_no = 0;
-    uint len = BUFSIZ;
+    const uint len = BUFSIZ;
     char buf[BUFSIZ];
     bool good = true;
     const char* line;
     FILE* in;
-    SList vertlist, elemlist, matlist, matnamelist;
+    SList elemlist, vertlist, txptlist,
+          matlist, matnamelist,
+          texlist, texnamelist;
     uint material = Max_uint;
     Scene* scene;
 
@@ -37,10 +49,13 @@ bool readin_wavefront (RaySpace* space, const char* filename)
     in = fopen (filename, "rb");
     if (!in)  return false;
 
-    init_SList (&vertlist);
     init_SList (&elemlist);
+    init_SList (&vertlist);
+    init_SList (&txptlist);
     init_SList (&matlist);
     init_SList (&matnamelist);
+    init_SList (&texlist);
+    init_SList (&texnamelist);
 
     for (line = fgets (buf, len, in);
          good && line;
@@ -49,14 +64,31 @@ bool readin_wavefront (RaySpace* space, const char* filename)
         uint i;
         line_no += 1;
 
-        i = strcspn (buf, "\r\n");
-        buf[i] = '\0';
+        strstrip_eol (buf);
+        line = strskip_ws (line);
 
-        i = strspn (line, " \t");
-        assert (i < len);
-        line = &line[i];
-
-        if (line[0] == 'v')
+        if (0 == strncmp (line, "vn", 2))
+        {
+        }
+        else if (0 == strncmp (line, "vt", 2))
+        {
+            BaryPoint* point;
+            point = AllocT( BaryPoint, 1 );
+            app_SList (&txptlist, point);
+            line = &line[2];
+            UFor( i, NDimensions-1 )
+            {
+                line = strto_real (&point->coords[i], line);
+                if (!line)
+                {
+                    good = false;
+                    fprintf (stderr, "Line:%u  Not enough coordinates!\n",
+                             line_no);
+                    break;
+                }
+            }
+        }
+        else if (line[0] == 'v')
         {
             Point* vert;
             vert = AllocT( Point, 1 );
@@ -76,19 +108,21 @@ bool readin_wavefront (RaySpace* space, const char* filename)
         }
         else if (line[0] == 'f')
         {
+            uint tmp;
             SceneElement elem;
             init_SceneElement (&elem);
             elem.material = material;
             good = false;
 
             line = &line[1];
-            if (line)  line = strto_uint (&elem.pts[0], line);
-            if (line)  line = strto_uint (&elem.pts[1], line);
+            line = parse_face_field (&elem.pts[0], &elem.txpts[0], &tmp, line);
+            line = parse_face_field (&elem.pts[1], &elem.txpts[1], &tmp, line);
 
             if (line) while (true)
             {
                 SceneElement* tri_elt;
-                line = strto_uint (&elem.pts[2], line);
+                line = parse_face_field (&elem.pts[2], &elem.txpts[2],
+                                         &tmp, line);
                 if (line)  good = true;
                 else       break;
 
@@ -97,14 +131,14 @@ bool readin_wavefront (RaySpace* space, const char* filename)
                 app_SList (&elemlist, tri_elt);
 
                 elem.pts[1] = elem.pts[2];
+                elem.txpts[1] = elem.txpts[2];
             }
         }
         else if (0 == strncmp (line, "mtllib", 6))
         {
-            line = &line[6];
-            i = strspn (line, " \t");
-            line = &line[i];
-            good = readin_materials (&matlist, &matnamelist, line);
+            line = strskip_ws (&line[6]);
+            good = readin_materials (&matlist, &matnamelist,
+                                     &texlist, &texnamelist, line);
             if (!good)
             {
                 fprintf (stderr, "Line:%u  Failed to read materials!\n",
@@ -113,35 +147,42 @@ bool readin_wavefront (RaySpace* space, const char* filename)
         }
         else if (0 == strncmp (line, "usemtl", 6))
         {
-            line = &line[6];
-            i = strspn (line, " \t");
-            line = &line[i];
+            line = strskip_ws (&line[6]);
             material = search_SList (&matnamelist, line, streql);
         }
     }
     fclose (in);
 
     cleanup_SList (&matnamelist);
+    cleanup_SList (&texnamelist);
 
     if (!good)
     {
-        cleanup_SList (&vertlist);
         cleanup_SList (&elemlist);
+        cleanup_SList (&vertlist);
+        cleanup_SList (&txptlist);
         cleanup_SList (&matlist);
+        cleanup_SList (&texlist);
     }
     else
     {
         uint ei;
 
-        scene->nverts = vertlist.nmembs;
         scene->nelems = elemlist.nmembs;
+        scene->nverts = vertlist.nmembs;
+        scene->ntxpts = txptlist.nmembs;
         scene->nmatls = matlist.nmembs;
-        scene->verts = AllocT( Point, vertlist.nmembs );
+        scene->ntxtrs = texlist.nmembs;
         scene->elems = AllocT( SceneElement, elemlist.nmembs );
+        scene->verts = AllocT( Point, vertlist.nmembs );
+        scene->txpts = AllocT( BaryPoint, txptlist.nmembs );
         scene->matls = AllocT( Material, matlist.nmembs );
-        unroll_SList (scene->verts, &vertlist, sizeof (Point));
+        scene->txtrs = AllocT( Texture, texlist.nmembs );
         unroll_SList (scene->elems, &elemlist, sizeof (SceneElement));
+        unroll_SList (scene->verts, &vertlist, sizeof (Point));
+        unroll_SList (scene->txpts, &txptlist, sizeof (BaryPoint));
         unroll_SList (scene->matls, &matlist, sizeof (Material));
+        unroll_SList (scene->txtrs, &texlist, sizeof (Texture));
 
         space->nelems = scene->nelems;
         space->elems = AllocT( Triangle, space->nelems );
@@ -159,15 +200,14 @@ bool readin_wavefront (RaySpace* space, const char* filename)
             {
                 uint vert_id;
                 vert_id = read_tri->pts[pi];
-                if (vert_id == 0 || vert_id > scene->nverts)
+                if (vert_id >= scene->nverts)
                 {
                     fprintf (stderr, "Bad vertex:%u\n", vert_id);
                     good = false;
                 }
                 else
-                    copy_Point (&tri->pts[pi], &scene->verts[vert_id-1]);
+                    copy_Point (&tri->pts[pi], &scene->verts[vert_id]);
             }
-            
         }
 
         if (good)
@@ -184,6 +224,34 @@ bool readin_wavefront (RaySpace* space, const char* filename)
     }
 
     return good;
+}
+
+
+    const char*
+parse_face_field (uint* v, uint* vt, uint* vn, const char* line)
+{
+    if (line)
+    {
+        line = strto_uint (v, line);
+    }
+    if (line)
+    {
+        *v -= 1;
+        if (line[0] == '/')
+            line = strto_uint (vt, &line[1]);
+    }
+    if (line)
+    {
+        *vt -= 1;
+        if (line[0] == '/')
+            line = strto_uint (vn, &line[1]);
+    }
+    if (line)
+    {
+        *vn -= 1;
+    }
+
+    return line;
 }
 
 
@@ -205,7 +273,9 @@ strto_real_colors (real* a, const char* line)
 
 
     bool
-readin_materials (SList* matlist, SList* namelist, const char* filename)
+readin_materials (SList* matlist, SList* namelist,
+                  SList* texlist, SList* texnamelist,
+                  const char* filename)
 {
     uint line_no = 0;
     uint len = BUFSIZ;
@@ -213,7 +283,11 @@ readin_materials (SList* matlist, SList* namelist, const char* filename)
     bool good = true;
     const char* line;
     FILE* in;
+    Material scrap_material;
     Material* material;
+
+    material = &scrap_material;
+    init_Material (material);
 
     assert (matlist->nmembs == namelist->nmembs);
     in = fopen (filename, "rb");
@@ -227,24 +301,17 @@ readin_materials (SList* matlist, SList* namelist, const char* filename)
          good && line;
          line = fgets (buf, len, in))
     {
-        uint i;
         line_no += 1;
 
-        i = strcspn (buf, "\r\n");
-        buf[i] = '\0';
-
-        i = strspn (line, " \t");
-        assert (i < len);
-        line = &line[i];
+        strstrip_eol (buf);
+        line = strskip_ws (line);
 
         if (0 == strncmp (line, "newmtl", 6))
         {
             uint namelen;
             char* name;
 
-            line = &line[6];
-            i = strspn (line, " \t");
-            line = &line[i];
+            line = strskip_ws (&line[6]);
 
             namelen = strlen (line);
             name = AllocT( char, namelen+1 );
@@ -254,7 +321,6 @@ readin_materials (SList* matlist, SList* namelist, const char* filename)
             material = AllocT( Material, 1 );
             init_Material (material);
             app_SList (matlist, material);
-
         }
         else if (0 == strncmp (line, "Ns", 2))
         {
@@ -282,6 +348,20 @@ readin_materials (SList* matlist, SList* namelist, const char* filename)
         {
             good = strto_real_colors (material->specular, &line[2]);
         }
+        else if (0 == strncmp (line, "map_Ka", 6))
+        {
+            material->ambient_texture =
+                parse_texture (texlist, texnamelist, strskip_ws (&line[6]));
+            if (material->ambient_texture == Max_uint)
+                good = false;
+        }
+        else if (0 == strncmp (line, "map_Kd", 6))
+        {
+            material->diffuse_texture =
+                parse_texture (texlist, texnamelist, strskip_ws (&line[6]));
+            if (material->diffuse_texture == Max_uint)
+                good = false;
+        }
     }
 
     if (!good)
@@ -291,5 +371,38 @@ readin_materials (SList* matlist, SList* namelist, const char* filename)
     assert (matlist->nmembs == namelist->nmembs);
     fclose (in);
     return good;
+}
+
+
+    uint
+parse_texture (SList* texlist, SList* texnamelist, const char* filename)
+{
+    uint i;
+    i = search_SList (texnamelist, filename, streql);
+
+    if (i == Max_uint)
+    {
+        Texture* texture;
+        texture = AllocT( Texture, 1 );
+
+        texture->pixels = readin_PPM_image (filename,
+                                            &texture->nrows,
+                                            &texture->ncols);
+
+        if (texture->pixels)
+        {
+            char* s;
+            i = texlist->nmembs;
+            s = AllocT( char, strlen(filename) + 1 );
+            strcpy (s, filename);
+            app_SList (texlist, texture);
+            app_SList (texnamelist, s);
+        }
+        else
+        {
+            free (texture);
+        }
+    }
+    return i;
 }
 

@@ -10,18 +10,23 @@
 struct scene_element_struct
 {
     uint pts[NTrianglePoints];
+    uint txpts[NTrianglePoints];
     uint material;
 };
 typedef struct scene_element_struct SceneElement;
 
 struct scene_struct
 {
-    uint nverts;
     uint nelems;
+    uint nverts;
+    uint ntxpts;
     uint nmatls;
-    Point* verts;
-    SceneElement* elems;
-    Material* matls;
+    uint ntxtrs;
+    SceneElement* elems; /* Elements.*/
+    Point* verts; /* Vertices.*/
+    BaryPoint* txpts; /* Texture points.*/
+    Material* matls; /* Materials.*/
+    Texture* txtrs; /* Textures.*/
     BoundingBox box;
 };
 typedef struct scene_struct Scene;

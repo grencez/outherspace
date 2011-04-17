@@ -4,8 +4,8 @@
 
 CONFIG = fast
 CONFIG = fast openmp
-#CONFIG = fast openmp noassert
 #CONFIG = fast openmp benchmark
+#CONFIG = fast openmp noassert
 #CONFIG = fast mpi
 #CONFIG = mpi debug
 #CONFIG = debug
@@ -93,6 +93,7 @@ endif
 
 CSources = kdtree.c \
 		   material.c \
+		   pnm-image.c \
 		   raytrace.c \
 		   scene.c \
 		   simplex.c \
@@ -119,7 +120,7 @@ hello: hello.c $(CSources)
 test-hello: hello
 	LD_LIBRARY_PATH=$(OpenCLLibPath) ./$<
 
-cli: cli.c compute.c main.c $(CSources)
+cli: cli.c compute.c $(CSources)
 	$(CC) $(CFLAGS) $< -o $@ $(LFLAGS)
 
 gui: gui.c compute.c motion.c $(CSources)
