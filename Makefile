@@ -128,7 +128,7 @@ gui: gui.c compute.c motion.c $(CSources)
 		`sdl-config --cflags` \
 		$< -o $@ \
 		`pkg-config --libs gtk+-2.0` \
-		`sdl-config --libs` \
+		-lSDL \
 		$(LFLAGS)
 
 .PHONY: test
