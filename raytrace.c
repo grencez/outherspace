@@ -387,6 +387,73 @@ cast_ray_simple (uint* restrict ret_hit, real* restrict ret_mag,
     *ret_mag = hit_mag;
 }
 
+
+static
+    bool
+test_intersections (uint* ret_hit,
+                    real* ret_mag,
+                    const Point* restrict origin,
+                    const Point* restrict dir,
+                    uint nelemidcs,
+                    __global const uint* restrict elemidcs,
+                    __global const Triangle* restrict elems,
+                    const BoundingBox* restrict box)
+{
+    uint i, hit_idx;
+    real hit_mag;
+
+    hit_idx = *ret_hit;
+    hit_mag = *ret_mag;
+
+    UFor( i, nelemidcs )
+    {
+        uint tmp_hit;
+        real tmp_mag;
+        const Triangle* restrict tri;
+        tmp_hit = elemidcs[i];
+#if __OPENCL_VERSION__
+        const Triangle stri = elems[tmp_hit];
+        tri = &stri;
+#else
+        tri = &elems[tmp_hit];
+#endif
+            /* Triangle tri; */
+            /* elem_Scene (&tri, &space->scene, leaf->elems[i]); */
+
+        if (hit_Triangle (&tmp_mag, origin, dir, tri))
+        {
+            if (tmp_mag < hit_mag)
+            {
+                hit_idx = tmp_hit;
+                hit_mag = tmp_mag;
+            }
+        }
+    }
+
+
+    *ret_hit = hit_idx;
+    *ret_mag = hit_mag;
+
+    if (hit_mag != Max_real)
+    {
+        Point isect;
+        scale_Point (&isect, dir, hit_mag);
+        summ_Point (&isect, &isect, origin);
+
+        return inside_BoundingBox (box, &isect);
+#if 0
+        output_BoundingBox (stderr, box);
+        fputs ("\n", stderr);
+        output_Point (stderr, origin);
+        fputs (" => ", stderr);
+        output_Point (stderr, &isect);
+        fputs ("\n", stderr);
+#endif
+    }
+    return false;
+}
+
+
     void
 cast_ray (uint* restrict ret_hit, real* restrict ret_mag,
           const Point* restrict origin,
@@ -400,9 +467,9 @@ cast_ray (uint* restrict ret_hit, real* restrict ret_mag,
 {
     Point salo_entrance;
     uint node_idx, parent = 0;
+    Point* restrict entrance;
     uint hit_idx;
     real hit_mag;
-    Point* restrict entrance;
 
     entrance = &salo_entrance;
 
@@ -427,82 +494,25 @@ cast_ray (uint* restrict ret_hit, real* restrict ret_mag,
         node_idx = 0;
     }
 
-    while (1)
+    do
     {
-        __global const KDTreeNode* restrict node;
-        node = &nodes[node_idx];
+        __global const KDTreeLeaf* restrict leaf;
+        bool hit_in_leaf;
 
-        if (leaf_KDTreeNode (node))
-        {
-            uint i;
-            __global const KDTreeLeaf* restrict leaf;
+        node_idx = descend_KDTreeNode (&parent, entrance, node_idx, nodes);
 
-            leaf = &node->as.leaf;
-            box = &leaf->box;
-                /* output_BoundingBox (stdout, box); */
-                /* fputc ('\n', stdout); */
+        leaf = &nodes[node_idx].as.leaf;
+        hit_in_leaf =
+            test_intersections (&hit_idx, &hit_mag, origin, dir,
+                                leaf->nelems, &elemidcs[leaf->elemidcs],
+                                elems, &leaf->box);
+        if (hit_in_leaf)  break;
 
-            UFor( i, leaf->nelems )
-            {
-                real mag;
-                uint idx;
-                const Triangle* restrict tri;
-                idx = elemidcs[leaf->elemidcs + i];
-#if __OPENCL_VERSION__
-                const Triangle stri = elems[idx];
-                tri = &stri;
-#else
-                tri = &elems[idx];
-#endif
-                    /* Triangle tri; */
-                    /* elem_Scene (&tri, &space->scene, leaf->elems[i]); */
-
-                if (hit_Triangle (&mag, origin, dir, tri))
-                {
-                    if (mag < hit_mag)
-                    {
-                        hit_mag = mag;
-                        hit_idx = idx;
-                    }
-                }
-            }
-
-            if (hit_mag != Max_real)
-            {
-                Point hit;
-                scale_Point (&hit, dir, hit_mag);
-                summ_Point (&hit, &hit, origin);
-                if (inside_BoundingBox (box, &hit))  break;
-#if 0
-                output_BoundingBox (stderr, box);
-                fputs ("\n", stderr);
-                output_Point (stderr, origin);
-                fputs (" => ", stderr);
-                output_Point (stderr, &hit);
-                fputs ("\n", stderr);
-#endif
-            }
-
-            node_idx = upnext_KDTreeNode (entrance, &parent,
-                                          origin, dir, node_idx, nodes);
-            if (node_idx == parent)  break;
-        }
-        else
-        {
-            __global const KDTreeInner* restrict inner;
-            inner = &node->as.inner;
-            parent = node_idx;
-
-                /* Subtlety: Inclusive case here must be opposite of
-                 * inclusive case in upnext_KDTreeNode to avoid infinite
-                 * iteration on rays in the splitting plane's subspace.
-                 */
-            if (entrance->coords[node->split_dim] <= inner->split_pos)
-                node_idx = inner->children[0];
-            else
-                node_idx = inner->children[1];
-        }
+        node_idx = upnext_KDTreeNode (entrance, &parent,
+                                      origin, dir, node_idx, nodes);
     }
+    while (node_idx != parent);
+
     *ret_hit = hit_idx;
     *ret_mag = hit_mag;
 }

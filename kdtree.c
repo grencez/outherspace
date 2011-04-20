@@ -740,12 +740,13 @@ uint find_KDTreeNode (uint* ret_parent,
 }
 
 
-uint upnext_KDTreeNode (Point* entrance,
-                        uint* ret_parent,
-                        const Point* origin,
-                        const Point* dir,
-                        uint node_idx,
-                        __global const KDTreeNode* nodes)
+    uint
+upnext_KDTreeNode (Point* entrance,
+                   uint* ret_parent,
+                   const Point* origin,
+                   const Point* dir,
+                   uint node_idx,
+                   __global const KDTreeNode* nodes)
 {
     __global const BoundingBox* box;
     uint child_idx;
@@ -798,5 +799,34 @@ uint upnext_KDTreeNode (Point* entrance,
     }
     *ret_parent = node_idx;
     return child_idx;
+}
+
+
+    uint
+descend_KDTreeNode (uint* ret_parent,
+                    const Point* entrance,
+                    uint node_idx,
+                    __global const KDTreeNode* nodes)
+{
+    __global const KDTreeNode* restrict node;
+    node = &nodes[node_idx];
+
+    while (! leaf_KDTreeNode (node))
+    {
+        __global const KDTreeInner* restrict inner;
+        inner = &node->as.inner;
+        *ret_parent = node_idx;
+
+            /* Subtlety: Inclusive case here must be opposite of
+             * inclusive case in upnext_KDTreeNode to avoid infinite
+             * iteration on rays in the splitting plane's subspace.
+             */
+        if (entrance->coords[node->split_dim] <= inner->split_pos)
+            node_idx = inner->children[0];
+        else
+            node_idx = inner->children[1];
+    }
+
+    return node_idx;
 }
 

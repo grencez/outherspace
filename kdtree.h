@@ -63,12 +63,18 @@ uint find_KDTreeNode (uint* ret_parent,
                       const Point* origin,
                       __global const KDTreeNode* nodes);
 
-uint upnext_KDTreeNode (Point* entrance,
-                        uint* ret_parent,
-                        const Point* origin,
-                        const Point* dir,
-                        uint node,
-                        __global const KDTreeNode* nodes);
+uint
+upnext_KDTreeNode (Point* entrance,
+                   uint* ret_parent,
+                   const Point* origin,
+                   const Point* dir,
+                   uint node,
+                   __global const KDTreeNode* nodes);
+uint
+descend_KDTreeNode (uint* ret_parent,
+                    const Point* entrance,
+                    uint node_idx,
+                    __global const KDTreeNode* nodes);
 
 #ifndef __OPENCL_VERSION__
 void output_KDTree (FILE* out, const KDTree* tree,

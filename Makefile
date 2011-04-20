@@ -1,6 +1,7 @@
 
 #CC = clang
 #CC = gcc
+#CC = llvm-gcc
 
 CONFIG = fast
 CONFIG = fast openmp
@@ -65,6 +66,7 @@ endif
 ## Do we have bool type?
 ifneq (,$(findstring c++,$(CONFIG)))
 	CC = $(CXX)
+	#CFLAGS += -fno-rtti
 	CFLAGS += -DCOMPILER_HAS_BOOL
 endif
 ## Use the C99 standard.
