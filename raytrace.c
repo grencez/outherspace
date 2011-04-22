@@ -267,7 +267,7 @@ fill_pixel (byte* ret_red, byte* ret_green, byte* ret_blue,
             texpoint.coords[i] = 0;
         }
 
-        UFor( i, NDimensions )
+        UFor( i, 3 )
         {
             uint j;
             const BaryPoint* tmp;
@@ -322,73 +322,6 @@ fill_pixel (byte* ret_red, byte* ret_green, byte* ret_blue,
 
 
 static
-    void
-cast_ray_simple_barycentric (uint* restrict ret_hit,
-                             real* restrict ret_mag,
-                             const Point* restrict origin,
-                             const Point* restrict dir,
-                             uint nelems,
-                             const BarySimplex* restrict elems)
-{
-    uint i;
-    uint hit_idx;
-    real hit_mag;
-
-    hit_idx = nelems;
-    hit_mag = Max_real;
-
-    UFor( i, nelems )
-    {
-        real mag;
-        if (hit_BarySimplex (&mag, origin, dir, &elems[i]))
-        {
-            if (mag < hit_mag)
-            {
-                hit_mag = mag;
-                hit_idx = i;
-            }
-        }
-    }
-    *ret_hit = hit_idx;
-    *ret_mag = hit_mag;
-}
-
-static
-    void
-cast_ray_simple (uint* restrict ret_hit, real* restrict ret_mag,
-                 const Point* restrict origin,
-                 const Point* restrict dir,
-                 uint nelems,
-                 const Triangle* restrict elems,
-                 const PointXfrm* view_basis)
-{
-    uint i;
-    uint hit_idx;
-    real hit_mag;
-
-    (void) view_basis;
-
-    hit_idx = nelems;
-    hit_mag = Max_real;
-
-    UFor( i, nelems )
-    {
-        real mag;
-        if (hit_Triangle (&mag, origin, dir, &elems[i]))
-        {
-            if (mag < hit_mag)
-            {
-                hit_mag = mag;
-                hit_idx = i;
-            }
-        }
-    }
-    *ret_hit = hit_idx;
-    *ret_mag = hit_mag;
-}
-
-
-static
     bool
 test_intersections (uint* ret_hit,
                     real* ret_mag,
@@ -396,7 +329,8 @@ test_intersections (uint* ret_hit,
                     const Point* restrict dir,
                     uint nelemidcs,
                     __global const uint* restrict elemidcs,
-                    __global const Triangle* restrict elems,
+                    __global const BarySimplex* restrict simplices,
+                    __global const Triangle* restrict tris,
                     const BoundingBox* restrict box)
 {
     uint i, hit_idx;
@@ -407,26 +341,35 @@ test_intersections (uint* ret_hit,
 
     UFor( i, nelemidcs )
     {
+        bool didhit;
         uint tmp_hit;
         real tmp_mag;
-        const Triangle* restrict tri;
-        tmp_hit = elemidcs[i];
-#if __OPENCL_VERSION__
-        const Triangle stri = elems[tmp_hit];
-        tri = &stri;
-#else
-        tri = &elems[tmp_hit];
-#endif
-            /* Triangle tri; */
-            /* elem_Scene (&tri, &space->scene, leaf->elems[i]); */
 
-        if (hit_Triangle (&tmp_mag, origin, dir, tri))
+        if (BarycentricRayTrace)
         {
-            if (tmp_mag < hit_mag)
-            {
-                hit_idx = tmp_hit;
-                hit_mag = tmp_mag;
-            }
+            tmp_hit = elemidcs[i];
+            didhit = hit_BarySimplex (&tmp_mag, origin, dir,
+                                      &simplices[tmp_hit]);
+        }
+        else 
+        {
+            const Triangle* restrict tri;
+            tmp_hit = elemidcs[i];
+#if __OPENCL_VERSION__
+            const Triangle stri = tris[tmp_hit];
+            tri = &stri;
+#else
+            tri = &tris[tmp_hit];
+#endif
+                /* Triangle tri; */
+                /* elem_Scene (&tri, &space->scene, leaf->elems[i]); */
+            didhit = hit_Triangle (&tmp_mag, origin, dir, tri);
+        }
+
+        if (didhit && tmp_mag < hit_mag)
+        {
+            hit_idx = tmp_hit;
+            hit_mag = tmp_mag;
         }
     }
 
@@ -454,14 +397,16 @@ test_intersections (uint* ret_hit,
 }
 
 
+static
     void
 cast_ray (uint* restrict ret_hit, real* restrict ret_mag,
           const Point* restrict origin,
           const Point* restrict dir,
           const uint nelems,
-          __global const Triangle* restrict elems,
           __global const uint* restrict elemidcs,
           __global const KDTreeNode* restrict nodes,
+          __global const BarySimplex* restrict simplices,
+          __global const Triangle* restrict tris,
           __global const BoundingBox* restrict box,
           bool inside_box)
 {
@@ -475,6 +420,16 @@ cast_ray (uint* restrict ret_hit, real* restrict ret_mag,
 
     hit_mag = Max_real;
     hit_idx = nelems;
+
+    if (!KDTreeRayTrace)
+    {
+        test_intersections (&hit_idx, &hit_mag, origin, dir,
+                            nelems, elemidcs,
+                            simplices, tris, box);
+        *ret_hit = hit_idx;
+        *ret_mag = hit_mag;
+        return;
+    }
 
     if (inside_box)
     {
@@ -505,7 +460,7 @@ cast_ray (uint* restrict ret_hit, real* restrict ret_mag,
         hit_in_leaf =
             test_intersections (&hit_idx, &hit_mag, origin, dir,
                                 leaf->nelems, &elemidcs[leaf->elemidcs],
-                                elems, &leaf->box);
+                                simplices, tris, &leaf->box);
         if (hit_in_leaf)  break;
 
         node_idx = upnext_KDTreeNode (entrance, &parent,
@@ -540,17 +495,11 @@ cast_recurse (uint* ret_hit,
 
     hit_space = space;
 
-    if (KDTreeRayTrace)
-        cast_ray (&hit_idx, &hit_mag, origin, dir,
-                  space->nelems, space->elems,
-                  space->tree.elemidcs, space->tree.nodes,
-                  &space->scene.box, inside_box);
-    else if (BarycentricRayTrace)
-        cast_ray_simple_barycentric (&hit_idx, &hit_mag, origin, dir,
-                                     space->nelems, space->simplices);
-    else
-        cast_ray_simple (&hit_idx, &hit_mag, origin, dir,
-                         space->nelems, space->elems, view_basis);
+    cast_ray (&hit_idx, &hit_mag, origin, dir,
+              space->nelems, space->tree.elemidcs,
+              space->tree.nodes,
+              space->simplices, space->elems,
+              &space->scene.box, inside_box);
 
     if (hit_idx < hit_space->nelems)
     {
@@ -797,8 +746,10 @@ rays_to_hits_fixed_plane (uint* hits, real* mags,
 
             cast_ray (&hit, &mag,
                       &origin, &dir,
-                      space->nelems, space->elems,
-                      space->tree.elemidcs, space->tree.nodes,
+                      space->nelems,
+                      space->tree.elemidcs,
+                      space->tree.nodes,
+                      space->simplices, space->elems,
                       &space->scene.box, inside_box);
             hitline[col] = hit;
             magline[col] = mag;

@@ -104,8 +104,14 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
             break;
         case GDK_Escape:
             gdk_pointer_ungrab (event->time);  break;
+        case GDK_D:
+            dim = 2;
+            stride = 1;
+            break;
         case GDK_d:
-            rotate_dir_dim = true;  break;
+            if (ctrl_mod) { rotate_dir_dim = true; }
+            else { dim = 2; stride = -1; }
+            break;
         case GDK_L:
             view_light_change = 1;  break;
         case GDK_l:

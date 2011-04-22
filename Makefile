@@ -28,9 +28,6 @@ ifeq ($(CC),g++)
 	CONFIG += c++
 endif
 
-ifneq ($(CC),clang)
-	CFLAGS += -combine
-endif
 CFLAGS += -fwhole-program
 CFLAGS += -Wall -Wextra
 
@@ -43,6 +40,8 @@ endif
 ## Go really fast.
 ifneq (,$(findstring fast,$(CONFIG)))
 	CFLAGS += -O3
+	#CFLAGS += -Ofast
+	#CFLAGS += -march=native
 	#CFLAGS += -ffast-math
 	#CFLAGS += -march=native -mtune=native
 endif

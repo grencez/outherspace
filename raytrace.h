@@ -74,17 +74,6 @@ fill_pixel (byte* ret_red, byte* ret_green, byte* ret_blue,
             const Point* dir,
             const BarySimplex* simplex,
             const Scene* scene);
-void
-cast_ray (uint* restrict ret_hit,
-          real* restrict ret_mag,
-          const Point* restrict origin,
-          const Point* restrict dir,
-          const uint nelems,
-          __global const Triangle* restrict elems,
-          __global const uint* restrict elemidcs,
-          __global const KDTreeNode* restrict nodes,
-          __global const BoundingBox* restrict box,
-          bool inside_box);
 
 #ifndef __OPENCL_VERSION__
 void

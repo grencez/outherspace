@@ -425,12 +425,13 @@ determine_split (KDTreeGrid* logrid, KDTreeGrid* higrid, KDTreeGrid* grid)
     uint nelems, nintls;
     uint dim;
     real cost_split, cost_nosplit;
-    uint nbelow, nabove, split_dim;
-    real split_pos;
-    bool split_low;
+    uint nbelow = 0, nabove = 0, split_dim = NDimensions;
+    real split_pos = 0;
+    bool split_low = false;
 
-    assert (even_uint (grid->nintls));
     nintls = grid->nintls;
+    assert (even_uint (nintls));
+
     nelems = nintls / 2;
     cost_split = Max_real;
     cost_nosplit = cost_it * nelems;
@@ -825,6 +826,8 @@ descend_KDTreeNode (uint* ret_parent,
             node_idx = inner->children[0];
         else
             node_idx = inner->children[1];
+
+        node = &nodes[node_idx];
     }
 
     return node_idx;
