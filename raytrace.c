@@ -481,11 +481,11 @@ cast_recurse (uint* ret_hit,
               Point* ret_origin,
               Point* ret_dir,
               const RaySpace* restrict space,
-              const RayImage* restrict image,
               const PointXfrm* restrict view_basis,
               const Point* restrict origin,
               const Point* restrict dir,
-              bool inside_box)
+              bool inside_box,
+              uint ignore_object)
 {
     uint hit_idx;
     real hit_mag;
@@ -519,6 +519,8 @@ cast_recurse (uint* ret_hit,
         Point tmp_origin, tmp_dir;
         const RaySpace* tmp_space;
 
+        if (i == ignore_object)  continue;
+
         object = &space->objects[i];
 
         diff_Point (&diff, origin, &object->centroid);
@@ -537,8 +539,9 @@ cast_recurse (uint* ret_hit,
         
         cast_recurse (&tmp_hit, &tmp_mag, &tmp_space,
                       &tmp_origin, &tmp_dir,
-                      &object->space, image, &rel_basis,
-                      &rel_origin, &rel_dir, rel_inside_box);
+                      &object->space, &rel_basis,
+                      &rel_origin, &rel_dir, rel_inside_box,
+                      Max_uint);
 
         if (tmp_mag < hit_mag)
         {
@@ -582,7 +585,8 @@ cast_record (uint* hitline,
 
     cast_recurse (&hit_idx, &hit_mag, &hit_space,
                   &hit_origin, &hit_dir,
-                  space, image, view_basis, origin, dir, inside_box);
+                  space, view_basis, origin, dir, inside_box,
+                  Max_uint);
 
     if (hitline)  hitline[col] = hit_idx;
     if (magline)  magline[col] = hit_mag;

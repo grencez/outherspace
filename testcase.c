@@ -4,23 +4,31 @@
 #include "wavefront-file.h"
 
 static void
-random_Triangle (Triangle* elem, const BoundingBox* box);
-static Triangle*
-random_Triangles (uint nelems, const BoundingBox* box);
+random_Point (Point* p, const BoundingBox* box);
+static Point*
+random_Points (uint npts, const BoundingBox* box);
 static void
 random_RaySpace (RaySpace* space, uint nelems);
 
     bool
 setup_testcase_triangles (RaySpace* space,
-                          Point* view_origin,
+                          Point* view_origin, PointXfrm* view_basis,
                           real* view_angle)
 {
+#if 1
+    uint i;
+    (void) view_basis;
     random_RaySpace (space, 50);
-
-    view_origin->coords[0] = 50;
-    view_origin->coords[1] = 50;
-    view_origin->coords[DirDimension] = -70;
     *view_angle = M_PI / 3;
+    UFor( i, NDimensions )
+        view_origin->coords[i] = 50;
+    view_origin->coords[DirDimension] = -70;
+#else
+        /* Paste custom starting parameters here!
+         * (Obtained by pressing 'P' in the GUI.)
+         */
+#endif
+
     return true;
 }
 
@@ -67,41 +75,39 @@ setup_testcase_track (RaySpace* space,
 
 
     void
-random_Triangle (Triangle* elem, const BoundingBox* box)
+random_Point (Point* p, const BoundingBox* box)
 {
-    uint pi, ci;
-    UFor( pi, NTrianglePoints )
-    {
+    uint ci;
 #if 0
-        const uint dim_cutoff = 3;
+    const uint dim_cutoff = 3;
 #else
-        const uint dim_cutoff = NDimensions;
+    const uint dim_cutoff = NDimensions;
 #endif
-        UFor( ci, NDimensions )
-        {
-            real x, lo, hi;
-            lo = box->min_corner.coords[ci];
-            hi = box->max_corner.coords[ci];
-            if (ci < dim_cutoff)
-                x = lo + (hi - lo) * ((real) rand () / RAND_MAX);
-            else
-                x = 0;
-                /* printf ("%f\n", x); */
-            elem->pts[pi].coords[ci] = x;
-        }
+    UFor( ci, NDimensions )
+    {
+        real x, lo, hi;
+        lo = box->min_corner.coords[ci];
+        hi = box->max_corner.coords[ci];
+        if (ci < dim_cutoff)
+            x = lo + (hi - lo) * ((real) rand () / RAND_MAX);
+        else
+            x = 0;
+            /* printf ("%f\n", x); */
+        p->coords[ci] = x;
     }
 }
 
 
-Triangle* random_Triangles (uint nelems, const BoundingBox* box)
+    Point*
+random_Points (uint npts, const BoundingBox* box)
 {
-    uint ei;
-    Triangle* elems;
-    elems = AllocT( Triangle, nelems );
+    uint i;
+    Point* pts;
+    pts = AllocT( Point, npts );
 
-    UFor( ei, nelems )
-        random_Triangle (&elems[ei], box);
-    return elems;
+    UFor( i, npts )
+        random_Point (&pts[i], box);
+    return pts;
 }
 
 
@@ -126,30 +132,34 @@ void random_RaySpace (RaySpace* space, uint nelems)
         box->max_corner.coords[i] = 100;
     }
 
+    space->scene.nverts = NDimensions * nelems;
+    space->scene.verts = random_Points (space->scene.nverts, box);
+
     space->nelems = nelems;
-
-    space->elems = random_Triangles (nelems, box);
-
-    space->scene.nverts = NTrianglePoints * nelems;
     space->scene.nelems = nelems;
-    space->scene.verts = AllocT( Point, space->scene.nverts );
+    space->elems = AllocT( Triangle, nelems );
     space->scene.elems = AllocT( SceneElement, nelems );
     space->nobjects = 0;
 
     UFor( i, nelems )
     {
         uint pi, offset;
-        offset = i * NTrianglePoints;
+        offset = i * NDimensions;
         init_SceneElement (&space->scene.elems[i]);
-        UFor( pi, NTrianglePoints )
+        UFor( pi, NDimensions )
         {
-            copy_Point (&space->scene.verts[pi + offset],
-                        &space->elems[i].pts[pi]);
+            if (pi < NTrianglePoints)
+                copy_Point (&space->elems[i].pts[pi],
+                            &space->scene.verts[pi + offset]);
             space->scene.elems[i].pts[pi] = pi + offset;
         }
     }
     space->simplices = AllocT( BarySimplex, nelems );
     UFor( i, nelems )
-        tri_to_BarySimplex (&space->simplices[i], &space->elems[i]);
+    {
+        PointXfrm raw;
+        elem_Scene (&raw, &space->scene, i);
+        init_BarySimplex (&space->simplices[i], &raw);
+    }
 }
 

@@ -17,6 +17,7 @@
 
 static const bool RenderDrawsPattern = false;
 static const bool ForceFauxFishEye = false;
+static const bool ShowFrameRate = false;
 
 static ObjectMotion racer_motions[NRacers];
 
@@ -488,7 +489,8 @@ render_RaySpace (byte* data, const RaySpace* space,
         time = monotime ();
         dt = time - prev_time;
 
-        fprintf (stderr, "FPS:%f\n", 1 / dt);
+        if (ShowFrameRate)
+            fprintf (stderr, "FPS:%f\n", 1 / dt);
 
 #if 0
         UFor( i, space->nobjects )
@@ -734,7 +736,7 @@ gui_main (int argc, char* argv[], RaySpace* space)
 
         /* gtk_widget_set_app_paintable (window, TRUE); */
     gtk_window_set_position (GTK_WINDOW(window), GTK_WIN_POS_CENTER);
-    gtk_window_set_title (GTK_WINDOW(window), "lines");
+    gtk_window_set_title (GTK_WINDOW(window), "OuTHER SPACE");
     gtk_window_set_default_size (GTK_WINDOW(window), view_ncols, view_nrows); 
 
     gtk_widget_show_all (window);
@@ -760,7 +762,8 @@ int main (int argc, char* argv[])
     if (use_random_scene)
     {
         PointXfrm tmp_basis;
-        good = setup_testcase_triangles (&space, &view_origin, &view_angle);
+        good = setup_testcase_triangles (&space, &view_origin,
+                                         &view_basis, &view_angle);
 
         identity_PointXfrm (&tmp_basis);
             /* Tilt backwards a bit.*/

@@ -9,8 +9,8 @@
 
 struct scene_element_struct
 {
-    uint pts[NTrianglePoints];
-    uint txpts[NTrianglePoints];
+    uint pts[NDimensions];
+    uint txpts[NDimensions];
     uint material;
 };
 typedef struct scene_element_struct SceneElement;
@@ -37,7 +37,10 @@ void init_SceneElement (SceneElement* elem);
 void copy_SceneElement (SceneElement* dst, const SceneElement* src);
 void cleanup_Scene (Scene* scene);
 void vert_Scene (Point* dst, const Scene* scene, uint idx);
-void elem_Scene (Triangle* dst, const Scene* scene, uint idx);
+void
+tri_Scene (Triangle* dst, const Scene* scene, uint idx);
+void
+elem_Scene (PointXfrm* dst, const Scene* scene, uint idx);
 #ifdef INCLUDE_SOURCE
 #include "scene.c"
 #endif

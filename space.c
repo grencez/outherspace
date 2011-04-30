@@ -99,6 +99,14 @@ void negate_Point (Point* dst, const Point* src)
         dst->coords[i] = - src->coords[i];
 }
 
+    void
+checker_negate_Point (Point* p)
+{
+    uint i;
+    UFor( i, NDimensions / 2 )
+        p->coords[2*i+1] = - p->coords[2*i+1];
+}
+
 real magnitude_Point (const Point* a)
 {
     return sqrt (dot_Point (a, a));

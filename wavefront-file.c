@@ -214,7 +214,11 @@ bool readin_wavefront (RaySpace* space, const char* filename)
         {
             space->simplices = AllocT( BarySimplex, space->nelems );
             UFor( ei, scene->nelems )
-                tri_to_BarySimplex (&space->simplices[ei], &space->elems[ei]);
+            {
+                PointXfrm raw;
+                elem_Scene (&raw, scene, ei);
+                init_BarySimplex (&space->simplices[ei], &raw);
+            }
             init_BoundingBox (&scene->box, scene->nverts, scene->verts);
         }
         else

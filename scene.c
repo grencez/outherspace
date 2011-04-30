@@ -43,7 +43,8 @@ void vert_Scene (Point* dst, const Scene* scene, uint idx)
     copy_Point (dst, &scene->verts[idx]);
 }
 
-void elem_Scene (Triangle* dst, const Scene* scene, uint idx)
+    void
+tri_Scene (Triangle* dst, const Scene* scene, uint idx)
 {
     uint i;
     const SceneElement* elem;
@@ -51,6 +52,18 @@ void elem_Scene (Triangle* dst, const Scene* scene, uint idx)
     elem = &scene->elems[idx];
 
     UFor( i, NTrianglePoints )
+        vert_Scene (&dst->pts[i], scene, elem->pts[i]);
+}
+
+    void
+elem_Scene (PointXfrm* dst, const Scene* scene, uint idx)
+{
+    uint i;
+    const SceneElement* elem;
+
+    elem = &scene->elems[idx];
+
+    UFor( i, NDimensions )
         vert_Scene (&dst->pts[i], scene, elem->pts[i]);
 }
 

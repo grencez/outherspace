@@ -330,7 +330,7 @@ run_ray_cast ()
     global_work_size[0] = nrows;
     global_work_size[1] = ncols;
 
-    setup_testcase_triangles (&space, &view_origin, &view_angle);
+    setup_testcase_triangles (&space, &view_origin, &view_basis, &view_angle);
 
     partition_RaySpace (&space);
     identity_PointXfrm (&view_basis);

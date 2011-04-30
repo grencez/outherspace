@@ -5,7 +5,7 @@
 
 bool
 setup_testcase_triangles (RaySpace* space,
-                          Point* view_origin,
+                          Point* view_origin, PointXfrm* view_basis,
                           real* view_angle);
 bool
 setup_testcase_track (RaySpace* space,

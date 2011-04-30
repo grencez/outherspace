@@ -60,9 +60,6 @@ hit_BarySimplex (real* restrict ret_dist,
                  const Point* restrict dir,
                  const BarySimplex* restrict elem);
 
-void
-tri_to_BarySimplex (BarySimplex* simplex, const Triangle* tri);
-
 #ifndef __OPENCL_VERSION__
 void output_Triangle (FILE* out, const Triangle* elem);
 #ifdef INCLUDE_SOURCE

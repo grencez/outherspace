@@ -30,6 +30,8 @@ void zero_Point (Point* a);
 void copy_Point (Point* dst, const Point* src);
 void copy_BoundingBox (BoundingBox* dst, const BoundingBox* src);
 void negate_Point (Point* dst, const Point* src);
+void
+checker_negate_Point (Point* p);
 real magnitude_Point (const Point* a);
 void normalize_Point (Point* dst, const Point* a);
 void proj_Point (Point* dst, const Point* a, const Point* b);

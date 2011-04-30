@@ -40,7 +40,9 @@ int main (int argc, char** argv)
     image.ncols = 2000;
     image.hits = AllocT( uint, image.nrows * image.ncols );
     image.mags = AllocT( real, image.nrows * image.ncols );
-    good = setup_testcase_triangles (&space, &view_origin, &view_angle);
+    good = setup_testcase_triangles (&space,
+                                     &view_origin, &view_basis,
+                                     &view_angle);
 #elif 1
     image.nrows = 1000;
     image.ncols = 1000;

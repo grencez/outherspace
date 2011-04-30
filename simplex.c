@@ -309,7 +309,7 @@ void init_BarySimplex (BarySimplex* elem, const PointXfrm* raw)
 
     plane = &elem->plane;
     row_minors_PointXfrm (&plane->normal, &surf, 0);
-    plane->normal.coords[1] = - plane->normal.coords[1];
+    checker_negate_Point (&plane->normal);
     init_Plane (plane, &plane->normal, &raw->pts[0]);
     copy_Point (&surf.pts[0], &plane->normal);
 
@@ -320,7 +320,7 @@ void init_BarySimplex (BarySimplex* elem, const PointXfrm* raw)
 
         plane = &elem->barys[i];
         row_minors_PointXfrm (&plane->normal, &surf, 1+i);
-        plane->normal.coords[1] = - plane->normal.coords[1];
+        checker_negate_Point (&plane->normal);
         init_Plane (plane, &plane->normal, &raw->pts[0]);
         barycentric_Plane (plane, plane, &surf.pts[1+i]);
 
@@ -409,20 +409,4 @@ hit_BarySimplex (real* restrict ret_dist,
 #endif
     return true;
 }
-
-
-    void
-tri_to_BarySimplex (BarySimplex* simplex, const Triangle* tri)
-{
-    PointXfrm raw;
-    uint pi;
-    UFor( pi, NTrianglePoints )
-        copy_Point (&raw.pts[pi], &tri->pts[pi]);
-        
-    for (pi = NTrianglePoints; pi < NDimensions; ++pi)
-        zero_Point (&raw.pts[pi]);
-
-    init_BarySimplex (simplex, &raw);
-}
-
 
