@@ -118,62 +118,6 @@ void cleanup_KDTree (KDTree* tree)
         free (tree->elemidcs);
 }
 
-    void
-init_Triangle_KDTreeGrid (KDTreeGrid* grid,
-                          uint nelems, const Triangle* elems,
-                          const BoundingBox* box)
-{
-    uint i;
-
-    assert (nelems > 0);
-    UFor( i, nelems )
-    {
-        uint pi;
-        UFor( pi, NTrianglePoints )
-            assert (inside_BoundingBox (box, &elems[i].pts[pi]));
-    }
-
-    grid->nintls = 2 * nelems;
-    grid->intls[0] = AllocT( uint, NDimensions * grid->nintls );
-    grid->coords[0] = AllocT( real, NDimensions * grid->nintls );
-
-    UFor( i, NDimensions )
-    {
-        grid->intls[i] = &grid->intls[0][i * grid->nintls];
-        grid->coords[i] = &grid->coords[0][i * grid->nintls];
-    }
-
-    UFor( i, nelems )
-    {
-        uint ti, dim;
-        const Triangle* elem;
-
-        ti = 2*i;
-        elem = &elems[i];
-
-        UFor( dim, NDimensions )
-        {
-            uint pi;
-            real min_coord = Max_real;
-            real max_coord = Min_real;
-
-            UFor( pi, NTrianglePoints )
-            {
-                if (elem->pts[pi].coords[dim] < min_coord)
-                    min_coord = elem->pts[pi].coords[dim];
-                if (elem->pts[pi].coords[dim] > max_coord)
-                    max_coord = elem->pts[pi].coords[dim];
-            }
-
-            grid->intls[dim][ti] = ti;
-            grid->intls[dim][ti+1] = ti+1;
-            grid->coords[dim][ti] = min_coord;
-            grid->coords[dim][ti+1] = max_coord;
-        }
-    }
-    copy_BoundingBox (&grid->box, box);
-}
-
 static
     void
 cleanup_KDTreeGrid (KDTreeGrid* grid)

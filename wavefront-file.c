@@ -28,7 +28,8 @@ streql (const void* a, const void* b)
     return 0 == strcmp ((char*) a, (char*) b);
 }
 
-bool readin_wavefront (RaySpace* space, const char* filename)
+    bool
+readin_wavefront (Scene* scene, const char* filename)
 {
     uint line_no = 0;
     const uint len = BUFSIZ;
@@ -40,11 +41,8 @@ bool readin_wavefront (RaySpace* space, const char* filename)
           matlist, matnamelist,
           texlist, texnamelist;
     uint material = Max_uint;
-    Scene* scene;
 
     buf[len-1] = 0;
-
-    scene = &space->scene;
 
     in = fopen (filename, "rb");
     if (!in)  return false;
@@ -184,46 +182,22 @@ bool readin_wavefront (RaySpace* space, const char* filename)
         unroll_SList (scene->matls, &matlist, sizeof (Material));
         unroll_SList (scene->txtrs, &texlist, sizeof (Texture));
 
-        space->nelems = scene->nelems;
-        space->elems = AllocT( Triangle, space->nelems );
-
         UFor( ei, scene->nelems )
         {
             uint pi;
-            SceneElement* read_tri;
-            Triangle* tri;
-
-            read_tri = &scene->elems[ei];
-            tri = &space->elems[ei];
+            SceneElement* elem;
+            elem = &scene->elems[ei];
 
             UFor( pi, NTrianglePoints )
             {
-                uint vert_id;
-                vert_id = read_tri->pts[pi];
-                if (vert_id >= scene->nverts)
+                uint vi;
+                vi = elem->pts[pi];
+                if (vi >= scene->nverts)
                 {
-                    fprintf (stderr, "Bad vertex:%u\n", vert_id);
+                    fprintf (stderr, "Bad vertex:%u\n", vi);
                     good = false;
                 }
-                else
-                    copy_Point (&tri->pts[pi], &scene->verts[vert_id]);
             }
-        }
-
-        if (good)
-        {
-            space->simplices = AllocT( BarySimplex, space->nelems );
-            UFor( ei, scene->nelems )
-            {
-                PointXfrm raw;
-                elem_Scene (&raw, scene, ei);
-                init_BarySimplex (&space->simplices[ei], &raw);
-            }
-            init_BoundingBox (&scene->box, scene->nverts, scene->verts);
-        }
-        else
-        {
-            free (space->elems);
         }
     }
 

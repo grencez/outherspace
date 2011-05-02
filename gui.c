@@ -2,7 +2,6 @@
 #include "pnm-image.h"
 #include "motion.h"
 #include "testcase.h"
-#include "wavefront-file.h"
 
 #ifdef DistribCompute
 #include "compute.h"
@@ -21,6 +20,7 @@ static const bool ShowFrameRate = false;
 
 static ObjectMotion racer_motions[NRacers];
 
+static real stride_magnitude = 10;
 static real prev_time;
 static Point view_origin;
 static PointXfrm view_basis;
@@ -66,12 +66,12 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
     tristate view_angle_change = 0;
     tristate resize = 0;
     tristate view_light_change = 0;
+    tristate stride_mag_change = 0;
     bool reflect = false;
     bool rotate_dir_dim = false;
     bool change_cast_method = false;
     bool print_view_code = false;
     bool recast = true;
-    const real scale = 5;
     FILE* out;
     bool shift_mod, ctrl_mod;
 
@@ -121,6 +121,10 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
             print_view_code = true;  break;
         case GDK_r:
             reflect = true;  break;
+        case GDK_S:
+            stride_mag_change = 1; break;
+        case GDK_s:
+            stride_mag_change = -1; break;
         case GDK_V:
             view_angle_change = 1;  break;
         case GDK_v:
@@ -137,7 +141,7 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
 
     if (view_light_change)
     {
-        real diff = 10;
+        real diff = stride_magnitude;
         if (view_light_change > 0)
             ray_image.view_light += diff;
         else if (diff <= ray_image.view_light)
@@ -149,12 +153,18 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
     if (stride != 0)
     {
         Point diff;
-        scale_Point (&diff, &view_basis.pts[dim], scale * stride);
+        scale_Point (&diff, &view_basis.pts[dim], stride_magnitude * stride);
         summ_Point (&view_origin, &view_origin, &diff);
 
         fputs ("pos:", out);
         output_Point (out, &view_origin);
         fputc ('\n', out);
+    }
+    if (stride_mag_change != 0)
+    {
+        if (stride_mag_change > 0)  stride_magnitude *= 2;
+        else                        stride_magnitude /= 2;
+        fprintf (out, "stride_magnitude: %f\n", stride_magnitude);
     }
     else if (roll != 0)
     {
@@ -195,7 +205,7 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
         }
         else
         {
-            const real diff = 50;
+            const real diff = stride_magnitude;
             if (view_angle_change > 0)  view_width += diff;
             else                        view_width -= diff;
             fprintf (out, "view_width:%f\n", view_width);
@@ -251,15 +261,15 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
     else if (print_view_code)
     {
         uint i;
-        fprintf (out, "*view_angle = (real) %15g;\n", view_angle);
+        fprintf (out, "*view_angle = %g;\n", view_angle);
         UFor( i, NDimensions )
         {
             uint j;
-            fprintf (out, "view_origin->coords[%u] = (real) %15g;\n",
+            fprintf (out, "view_origin->coords[%u] = %g;\n",
                      i, view_origin.coords[i]);
             UFor( j, NDimensions )
             {
-                fprintf (out, "view_basis->pts[%u].coords[%u] = (real) %15g;\n",
+                fprintf (out, "view_basis->pts[%u].coords[%u] = %g;\n",
                          i, j, view_basis.pts[i].coords[j]);
             }
         }
@@ -340,7 +350,8 @@ static gboolean poll_joystick (gpointer widget)
     if (stride != 0)
     {
         Point diff;
-        scale_Point (&diff, &view_basis.pts[DirDimension], stride * 5);
+        scale_Point (&diff, &view_basis.pts[DirDimension],
+                     stride_magnitude * stride);
         summ_Point (&view_origin, &view_origin, &diff);
     }
 #else
@@ -353,7 +364,7 @@ static gboolean poll_joystick (gpointer widget)
         rotate_object (&racer_motions[0], 0, 1, roll * M_PI / 3);
     }
 
-    racer_motions[0].accel = 5 * stride;
+    racer_motions[0].accel = stride_magnitude * stride;
 #endif
 
         /* fprintf (stderr, "x:%d  y:%d\n", x, y); */
@@ -747,7 +758,6 @@ gui_main (int argc, char* argv[], RaySpace* space)
 int main (int argc, char* argv[])
 {
     bool good = true;
-    const bool use_random_scene = true;
     bool call_gui = true;
     RaySpace space;
 
@@ -755,37 +765,24 @@ int main (int argc, char* argv[])
     init_compute (&argc, &argv);
 #endif
 
-    init_RaySpace (&space);
-    identity_PointXfrm (&view_basis);
-    zero_Point (&view_origin);
-
-    if (use_random_scene)
-    {
-        PointXfrm tmp_basis;
-        good = setup_testcase_triangles (&space, &view_origin,
-                                         &view_basis, &view_angle);
-
-        identity_PointXfrm (&tmp_basis);
-            /* Tilt backwards a bit.*/
-            /* tmp_basis.pts[0].coords[2] = -0.5; */
-            /* tmp_basis.pts[0].coords[3] = -0.3; */
-            /* tmp_basis.pts[0].coords[4] = -0.1; */
-        orthorotate_PointXfrm (&view_basis, &tmp_basis, 1);
-    }
-    else
-    {
-        good = setup_testcase_track (&space,
-                                     &view_origin, &view_basis,
-                                     &view_angle);
-    }
+    good =
+#if 0
+#elif 1
+        setup_testcase_triangles
+#elif 0
+        setup_testcase_track
+#elif 0
+        setup_testcase_4d_surface
+#elif 0
+        setup_testcase_sphere
+#endif
+        (&space, &view_origin, &view_basis, &view_angle);
 
     if (!good)
     {
         fputs ("Setup failed!\n", stderr);
         return 1;
     }
-
-    partition_RaySpace (&space);
 
 #ifdef DistribCompute
     call_gui = !rays_to_hits_computeloop (&space);

@@ -29,13 +29,9 @@ int main (int argc, char** argv)
 #endif
 
     out = stdout;
-    init_RaySpace (&space);
     init_RayImage (&image);
-    zero_Point (&view_origin);
-    identity_PointXfrm (&view_basis);
 
-#if 0
-#elif 1
+#if 1
     image.nrows = 2000;
     image.ncols = 2000;
     image.hits = AllocT( uint, image.nrows * image.ncols );
@@ -43,30 +39,20 @@ int main (int argc, char** argv)
     good = setup_testcase_triangles (&space,
                                      &view_origin, &view_basis,
                                      &view_angle);
-#elif 1
+#else
     image.nrows = 1000;
     image.ncols = 1000;
     image.pixels = AllocT( byte, image.nrows * 3 * image.ncols );
-    good = setup_testcase_track (&space,
-                                 &view_origin, &view_basis,
-                                 &view_angle);
-#else
-    image.nrows = 2000;
-    image.ncols = 2000;
-    good = readin_wavefront (&space, "track_1.obj");
-
-    view_origin.coords[0] = 10;
-    view_origin.coords[1] = 0;
-    view_origin.coords[DirDimension] = -250;
-
-    {
-        PointXfrm tmp_basis;
-        identity_PointXfrm (&tmp_basis);
-            /* Tilt backwards a bit.*/
-        tmp_basis.pts[0].coords[DirDimension] = -0.5;
-        orthorotate_PointXfrm (&view_basis, &tmp_basis, 0);
-    }
-    image.pixels = AllocT( byte, image.nrows * 3 * image.ncols );
+    good =
+#if 0
+#elif 0
+        setup_testcase_track
+#elif 0
+        setup_testcase_4d_surface
+#elif 1
+        setup_testcase_sphere
+#endif
+        (&space, &view_origin, &view_basis, &view_angle);
 #endif
 
     if (!good)
@@ -75,10 +61,8 @@ int main (int argc, char** argv)
         return 1;
     }
 
-        /* output_BoundingBox (out, &space.scene.box); */
-
-    partition_RaySpace (&space);
-        /* output_KDTree (stderr, &space.tree, space.nelems, space.elems); */
+        /* output_BoundingBox (out, &space.box);  fputc ('\n', out); */
+        /* output_KDTree (out, &space.tree, space.nelems, space.elems); */
         /* output_gv_KDTree (out, &space.tree); */
 
 #ifdef BENCHMARKING

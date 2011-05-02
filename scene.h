@@ -27,7 +27,6 @@ struct scene_struct
     BaryPoint* txpts; /* Texture points.*/
     Material* matls; /* Materials.*/
     Texture* txtrs; /* Textures.*/
-    BoundingBox box;
 };
 typedef struct scene_struct Scene;
 
@@ -41,6 +40,8 @@ void
 tri_Scene (Triangle* dst, const Scene* scene, uint idx);
 void
 elem_Scene (PointXfrm* dst, const Scene* scene, uint idx);
+void
+interpolate_Scene (Scene* dst, uint k, uint nscenes, const Scene* scenes);
 #ifdef INCLUDE_SOURCE
 #include "scene.c"
 #endif

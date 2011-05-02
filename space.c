@@ -217,7 +217,7 @@ bool hit_outer_BoundingBox (Point* entrance,
             if (origin->coords[dim] > box->max_corner.coords[dim])
                 return false;
             if (origin->coords[dim] > box->min_corner.coords[dim])
-                cost.coords[dim] = Min_real;
+                cost.coords[dim] = Small_real;
             else
                 cost.coords[dim] = ((box->min_corner.coords[dim]
                                      - origin->coords[dim])
@@ -228,7 +228,7 @@ bool hit_outer_BoundingBox (Point* entrance,
             if (origin->coords[dim] < box->min_corner.coords[dim])
                 return false;
             if (origin->coords[dim] < box->max_corner.coords[dim])
-                cost.coords[dim] = Min_real;
+                cost.coords[dim] = Small_real;
             else
                 cost.coords[dim] = ((box->max_corner.coords[dim]
                                      - origin->coords[dim])
@@ -236,7 +236,7 @@ bool hit_outer_BoundingBox (Point* entrance,
         }
         else
         {
-            cost.coords[dim] = Min_real;
+            cost.coords[dim] = Small_real;
         }
     }
 

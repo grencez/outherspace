@@ -332,9 +332,6 @@ run_ray_cast ()
 
     setup_testcase_triangles (&space, &view_origin, &view_basis, &view_angle);
 
-    partition_RaySpace (&space);
-    identity_PointXfrm (&view_basis);
-
     hits = AllocT( uint, nrows * ncols );
     hits_size = nrows * ncols * sizeof (uint);
 

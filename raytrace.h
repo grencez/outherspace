@@ -26,6 +26,7 @@ struct ray_space_struct
     Triangle* elems;
     BarySimplex* simplices;
     Scene scene;
+    BoundingBox box;
     KDTree tree;
     uint nobjects;
     RaySpaceObject* objects;
@@ -125,6 +126,9 @@ void build_MultiRayCastParams (MultiRayCastParams* params,
 void init_RaySpace (RaySpace* space);
 void cleanup_RaySpace (RaySpace* space);
 void partition_RaySpace (RaySpace* space);
+void
+init_Scene_KDTreeGrid (KDTreeGrid* grid, const Scene* scene,
+                       const BoundingBox* box);
 void init_RayImage (RayImage* image);
 void resize_RayImage (RayImage* image);
 void downsample_RayImage (RayImage* image, uint inv);

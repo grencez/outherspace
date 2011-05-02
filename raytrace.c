@@ -11,8 +11,13 @@
 #include <omp.h>
 #endif
 
+    /* Note: When setting this to false, set MaxKDTreeDepth = 0 in kdtree.c.*/
 static const bool KDTreeRayTrace = true;
+#if NDimensions == 3
 static const bool BarycentricRayTrace = false;
+#else
+static const bool BarycentricRayTrace = true;
+#endif
     /* #define TrivialMpiRayTrace */
 
 #ifdef TrivialMpiRayTrace
@@ -31,6 +36,47 @@ void init_RaySpace (RaySpace* space)
     space->tree.nnodes = 0;
     space->nobjects = 0;
     space->object_tree.nnodes = 0;
+}
+
+    void
+init_filled_RaySpace (RaySpace* space)
+{
+    uint ei;
+    const Scene* scene;
+    scene = &space->scene;
+
+    init_BoundingBox (&space->box, scene->nverts, scene->verts);
+
+    space->nelems = scene->nelems;
+    space->elems = AllocT( Triangle, space->nelems );
+
+    UFor( ei, space->nelems )
+    {
+        uint pi;
+        const SceneElement* elem;
+        Triangle* tri;
+
+        elem = &scene->elems[ei];
+        tri = &space->elems[ei];
+
+        UFor( pi, NTrianglePoints )
+        {
+            uint vi;
+            vi = elem->pts[pi];
+            assert (vi < scene->nverts);
+            copy_Point (&tri->pts[pi], &scene->verts[vi]);
+        }
+    }
+
+    space->simplices = AllocT( BarySimplex, space->nelems );
+    UFor( ei, space->nelems )
+    {
+        PointXfrm raw;
+        elem_Scene (&raw, scene, ei);
+        init_BarySimplex (&space->simplices[ei], &raw);
+    }
+
+    partition_RaySpace (space);
 }
 
 void cleanup_RaySpace (RaySpace* space)
@@ -53,19 +99,71 @@ void partition_RaySpace (RaySpace* space)
     KDTreeGrid grid;
     uint i;
 
-    init_Triangle_KDTreeGrid (&grid, space->nelems, space->elems,
-                              &space->scene.box);
+    init_Scene_KDTreeGrid (&grid, &space->scene, &space->box);
     build_KDTree (&space->tree, &grid);
     cleanup_KDTreeGrid (&grid);
 
     UFor( i, space->nobjects )
+        partition_RaySpace (&space->objects[i].space);
+}
+
+    void
+init_Scene_KDTreeGrid (KDTreeGrid* grid, const Scene* scene,
+                       const BoundingBox* box)
+{
+    uint i, nelems;
+
+    nelems = scene->nelems;
+    assert (nelems > 0);
+
+    grid->nintls = 2 * nelems;
+    grid->intls[0] = AllocT( uint, NDimensions * grid->nintls );
+    grid->coords[0] = AllocT( real, NDimensions * grid->nintls );
+
+    UFor( i, NDimensions )
     {
-        init_Triangle_KDTreeGrid (&grid, space->objects[i].space.nelems,
-                                  space->objects[i].space.elems,
-                                  &space->objects[i].space.scene.box);
-        build_KDTree (&space->objects[i].space.tree, &grid);
-        cleanup_KDTreeGrid (&grid);
+        grid->intls[i] = &grid->intls[0][i * grid->nintls];
+        grid->coords[i] = &grid->coords[0][i * grid->nintls];
     }
+
+    UFor( i, nelems )
+    {
+        uint pi, dim, ti;
+        const SceneElement* elem;
+        real coords[NDimensions][2];
+
+        elem = &scene->elems[i];
+
+        UFor( dim, NDimensions )
+        {
+            coords[dim][0] = Max_real;
+            coords[dim][1] = Min_real;
+        }
+
+        UFor( pi, NDimensions )
+        {
+            const Point* p;
+            p = &scene->verts[elem->pts[pi]];
+            UFor( dim, NDimensions )
+            {
+                assert (inside_BoundingBox (box, p));
+                if (p->coords[dim] < coords[dim][0])
+                    coords[dim][0] = p->coords[dim];
+                if (p->coords[dim] > coords[dim][1])
+                    coords[dim][1] = p->coords[dim];
+            }
+        }
+
+        ti = 2*i;
+        UFor( dim, NDimensions )
+        {
+            grid->intls[dim][ti] = ti;
+            grid->intls[dim][ti+1] = ti+1;
+            grid->coords[dim][ti] = coords[dim][0];
+            grid->coords[dim][ti+1] = coords[dim][1];
+        }
+    }
+    copy_BoundingBox (&grid->box, box);
 }
 
 void init_RayImage (RayImage* image)
@@ -194,6 +292,7 @@ fill_pixel (byte* ret_red, byte* ret_green, byte* ret_blue,
             const BarySimplex* simplex,
             const Scene* scene)
 {
+    const bool shade_by_element = false;
     const uint nincs = 256;
     byte rgb[3];
     const SceneElement* elem;
@@ -245,6 +344,14 @@ fill_pixel (byte* ret_red, byte* ret_green, byte* ret_blue,
             rgb[2] = nincs - 1;
             rgb[0] = val - 4 * nincs;
         }
+    }
+
+    if (shade_by_element)
+    {
+        real scale = 0;
+        scale = 1 - (real) hit_idx / scene->nelems;
+        UFor( i, 3 )
+            rgb[i] *= scale;
     }
 
         /* Texture mapping.*/
@@ -499,7 +606,7 @@ cast_recurse (uint* ret_hit,
               space->nelems, space->tree.elemidcs,
               space->tree.nodes,
               space->simplices, space->elems,
-              &space->scene.box, inside_box);
+              &space->box, inside_box);
 
     if (hit_idx < hit_space->nelems)
     {
@@ -525,15 +632,15 @@ cast_recurse (uint* ret_hit,
 
         diff_Point (&diff, origin, &object->centroid);
         xfrm_Point (&rel_origin, &object->orientation, &diff);
-        summ_Point (&diff, &object->space.scene.box.min_corner, 
-                    &object->space.scene.box.max_corner);
+        summ_Point (&diff, &object->space.box.min_corner, 
+                    &object->space.box.max_corner);
         scale_Point (&diff, &diff, 0.5);
         summ_Point (&rel_origin, &rel_origin, &diff);
 
         xfrm_Point (&rel_dir, &object->orientation, dir);
 
         rel_inside_box =
-            inside_BoundingBox (&object->space.scene.box, &rel_origin);
+            inside_BoundingBox (&object->space.box, &rel_origin);
 
         xfrm_PointXfrm (&rel_basis, view_basis, &object->orientation);
         
@@ -634,7 +741,7 @@ rays_to_hits_fish (RayImage* image,
     col_delta = view_angle / ncols;
     col_start += col_delta / 2;
 
-    inside_box = inside_BoundingBox (&space->scene.box, origin);
+    inside_box = inside_BoundingBox (&space->box, origin);
 
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic)
@@ -703,9 +810,9 @@ rays_to_hits_fixed_plane (uint* hits, real* mags,
     real col_delta, row_delta;
     const BoundingBox* box;
 
-    box = &space->scene.box;
+    box = &space->box;
 
-    row_start = space->scene.box.min_corner.coords[row_dim];
+    row_start = space->box.min_corner.coords[row_dim];
     row_delta = (box->max_corner.coords[row_dim] - row_start) / nrows;
     row_start += row_delta / 2;
 
@@ -754,7 +861,7 @@ rays_to_hits_fixed_plane (uint* hits, real* mags,
                       space->tree.elemidcs,
                       space->tree.nodes,
                       space->simplices, space->elems,
-                      &space->scene.box, inside_box);
+                      &space->box, inside_box);
             hitline[col] = hit;
             magline[col] = mag;
 
@@ -784,7 +891,7 @@ rays_to_hits_parallel (RayImage* restrict image,
     nrows = image->nrows;
     ncols = image->ncols;
 
-    box = &space->scene.box;
+    box = &space->box;
     dir = &view_basis->pts[dir_dim];
 
     row_delta = view_width / nrows;
@@ -892,7 +999,7 @@ rays_to_hits (RayImage* restrict image,
     nprocs = 1;
 #endif
 
-    box = &space->scene.box;
+    box = &space->box;
     setup_ray_pixel_deltas (&dir_start, &row_delta, &col_delta,
                             nrows, ncols,
                             view_basis, view_angle);
@@ -1036,7 +1143,7 @@ void build_MultiRayCastParams (MultiRayCastParams* params,
                             nrows, ncols,
                             view_basis, view_angle);
 
-    copy_BoundingBox (&params->box, &space->scene.box);
+    copy_BoundingBox (&params->box, &space->box);
     params->nelems = space->nelems;
     params->npixels[row_dim] = nrows;
     params->npixels[col_dim] = ncols;

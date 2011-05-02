@@ -1,9 +1,10 @@
 
 #ifndef WAVEFRONT_FILE_H_
 #define WAVEFRONT_FILE_H_
-#include "raytrace.h"
+#include "scene.h"
 
-bool readin_wavefront (RaySpace* space, const char* filename);
+bool
+readin_wavefront (Scene* scene, const char* filename);
 
 #ifdef INCLUDE_SOURCE
 #include "wavefront-file.c"

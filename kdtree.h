@@ -3,8 +3,8 @@
 #ifndef __OPENCL_VERSION__
 #define KDTREE_H_
 
-#include "scene.h"
 #include "simplex.h"
+#include "space.h"
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
 struct kd_tree_leaf_struct;
@@ -83,10 +83,6 @@ void output_gv_KDTree (FILE* out, const KDTree* tree);
 
 void cleanup_KDTree (KDTree* tree);
 
-void
-init_Triangle_KDTreeGrid (KDTreeGrid* grid,
-                          uint nelems, const Triangle* elems,
-                          const BoundingBox* box);
 void
 build_KDTree (KDTree* tree, KDTreeGrid* grid);
 

@@ -50,7 +50,8 @@ typedef byte bool;
 #if 0
 typedef double real;
 #define Max_real DBL_MAX
-#define Min_real DBL_MIN
+#define Min_real (-DBL_MAX)
+#define Small_real DBL_MIN
 #define Epsilon_real DBL_EPSILON
 
 #ifndef M_PI
@@ -64,7 +65,8 @@ typedef double real;
 #else
 typedef float real;
 #define Max_real FLT_MAX
-#define Min_real FLT_MIN
+#define Min_real (-FLT_MAX)
+#define Small_real FLT_MIN
 #define Epsilon_real FLT_EPSILON
 
 #ifndef M_PI
