@@ -184,11 +184,12 @@ readin_wavefront (Scene* scene, const char* filename)
 
         UFor( ei, scene->nelems )
         {
+            const uint nverts = 3;
             uint pi;
             SceneElement* elem;
             elem = &scene->elems[ei];
 
-            UFor( pi, NTrianglePoints )
+            UFor( pi, nverts )
             {
                 uint vi;
                 vi = elem->pts[pi];

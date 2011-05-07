@@ -23,7 +23,7 @@ typedef struct multi_ray_cast_params_struct MultiRayCastParams;
 struct ray_space_struct
 {
     uint nelems;
-    Triangle* elems;
+    Simplex* elems;
     BarySimplex* simplices;
     Scene scene;
     BoundingBox box;

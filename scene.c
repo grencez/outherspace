@@ -46,20 +46,35 @@ void cleanup_Scene (Scene* scene)
     }
 }
 
+    void
+output_SceneElement (FILE* out, const Scene* scene, uint ei)
+{
+    uint i;
+    UFor( i, NDimensions )
+    {
+        uint vi;
+        vi = scene->elems[ei].pts[i];
+        if (i == 0)  fputc ('[', out);
+        else         fputc (' ', out);
+        output_Point (out, &scene->verts[vi]);
+    }
+    fputc (']', out);
+}
+
 void vert_Scene (Point* dst, const Scene* scene, uint idx)
 {
     copy_Point (dst, &scene->verts[idx]);
 }
 
     void
-tri_Scene (Triangle* dst, const Scene* scene, uint idx)
+simplex_Scene (Simplex* dst, const Scene* scene, uint idx)
 {
     uint i;
     const SceneElement* elem;
 
     elem = &scene->elems[idx];
 
-    UFor( i, NTrianglePoints )
+    UFor( i, NDimensions )
         vert_Scene (&dst->pts[i], scene, elem->pts[i]);
 }
 
@@ -75,6 +90,12 @@ elem_Scene (PointXfrm* dst, const Scene* scene, uint idx)
         vert_Scene (&dst->pts[i], scene, elem->pts[i]);
 }
 
+
+    uint
+simplex_fill_count (uint k)
+{
+    return k;
+}
 
     /* Given 2 simplices of dimension /k-1/,
      * create /k/ simplices of dimension /k/
@@ -163,7 +184,7 @@ interpolate_Scene (Scene* dst, uint k, uint nscenes, const Scene* scenes)
     }
 
     init_Scene (dst);
-    dst->nelems = k * (nscenes-1) * nelems;
+    dst->nelems =  (nscenes-1) * nelems * simplex_fill_count (k);
     dst->elems = AllocT( SceneElement, dst->nelems );
     dst->nverts = nscenes * nverts;
     dst->verts = AllocT( Point, dst->nverts );

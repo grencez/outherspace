@@ -48,7 +48,7 @@ output_KDTreeNode (FILE* out, uint node_idx,
 }
 
 void output_KDTree (FILE* out, const KDTree* tree,
-                    uint nelems, const Triangle* elems)
+                    uint nelems, const Simplex* elems)
 {
     uint i;
     fputs ("-- KDTree --\n", out);
@@ -56,7 +56,7 @@ void output_KDTree (FILE* out, const KDTree* tree,
     UFor( i, nelems )
     {
         fprintf (out, "\n %u  ", i);
-        output_Triangle (out, &elems[i]);
+        output_Simplex (out, &elems[i]);
     }
     fputs ("\n- Nodes -\n", out);
     output_KDTreeNode (out, 0, 0, tree);
@@ -552,7 +552,7 @@ build_KDTreeNode (uint node_idx, uint parent,
             UFor( i, nelems )
             {
                 fprintf (out, "\n%*s", 2*depth+1, "");
-                output_Triangle (out, elems[i]);
+                output_Simplex (out, elems[i]);
             }
             fputc ('\n', out);
         }

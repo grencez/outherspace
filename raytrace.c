@@ -48,18 +48,18 @@ init_filled_RaySpace (RaySpace* space)
     init_BoundingBox (&space->box, scene->nverts, scene->verts);
 
     space->nelems = scene->nelems;
-    space->elems = AllocT( Triangle, space->nelems );
+    space->elems = AllocT( Simplex, space->nelems );
 
     UFor( ei, space->nelems )
     {
         uint pi;
         const SceneElement* elem;
-        Triangle* tri;
+        Simplex* tri;
 
         elem = &scene->elems[ei];
         tri = &space->elems[ei];
 
-        UFor( pi, NTrianglePoints )
+        UFor( pi, NDimensions )
         {
             uint vi;
             vi = elem->pts[pi];
@@ -293,6 +293,7 @@ fill_pixel (byte* ret_red, byte* ret_green, byte* ret_blue,
             const Scene* scene)
 {
     const bool shade_by_element = false;
+    const bool color_by_element = false;
     const uint nincs = 256;
     byte rgb[3];
     const SceneElement* elem;
@@ -346,17 +347,29 @@ fill_pixel (byte* ret_red, byte* ret_green, byte* ret_blue,
         }
     }
 
-    if (shade_by_element)
+    if (color_by_element)
     {
-        real scale = 0;
-        scale = 1 - (real) hit_idx / scene->nelems;
-        UFor( i, 3 )
-            rgb[i] *= scale;
-    }
+        uint color_diff, x, y;
+        color_diff = 0xFFFFFF / scene->nelems;
+        x = color_diff * (scene->nelems - hit_idx);
+        y = 0;
 
-        /* Texture mapping.*/
-    if (material && material->ambient_texture != Max_uint)
+        UFor( i, 3 )
+        {
+            uint j;
+            UFor( j, 8 )
+            {
+                if (0 != (x & (1 << (i + 3*j))))
+                    y |= (1 << (8*i + j));
+            }
+        }
+        rgb[0] = (byte) ((y & 0xFF0000) >> 16);
+        rgb[1] = (byte) ((y & 0x00FF00) >>  8);
+        rgb[2] = (byte) ((y & 0x0000FF) >>  0);
+    }
+    else if (material && material->ambient_texture != Max_uint)
     {
+            /* Texture mapping.*/
         const Texture* ambient_texture;
         Point isect, bpoint;
         BaryPoint texpoint;
@@ -390,7 +403,14 @@ fill_pixel (byte* ret_red, byte* ret_green, byte* ret_blue,
         map_Texture (rgb, ambient_texture, &texpoint);
     }
 
-    if (image->shading_on)
+    if (shade_by_element)
+    {
+        real scale = 0;
+        scale = 1 - (real) hit_idx / scene->nelems;
+        UFor( i, 3 )
+            rgb[i] *= scale;
+    }
+    else if (image->shading_on)
     {
         real scale;
         Point tmp;
@@ -437,7 +457,7 @@ test_intersections (uint* ret_hit,
                     uint nelemidcs,
                     __global const uint* restrict elemidcs,
                     __global const BarySimplex* restrict simplices,
-                    __global const Triangle* restrict tris,
+                    __global const Simplex* restrict tris,
                     const BoundingBox* restrict box)
 {
     uint i, hit_idx;
@@ -460,17 +480,17 @@ test_intersections (uint* ret_hit,
         }
         else 
         {
-            const Triangle* restrict tri;
+            const Simplex* restrict tri;
             tmp_hit = elemidcs[i];
 #if __OPENCL_VERSION__
-            const Triangle stri = tris[tmp_hit];
+            const Simplex stri = tris[tmp_hit];
             tri = &stri;
 #else
             tri = &tris[tmp_hit];
 #endif
-                /* Triangle tri; */
+                /* Simplex tri; */
                 /* elem_Scene (&tri, &space->scene, leaf->elems[i]); */
-            didhit = hit_Triangle (&tmp_mag, origin, dir, tri);
+            didhit = hit_Simplex (&tmp_mag, origin, dir, tri);
         }
 
         if (didhit && tmp_mag < hit_mag)
@@ -513,7 +533,7 @@ cast_ray (uint* restrict ret_hit, real* restrict ret_mag,
           __global const uint* restrict elemidcs,
           __global const KDTreeNode* restrict nodes,
           __global const BarySimplex* restrict simplices,
-          __global const Triangle* restrict tris,
+          __global const Simplex* restrict tris,
           __global const BoundingBox* restrict box,
           bool inside_box)
 {

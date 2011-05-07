@@ -35,9 +35,11 @@ void init_Scene (Scene* scene);
 void init_SceneElement (SceneElement* elem);
 void copy_SceneElement (SceneElement* dst, const SceneElement* src);
 void cleanup_Scene (Scene* scene);
+void
+output_SceneElement (FILE* out, const Scene* scene, uint ei);
 void vert_Scene (Point* dst, const Scene* scene, uint idx);
 void
-tri_Scene (Triangle* dst, const Scene* scene, uint idx);
+simplex_Scene (Simplex* dst, const Scene* scene, uint idx);
 void
 elem_Scene (PointXfrm* dst, const Scene* scene, uint idx);
 void

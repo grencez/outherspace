@@ -67,7 +67,7 @@ setup_testcase_track (RaySpace* space,
         good = readin_wavefront (&space->objects[i].space.scene,
                                  "machine_1.obj");
         if (!good)  return false;
-        init_filled_RaySpace (space);
+        init_filled_RaySpace (&space->objects[i].space);
         zero_Point (&space->objects[i].centroid);
         space->objects[i].centroid.coords[0] = 75 * i + 300;
         identity_PointXfrm (&space->objects[i].orientation);
@@ -131,23 +131,24 @@ setup_testcase_sphere (RaySpace* space,
 #if 0
 #elif 1
     *view_angle = 1.0472;
-    view_origin->coords[0] = 0.305251;
-    view_basis->pts[0].coords[0] = -0.176537;
-    view_basis->pts[0].coords[1] = -0.0143234;
-    view_basis->pts[0].coords[2] = -0.98419;
-    view_origin->coords[1] = 0.265131;
-    view_basis->pts[1].coords[0] = 0.65388;
-    view_basis->pts[1].coords[1] = -0.749081;
-    view_basis->pts[1].coords[2] = -0.106387;
-    view_origin->coords[2] = -0.0538335;
-    view_basis->pts[2].coords[0] = -0.735714;
-    view_basis->pts[2].coords[1] = -0.662323;
-    view_basis->pts[2].coords[2] = 0.141606;
+    view_origin->coords[0] = 1.01034;
+    view_basis->pts[0].coords[0] = -0.49957;
+    view_basis->pts[0].coords[1] = 0.840569;
+    view_basis->pts[0].coords[2] = 0.209461;
+    view_origin->coords[1] = 0.648768;
+    view_basis->pts[1].coords[0] = -0.708308;
+    view_basis->pts[1].coords[1] = -0.257146;
+    view_basis->pts[1].coords[2] = -0.657401;
+    view_origin->coords[2] = -1.02315;
+    view_basis->pts[2].coords[0] = -0.498728;
+    view_basis->pts[2].coords[1] = -0.476781;
+    view_basis->pts[2].coords[2] = 0.723844;
+
 
     if (NDimensions == 4)
     {
         swaprows_PointXfrm (view_basis, 2, 3);
-        view_origin->coords[3] = 50;
+        view_origin->coords[3] = 26.2109;
     }
 #endif
 

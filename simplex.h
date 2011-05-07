@@ -5,12 +5,11 @@
 #include "xfrm.h"
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
-#define NTrianglePoints 3
-struct triangle_struct
+struct simplex_struct
 {
-    Point pts[NTrianglePoints];
+    Point pts[NDimensions];
 };
-typedef struct triangle_struct Triangle;
+typedef struct simplex_struct Simplex;
 
 struct plane_struct
 {
@@ -34,19 +33,19 @@ typedef struct bary_simplex_struct BarySimplex;
 
 
 bool
-hit_Triangle (real* restrict ret_dist,
-              const Point* restrict origin,
-              const Point* restrict dir,
-              const Triangle* restrict elem);
-bool hit_proj_Triangle (real* restrict dist,
+hit_Simplex (real* restrict ret_dist,
+             const Point* restrict origin,
+             const Point* restrict dir,
+             const Simplex* restrict elem);
+bool hit_proj_Simplex (real* restrict dist,
                         const Point* restrict origin,
                         const Point* restrict kd_dir,
-                        const Triangle* restrict elem,
+                        const Simplex* restrict elem,
                         const PointXfrm* restrict view_basis);
-bool hit_weak_Triangle (real* restrict dist,
+bool hit_weak_Simplex (real* restrict dist,
                         const Point* restrict origin,
                         const Point* restrict kd_dir,
-                        const Triangle* restrict elem);
+                        const Simplex* restrict elem);
 
 void init_Plane (Plane* plane, const Point* normal, const Point* point);
 real distance_Plane (const Plane* plane, const Point* point);
@@ -61,7 +60,7 @@ hit_BarySimplex (real* restrict ret_dist,
                  const BarySimplex* restrict elem);
 
 #ifndef __OPENCL_VERSION__
-void output_Triangle (FILE* out, const Triangle* elem);
+void output_Simplex (FILE* out, const Simplex* elem);
 #ifdef INCLUDE_SOURCE
 #include "simplex.c"
 #endif

@@ -379,7 +379,7 @@ run_ray_cast ()
 
     inp_elems = clCreateBuffer (context,
                                 CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                                space.nelems * sizeof (Triangle),
+                                space.nelems * sizeof (Simplex),
                                 space.elems, &err);
     check_cl_status (err, "alloc elems buffer");
 

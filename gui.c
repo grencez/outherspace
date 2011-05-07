@@ -399,14 +399,17 @@ static gboolean move_mouse_fn (GtkWidget* widget,
 
 static gboolean grab_mouse_fn (GtkWidget* da,
                                GdkEventButton* event,
-                               GdkWindowEdge edge)
+                               gpointer state)
 {
         /* GdkCursor* cursor; */
     int width, height;
-    real vert, horz;
+    uint row, col;
     FILE* out;
+    bool do_rotate = false;
+    bool do_raycast = false;
+    const RaySpace* space;
 
-    (void) edge;
+    space = (RaySpace*) state;
 
     out = stdout;
 
@@ -419,36 +422,90 @@ static gboolean grab_mouse_fn (GtkWidget* da,
         return FALSE;
     }
 
-        /* Our X is vertical and Y is horizontal.*/
-    vert = (view_nrows - 2 * event->y) / view_nrows;
-    horz = (2 * event->x - view_ncols) / view_ncols;
+    row = view_nrows - event->y - 1;
+    col = event->x;
 
-        /* fprintf (out, "vert:%f  horz:%f\n", vert, horz); */
+    if      (event->button == 1)  do_rotate = true;
+    else if (event->button == 3)  do_raycast = true;
 
-    set_rotate_view (vert, horz);
+    if (do_rotate)
+    {
+        real vert, horz;
+            /* Our X is vertical and Y is horizontal.*/
+        vert = (2 * (real) row - view_nrows) / view_nrows;
+        horz = (2 * (real) col - view_ncols) / view_ncols;
 
-    fputs ("basis:", out);
-    output_PointXfrm (out, &view_basis);
-    fputc ('\n', out);
-    needs_recast = true;
-    gtk_widget_queue_draw (da);
+        fprintf (out, "vert:%f  horz:%f\n", vert, horz);
+
+        set_rotate_view (vert, horz);
+
+        fputs ("basis:", out);
+        output_PointXfrm (out, &view_basis);
+        fputc ('\n', out);
+        needs_recast = true;
+        gtk_widget_queue_draw (da);
 
 #if 0
-    cursor = gdk_cursor_new (GDK_GUMBY);
-    gdk_pointer_grab (da->window,
-                      FALSE,
-                      0,
-                      da->window,
-                      cursor,
-                      event->time);
-    gdk_cursor_unref (cursor);
+        cursor = gdk_cursor_new (GDK_GUMBY);
+        gdk_pointer_grab (da->window,
+                          FALSE,
+                          0,
+                          da->window,
+                          cursor,
+                          event->time);
+        gdk_cursor_unref (cursor);
 
 #endif
 
-    mouse_coords[0] = event->x_root;
-    mouse_coords[1] = event->y_root;
-    mouse_diff[0] = 0;
-    mouse_diff[1] = 0;
+        mouse_coords[0] = event->x_root;
+        mouse_coords[1] = event->y_root;
+        mouse_diff[0] = 0;
+        mouse_diff[1] = 0;
+    }
+    else if (do_raycast)
+    {
+        uint hit_idx;
+        real hit_mag;
+        const RaySpace* hit_space;
+        Point hit_origin, hit_dir;
+        Point origin, dir;
+        Point dir_start, row_delta, col_delta, partial_dir;
+        bool inside_box;
+
+
+        copy_Point (&origin, &view_origin);
+        inside_box = inside_BoundingBox (&space->box, &origin);
+
+        setup_ray_pixel_deltas (&dir_start, &row_delta, &col_delta,
+                                view_nrows, view_ncols,
+                                &view_basis, view_angle);
+        scale_Point (&partial_dir, &row_delta, row);
+        summ_Point (&partial_dir, &partial_dir, &dir_start);
+        scale_Point (&dir, &col_delta, col);
+        summ_Point (&dir, &dir, &partial_dir);
+        normalize_Point (&dir, &dir);
+
+        cast_recurse (&hit_idx, &hit_mag, &hit_space,
+                      &hit_origin, &hit_dir,
+                      space, &view_basis,
+                      &origin, &dir,
+                      inside_box, Max_uint);
+        if (hit_idx < space->nelems)
+        {
+            Point isect;
+            scale_Point (&isect, &dir, hit_mag);
+            summ_Point (&isect, &origin, &isect);
+            fprintf (out, "Elem:%u  Intersect:", hit_idx);
+            output_Point (out, &isect);
+            fputc ('\n', out);
+            output_SceneElement (out, &hit_space->scene, hit_idx);
+            fputc ('\n', out);
+        }
+        else
+        {
+            fputs ("No hit!\n", out);
+        }
+    }
 
     return FALSE;
 }
@@ -592,40 +649,6 @@ render_RaySpace (byte* data, const RaySpace* space,
                 ((guint32) pixline[3*col+2] <<  0);
         }
     }
-
-#if 0
-    UFor( row, view_nrows )
-    {
-        guint32 color_diff;
-        color_diff = (guint32) 0xFFFFFF / (guint32) space->nelems;
-        uint* hitline;
-        guint32* outline;
-        if (row >= nrows)  break;
-
-        hitline = &ray_hits[view_ncols * row];
-        outline = (guint32*) &data[stride * (view_nrows - row - 1)];
-
-        UFor( col, view_ncols )
-        {
-            guint32 i, x, y;
-            if (col >= ncols)  break;
-
-            x = color_diff * (space->nelems - hitline[col]);
-            y = 0xFF000000;
-
-            UFor( i, 3 )
-            {
-                guint32 j;
-                UFor( j, 8 )
-                {
-                    if (0 != (x & (1 << (i + 3*j))))
-                        y |= (1 << (8*i + j));
-                }
-            }
-            outline[col] = y;
-        }
-    }
-#endif
 }
 
 
@@ -696,7 +719,7 @@ gui_main (int argc, char* argv[], RaySpace* space)
     g_signal_connect (window, "key-press-event",
                       G_CALLBACK(key_press_fn), NULL);
     g_signal_connect (window, "button-press-event",
-                      G_CALLBACK(grab_mouse_fn), NULL);
+                      G_CALLBACK(grab_mouse_fn), space);
     g_timeout_add (1000 / 60, &poll_joystick, window);
 
 
@@ -773,7 +796,7 @@ int main (int argc, char* argv[])
         setup_testcase_track
 #elif 0
         setup_testcase_4d_surface
-#elif 0
+#elif 1
         setup_testcase_sphere
 #endif
         (&space, &view_origin, &view_basis, &view_angle);

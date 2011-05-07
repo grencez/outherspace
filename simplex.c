@@ -5,12 +5,12 @@
 #include <assert.h>
 #include <math.h>
 
-void output_Triangle (FILE* out, const Triangle* elem)
+void output_Simplex (FILE* out, const Simplex* elem)
 {
     uint pi;
     const char* delim = "";
     fputc ('[', out);
-    UFor( pi, NTrianglePoints )
+    UFor( pi, NDimensions )
     {
         fputs (delim, out);
         output_Point (out, &elem->pts[pi]);
@@ -36,10 +36,10 @@ cross_Point (Point* restrict dst,
 
 
     bool
-hit_Triangle (real* restrict ret_dist,
-              const Point* restrict origin,
-              const Point* restrict dir,
-              const Triangle* restrict elem)
+hit_Simplex (real* restrict ret_dist,
+             const Point* restrict origin,
+             const Point* restrict dir,
+             const Simplex* restrict elem)
 {
         /* const real epsilon = (real) 0.000001; */
     const real epsilon = 0;
@@ -105,10 +105,10 @@ static real dot3 (const real a[3], const real b[3])
     return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 }
 
-bool hit_proj_Triangle (real* restrict dist,
+bool hit_proj_Simplex (real* restrict dist,
                         const Point* restrict origin,
                         const Point* restrict kd_dir,
-                        const Triangle* restrict elem,
+                        const Simplex* restrict elem,
                         const PointXfrm* restrict view_basis)
 {
         /* const real epsilon = (real) 0.000001; */
@@ -185,10 +185,10 @@ bool hit_proj_Triangle (real* restrict dist,
     return *dist >= 0;
 }
 
-bool hit_weak_Triangle (real* restrict dist,
+bool hit_weak_Simplex (real* restrict dist,
                         const Point* restrict origin,
                         const Point* restrict kd_dir,
-                        const Triangle* restrict elem)
+                        const Simplex* restrict elem)
 {
         /* const real epsilon = (real) 0.000001; */
     const real epsilon = 0;

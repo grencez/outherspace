@@ -78,7 +78,7 @@ descend_KDTreeNode (uint* ret_parent,
 
 #ifndef __OPENCL_VERSION__
 void output_KDTree (FILE* out, const KDTree* tree,
-                    uint nelems, const Triangle* elems);
+                    uint nelems, const Simplex* elems);
 void output_gv_KDTree (FILE* out, const KDTree* tree);
 
 void cleanup_KDTree (KDTree* tree);
