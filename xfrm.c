@@ -265,6 +265,20 @@ real det3_PointXfrm (const PointXfrm* xfrm,
             - a[2][2]*a[1][0]*a[0][1]);
 }
 
+real det_PointXfrm (const PointXfrm* xfrm)
+{
+    uint i;
+    real det;
+    Point p;
+
+    row_minors_PointXfrm (&p, xfrm, 0);
+    checker_negate_Point (&p);
+    det = 0;
+    UFor( i, NDimensions )
+        det += p.coords[i] * xfrm->pts[i].coords[0];
+    return det;
+}
+
 void row_minors_PointXfrm (Point* dst, const PointXfrm* xfrm, uint row)
 {
 #if NDimensions == 3
@@ -288,7 +302,7 @@ void row_minors_PointXfrm (Point* dst, const PointXfrm* xfrm, uint row)
     dst->coords[2] = det3_PointXfrm (xfrm, i, j, k, 0, 1, 3);
     dst->coords[3] = det3_PointXfrm (xfrm, i, j, k, 0, 1, 2);
 #else
-    assert (0);
+    assert (0 && "Not implemented.");
 #endif
 }
 

@@ -32,6 +32,8 @@ real det2_PointXfrm (const PointXfrm* xfrm,
 real det3_PointXfrm (const PointXfrm* xfrm,
                      uint ri, uint rj, uint rk,
                      uint ci, uint cj, uint ck);
+real
+det_PointXfrm (const PointXfrm* xfrm);
 void row_minors_PointXfrm (Point* dst, const PointXfrm* xfrm, uint row);
 
 #ifndef __OPENCL_VERSION__

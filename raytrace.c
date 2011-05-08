@@ -71,9 +71,11 @@ init_filled_RaySpace (RaySpace* space)
     space->simplices = AllocT( BarySimplex, space->nelems );
     UFor( ei, space->nelems )
     {
-        PointXfrm raw;
-        elem_Scene (&raw, scene, ei);
-        init_BarySimplex (&space->simplices[ei], &raw);
+        Simplex raw;
+        bool good;
+        simplex_Scene (&raw, scene, ei);
+        good = init_BarySimplex (&space->simplices[ei], &raw);
+        assert (good);
     }
 
     partition_RaySpace (space);

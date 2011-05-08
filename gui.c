@@ -796,6 +796,8 @@ int main (int argc, char* argv[])
         setup_testcase_track
 #elif 0
         setup_testcase_4d_surface
+#elif 0
+        setup_testcase_interp
 #elif 1
         setup_testcase_sphere
 #endif

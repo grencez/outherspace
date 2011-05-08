@@ -94,6 +94,112 @@ setup_testcase_track (RaySpace* space,
     return good;
 }
 
+    bool
+setup_testcase_manual_interp (RaySpace* space,
+                              Point* view_origin,
+                              PointXfrm* view_basis,
+                              real* view_angle)
+{
+    FILE* out;
+    uint i;
+    const uint nverts = 6;
+    const uint nelems = 15;
+    const uint ndims = 4;
+    uint elem_idx = 0;
+    const real verts[][4] =
+    {
+            /* 0 */
+        {1, 0, 0, 0},
+        {0, 1, 0, 0},
+        {0, 0, 1, 0},
+            /* 3 */
+        {0, 1, 0, 1},
+        {1, 2, 0, 1},
+        {0, 0, 1, 1},
+    };
+    const uint elems[][4] =
+    {
+        { 0, 1, 2,  3       },
+        { 0, 1, 2,     4    },
+        { 0, 1, 2,        5 },
+        { 0, 1,     3, 4    },
+        { 0, 1,     3,    5 },
+        { 0, 1,        4, 5 },
+        { 0,    2,  3, 4    },
+        { 0,    2,  3,    5 },
+        { 0,    2,     4, 5 },
+        { 0,        3, 4, 5 },
+        {    1, 2,  3, 4    },
+        {    1, 2,  3,    5 },
+        {    1, 2,     4, 5 },
+        {    1,     3, 4, 5 },
+        {       2,  3, 4, 5 },
+
+        { 0, 0, 0, 0 }
+    };
+    Scene* scene;
+
+    assert (NDimensions == ndims);
+
+    out = stderr;
+
+    init_RaySpace (space);
+    identity_PointXfrm (view_basis);
+    zero_Point (view_origin);
+
+    scene = &space->scene;
+    scene->nelems = nelems;
+    scene->nverts = nverts;
+    scene->elems = AllocT( SceneElement, nelems );
+    scene->verts = AllocT( Point, nverts );
+
+    UFor( i, nverts )
+    {
+        uint j;
+        UFor( j, ndims )
+            scene->verts[i].coords[j] = verts[i][j];
+    }
+
+    UFor( i, nelems )
+    {
+        uint j;
+        Simplex simplex;
+        SceneElement* elem;
+
+        elem = &scene->elems[elem_idx];
+        init_SceneElement (elem);
+
+        UFor( j, ndims )
+        {
+            elem->pts[j] = elems[i][j];
+            copy_Point (&simplex.pts[j], &scene->verts[elem->pts[j]]);
+        }
+
+        if (degenerate_Simplex (&simplex))
+        {
+            fputs ("Skipping: ", out);
+            output_Simplex (out, &simplex);
+            fputc ('\n', out);
+        }
+        else
+        {
+            elem_idx += 1;
+        }
+    }
+    scene->nelems = elem_idx;
+
+    init_filled_RaySpace (space);
+
+    *view_angle = 1.0472;
+    swaprows_PointXfrm (view_basis, 2, 3);
+
+#if 0
+#elif 0
+#endif
+
+
+    return true;
+}
 
     bool
 setup_testcase_sphere (RaySpace* space,
@@ -102,6 +208,7 @@ setup_testcase_sphere (RaySpace* space,
                        real* view_angle)
 {
     bool good;
+    FILE* out = stderr;
     uint nscenes = 2;
     Scene scenes[2];
 
@@ -149,9 +256,12 @@ setup_testcase_sphere (RaySpace* space,
     {
         swaprows_PointXfrm (view_basis, 2, 3);
         view_origin->coords[3] = 26.2109;
+        view_origin->coords[3] = 0;
     }
 #endif
 
+        /* output_KDTree (out, &space->tree, space->nelems, space->elems); */
+    output_BoundingBox (out, &space->box);
     return good;
 }
 

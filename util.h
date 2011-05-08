@@ -88,6 +88,8 @@ tristate compare_real (real a, real b);
 real match_real (real a, real b);
 real absolute_error (real expect, real result);
 real relative_error (real expect, real result, real large);
+real
+approx_eql (real expect, real result, real large, real mul);
 tristate signum_real (real a);
 tristate mul_signum (tristate a, tristate b);
 
@@ -96,7 +98,7 @@ tristate mul_signum (tristate a, tristate b);
 #define AssertStatus( stat, msg )
 #else
 #define AssertApprox( expect, result, large, mul ) \
-    assert (mul*Epsilon_real >= fabs (relative_error (expect, result, large)))
+    assert (approx_eql (expect, result, large, mul))
 #define AssertStatus( stat, msg ) \
     assert_status (stat, msg, __FILE__, __LINE__)
 #endif

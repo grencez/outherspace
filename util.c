@@ -4,6 +4,7 @@
 
 #include <assert.h>
 #include <ctype.h>
+#include <math.h>
 #include <string.h>
 
 #ifdef DistribCompute
@@ -170,6 +171,12 @@ real relative_error (real expect, real result, real large)
         return err;
 
     return err / match_real (expect, large);
+}
+
+    real
+approx_eql (real expect, real result, real large, real mul)
+{
+    return mul*Epsilon_real >= fabs (relative_error (expect, result, large));
 }
 
 tristate signum_real (real a)

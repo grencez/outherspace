@@ -12,6 +12,11 @@ setup_testcase_track (RaySpace* space,
                       Point* view_origin, PointXfrm* view_basis,
                       real* view_angle);
 bool
+setup_testcase_manual_interp (RaySpace* space,
+                              Point* view_origin,
+                              PointXfrm* view_basis,
+                              real* view_angle);
+bool
 setup_testcase_sphere (RaySpace* space,
                        Point* view_origin,
                        PointXfrm* view_basis,

@@ -297,12 +297,20 @@ void barycentric_Plane (Plane* dst, const Plane* plane, const Point* point)
 #endif
 }
 
+    bool
+degenerate_Simplex (const Simplex* raw)
+{
+    BarySimplex tmp;
+    return !init_BarySimplex (&tmp, raw);
+}
 
-void init_BarySimplex (BarySimplex* elem, const PointXfrm* raw)
+    bool
+init_BarySimplex (BarySimplex* elem, const Simplex* raw)
 {
     uint i;
     PointXfrm surf;
     Plane* plane;
+    bool good = true;
 
     UFor( i, NDimensions-1 )
         diff_Point (&surf.pts[1+i], &raw->pts[1+i], &raw->pts[0]);
@@ -315,8 +323,9 @@ void init_BarySimplex (BarySimplex* elem, const PointXfrm* raw)
 
     UFor( i, NDimensions-1 )
     {
-        AssertApprox( 0, dot_Point (&surf.pts[0], &surf.pts[i+1]),
-                      magnitude_Point (&surf.pts[i+1]), 1e1 );
+        if (!approx_eql (0, dot_Point (&surf.pts[0], &surf.pts[i+1]),
+                         magnitude_Point (&surf.pts[i+1]), 1e1))
+            good = false;
 
         plane = &elem->barys[i];
         row_minors_PointXfrm (&plane->normal, &surf, 1+i);
@@ -324,9 +333,11 @@ void init_BarySimplex (BarySimplex* elem, const PointXfrm* raw)
         init_Plane (plane, &plane->normal, &raw->pts[0]);
         barycentric_Plane (plane, plane, &surf.pts[1+i]);
 
-        AssertApprox( 1, distance_Plane (plane, &raw->pts[1+i]),
-                      plane->offset, 5e2 );
+        if (!approx_eql (1, distance_Plane (plane, &raw->pts[1+i]),
+                         plane->offset, 5e2))
+            good = false;
     }
+    return good;
 }
 
 

@@ -41,8 +41,6 @@ void vert_Scene (Point* dst, const Scene* scene, uint idx);
 void
 simplex_Scene (Simplex* dst, const Scene* scene, uint idx);
 void
-elem_Scene (PointXfrm* dst, const Scene* scene, uint idx);
-void
 interpolate_Scene (Scene* dst, uint k, uint nscenes, const Scene* scenes);
 #ifdef INCLUDE_SOURCE
 #include "scene.c"
