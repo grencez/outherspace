@@ -12,13 +12,15 @@
 #include <gdk/gdkkeysyms.h>
 #include <SDL.h>
 
-#define NRacers 10
+    /* #define NRacers 10 */
 
 static const bool RenderDrawsPattern = false;
 static const bool ForceFauxFishEye = false;
 static const bool ShowFrameRate = false;
 
+#ifdef NRacers
 static ObjectMotion racer_motions[NRacers];
+#endif
 
 static real stride_magnitude = 10;
 static real prev_time;
@@ -551,7 +553,9 @@ render_RaySpace (byte* data, const RaySpace* space,
 
     if (needs_recast)
     {
+#ifdef NRacers
         uint i;
+#endif
         real time, dt;
 
         time = monotime ();
@@ -560,7 +564,7 @@ render_RaySpace (byte* data, const RaySpace* space,
         if (ShowFrameRate)
             fprintf (stderr, "FPS:%f\n", 1 / dt);
 
-#if 0
+#ifdef NRacers
         UFor( i, space->nobjects )
         {
             uint j;

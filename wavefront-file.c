@@ -37,7 +37,8 @@ readin_wavefront (Scene* scene, const char* filename)
     bool good = true;
     const char* line;
     FILE* in;
-    SList elemlist, vertlist, txptlist,
+    SList elemlist, vertlist,
+          vnmllist, txptlist,
           matlist, matnamelist,
           texlist, texnamelist;
     uint material = Max_uint;
@@ -49,6 +50,7 @@ readin_wavefront (Scene* scene, const char* filename)
 
     init_SList (&elemlist);
     init_SList (&vertlist);
+    init_SList (&vnmllist);
     init_SList (&txptlist);
     init_SList (&matlist);
     init_SList (&matnamelist);
@@ -67,6 +69,21 @@ readin_wavefront (Scene* scene, const char* filename)
 
         if (0 == strncmp (line, "vn", 2))
         {
+            Point* normal;
+            normal = AllocT( Point, 1 );
+            app_SList (&vnmllist, normal);
+            line = &line[2];
+            UFor( i, NDimensions )
+            {
+                line = strto_real (&normal->coords[i], line);
+                if (!line)
+                {
+                    good = false;
+                    fprintf (stderr, "Line:%u  Not enough coordinates!\n",
+                             line_no);
+                    break;
+                }
+            }
         }
         else if (0 == strncmp (line, "vt", 2))
         {
@@ -106,21 +123,22 @@ readin_wavefront (Scene* scene, const char* filename)
         }
         else if (line[0] == 'f')
         {
-            uint tmp;
             SceneElement elem;
             init_SceneElement (&elem);
             elem.material = material;
             good = false;
 
             line = &line[1];
-            line = parse_face_field (&elem.pts[0], &elem.txpts[0], &tmp, line);
-            line = parse_face_field (&elem.pts[1], &elem.txpts[1], &tmp, line);
+            line = parse_face_field (&elem.pts[0], &elem.txpts[0],
+                                     &elem.vnmls[0], line);
+            line = parse_face_field (&elem.pts[1], &elem.txpts[1],
+                                     &elem.vnmls[1], line);
 
             if (line) while (true)
             {
                 SceneElement* tri_elt;
                 line = parse_face_field (&elem.pts[2], &elem.txpts[2],
-                                         &tmp, line);
+                                         &elem.vnmls[2], line);
                 if (line)  good = true;
                 else       break;
 
@@ -158,6 +176,7 @@ readin_wavefront (Scene* scene, const char* filename)
     {
         cleanup_SList (&elemlist);
         cleanup_SList (&vertlist);
+        cleanup_SList (&vnmllist);
         cleanup_SList (&txptlist);
         cleanup_SList (&matlist);
         cleanup_SList (&texlist);
@@ -168,16 +187,19 @@ readin_wavefront (Scene* scene, const char* filename)
 
         scene->nelems = elemlist.nmembs;
         scene->nverts = vertlist.nmembs;
+        scene->nvnmls = vnmllist.nmembs;
         scene->ntxpts = txptlist.nmembs;
         scene->nmatls = matlist.nmembs;
         scene->ntxtrs = texlist.nmembs;
         scene->elems = AllocT( SceneElement, elemlist.nmembs );
         scene->verts = AllocT( Point, vertlist.nmembs );
+        scene->vnmls = AllocT( Point, vnmllist.nmembs );
         scene->txpts = AllocT( BaryPoint, txptlist.nmembs );
         scene->matls = AllocT( Material, matlist.nmembs );
         scene->txtrs = AllocT( Texture, texlist.nmembs );
         unroll_SList (scene->elems, &elemlist, sizeof (SceneElement));
         unroll_SList (scene->verts, &vertlist, sizeof (Point));
+        unroll_SList (scene->vnmls, &vnmllist, sizeof (Point));
         unroll_SList (scene->txpts, &txptlist, sizeof (BaryPoint));
         unroll_SList (scene->matls, &matlist, sizeof (Material));
         unroll_SList (scene->txtrs, &texlist, sizeof (Texture));

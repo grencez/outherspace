@@ -10,6 +10,7 @@
 struct scene_element_struct
 {
     uint pts[NDimensions];
+    uint vnmls[NDimensions];
     uint txpts[NDimensions];
     uint material;
 };
@@ -19,12 +20,14 @@ struct scene_struct
 {
     uint nelems;
     uint nverts;
+    uint nvnmls;
     uint ntxpts;
     uint nmatls;
     uint ntxtrs;
     SceneElement* elems; /* Elements.*/
     Point* verts; /* Vertices.*/
     BaryPoint* txpts; /* Texture points.*/
+    Point* vnmls; /* Vertex normals.*/
     Material* matls; /* Materials.*/
     Texture* txtrs; /* Textures.*/
 };

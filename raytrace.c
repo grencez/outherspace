@@ -284,6 +284,25 @@ void dir_from_MultiRayCastParams (Point* dir, uint row, uint col,
 }
 
 
+static
+    void
+map_vertex_normal (Point* normal,
+                   const Point* vnmls,
+                   const SceneElement* elem,
+                   const Point* bpoint)
+{
+    uint i;
+    zero_Point (normal);
+    UFor( i, NDimensions )
+    {
+        Point tmp;
+        assert (elem->vnmls[i] != Max_uint);
+        scale_Point (&tmp, &vnmls[elem->vnmls[i]], bpoint->coords[i]);
+        summ_Point (normal, normal, &tmp);
+    }
+    normalize_Point (normal, normal);
+}
+
     void
 fill_pixel (byte* ret_red, byte* ret_green, byte* ret_blue,
             uint hit_idx,
@@ -296,10 +315,12 @@ fill_pixel (byte* ret_red, byte* ret_green, byte* ret_blue,
 {
     const bool shade_by_element = false;
     const bool color_by_element = false;
+    const bool compute_bary_coords = true;
     const uint nincs = 256;
     byte rgb[3];
     const SceneElement* elem;
     const Material* material = 0;
+    Point bpoint;
     uint i;
 
     if (!simplex)
@@ -349,6 +370,20 @@ fill_pixel (byte* ret_red, byte* ret_green, byte* ret_blue,
         }
     }
 
+    if (compute_bary_coords)
+    {
+        Point isect;
+
+        scale_Point (&isect, dir, mag);
+        summ_Point (&isect, &isect, origin);
+        bpoint.coords[0] = 1;
+        UFor( i, NDimensions-1 )
+        {
+            bpoint.coords[i+1] = distance_Plane (&simplex->barys[i], &isect);
+            bpoint.coords[0] -= bpoint.coords[i+1];
+        }
+    }
+
     if (color_by_element)
     {
         uint color_diff, x, y;
@@ -373,35 +408,21 @@ fill_pixel (byte* ret_red, byte* ret_green, byte* ret_blue,
     {
             /* Texture mapping.*/
         const Texture* ambient_texture;
-        Point isect, bpoint;
         BaryPoint texpoint;
 
         ambient_texture = &scene->txtrs[material->ambient_texture];
-
-        scale_Point (&isect, dir, mag);
-        summ_Point (&isect, &isect, origin);
-
-        bpoint.coords[0] = 1;
         UFor( i, NDimensions-1 )
-        {
-            bpoint.coords[i+1] = distance_Plane (&simplex->barys[i], &isect);
-            bpoint.coords[0] -= bpoint.coords[i+1];
             texpoint.coords[i] = 0;
-        }
 
         UFor( i, 3 )
         {
             uint j;
             const BaryPoint* tmp;
-
             tmp = &scene->txpts[elem->txpts[i]];
 
             UFor( j, NDimensions-1 )
-            {
                 texpoint.coords[j] += bpoint.coords[i] * tmp->coords[j];
-            }
         }
-
         map_Texture (rgb, ambient_texture, &texpoint);
     }
 
@@ -415,14 +436,30 @@ fill_pixel (byte* ret_red, byte* ret_green, byte* ret_blue,
     else if (image->shading_on)
     {
         real scale;
-        Point tmp;
 
+#if 0
+        Point tmp;
         proj_Plane (&tmp, dir, &simplex->plane);
         scale = dot_Point (dir, &tmp);
 
         if (scale < 0)  scale = -scale;
         scale = 1 - scale;
         if (scale < 0)  scale = 0;
+#else
+        if (scene->vnmls)
+        {
+            Point normal;
+            map_vertex_normal (&normal, scene->vnmls,
+                               elem, &bpoint);
+            scale = dot_Point (dir, &normal);
+        }
+        else
+        {
+            scale = dot_Point (dir, &simplex->plane.normal);
+        }
+        if (scale < 0)  scale = -scale;
+        if (scale > 1)  scale = 1;
+#endif
 
         UFor( i, 3 )
         {
