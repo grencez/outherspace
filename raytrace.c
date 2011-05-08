@@ -446,7 +446,7 @@ fill_pixel (byte* ret_red, byte* ret_green, byte* ret_blue,
         scale = 1 - scale;
         if (scale < 0)  scale = 0;
 #else
-        if (scene->vnmls)
+        if (0 < scene->nvnmls)
         {
             Point normal;
             map_vertex_normal (&normal, scene->vnmls,
