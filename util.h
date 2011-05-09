@@ -16,6 +16,8 @@
 #define ResizeT( Type, arr, capacity ) \
     ((arr) = (Type*) realloc (arr, (capacity) * sizeof (Type)))
 
+#define CopyT( Type, dst, src, lo, count ) \
+    (array_cpy (dst, src, lo, count, sizeof (Type)))
 
 typedef unsigned int uint;
 typedef unsigned char byte;
@@ -108,6 +110,8 @@ tristate mul_signum (tristate a, tristate b);
 #ifndef __OPENCL_VERSION__
 uint index_of (const void* e, const void* arr, size_t size);
 void array_set (void* arr, uint i, const void* e, size_t size);
+void
+array_cpy (void* dst, const void* src, uint lo, uint count, size_t size);
 char* strto_uint (uint* ret, const char* in);
 char* strto_real (real* ret, const char* in);
 const char* strskip_ws (const char* line);

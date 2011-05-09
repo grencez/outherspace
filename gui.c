@@ -489,8 +489,7 @@ static gboolean grab_mouse_fn (GtkWidget* da,
 
         cast_recurse (&hit_idx, &hit_mag, &hit_space,
                       &hit_origin, &hit_dir,
-                      space, &view_basis,
-                      &origin, &dir,
+                      space, &origin, &dir,
                       inside_box, Max_uint);
         if (hit_idx < space->nelems)
         {

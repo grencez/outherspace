@@ -26,8 +26,8 @@ struct scene_struct
     uint ntxtrs;
     SceneElement* elems; /* Elements.*/
     Point* verts; /* Vertices.*/
-    BaryPoint* txpts; /* Texture points.*/
     Point* vnmls; /* Vertex normals.*/
+    BaryPoint* txpts; /* Texture points.*/
     Material* matls; /* Materials.*/
     Texture* txtrs; /* Textures.*/
 };

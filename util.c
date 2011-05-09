@@ -27,6 +27,15 @@ void array_set (void* arr, uint i, const void* e, size_t size)
     memcpy ((void*) ((size_t) arr + ((size_t) i * size)), e, size);
 }
 
+    void
+array_cpy (void* dst, const void* src, uint lo, uint count, size_t size)
+{
+    if (size > 0)
+        memcpy ((void*) ((size_t) dst + ((size_t) lo * size)),
+                src,
+                count * size);
+}
+
 char* strto_uint (uint* ret, const char* in)
 {
     unsigned long v;

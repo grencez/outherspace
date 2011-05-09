@@ -31,6 +31,7 @@ streql (const void* a, const void* b)
     bool
 readin_wavefront (Scene* scene, const char* filename)
 {
+    const uint ndims = 3;
     uint line_no = 0;
     const uint len = BUFSIZ;
     char buf[BUFSIZ];
@@ -73,7 +74,7 @@ readin_wavefront (Scene* scene, const char* filename)
             normal = AllocT( Point, 1 );
             app_SList (&vnmllist, normal);
             line = &line[2];
-            UFor( i, NDimensions )
+            UFor( i, ndims )
             {
                 line = strto_real (&normal->coords[i], line);
                 if (!line)
@@ -91,7 +92,7 @@ readin_wavefront (Scene* scene, const char* filename)
             point = AllocT( BaryPoint, 1 );
             app_SList (&txptlist, point);
             line = &line[2];
-            UFor( i, NDimensions-1 )
+            UFor( i, ndims-1 )
             {
                 line = strto_real (&point->coords[i], line);
                 if (!line)
@@ -109,7 +110,7 @@ readin_wavefront (Scene* scene, const char* filename)
             vert = AllocT( Point, 1 );
             app_SList (&vertlist, vert);
             line = &line[1];
-            UFor( i, NDimensions )
+            UFor( i, ndims )
             {
                 line = strto_real (&vert->coords[i], line);
                 if (!line)

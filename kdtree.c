@@ -282,6 +282,9 @@ quicksort_intervals (uint* intls, uint p, uint r, const real* coords)
     if (p < r)
     {
         uint q;
+            /* TODO: Make this a 3-way partition.
+             * Test for equality with the pivot element!
+             */
         q = partition_intervals (intls, p, r, coords);
         if (q > 0)
             quicksort_intervals (intls, p, q -1, coords);
@@ -289,7 +292,6 @@ quicksort_intervals (uint* intls, uint p, uint r, const real* coords)
     }
 }
 
-#if 0
 static
     void
 bubblesort_intervals (uint nintls, uint* intls, const real* coords)
@@ -314,20 +316,19 @@ bubblesort_intervals (uint nintls, uint* intls, const real* coords)
         }
     }
 }
-#endif
 
 static
     void
 sort_intervals (uint nintls, uint* intls, const real* coords)
 {
     uint i;
+    const bool use_quicksort = true;
     assert (even_uint (nintls));
     assert (minimal_unique (nintls, intls));
-#if 0
-    bubblesort_intervals (nintls, intls, coords);
-#else
-    quicksort_intervals (intls, 0, nintls-1, coords);
-#endif
+    if (use_quicksort)
+        quicksort_intervals (intls, 0, nintls-1, coords);
+    else
+        bubblesort_intervals (nintls, intls, coords);
     assert (minimal_unique (nintls, intls));
     if (nintls > 0)
     {

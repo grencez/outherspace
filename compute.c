@@ -435,7 +435,7 @@ void rays_to_hits_computer (RayImage* restrict image,
             row = row_off + i;
             rows_computed[nrows_computed++] = row;
             rays_to_hits_row (image, row,
-                              space, origin, view_basis,
+                              space, origin,
                               &dir_start, &row_delta, &col_delta,
                               inside_box);
         }

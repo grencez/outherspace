@@ -444,19 +444,9 @@ fill_pixel (byte* ret_red, byte* ret_green, byte* ret_blue,
     {
         real dscale, sscale;
 
-#if 0
-        Point tmp;
-        proj_Plane (&tmp, dir, &simplex->plane);
-        dscale = dot_Point (dir, &tmp);
-
-        if (dscale < 0)  dscale = -dscale;
-        dscale = 1 - dscale;
-        if (dscale < 0)  dscale = 0;
-#else
         dscale = dot_Point (dir, &normal);
         if (dscale < 0)  dscale = -dscale;
         if (dscale > 1)  dscale = 1;
-#endif
 
             /* Specular */
         if (material)
@@ -670,7 +660,6 @@ cast_recurse (uint* ret_hit,
               Point* ret_origin,
               Point* ret_dir,
               const RaySpace* restrict space,
-              const PointXfrm* restrict view_basis,
               const Point* restrict origin,
               const Point* restrict dir,
               bool inside_box,
@@ -700,7 +689,6 @@ cast_recurse (uint* ret_hit,
     {
         Point diff, rel_origin, rel_dir;
         const RaySpaceObject* object;
-        PointXfrm rel_basis;
         bool rel_inside_box;
             /* Returns from ray cast.*/
         uint tmp_hit;
@@ -724,11 +712,9 @@ cast_recurse (uint* ret_hit,
         rel_inside_box =
             inside_BoundingBox (&object->space.box, &rel_origin);
 
-        xfrm_PointXfrm (&rel_basis, view_basis, &object->orientation);
-        
         cast_recurse (&tmp_hit, &tmp_mag, &tmp_space,
                       &tmp_origin, &tmp_dir,
-                      &object->space, &rel_basis,
+                      &object->space,
                       &rel_origin, &rel_dir, rel_inside_box,
                       Max_uint);
 
@@ -761,7 +747,6 @@ cast_record (uint* hitline,
              uint col,
              const RaySpace* restrict space,
              const RayImage* restrict image,
-             const PointXfrm* restrict view_basis,
              const Point* restrict origin,
              const Point* restrict dir,
              bool inside_box)
@@ -774,7 +759,7 @@ cast_record (uint* hitline,
 
     cast_recurse (&hit_idx, &hit_mag, &hit_space,
                   &hit_origin, &hit_dir,
-                  space, view_basis, origin, dir, inside_box,
+                  space, origin, dir, inside_box,
                   Max_uint);
 
     if (hitline)  hitline[col] = hit_idx;
@@ -870,7 +855,7 @@ rays_to_hits_fish (RayImage* image,
             normalize_Point (&dir, &tdir);
 
             cast_record (hitline, magline, pixline, col,
-                         space, image, view_basis,
+                         space, image,
                          origin, &dir, inside_box);
         }
     }
@@ -1014,7 +999,7 @@ rays_to_hits_parallel (RayImage* restrict image,
             inside_box = inside_BoundingBox (box, &ray_origin);
 
             cast_record (hitline, magline, pixline, col,
-                         space, image, view_basis,
+                         space, image,
                          &ray_origin, dir, inside_box);
         }
     }
@@ -1093,7 +1078,7 @@ rays_to_hits (RayImage* restrict image,
 #endif
     for (row = myrank; row < nrows; row += nprocs)
     {
-        rays_to_hits_row (image, row, space, origin, view_basis,
+        rays_to_hits_row (image, row, space, origin,
                           &dir_start, &row_delta, &col_delta,
                           inside_box);
     }
@@ -1109,7 +1094,6 @@ rays_to_hits (RayImage* restrict image,
 rays_to_hits_row (RayImage* image, uint row,
                   const RaySpace* restrict space,
                   const Point* restrict origin,
-                  const PointXfrm* restrict view_basis,
                   const Point* dir_start,
                   const Point* row_delta,
                   const Point* col_delta,
@@ -1147,7 +1131,7 @@ rays_to_hits_row (RayImage* image, uint row,
         normalize_Point (&dir, &dir);
 
         cast_record (hitline, magline, pixline, col,
-                     space, image, view_basis,
+                     space, image,
                      origin, &dir, inside_box);
 
             /* if (row == 333 && col == 322)  puts (elem ? "hit" : "miss"); */

@@ -223,12 +223,21 @@ setup_testcase_sphere (RaySpace* space,
     }
     else
     {
+        uint i;
+        const real dcoords[2] = { 0, 100 };
         assert (NDimensions == 4);
 
         good = readin_wavefront (&scenes[0], "sphere1.obj");
         if (!good)  return false;
         good = readin_wavefront (&scenes[1], "sphere2.obj");
         if (!good)  return false;
+
+        UFor( i, nscenes )
+        {
+            uint j;
+            UFor( j, scenes[i].nverts )
+                scenes[i].verts[j].coords[3] = dcoords[i];
+        }
 
         interpolate_Scene (&space->scene, NDimensions-1, nscenes, scenes);
     }
@@ -286,6 +295,8 @@ setup_testcase_4d_surface (RaySpace* space,
     }
     else
     {
+        uint i;
+        const real dcoords[2] = { 0, 100 };
         assert (NDimensions == 4);
 
         good = readin_wavefront (&scenes[0], "plate1.obj");
@@ -294,6 +305,13 @@ setup_testcase_4d_surface (RaySpace* space,
         if (!good)  return false;
 
         interpolate_Scene (&space->scene, NDimensions-1, nscenes, scenes);
+
+        UFor( i, nscenes )
+        {
+            uint j;
+            UFor( j, scenes[i].nverts )
+                scenes[i].verts[j].coords[3] = dcoords[i];
+        }
     }
 
     init_filled_RaySpace (space);

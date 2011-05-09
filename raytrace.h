@@ -111,7 +111,6 @@ void
 rays_to_hits_row (RayImage* image, uint row,
                   const RaySpace* restrict space,
                   const Point* restrict origin,
-                  const PointXfrm* restrict view_basis,
                   const Point* dir_start,
                   const Point* row_delta,
                   const Point* col_delta,
