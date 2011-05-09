@@ -140,7 +140,8 @@ output_bytes (FILE* out, uint nbytes, const byte* bytes)
         sprintf (&buf[2*i], "%02x", bytes[i]);
 
     buf[2*nbytes] = '\n';
-    fwrite (buf, (2 * nbytes + 1) * sizeof(char), 1, out);
+    i = fwrite (buf, (2 * nbytes + 1) * sizeof(char), 1, out);
+    assert (i == 1);
 }
 
     void
@@ -400,7 +401,7 @@ void rays_to_hits_computer (RayImage* restrict image,
     nrows = image->nrows;
     ncols = image->ncols;
 
-    box = &space->scene.box;
+    box = &space->box;
     inside_box = inside_BoundingBox (box, origin);
 
     setup_ray_pixel_deltas (&dir_start, &row_delta, &col_delta,

@@ -170,11 +170,14 @@ init_Scene_KDTreeGrid (KDTreeGrid* grid, const Scene* scene,
 
 void init_RayImage (RayImage* image)
 {
+    uint i;
     image->hits = 0;
     image->mags = 0;
     image->pixels = 0;
     image->nrows = 0;
     image->ncols = 0;
+    UFor( i, NColors )
+        image->ambient[i] = 0.2;
     image->view_light = 0;
     image->shading_on = true;
     image->color_distance_on = false;
@@ -320,7 +323,7 @@ fill_pixel (byte* ret_red, byte* ret_green, byte* ret_blue,
     byte rgb[3];
     const SceneElement* elem;
     const Material* material = 0;
-    Point bpoint;
+    Point bpoint, normal;
     uint i;
 
     if (!simplex)
@@ -383,6 +386,10 @@ fill_pixel (byte* ret_red, byte* ret_green, byte* ret_blue,
             bpoint.coords[0] -= bpoint.coords[i+1];
         }
     }
+    if (compute_bary_coords && 0 < scene->nvnmls)
+        map_vertex_normal (&normal, scene->vnmls, elem, &bpoint);
+    else
+        copy_Point (&normal, &simplex->plane.normal);
 
     if (color_by_element)
     {
@@ -435,52 +442,68 @@ fill_pixel (byte* ret_red, byte* ret_green, byte* ret_blue,
     }
     else if (image->shading_on)
     {
-        real scale;
+        real dscale, sscale;
 
 #if 0
         Point tmp;
         proj_Plane (&tmp, dir, &simplex->plane);
-        scale = dot_Point (dir, &tmp);
+        dscale = dot_Point (dir, &tmp);
 
-        if (scale < 0)  scale = -scale;
-        scale = 1 - scale;
-        if (scale < 0)  scale = 0;
+        if (dscale < 0)  dscale = -dscale;
+        dscale = 1 - dscale;
+        if (dscale < 0)  dscale = 0;
 #else
-        if (0 < scene->nvnmls)
+        dscale = dot_Point (dir, &normal);
+        if (dscale < 0)  dscale = -dscale;
+        if (dscale > 1)  dscale = 1;
+#endif
+
+            /* Specular */
+        if (material)
         {
-            Point normal;
-            map_vertex_normal (&normal, scene->vnmls,
-                               elem, &bpoint);
-            scale = dot_Point (dir, &normal);
+            Point refldir;
+            scale_Point (&refldir, &normal,
+                         2 * dot_Point (&normal, dir));
+            diff_Point (&refldir, dir, &refldir);
+            sscale = - dot_Point (&refldir, dir);
+            sscale = clamp_real (sscale, 0, 1);
+            sscale = pow (sscale, material->shininess);
         }
         else
         {
-            scale = dot_Point (dir, &simplex->plane.normal);
+            sscale = 0;
         }
-        if (scale < 0)  scale = -scale;
-        if (scale > 1)  scale = 1;
-#endif
 
         UFor( i, 3 )
         {
-            real ambient = 0.2;
-            real diffuse = 1;
+            real ambient, diffuse, specular;
             real tscale;
+
+                /* If the cosine above (/diffuse_scale/) is 1,
+                 * and the light intensity is 1 (assumed),
+                 * and the material's diffuse portion is 1,
+                 * then the resulting color value should be exactly 1.
+                 * Thus, diffuse + ambient = 1
+                 * before factoring in the cosine or material spec.
+                 */
+            ambient = image->ambient[i];
+            diffuse = 1 - ambient;
+            specular = 0;
+
             if (material)
             {
-                ambient = material->ambient[i];
-                diffuse = material->diffuse[i];
+                ambient *= material->ambient[i];
+                diffuse *= material->diffuse[i];
+                specular = material->specular[i];
             }
 
-            diffuse *= 1 - ambient;
-
-            tscale = ambient + diffuse * scale;
-            if (tscale > 1)  tscale = 1;
+            tscale = ambient + diffuse * dscale + specular * sscale;
+            tscale = clamp_real (tscale, 0, 1);
 
             rgb[i] = (byte) (tscale * rgb[i]);
         }
     }
-                
+
     *ret_red = rgb[0];
     *ret_green = rgb[1];
     *ret_blue = rgb[2];

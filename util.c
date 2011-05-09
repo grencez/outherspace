@@ -158,6 +158,15 @@ real match_real (real a, real b)
     return b;
 }
 
+    real
+clamp_real (real x, real lo, real hi)
+{
+    assert (lo <= hi);
+    if (x < lo)  return lo;
+    if (x > hi)  return hi;
+    return x;
+}
+
 real absolute_error (real expect, real result)
 {
     return result - expect;

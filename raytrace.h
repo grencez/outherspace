@@ -48,6 +48,7 @@ struct ray_image_struct
     byte* pixels;
     uint nrows;
     uint ncols;
+    real ambient[NColors];
     real view_light;
     bool shading_on;
     bool color_distance_on;
