@@ -111,10 +111,20 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
             dim = 2;
             stride = 1;
             break;
+#ifdef NRacers
+        case GDK_c:
+            racer_motions[0].collide = !racer_motions[0].collide;
+            break;
+#endif
         case GDK_d:
             if (ctrl_mod) { rotate_dir_dim = true; }
             else { dim = 2; stride = -1; }
             break;
+#ifdef NRacers
+        case GDK_g:
+            racer_motions[0].gravity = !racer_motions[0].gravity;
+            break;
+#endif
         case GDK_L:
             view_light_change = 1;  break;
         case GDK_l:
@@ -308,7 +318,8 @@ set_rotate_view (real vert, real horz)
 
 static gboolean poll_joystick (gpointer widget)
 {
-    const bool flight_style = true;
+    const bool inv_vert = true;
+    const bool use_roll = false;
     int x, y;
     tristate stride = 0;
     real vert, horz, roll;
@@ -321,27 +332,35 @@ static gboolean poll_joystick (gpointer widget)
     x = SDL_JoystickGetAxis (joystick_handle, 1);
     y = SDL_JoystickGetAxis (joystick_handle, 0);
 
+        /* Dead zones!*/
     if (x > 0 && x <  3000)  x = 0;
     if (x < 0 && x > -3000)  x = 0;
     if (y > 0 && y <  3000)  y = 0;
     if (y < 0 && y > -3000)  y = 0;
 
-    vert = (real) x / 327670;
-    horz = (real) y / 327670;
-    if (flight_style)
+    vert = (real) x / 32767;
+    horz = (real) y / 32767;
+
+    if (use_roll)
     {
         roll = horz;
         horz = 0;
     }
-    else
-    {
-        vert = - vert;
-    }
 
-#if 1
+    if (!inv_vert)
+        vert = - vert;
+
+#ifdef NRacers
+    rotate_object (&racer_motions[0], 0, 2, - vert * M_PI / 2);
+    rotate_object (&racer_motions[0], 1, 2, - horz * M_PI / 2);
+    if (use_roll)
+        rotate_object (&racer_motions[0], 0, 1, roll * M_PI / 2);
+
+    racer_motions[0].thrust = stride;
+#else
     set_rotate_view (vert, horz);
 
-    if (flight_style)
+    if (use_roll)
     {
         PointXfrm rotation, tmp;
         rotation_PointXfrm (&rotation, 0, 1, - roll * M_PI / 5);
@@ -356,20 +375,11 @@ static gboolean poll_joystick (gpointer widget)
                      stride_magnitude * stride);
         summ_Point (&view_origin, &view_origin, &diff);
     }
-#else
-    rotate_object (&racer_motions[0], 0, 2,
-                   - vert * M_PI / 3);
-    rotate_object (&racer_motions[0], 1, 2,
-                   - horz * M_PI / 3);
-    if (flight_style)
-    {
-        rotate_object (&racer_motions[0], 0, 1, roll * M_PI / 3);
-    }
-
-    racer_motions[0].accel = stride_magnitude * stride;
 #endif
 
-        /* fprintf (stderr, "x:%d  y:%d\n", x, y); */
+    if (false)
+        fprintf (stderr, "vert:%f  horz:%f  roll:%f  stride:%d\n",
+                 vert, horz, roll, stride);
     if (false)
     {
         int nbuttons;
@@ -545,16 +555,13 @@ render_pattern (byte* data, void* state, int height, int width, int stride)
 
 static
     void
-render_RaySpace (byte* data, const RaySpace* space,
+render_RaySpace (byte* data, RaySpace* space,
                  uint nrows, uint ncols, uint stride)
 {
     uint row;
 
     if (needs_recast)
     {
-#ifdef NRacers
-        uint i;
-#endif
         real time, dt;
 
         time = monotime ();
@@ -564,32 +571,11 @@ render_RaySpace (byte* data, const RaySpace* space,
             fprintf (stderr, "FPS:%f\n", 1 / dt);
 
 #ifdef NRacers
-        UFor( i, space->nobjects )
-        {
-            uint j;
-            ObjectMotion* motion;
-            motion = &racer_motions[i];
-
-                /* space->objects[i].centroid.coords[0] = 50 * sin (time + i); */
-                /* space->objects[i].centroid.coords[1] = 50 * cos (time + i); */
-
-
-                /* rotate_object (motion, 0, 1, .5); */
-            UFor( j, 5 )
-            {
-                    /* rotate_object (motion, 0, 2, .5); */
-                    /* rotate_object (motion, 0, 1, .7); */
-                    /* rotate_object (motion, 0, 1, .7); */
-                    /* motion->accel = 10; */
-                    /* motion->veloc.coords[0] = 10 * sin (time + i); */
-                    /* motion->veloc.coords[1] = 10 * cos (time + i); */
-                move_object (&space->objects[i], motion, dt, true);
-            }
-            zero_rotations (motion);
-        }
+        move_objects (space, racer_motions, dt);
 
         {
             Point tmp;
+#if 0
             PointXfrm basis;
             const ObjectMotion* motion;
             const RaySpaceObject* object;
@@ -609,6 +595,11 @@ render_RaySpace (byte* data, const RaySpace* space,
             scale_Point (&tmp, &object->orientation.pts[0], 70);
             summ_Point (&view_origin, &view_origin, &tmp);
             summ_Point (&view_origin, &view_origin, &object->centroid);
+#else
+            copy_PointXfrm (&view_basis, &object->orientation);
+            scale_Point (&tmp, &object->orientation.pts[DirDimension], -130);
+            summ_Point (&view_origin, &object->centroid, &tmp);
+#endif
         }
 #endif
 
@@ -696,15 +687,11 @@ static
     void
 gui_main (int argc, char* argv[], RaySpace* space)
 {
-        /* GtkWidget is the storage type for widgets */
-        /* GtkWidget *frame; */
     GtkWidget *window;
-        /* GtkWidget *vbox; */
-        /* GtkWidget *da; */
 
-    SDL_InitSubSystem (SDL_INIT_JOYSTICK);
-    joystick_handle = SDL_JoystickOpen (0);
+    SDL_Init (SDL_INIT_JOYSTICK);
     SDL_JoystickEventState (SDL_QUERY);
+    joystick_handle = SDL_JoystickOpen (0);
     fprintf (stderr, "Joystick has %d buttons!\n",
              SDL_JoystickNumButtons (joystick_handle));
 
@@ -726,52 +713,6 @@ gui_main (int argc, char* argv[], RaySpace* space)
     g_timeout_add (1000 / 60, &poll_joystick, window);
 
 
-#if 0
-    vbox = gtk_vbox_new (FALSE, 8);
-        /* gtk_container_set_border_width (GTK_CONTAINER (vbox), 8); */
-    gtk_container_add (GTK_CONTAINER (window), vbox);
-
-    frame = gtk_frame_new (NULL);
-        /* gtk_frame_set_shadow_type (GTK_FRAME (frame), GTK_SHADOW_IN); */
-    gtk_box_pack_start (GTK_BOX (vbox), frame, TRUE, TRUE, 0);
-
-    da = gtk_drawing_area_new ();
-    gtk_widget_set_size_request (da, 100, 100);
-
-    gtk_container_add (GTK_CONTAINER (frame), da);
-
-    /*
-    {
-        int width = 50;
-        int height = 50;
-        cairo_format_t fmt = CAIRO_FORMAT_ARGB32;
-        cairo_surface_t* surface;
-        int stride;
-        unsigned char* data;
-        stride = cairo_format_stride_for_width (fmt, width);
-        data = (unsigned char*) malloc (stride * height);
-
-        surface = cairo_image_surface_create_for_data (data, fmt,
-                                                       width, height,
-                                                       stride);
-    }
-    */
-
-    /*
-    {
-        GdkGeometry hints;
-        hints.max_width = 500;
-        hints.max_height = 500;
-
-        gtk_window_set_geometry_hints (vbox->window, vbox, &hints, GDK_HINT_MAX_SIZE);
-    }
-    */
-
-    g_signal_connect (da, "expose-event",
-                      G_CALLBACK (render_expose), NULL);
-#endif
-
-        /* gtk_widget_set_app_paintable (window, TRUE); */
     gtk_window_set_position (GTK_WINDOW(window), GTK_WIN_POS_CENTER);
     gtk_window_set_title (GTK_WINDOW(window), "OuTHER SPACE");
     gtk_window_set_default_size (GTK_WINDOW(window), view_ncols, view_nrows); 

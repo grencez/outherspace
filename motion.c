@@ -3,14 +3,22 @@
 #include "motion.h"
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
+static void
+move_object (RaySpace* space, ObjectMotion* motion, uint objidx, real dt);
+static void
+zero_rotations (ObjectMotion* motion);
+
     void
 init_ObjectMotion (ObjectMotion* motion)
 {
     uint i;
     zero_Point (&motion->veloc);
-    motion->accel = 0;
+    motion->thrust = 0;
     UFor( i, N2DimRotations )
         motion->rots[i] = 0;
+        /* These don't do anything yet.*/
+    motion->gravity = false;
+    motion->collide = false;
 }
 
     void
@@ -20,7 +28,32 @@ rotate_object (ObjectMotion* motion, uint xdim, uint ydim, real angle)
     motion->rots[xdim * (NDimensions - 2) + ydim - 1] += angle;
 }
 
-static
+    void
+move_objects (RaySpace* space, ObjectMotion* motions, real dt)
+{
+    const uint nincs = 10;
+    RaySpaceObject* objects;
+    real inc;
+    uint i, nobjects;
+    nobjects = space->nobjects;
+    objects = space->objects;
+
+    inc = dt / nincs;
+
+    UFor( i, nincs )
+    {
+        uint j;
+        UFor( j, nobjects )
+            move_object (space, &motions[j], j, inc);
+    }
+
+    UFor( i, nobjects )
+    {
+        zero_rotations (&motions[i]);
+        motions[i].thrust = 0;
+    }
+}
+
     void
 zero_rotations (ObjectMotion* motion)
 {
@@ -36,12 +69,14 @@ zero_rotations (ObjectMotion* motion)
 }
 
     void
-move_object (RaySpaceObject* object, ObjectMotion* motion,
-             real dt, bool preserve)
+move_object (RaySpace* space, ObjectMotion* motion, uint objidx, real dt)
 {
     uint i;
     PointXfrm basis;
-    Point dir;
+    RaySpaceObject* object;
+    Point dir, veloc;
+
+    object = &space->objects[objidx];
 
         /* Rotate object.*/
     dir.coords[DirDimension] = 1;
@@ -82,25 +117,33 @@ move_object (RaySpaceObject* object, ObjectMotion* motion,
         }
     }
 
-    if (!preserve)  zero_rotations (motion);
+        /* Assume full grip causes orthogonal motion to be lost.*/
+    proj_Point (&veloc, &motion->veloc,
+                &object->orientation.pts[DirDimension]);
 
-    scale_Point (&dir,
-                 &object->orientation.pts[DirDimension],
-                 motion->accel * dt);
-    summ_Point (&motion->veloc, &motion->veloc, &dir);
-    scale_Point (&dir, &motion->veloc, dt);
-    summ_Point (&object->centroid, &object->centroid, &dir);
-
-    if (motion->accel == 0)
+    if (motion->thrust != 0)
     {
-        real mag, x;
-        x = 5 * dt;
-        mag = magnitude_Point (&motion->veloc);
-        
-        if (mag > x)  scale_Point (&motion->veloc, &motion->veloc,
-                                   (mag - x) / mag);
-        else          zero_Point (&motion->veloc);
+        const real alpha = 5;  /* Arbitrary coefficient.*/
+        const real vthrust = 733;  /* Velocity of thrusters.*/
+        real accel, mag;
+        Point tmp;
+
+        mag = magnitude_Point (&veloc);
+        accel = alpha * (vthrust - mag);
+        if (motion->thrust < 0)  accel = - accel;
+
+        scale_Point (&tmp, &object->orientation.pts[DirDimension], accel * dt);
+        summ_Point (&veloc, &veloc, &tmp);
     }
-    if (!preserve)  motion->accel = 0;
+    else
+    {
+            /* HACK to make racer stop fast!*/
+            /* Half the speed every second.*/
+        scale_Point (&veloc, &veloc, pow (0.5, dt));
+    }
+
+    copy_Point (&motion->veloc, &veloc);
+    scale_Point (&veloc, &veloc, dt);
+    summ_Point (&object->centroid, &object->centroid, &veloc);
 }
 

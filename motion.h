@@ -13,8 +13,10 @@ typedef struct object_motion_struct ObjectMotion;
 struct object_motion_struct
 {
     Point veloc;
-    real accel;
+    tristate thrust;
     real rots[N2DimRotations];
+    bool gravity;
+    bool collide;
 };
 
 void
@@ -22,8 +24,7 @@ init_ObjectMotion (ObjectMotion* motion);
 void
 rotate_object (ObjectMotion* motion, uint xdim, uint ydim, real angle);
 void
-move_object (RaySpaceObject* object, ObjectMotion* motion,
-             real dt, bool preserve);
+move_objects (RaySpace* space, ObjectMotion* motions, real dt);
 
 #ifndef __OPENCL_VERSION__
 #ifdef INCLUDE_SOURCE
