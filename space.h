@@ -49,6 +49,8 @@ bool hit_BoundingBox (Point* entrance,
                       const Point* origin, const Point* dir);
 void init_BoundingBox (BoundingBox* box, uint npoints, const Point* points);
 void adjust_BoundingBox (BoundingBox* box, const Point* point);
+void
+centroid_BoundingBox (Point* dst, const BoundingBox* box);
 bool inside_BoundingBox (__global const BoundingBox* box, const Point* point);
 real surface_area_BoundingBox (const BoundingBox* box);
 void split_BoundingBox (BoundingBox* lo_box, BoundingBox* hi_box,

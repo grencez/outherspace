@@ -15,8 +15,8 @@ struct object_motion_struct
     Point veloc;
     tristate thrust;
     real rots[N2DimRotations];
-    bool gravity;
     bool collide;
+    bool gravity;
 };
 
 void

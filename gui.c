@@ -575,10 +575,10 @@ render_RaySpace (byte* data, RaySpace* space,
 
         {
             Point tmp;
+            const RaySpaceObject* object;
 #if 0
             PointXfrm basis;
             const ObjectMotion* motion;
-            const RaySpaceObject* object;
             motion = &racer_motions[0];
             object = &space->objects[0];
             scale_Point (&tmp, &object->orientation.pts[DirDimension],
@@ -596,6 +596,7 @@ render_RaySpace (byte* data, RaySpace* space,
             summ_Point (&view_origin, &view_origin, &tmp);
             summ_Point (&view_origin, &view_origin, &object->centroid);
 #else
+            object = &space->objects[0];
             copy_PointXfrm (&view_basis, &object->orientation);
             scale_Point (&tmp, &object->orientation.pts[DirDimension], -130);
             summ_Point (&view_origin, &object->centroid, &tmp);
@@ -730,6 +731,14 @@ int main (int argc, char* argv[])
 
 #ifdef DistribCompute
     init_compute (&argc, &argv);
+#endif
+
+#ifdef NRacers
+    {
+        uint i;
+        UFor( i, NRacers )
+            init_ObjectMotion (&racer_motions[i]);
+    }
 #endif
 
     good =

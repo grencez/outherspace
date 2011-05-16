@@ -366,6 +366,13 @@ void adjust_BoundingBox (BoundingBox* box, const Point* point)
     }
 }
 
+    void
+centroid_BoundingBox (Point* dst, const BoundingBox* box)
+{
+    summ_Point (dst, &box->min_corner, &box->max_corner);
+    scale_Point (dst, dst, .5);
+}
+
 bool inside_BoundingBox (__global const BoundingBox* box, const Point* point)
 {
     bool inside = true;
