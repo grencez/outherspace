@@ -75,6 +75,7 @@ void col_PointXfrm (Point* dst, const PointXfrm* xfrm, uint col)
 void xfrm_Point (Point* dst, const PointXfrm* xfrm, const Point* src)
 {
     uint i;
+    assert (dst != src);
     UFor( i, NDimensions )
         dst->coords[i] = dot_Point (src, &xfrm->pts[i]);
 }
@@ -304,5 +305,20 @@ void row_minors_PointXfrm (Point* dst, const PointXfrm* xfrm, uint row)
 #else
     assert (0 && "Not implemented.");
 #endif
+}
+
+
+    void
+spherical3_PointXfrm (PointXfrm* dst, real zenith, real azimuthcc)
+{
+    PointXfrm rotation, tmp;
+
+    identity_PointXfrm (dst);
+
+    rotation_PointXfrm (&rotation, 0, DirDimension, M_PI / 2 - zenith);
+    xfrm_PointXfrm (&tmp, &rotation, dst);
+
+    rotation_PointXfrm (&rotation, 1, DirDimension, azimuthcc);
+    xfrm_PointXfrm (dst, &tmp, &rotation);
 }
 

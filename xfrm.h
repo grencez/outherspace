@@ -5,6 +5,8 @@
 #include "space.h"
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
+#define DirDimension (NDimensions - 1)
+
 struct point_xfrm_struct
 {
     Point pts[NDimensions];
@@ -35,6 +37,8 @@ real det3_PointXfrm (const PointXfrm* xfrm,
 real
 det_PointXfrm (const PointXfrm* xfrm);
 void row_minors_PointXfrm (Point* dst, const PointXfrm* xfrm, uint row);
+void
+spherical3_PointXfrm (PointXfrm* dst, real zenith, real azimuthcc);
 
 #ifndef __OPENCL_VERSION__
 void output_PointXfrm (FILE* out, const PointXfrm* xfrm);

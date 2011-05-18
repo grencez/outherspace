@@ -18,16 +18,48 @@ static const bool BarycentricRayTrace = false;
 #else
 static const bool BarycentricRayTrace = true;
 #endif
-    /* #define TrivialMpiRayTrace */
+#define TrivialMpiRayTrace
 
 #ifdef TrivialMpiRayTrace
 #include <mpi.h>
 static void
-balancer_triv_sync_mpi_RayImage (RayImage* image, uint nprocs);
+balancer_triv_sync_mpi_RayImage (RayImage* image,
+                                 uint row_off, uint row_nul,
+                                 uint nprocs);
 static void
 computer_triv_sync_mpi_RayImage (const RayImage* image,
+                                 uint row_off, uint row_nul,
                                  uint myrank, uint nprocs);
 #endif
+
+
+static void
+setup_ray_pixel_deltas_orthographic (Point* dir_start,
+                                     Point* row_delta,
+                                     Point* col_delta,
+                                     uint nrows, uint ncols,
+                                     const Point* origin,
+                                     const PointXfrm* view_basis,
+                                     real view_width);
+static void
+cast_row_orthographic (RayImage* restrict image,
+                       uint row,
+                       const RaySpace* restrict space,
+                       const RayCastAPriori* restrict known,
+                       const PointXfrm* restrict view_basis);
+static void
+setup_ray_pixel_deltas_perspective (Point* dir_start,
+                                    Point* row_delta,
+                                    Point* col_delta,
+                                    uint nrows, uint ncols,
+                                    const PointXfrm* view_basis,
+                                    real view_angle);
+static void
+cast_row_perspective (RayImage* image, uint row,
+                      const RaySpace* restrict space,
+                      const RayCastAPriori* restrict known,
+                      const Point* restrict origin);
+
 
 void init_RaySpace (RaySpace* space)
 {
@@ -176,6 +208,8 @@ void init_RayImage (RayImage* image)
     image->pixels = 0;
     image->nrows = 0;
     image->ncols = 0;
+    image->hifov = 2 * M_PI / 3;
+    image->perspective = true;
     UFor( i, NColors )
         image->ambient[i] = 0.2;
     image->view_light = 0;
@@ -939,81 +973,84 @@ rays_to_hits_fixed_plane (uint* hits, real* mags,
 
 
     void
-rays_to_hits_parallel (RayImage* restrict image,
-                       const RaySpace* restrict space,
-                       const Point* restrict origin,
-                       const PointXfrm* restrict view_basis,
-                       real view_width)
+setup_ray_pixel_deltas_orthographic (Point* dir_start,
+                                     Point* row_delta,
+                                     Point* col_delta,
+                                     uint nrows, uint ncols,
+                                     const Point* origin,
+                                     const PointXfrm* view_basis,
+                                     real view_width)
 {
-    uint row;
-    const uint row_dim = 0;
-    const uint col_dim = 1;
-    const uint dir_dim = DirDimension;
-    uint nrows, ncols;
-    real col_start, row_start;
-    real col_delta, row_delta;
-    const Point* restrict dir;
+    const uint row_dim = 0, col_dim = 1;
+    Point diff;
+    real tstart, tdelta;
+
+    copy_Point (dir_start, origin);
+
+    tdelta = view_width / nrows;
+    tstart = (- view_width + tdelta) / 2;
+
+    scale_Point (row_delta, &view_basis->pts[row_dim], tdelta);
+    scale_Point (&diff, &view_basis->pts[row_dim], tstart);
+    summ_Point (dir_start, dir_start, &diff);
+
+    tdelta = view_width / ncols;
+    tstart = (- view_width + tdelta) / 2;
+
+    scale_Point (col_delta, &view_basis->pts[col_dim], tdelta);
+    scale_Point (&diff, &view_basis->pts[col_dim], tstart);
+    summ_Point (dir_start, dir_start, &diff);
+}
+
+
+    void
+cast_row_orthographic (RayImage* restrict image,
+                       uint row,
+                       const RaySpace* restrict space,
+                       const RayCastAPriori* restrict known,
+                       const PointXfrm* restrict view_basis)
+{
+    uint col, ncols;
     const BoundingBox* box;
+    Point partial_ray_origin;
+    uint* hitline = 0;
+    real* magline = 0;
+    byte* pixline = 0;
 
-    nrows = image->nrows;
     ncols = image->ncols;
-
     box = &space->box;
-    dir = &view_basis->pts[dir_dim];
 
-    row_delta = view_width / nrows;
-    row_start = (- view_width + row_delta) / 2;
+    if (image->hits)  hitline = &image->hits[row * ncols];
+    if (image->mags)  magline = &image->mags[row * ncols];
+    if (image->pixels)  pixline = &image->pixels[row * 3 * ncols];
 
-    col_delta = view_width / ncols;
-    col_start = (- view_width + col_delta) / 2;
+    scale_Point (&partial_ray_origin, &known->row_delta, row);
+    summ_Point (&partial_ray_origin, &partial_ray_origin, &known->dir_start);
 
-#ifdef _OPENMP
-#pragma omp parallel for schedule(dynamic)
-#endif
-    UFor( row, nrows )
+    UFor( col, ncols )
     {
-        uint col;
-        Point partial_ray_origin;
-        uint* hitline = 0;
-        real* magline = 0;
-        byte* pixline = 0;
+        Point ray_origin;
+        bool inside_box;
 
-        if (image->hits)  hitline = &image->hits[row * ncols];
-        if (image->mags)  magline = &image->mags[row * ncols];
-        if (image->pixels)  pixline = &image->pixels[row * 3 * ncols];
+        scale_Point (&ray_origin, &known->col_delta, col);
+        summ_Point (&ray_origin, &ray_origin, &partial_ray_origin);
+        inside_box = inside_BoundingBox (box, &ray_origin);
 
-        scale_Point (&partial_ray_origin,
-                     &view_basis->pts[row_dim],
-                     row_start + row_delta * row);
-        summ_Point (&partial_ray_origin, &partial_ray_origin, origin);
-
-        UFor( col, ncols )
-        {
-            bool inside_box;
-            Point ray_origin;
-
-            scale_Point (&ray_origin,
-                         &view_basis->pts[col_dim],
-                         col_start + col_delta * col);
-            summ_Point (&ray_origin, &ray_origin, &partial_ray_origin);
-            inside_box = inside_BoundingBox (box, &ray_origin);
-
-            cast_record (hitline, magline, pixline, col,
-                         space, image,
-                         &ray_origin, dir, inside_box);
-        }
+        cast_record (hitline, magline, pixline, col,
+                     space, image,
+                     &ray_origin, &view_basis->pts[DirDimension],
+                     inside_box);
     }
 }
 
 
     void
-setup_ray_pixel_deltas (Point* restrict dir_start,
-                        Point* restrict row_delta,
-                        Point* restrict col_delta,
-                        uint nrows, uint ncols,
-                        const PointXfrm* restrict view_basis,
-                        real view_angle)
-                    
+setup_ray_pixel_deltas_perspective (Point* dir_start,
+                                    Point* row_delta,
+                                    Point* col_delta,
+                                    uint nrows, uint ncols,
+                                    const PointXfrm* view_basis,
+                                    real view_angle)
 {
     const uint row_dim = 0;
     const uint col_dim = 1;
@@ -1041,63 +1078,12 @@ setup_ray_pixel_deltas (Point* restrict dir_start,
     trxfrm_Point (col_delta, view_basis, &cdelta);
 }
 
-    void
-rays_to_hits (RayImage* restrict image,
-              const RaySpace* restrict space,
-              const Point* restrict origin,
-              const PointXfrm* restrict view_basis,
-              real view_angle)
-{
-    uint nprocs, myrank;
-    uint row;
-    uint nrows, ncols;
-    bool inside_box;
-    Point dir_start, row_delta, col_delta;
-    const BoundingBox* restrict box;
-
-    nrows = image->nrows;
-    ncols = image->ncols;
-
-#ifdef TrivialMpiRayTrace
-    MPI_Comm_size (MPI_COMM_WORLD, (int*) &nprocs);
-    MPI_Comm_rank (MPI_COMM_WORLD, (int*) &myrank);
-#else
-    myrank = 0;
-    nprocs = 1;
-#endif
-
-    box = &space->box;
-    setup_ray_pixel_deltas (&dir_start, &row_delta, &col_delta,
-                            nrows, ncols,
-                            view_basis, view_angle);
-
-    inside_box = inside_BoundingBox (box, origin);
-
-#ifdef _OPENMP
-#pragma omp parallel for schedule(dynamic)
-#endif
-    for (row = myrank; row < nrows; row += nprocs)
-    {
-        rays_to_hits_row (image, row, space, origin,
-                          &dir_start, &row_delta, &col_delta,
-                          inside_box);
-    }
-
-#ifdef TrivialMpiRayTrace
-    if (myrank == 0)  balancer_triv_sync_mpi_RayImage (image, nprocs);
-    else              computer_triv_sync_mpi_RayImage (image, myrank, nprocs);
-#endif
-}
-
 
     void
-rays_to_hits_row (RayImage* image, uint row,
-                  const RaySpace* restrict space,
-                  const Point* restrict origin,
-                  const Point* dir_start,
-                  const Point* row_delta,
-                  const Point* col_delta,
-                  bool inside_box)
+cast_row_perspective (RayImage* image, uint row,
+                      const RaySpace* restrict space,
+                      const RayCastAPriori* restrict known,
+                      const Point* restrict origin)
 {
     uint col, ncols;
     Point partial_dir;
@@ -1111,8 +1097,8 @@ rays_to_hits_row (RayImage* image, uint row,
     if (image->mags)  magline = &image->mags[row * ncols];
     if (image->pixels)  pixline = &image->pixels[row * 3 * ncols];
 
-    scale_Point (&partial_dir, row_delta, row);
-    summ_Point (&partial_dir, &partial_dir, dir_start);
+    scale_Point (&partial_dir, &known->row_delta, row);
+    summ_Point (&partial_dir, &partial_dir, &known->dir_start);
 
     UFor( col, ncols )
     {
@@ -1126,13 +1112,13 @@ rays_to_hits_row (RayImage* image, uint row,
         }
 #endif
 
-        scale_Point (&dir, col_delta, col);
+        scale_Point (&dir, &known->col_delta, col);
         summ_Point (&dir, &dir, &partial_dir);
         normalize_Point (&dir, &dir);
 
         cast_record (hitline, magline, pixline, col,
                      space, image,
-                     origin, &dir, inside_box);
+                     origin, &dir, known->inside_box);
 
             /* if (row == 333 && col == 322)  puts (elem ? "hit" : "miss"); */
     }
@@ -1141,42 +1127,47 @@ rays_to_hits_row (RayImage* image, uint row,
 
 #ifdef TrivialMpiRayTrace
     void
-balancer_triv_sync_mpi_RayImage (RayImage* image, uint nprocs)
+balancer_triv_sync_mpi_RayImage (RayImage* image,
+                                 uint row_off, uint row_nul,
+                                 uint nprocs)
 {
-    uint i, nrows, ncols;
-    nrows = image->nrows;
+    uint proc, ncols;
     ncols = image->ncols;
-    for (i = 1; i < nprocs; ++i)
+    for (proc = 1; proc < nprocs; ++proc)
     {
-        uint row;
-        for (row = i; row < nrows; row += nprocs)
+        uint i;
+        for (i = proc; i < row_nul; i += nprocs)
         {
             MPI_Status status;
+            uint row;
+            row = row_off + i;
             if (image->hits)
                 MPI_Recv (&image->hits[row*ncols],
                           ncols * sizeof(uint), MPI_BYTE,
-                          i, 1, MPI_COMM_WORLD, &status);
+                          proc, 1, MPI_COMM_WORLD, &status);
             if (image->mags)
                 MPI_Recv (&image->mags[row*ncols],
                           ncols * sizeof(real), MPI_BYTE,
-                          i, 1, MPI_COMM_WORLD, &status);
+                          proc, 1, MPI_COMM_WORLD, &status);
             if (image->pixels)
                 MPI_Recv (&image->pixels[row*3*ncols],
                           3 * ncols, MPI_BYTE,
-                          i, 1, MPI_COMM_WORLD, &status);
+                          proc, 1, MPI_COMM_WORLD, &status);
         }
     }
 }
 
     void
 computer_triv_sync_mpi_RayImage (const RayImage* image,
+                                 uint row_off, uint row_nul,
                                  uint myrank, uint nprocs)
 {
-    uint row, nrows, ncols;
-    nrows = image->nrows;
+    uint i, ncols;
     ncols = image->ncols;
-    for (row = myrank; row < nrows; row += nprocs)
+    for (i = myrank; i < row_nul; i += nprocs)
     {
+        uint row;
+        row = row_off + i;
         if (image->hits)
             MPI_Send (&image->hits[row*ncols],
                       ncols * sizeof(uint), MPI_BYTE,
@@ -1194,6 +1185,120 @@ computer_triv_sync_mpi_RayImage (const RayImage* image,
 #endif
 
 
+    void
+setup_RayCastAPriori (RayCastAPriori* dst,
+                      const RayImage* image,
+                      const Point* origin,
+                      const PointXfrm* view_basis,
+                      const BoundingBox* box)
+{
+    if (image->perspective)
+    {
+        setup_ray_pixel_deltas_perspective (&dst->dir_start,
+                                            &dst->row_delta,
+                                            &dst->col_delta,
+                                            image->nrows, image->ncols,
+                                            view_basis,
+                                            image->hifov);
+        dst->inside_box = inside_BoundingBox (box, origin);
+    }
+    else
+    {
+        setup_ray_pixel_deltas_orthographic (&dst->dir_start,
+                                             &dst->row_delta,
+                                             &dst->col_delta,
+                                             image->nrows, image->ncols,
+                                             origin, view_basis,
+                                             image->hifov);
+    }
+}
+
+
+    /* Expect /origin/ and /dir/ to already
+     * represent the middle line of sight.
+     */
+    void
+ray_from_RayCastAPriori (Point* origin, Point* dir,
+                         const RayCastAPriori* known,
+                         uint row, uint col,
+                         const RayImage* image)
+{
+    if (!image->perspective)
+    {
+        Point partial_ray_origin;
+        scale_Point (&partial_ray_origin, &known->row_delta, row);
+        summ_Point (&partial_ray_origin, &partial_ray_origin, &known->dir_start);
+
+        scale_Point (origin, &known->col_delta, col);
+        summ_Point (origin, origin, &partial_ray_origin);
+    }
+    else
+    {
+        Point partial_dir;
+        scale_Point (&partial_dir, &known->row_delta, row);
+        summ_Point (&partial_dir, &partial_dir, &known->dir_start);
+        scale_Point (dir, &known->col_delta, col);
+        summ_Point (dir, dir, &partial_dir);
+        normalize_Point (dir, dir);
+    }
+}
+
+
+    void
+cast_partial_RayImage (RayImage* restrict image,
+                       uint row_off,
+                       uint row_nul,
+                       const RaySpace* restrict space,
+                       const RayCastAPriori* restrict known,
+                       const Point* restrict origin,
+                       const PointXfrm* restrict view_basis)
+{
+    uint i, nprocs, myrank;
+
+#ifdef TrivialMpiRayTrace
+    MPI_Comm_size (MPI_COMM_WORLD, (int*) &nprocs);
+    MPI_Comm_rank (MPI_COMM_WORLD, (int*) &myrank);
+#else
+    myrank = 0;
+    nprocs = 1;
+#endif
+
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic)
+#endif
+    for (i = myrank; i < row_nul; i += nprocs)
+    {
+        if (image->perspective)
+            cast_row_perspective (image, row_off + i, space, known, origin);
+        else
+            cast_row_orthographic (image, row_off + i,
+                                   space, known, view_basis);
+    }
+
+#ifdef TrivialMpiRayTrace
+    if (myrank == 0)
+        balancer_triv_sync_mpi_RayImage (image, row_off, row_nul, nprocs);
+    else
+        computer_triv_sync_mpi_RayImage (image, row_off, row_nul,
+                                         myrank, nprocs);
+#endif
+}
+
+
+    void
+cast_RayImage (RayImage* restrict image,
+               const RaySpace* restrict space,
+               const Point* restrict origin,
+               const PointXfrm* restrict view_basis)
+{
+    RayCastAPriori known;
+    setup_RayCastAPriori (&known, image, origin, view_basis, &space->box);
+    cast_partial_RayImage (image, 0, image->nrows,
+                           space, &known,
+                           origin, view_basis);
+}
+
+
 void build_MultiRayCastParams (MultiRayCastParams* params,
                                uint nrows, uint ncols,
                                const RaySpace* space,
@@ -1203,11 +1308,11 @@ void build_MultiRayCastParams (MultiRayCastParams* params,
 {
     const uint row_dim = 0;
     const uint col_dim = 1;
-    setup_ray_pixel_deltas (&params->dir_start,
-                            &params->dir_delta[row_dim],
-                            &params->dir_delta[col_dim],
-                            nrows, ncols,
-                            view_basis, view_angle);
+    setup_ray_pixel_deltas_perspective (&params->dir_start,
+                                        &params->dir_delta[row_dim],
+                                        &params->dir_delta[col_dim],
+                                        nrows, ncols,
+                                        view_basis, view_angle);
 
     copy_BoundingBox (&params->box, &space->box);
     params->nelems = space->nelems;

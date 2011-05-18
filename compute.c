@@ -90,8 +90,7 @@ static void rays_to_hits_balancer (RayImage* image);
 void compute_rays_to_hits (RayImage* image,
                            const RaySpace* restrict space,
                            const Point* restrict origin,
-                           const PointXfrm* restrict view_basis,
-                           real view_angle)
+                           const PointXfrm* restrict view_basis)
 {
     uint i;
     (void) space;
@@ -112,9 +111,14 @@ void compute_rays_to_hits (RayImage* image,
         ret = MPI_Send ((void*) view_basis, 1 * sizeof (PointXfrm), MPI_BYTE,
                         proc, StdMsgTag, MPI_COMM_WORLD);
         AssertStatus( ret, "" );
-        ret = MPI_Send (&view_angle, 1 * sizeof (real), MPI_BYTE,
-                        proc, StdMsgTag, MPI_COMM_WORLD);
-        AssertStatus( ret, "" );
+        if (space->nobjects > 0)
+        {
+            ret = MPI_Send (space->objects,
+                            space->nobjects * sizeof (RaySpaceObject),
+                            MPI_BYTE,
+                            proc, StdMsgTag, MPI_COMM_WORLD);
+            AssertStatus( ret, "" );
+        }
     }
     rays_to_hits_balancer (image);
 }
@@ -327,24 +331,26 @@ static void
 rays_to_hits_computer (RayImage* restrict image,
                        const RaySpace* restrict space,
                        const Point* restrict origin,
-                       const PointXfrm* restrict view_basis,
-                       real view_angle);
+                       const PointXfrm* restrict view_basis);
 
 bool rays_to_hits_computeloop (const RaySpace* restrict space)
 {
     uint proc = 0;
+    RaySpaceObject* xfer_objects = 0;
+
     MPI_Comm_rank (MPI_COMM_WORLD, (int*) &proc);
+    xfer_objects = AllocT( RaySpaceObject, space->nobjects );
 
     if (proc == 0)  return false;
 
     while (true)
     {
         int ret;
+        uint i;
         MPI_Status status;
         RayImage image;
         Point origin;
         PointXfrm view_basis;
-        real view_angle;
 
         ret = MPI_Recv (0, 0, MPI_INT, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
         AssertStatus( ret, "Recv compute instruction" );
@@ -364,18 +370,33 @@ bool rays_to_hits_computeloop (const RaySpace* restrict space)
         ret = MPI_Recv (&view_basis, 1 * sizeof (PointXfrm), MPI_BYTE,
                         0, StdMsgTag, MPI_COMM_WORLD, &status);
         AssertStatus( ret, "" );
-        ret = MPI_Recv (&view_angle, 1 * sizeof (real), MPI_BYTE,
+        if (space->nobjects > 0)
+        {
+            ret = MPI_Recv (xfer_objects,
+                            space->nobjects * sizeof (RaySpaceObject),
+                            MPI_BYTE,
                         0, StdMsgTag, MPI_COMM_WORLD, &status);
-        AssertStatus( ret, "" );
+            AssertStatus( ret, "" );
+        }
 
         if (image.hits)  image.hits = AllocT( uint, 1 );
         if (image.mags)  image.mags = AllocT( real, 1 );
         if (image.pixels)  image.pixels = AllocT( byte, 1 );
         resize_RayImage (&image);
-        rays_to_hits_computer (&image, space,
-                               &origin, &view_basis, view_angle);
+
+        UFor( i, space->nobjects )
+        {
+            copy_Point (&space->objects[i].centroid,
+                        &xfer_objects[i].centroid);
+            copy_PointXfrm (&space->objects[i].orientation,
+                            &xfer_objects[i].orientation);
+        }
+
+        rays_to_hits_computer (&image, space, &origin, &view_basis);
         cleanup_RayImage (&image);
     }
+
+    if (xfer_objects)  free (xfer_objects);
     return true;
 }
 
@@ -384,30 +405,22 @@ bool rays_to_hits_computeloop (const RaySpace* restrict space)
 void rays_to_hits_computer (RayImage* restrict image,
                             const RaySpace* restrict space,
                             const Point* restrict origin,
-                            const PointXfrm* restrict view_basis,
-                            real view_angle)
+                            const PointXfrm* restrict view_basis)
 {
     MPI_Status status;
     uint i, row_off, row_nul;
     uint nrows, ncols;
     uint intl[2];
     MPI_Request recv_intl_req;
-    bool inside_box;
-    Point dir_start, row_delta, col_delta;
-    const BoundingBox* restrict box;
+    RayCastAPriori known;
     uint nrows_computed = 0;
     uint* rows_computed;
 
     nrows = image->nrows;
     ncols = image->ncols;
 
-    box = &space->box;
-    inside_box = inside_BoundingBox (box, origin);
+    setup_RayCastAPriori (&known, image, origin, view_basis, &space->box);
 
-    setup_ray_pixel_deltas (&dir_start, &row_delta, &col_delta,
-                            nrows, ncols,
-                            view_basis, view_angle);
-    
     rows_computed = AllocT( uint, nrows );
 
     MPI_Recv (intl, 2, MPI_UNSIGNED, 0, StdMsgTag, MPI_COMM_WORLD, &status);
@@ -430,15 +443,12 @@ void rays_to_hits_computer (RayImage* restrict image,
 #endif
         t0 = monotime ();
         UFor( i, row_nul )
-        {
-            uint row;
-            row = row_off + i;
-            rows_computed[nrows_computed++] = row;
-            rays_to_hits_row (image, row,
-                              space, origin,
-                              &dir_start, &row_delta, &col_delta,
-                              inside_box);
-        }
+            rows_computed[nrows_computed++] = row_off + i;
+
+        cast_partial_RayImage (image, row_off, row_nul,
+                               space, &known,
+                               origin, view_basis);
+
         dt = monotime () - t0;
 
         MPI_Wait (&recv_intl_req, &status);

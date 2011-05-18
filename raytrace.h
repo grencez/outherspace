@@ -9,15 +9,15 @@
 #include "xfrm.h"
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
-#define DirDimension (NDimensions - 1)
-
 struct ray_space_struct;
 struct ray_space_object_struct;
 struct ray_image_struct;
+struct ray_cast_a_priori_struct;
 struct multi_ray_cast_params_struct;
 typedef struct ray_space_struct RaySpace;
 typedef struct ray_space_object_struct RaySpaceObject;
 typedef struct ray_image_struct RayImage;
+typedef struct ray_cast_a_priori_struct RayCastAPriori;
 typedef struct multi_ray_cast_params_struct MultiRayCastParams;
 
 struct ray_space_struct
@@ -48,10 +48,20 @@ struct ray_image_struct
     byte* pixels;
     uint nrows;
     uint ncols;
+    real hifov;  /* Large field of view parameter.*/
+    bool perspective;
     real ambient[NColors];
     real view_light;
     bool shading_on;
     bool color_distance_on;
+};
+
+struct ray_cast_a_priori_struct
+{
+    Point dir_start;
+    Point row_delta;
+    Point col_delta;
+    bool inside_box;
 };
 
 struct multi_ray_cast_params_struct
@@ -89,32 +99,28 @@ rays_to_hits_fixed_plane (uint* hits, real* mags,
                           uint nrows, uint ncols,
                           const RaySpace* space, real zpos);
 void
-rays_to_hits_parallel (RayImage* restrict image,
-                       const RaySpace* space,
-                       const Point* origin,
-                       const PointXfrm* view_basis,
-                       real view_angle);
+setup_RayCastAPriori (RayCastAPriori* dst,
+                      const RayImage* image,
+                      const Point* origin,
+                      const PointXfrm* view_basis,
+                      const BoundingBox* box);
 void
-setup_ray_pixel_deltas (Point* dir_start,
-                        Point* row_delta,
-                        Point* col_delta,
-                        uint nrows, uint ncols,
-                        const PointXfrm* view_basis,
-                        real view_width);
+ray_from_RayCastAPriori (Point* origin, Point* dir,
+                         const RayCastAPriori* known,
+                         uint row, uint col,
+                         const RayImage* image);
 void
-rays_to_hits (RayImage* restrict image,
-              const RaySpace* space,
-              const Point* origin,
-              const PointXfrm* view_basis,
-              real view_angle);
+cast_partial_RayImage (RayImage* restrict image,
+                       uint row_off, uint row_nul,
+                       const RaySpace* restrict space,
+                       const RayCastAPriori* restrict known,
+                       const Point* restrict origin,
+                       const PointXfrm* restrict view_basis);
 void
-rays_to_hits_row (RayImage* image, uint row,
-                  const RaySpace* restrict space,
-                  const Point* restrict origin,
-                  const Point* dir_start,
-                  const Point* row_delta,
-                  const Point* col_delta,
-                  bool inside_box);
+cast_RayImage (RayImage* restrict image,
+               const RaySpace* restrict space,
+               const Point* restrict origin,
+               const PointXfrm* restrict view_basis);
 
 void build_MultiRayCastParams (MultiRayCastParams* params,
                                uint nrows, uint ncols,

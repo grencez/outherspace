@@ -8,6 +8,7 @@ CONFIG = fast openmp
 #CONFIG = fast openmp benchmark
 #CONFIG = fast openmp noassert
 #CONFIG = fast mpi
+#CONFIG = fast mpi openmp
 #CONFIG = mpi debug
 #CONFIG = debug
 #CONFIG = fast noassert
@@ -68,6 +69,18 @@ ifneq (,$(findstring c++,$(CONFIG)))
 	#CFLAGS += -fno-rtti
 	CFLAGS += -DCOMPILER_HAS_BOOL
 endif
+## Allow distributed parallelism.
+ifneq (,$(findstring mpi,$(CONFIG)))
+	ifneq (,$(findstring c++,$(CONFIG)))
+		CC = mpicxx
+	else
+		CC = mpicc
+	endif
+	# OpenMPI headers currently don't play well with C89.
+	CONFIG := $(filter-out ansi,$(CONFIG))
+	CFLAGS += -DDistribCompute -DCompressBigCompute
+	LFLAGS += -lz
+endif
 ## Use the C99 standard.
 ifneq (,$(findstring c99,$(CONFIG)))
 	CFLAGS += -std=c99
@@ -79,16 +92,6 @@ endif
 ## Allow parallelism.
 ifneq (,$(findstring openmp,$(CONFIG)))
 	CFLAGS += -fopenmp
-endif
-## Allow distributed parallelism.
-ifneq (,$(findstring mpi,$(CONFIG)))
-	ifneq (,$(findstring c++,$(CONFIG)))
-		CC = mpicxx
-	else
-		CC = mpicc
-	endif
-	CFLAGS += -DDistribCompute -DCompressBigCompute
-	LFLAGS += -lz
 endif
 
 
@@ -108,7 +111,7 @@ CSources = kdtree.c \
 
 LFLAGS += -lm
 
-all: cli gui hello
+all: cli gui
 	# Done!
 
 OpenCLPath = /home/grencez/ati-stream-sdk-v2.3-lnx64

@@ -17,7 +17,6 @@ int main (int argc, char** argv)
     RayImage image;
     Point view_origin;
     PointXfrm view_basis;
-    real view_angle = 2 * M_PI / 3;
     bool write_image = true;
     real t0;
 
@@ -38,7 +37,7 @@ int main (int argc, char** argv)
     image.mags = AllocT( real, image.nrows * image.ncols );
     good = setup_testcase_triangles (&space,
                                      &view_origin, &view_basis,
-                                     &view_angle);
+                                     &image.hifov);
 #else
     image.nrows = 1000;
     image.ncols = 1000;
@@ -52,7 +51,7 @@ int main (int argc, char** argv)
 #elif 1
         setup_testcase_sphere
 #endif
-        (&space, &view_origin, &view_basis, &view_angle);
+        (&space, &view_origin, &view_basis, &image.hifov);
 #endif
 
     if (!good)
@@ -76,8 +75,7 @@ int main (int argc, char** argv)
         int myrank;
         MPI_Comm_rank (MPI_COMM_WORLD, &myrank);
         if (myrank != 0)  write_image = false;
-        rays_to_hits (&image, &space, &view_origin,
-                      &view_basis, view_angle);
+        rays_to_hits (&image, &space, &view_origin, &view_basis);
         if (myrank == 0)
             printf ("sec:%f\n", monotime () - t0);
     }
@@ -93,7 +91,7 @@ int main (int argc, char** argv)
         {
             t0 = monotime ();
             compute_rays_to_hits (&image, &space,
-                                  &view_origin, &view_basis, view_angle);
+                                  &view_origin, &view_basis);
             printf ("sec:%f\n", monotime () - t0);
         }
 
@@ -101,7 +99,7 @@ int main (int argc, char** argv)
     }
 #endif
 #else
-    rays_to_hits (&image, &space, &view_origin, &view_basis, view_angle);
+    cast_RayImage (&image, &space, &view_origin, &view_basis);
     printf ("sec:%f\n", monotime () - t0);
 #endif
 

@@ -201,8 +201,8 @@ detect_collision (const RaySpace* space,
         centroid_BoundingBox (&diff, &object->space.box);
         diff_Point (&diff, &scene->verts[i], &diff);
 
-        xfrm_Point (&origin, &object->orientation, &diff);
-        xfrm_Point (&destin, new_orientation, &diff);
+        trxfrm_Point (&origin, &object->orientation, &diff);
+        trxfrm_Point (&destin, new_orientation, &diff);
 
         summ_Point (&origin, &origin, &object->centroid);
         summ_Point (&destin, &destin, new_centroid);

@@ -20,6 +20,9 @@ static const bool ShowFrameRate = false;
 
 #ifdef NRacers
 static ObjectMotion racer_motions[NRacers];
+    /* Reset every frame.*/
+static real view_azimuthcc = M_PI;
+static real view_zenith = M_PI / 2;
 #endif
 
 static real stride_magnitude = 10;
@@ -33,7 +36,6 @@ static uint mouse_diff[2];
 static RayImage ray_image;
 static real view_angle = 2 * M_PI / 3;
 static real view_width = 100;
-static bool view_perspective = true;
 static bool needs_recast = true;
 static SDL_Joystick* joystick_handle; 
 
@@ -205,7 +207,7 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
     }
     else if (view_angle_change != 0)
     {
-        if (view_perspective)
+        if (ray_image.perspective)
         {
             const real epsilon = (real) (.00001);
             const real diff = M_PI / 18;
@@ -264,8 +266,8 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
     }
     else if (change_cast_method)
     {
-        view_perspective = !view_perspective;
-        if (view_perspective)
+        ray_image.perspective = !ray_image.perspective;
+        if (ray_image.perspective)
             fputs ("method:perspective\n", out);
         else
             fputs ("method:parallel\n", out);
@@ -318,6 +320,8 @@ set_rotate_view (real vert, real horz)
 
 static gboolean poll_joystick (gpointer widget)
 {
+    const int js_nil = 3000;  /* Dead zone!*/
+    const int js_max = 32767;
     const bool inv_vert = true;
     const bool use_roll = false;
     int x, y;
@@ -332,14 +336,26 @@ static gboolean poll_joystick (gpointer widget)
     x = SDL_JoystickGetAxis (joystick_handle, 1);
     y = SDL_JoystickGetAxis (joystick_handle, 0);
 
-        /* Dead zones!*/
-    if (x > 0 && x <  3000)  x = 0;
-    if (x < 0 && x > -3000)  x = 0;
-    if (y > 0 && y <  3000)  y = 0;
-    if (y < 0 && y > -3000)  y = 0;
+    if (x > 0 && x <  js_nil)  x = 0;
+    if (x < 0 && x > -js_nil)  x = 0;
+    if (y > 0 && y <  js_nil)  y = 0;
+    if (y < 0 && y > -js_nil)  y = 0;
 
-    vert = (real) x / 32767;
-    horz = (real) y / 32767;
+    vert = (real) x / js_max;
+    horz = (real) y / js_max;
+
+#ifdef NRacers
+    x = SDL_JoystickGetAxis (joystick_handle, 4);
+    y = SDL_JoystickGetAxis (joystick_handle, 3);
+
+    if (x > 0 && x <  js_nil)  x = 0;
+    if (x < 0 && x > -js_nil)  x = 0;
+    if (y > 0 && y <  js_nil)  y = 0;
+    if (y < 0 && y > -js_nil)  y = 0;
+
+    view_zenith    = (M_PI / 2) * (1 - 1.0 * x / js_max);
+    view_azimuthcc =  M_PI      * (1 - 1.0 * y / js_max);
+#endif
 
     if (use_roll)
     {
@@ -351,8 +367,8 @@ static gboolean poll_joystick (gpointer widget)
         vert = - vert;
 
 #ifdef NRacers
-    rotate_object (&racer_motions[0], 0, 2, - vert * M_PI / 2);
-    rotate_object (&racer_motions[0], 1, 2, - horz * M_PI / 2);
+    rotate_object (&racer_motions[0], 0, DirDimension, - vert * M_PI / 2);
+    rotate_object (&racer_motions[0], 1, DirDimension, - horz * M_PI / 2);
     if (use_roll)
         rotate_object (&racer_motions[0], 0, 1, roll * M_PI / 2);
 
@@ -476,26 +492,25 @@ static gboolean grab_mouse_fn (GtkWidget* da,
     }
     else if (do_raycast)
     {
+        RayCastAPriori priori;
         uint hit_idx;
         real hit_mag;
         const RaySpace* hit_space;
         Point hit_origin, hit_dir;
         Point origin, dir;
-        Point dir_start, row_delta, col_delta, partial_dir;
         bool inside_box;
 
+        setup_RayCastAPriori (&priori, &ray_image,
+                              &view_origin, &view_basis,
+                              &space->box);
 
         copy_Point (&origin, &view_origin);
+        copy_Point (&dir, &view_basis.pts[DirDimension]);
+
         inside_box = inside_BoundingBox (&space->box, &origin);
 
-        setup_ray_pixel_deltas (&dir_start, &row_delta, &col_delta,
-                                view_nrows, view_ncols,
-                                &view_basis, view_angle);
-        scale_Point (&partial_dir, &row_delta, row);
-        summ_Point (&partial_dir, &partial_dir, &dir_start);
-        scale_Point (&dir, &col_delta, col);
-        summ_Point (&dir, &dir, &partial_dir);
-        normalize_Point (&dir, &dir);
+        ray_from_RayCastAPriori (&origin, &dir,
+                                 &priori, row, col, &ray_image);
 
         cast_recurse (&hit_idx, &hit_mag, &hit_space,
                       &hit_origin, &hit_dir,
@@ -596,27 +611,30 @@ render_RaySpace (byte* data, RaySpace* space,
             summ_Point (&view_origin, &view_origin, &tmp);
             summ_Point (&view_origin, &view_origin, &object->centroid);
 #else
+            PointXfrm rotation;
             object = &space->objects[0];
-            copy_PointXfrm (&view_basis, &object->orientation);
-            scale_Point (&tmp, &object->orientation.pts[DirDimension], -130);
+
+            spherical3_PointXfrm (&rotation, view_zenith,
+                                  view_azimuthcc - M_PI);
+            xfrm_PointXfrm (&view_basis, &rotation, &object->orientation);
+
+            scale_Point (&tmp, &view_basis.pts[DirDimension], -130);
             summ_Point (&view_origin, &object->centroid, &tmp);
 #endif
         }
 #endif
 
+        if (ray_image.perspective)  ray_image.hifov = view_angle;
+        else                        ray_image.hifov = view_width;
+
 #ifdef DistribCompute
-        compute_rays_to_hits (&ray_image,
-                              space, &view_origin, &view_basis, view_angle);
+        compute_rays_to_hits (&ray_image, space, &view_origin, &view_basis);
 #else
         if (ForceFauxFishEye)
             rays_to_hits_fish (&ray_image, space,
                                &view_origin, &view_basis, view_angle);
-        else if (view_perspective)
-            rays_to_hits (&ray_image, space,
-                          &view_origin, &view_basis, view_angle);
         else
-            rays_to_hits_parallel (&ray_image, space,
-                                   &view_origin, &view_basis, view_width);
+            cast_RayImage (&ray_image, space, &view_origin, &view_basis);
 #endif
         prev_time = time;
     }
