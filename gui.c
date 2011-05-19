@@ -357,6 +357,13 @@ static gboolean poll_joystick (gpointer widget)
     view_azimuthcc =  M_PI      * (1 - 1.0 * y / js_max);
 #endif
 
+#if NDimensions == 4
+    x = SDL_JoystickGetAxis (joystick_handle, 2);
+    view_origin.coords[3] =
+        clamp_real ((real) (x + js_max) / (2 * js_max),
+                    0, 1);
+#endif
+
     if (use_roll)
     {
         roll = horz;
@@ -768,7 +775,7 @@ int main (int argc, char* argv[])
 #elif 0
         setup_testcase_4d_surface
 #elif 0
-        setup_testcase_interp
+        setup_testcase_manual_interp
 #elif 1
         setup_testcase_sphere
 #endif

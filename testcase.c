@@ -290,21 +290,19 @@ setup_testcase_4d_surface (RaySpace* space,
 
     if (NDimensions == 3)
     {
-        good = readin_wavefront (&space->scene, "plate1.obj");
+        good = readin_wavefront (&space->scene, "sandbox.obj");
         if (!good)  return false;
     }
     else
     {
         uint i;
-        const real dcoords[2] = { 0, 100 };
+        const real dcoords[2] = { -0.001, 1.001 };
         assert (NDimensions == 4);
 
-        good = readin_wavefront (&scenes[0], "plate1.obj");
+        good = readin_wavefront (&scenes[0], "sandbox.obj");
         if (!good)  return false;
-        good = readin_wavefront (&scenes[1], "plate2.obj");
+        good = readin_wavefront (&scenes[1], "sandbox_flat.obj");
         if (!good)  return false;
-
-        interpolate_Scene (&space->scene, NDimensions-1, nscenes, scenes);
 
         UFor( i, nscenes )
         {
@@ -312,6 +310,8 @@ setup_testcase_4d_surface (RaySpace* space,
             UFor( j, scenes[i].nverts )
                 scenes[i].verts[j].coords[3] = dcoords[i];
         }
+
+        interpolate_Scene (&space->scene, NDimensions-1, nscenes, scenes);
     }
 
     init_filled_RaySpace (space);
@@ -323,17 +323,14 @@ setup_testcase_4d_surface (RaySpace* space,
     view_basis->pts[0].coords[0] = -0.0701899;
     view_basis->pts[0].coords[1] = -0.997534;
     view_basis->pts[0].coords[2] = 3.35915e-05;
-    view_basis->pts[0].coords[3] = 0;
     view_origin->coords[1] = 1885.96;
     view_basis->pts[1].coords[0] = 0.00932495;
     view_basis->pts[1].coords[1] = -0.000689809;
     view_basis->pts[1].coords[2] = -0.999956;
-    view_basis->pts[1].coords[3] = 0;
     view_origin->coords[2] = -343.056;
     view_basis->pts[2].coords[0] = 0.99749;
     view_basis->pts[2].coords[1] = -0.0701865;
     view_basis->pts[2].coords[2] = 0.00935037;
-    view_basis->pts[2].coords[3] = 0;
     if (NDimensions == 4)
     {
         swaprows_PointXfrm (view_basis, 2, 3);

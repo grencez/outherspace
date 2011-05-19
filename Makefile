@@ -12,7 +12,7 @@ CONFIG = fast openmp
 #CONFIG = mpi debug
 #CONFIG = debug
 #CONFIG = fast noassert
-#CONFIG = benchmark snappy debug
+#CONFIG = noassert snappy debug
 #CONFIG = benchmark snappy debug openmp
 #CONFIG = ultradebug
 

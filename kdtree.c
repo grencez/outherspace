@@ -254,41 +254,58 @@ swap_uint (uint* x, uint* y)
 
 
 static
-    uint
-partition_intervals (uint* intls, uint p, uint r, const real* coords)
+    void
+partition_intervals (uint* intls, uint* ret_q, uint* ret_r,
+                     uint p, uint s, const real* coords)
 {
-    uint i, j;
+    uint i, q, r, n;
     real x;
+    assert (p < s);
+    swap_uint (&intls[s], &intls[p+(s-p)/2]);
+    x = coords[intls[s]];
+    q = p;
+    r = s;
     i = p;
-    swap_uint (&intls[r], &intls[p+(r-p)/2]);
-    x = coords[intls[r]];
-    for (j = p; j < r; ++j)
+    while (i < r)
     {
-        if (coords[intls[j]] <= x)
+        real y;
+        y = coords[intls[i]];
+        if (y > x)
         {
-            swap_uint (&intls[i], &intls[j]);
             ++i;
         }
+        else if (y < x)
+        {
+            swap_uint (&intls[q], &intls[i]);
+            ++q;
+            ++i;
+        }
+        else if (y == x)
+        {
+            --r;
+            swap_uint (&intls[r], &intls[i]);
+        }
     }
-    swap_uint (&intls[i], &intls[r]);
-    return i;
+    assert (p <= q && q <= r && r <= s);
+    n = s - r + 1;
+    UFor( i, n )
+        swap_uint (&intls[q+i], &intls[r+i]);
+    *ret_q = q;
+    *ret_r = q + n;
 }
 
 
 static
     void
-quicksort_intervals (uint* intls, uint p, uint r, const real* coords)
+quicksort_intervals (uint* intls, uint p, uint s, const real* coords)
 {
-    if (p < r)
+    if (p < s)
     {
-        uint q;
-            /* TODO: Make this a 3-way partition.
-             * Test for equality with the pivot element!
-             */
-        q = partition_intervals (intls, p, r, coords);
+        uint q, r;
+        partition_intervals (intls, &q, &r, p, s, coords);
         if (q > 0)
             quicksort_intervals (intls, p, q -1, coords);
-        quicksort_intervals (intls, q +1, r, coords);
+        quicksort_intervals (intls, r, s, coords);
     }
 }
 
