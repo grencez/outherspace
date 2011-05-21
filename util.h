@@ -22,6 +22,8 @@
 typedef unsigned int uint;
 typedef unsigned char byte;
 
+#define NBitsInByte 8
+
 #ifndef COMPILER_HAS_BOOL
 typedef byte bool;
 #define true 1
@@ -37,7 +39,6 @@ typedef byte bool;
 #define NDEBUG
 #endif
 #endif
-#define INCLUDE_SOURCE
 
 #define __global
 
@@ -86,6 +87,8 @@ typedef float real;
 typedef int tristate;
 
 bool even_uint (uint a);
+uint
+ceil_uint (uint a, uint b);
 tristate compare_real (real a, real b);
 real match_real (real a, real b);
 real

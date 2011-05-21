@@ -109,15 +109,15 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
             break;
         case GDK_Escape:
             gdk_pointer_ungrab (event->time);  break;
-        case GDK_D:
-            dim = 2;
-            stride = 1;
-            break;
 #ifdef NRacers
         case GDK_c:
             racer_motions[0].collide = !racer_motions[0].collide;
             break;
 #endif
+        case GDK_D:
+            dim = 2;
+            stride = 1;
+            break;
         case GDK_d:
             if (ctrl_mod) { rotate_dir_dim = true; }
             else { dim = 2; stride = -1; }
@@ -327,6 +327,13 @@ static gboolean poll_joystick (gpointer widget)
     int x, y;
     tristate stride = 0;
     real vert, horz, roll;
+
+    if (!joystick_handle)
+    {
+        gtk_widget_queue_draw ((GtkWidget*) widget);
+        needs_recast = true;
+        return TRUE;
+    }
 
     SDL_JoystickUpdate ();
 

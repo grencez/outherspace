@@ -3,6 +3,8 @@
 #CC = gcc
 #CC = llvm-gcc
 
+DFLAGS += -DNDimensions=4
+
 CONFIG = fast
 CONFIG = fast openmp
 #CONFIG = fast openmp benchmark
@@ -24,6 +26,7 @@ CONFIG += ansi
 #LD_PRELOAD=$(pfx)/lib/valgrind/libmpiwrap-x86-linux.so \
 #	mpirun -np 3 valgrind ./cli 2>&1 | tee out
 
+#valgrind --num-callers=50 --db-attach=yes --db-command='cgdb -- %f %p'
 
 ifeq ($(CC),g++)
 	CONFIG += c++
@@ -31,6 +34,7 @@ endif
 
 CFLAGS += -fwhole-program
 CFLAGS += -Wall -Wextra
+DFLAGS += -DINCLUDE_SOURCE
 
 
 ## Serious debugging is about to happen.
@@ -95,8 +99,10 @@ ifneq (,$(findstring openmp,$(CONFIG)))
 endif
 
 
-CSources = kdtree.c \
+CSources = bitstring.c \
+		   kdtree.c \
 		   material.c \
+		   order.c \
 		   pnm-image.c \
 		   raytrace.c \
 		   scene.c \
@@ -111,13 +117,13 @@ CSources = kdtree.c \
 
 LFLAGS += -lm
 
-all: cli gui
+all: cli gui verify
 	# Done!
 
 OpenCLPath = /home/grencez/ati-stream-sdk-v2.3-lnx64
 OpenCLLibPath = $(OpenCLPath)/lib/x86_64
 hello: hello.c $(CSources)
-	$(CC) $(CFLAGS) -I $(OpenCLPath)/include $< -o $@ \
+	$(CC) $(CFLAGS) $(DFLAGS) -I $(OpenCLPath)/include $< -o $@ \
 		-L $(OpenCLLibPath) -lOpenCL $(LFLAGS)
 
 .PHONY: test-hello
@@ -125,15 +131,18 @@ test-hello: hello
 	LD_LIBRARY_PATH=$(OpenCLLibPath) ./$<
 
 cli: cli.c compute.c $(CSources)
-	$(CC) $(CFLAGS) $< -o $@ $(LFLAGS)
+	$(CC) $(CFLAGS) $(DFLAGS) $< -o $@ $(LFLAGS)
 
 gui: gui.c compute.c motion.c $(CSources)
-	$(CC) $(CFLAGS) `pkg-config --cflags gtk+-2.0` \
+	$(CC) $(CFLAGS) $(DFLAGS) `pkg-config --cflags gtk+-2.0` \
 		`sdl-config --cflags` \
 		$< -o $@ \
 		`pkg-config --libs gtk+-2.0` \
 		-lSDL \
 		$(LFLAGS)
+
+verify: verif/main.c $(CSources)
+	$(CC) $(CFLAGS) $(DFLAGS) -I . $< -o $@ $(LFLAGS)
 
 .PHONY: test
 test: cli
@@ -142,5 +151,5 @@ test: cli
 
 .PHONY: clean
 clean:
-	rm -f hello cli gui
+	rm -f hello cli gui verify
 

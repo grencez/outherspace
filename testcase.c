@@ -46,6 +46,71 @@ setup_testcase_triangles (RaySpace* space,
     return true;
 }
 
+static
+    bool
+interpolate_by_file (Scene* dst,
+                     uint nscenes,
+                     const char* const* filepaths,
+                     const real* dcoords)
+{
+    bool good = true;
+    uint i;
+    Scene* scenes;
+
+    assert (NDimensions ==  4);
+    if (NDimensions != 4)  return false;
+
+    scenes = AllocT( Scene, nscenes );
+
+    UFor( i, nscenes )
+    {
+        uint j;
+        good = readin_wavefront (&scenes[i], filepaths[i]);
+        if (!good)  return false;
+        UFor( j, scenes[i].nverts )
+            scenes[i].verts[j].coords[NDimensions-1] = dcoords[i];
+    }
+
+    interpolate_Scene (dst, NDimensions-1, nscenes, scenes);
+
+    if (scenes)  free (scenes);
+    return good;
+}
+
+static
+    bool
+setup_racers (RaySpace* space)
+{
+    uint i;
+    bool good = true;
+    space->nobjects = 10;
+    space->objects = AllocT( RaySpaceObject, space->nobjects );
+    UFor( i, space->nobjects )
+    {
+        init_RaySpace (&space->objects[i].space);
+
+        if (NDimensions == 3)
+        {
+            good = readin_wavefront (&space->objects[i].space.scene,
+                                     "machine_1.obj");
+            if (!good)  return false;
+        }
+        else
+        {
+            const char* const paths[2] = { "machine_1.obj", "machine_1.obj" };
+            const real dcoords[2] = { -0.1, 0.1 };
+            interpolate_by_file (&space->objects[i].space.scene,
+                                 2, paths, dcoords);
+        }
+
+        init_filled_RaySpace (&space->objects[i].space);
+        zero_Point (&space->objects[i].centroid);
+        space->objects[i].centroid.coords[0] = 75 * i + 300;
+        identity_PointXfrm (&space->objects[i].orientation);
+    }
+    return good;
+}
+              
 
     bool
 setup_testcase_track (RaySpace* space,
@@ -53,25 +118,13 @@ setup_testcase_track (RaySpace* space,
                       real* view_angle)
 {
     bool good;
-    uint i;
 
     init_RaySpace (space);
     identity_PointXfrm (view_basis);
     zero_Point (view_origin);
 
-    space->nobjects = 10;
-    space->objects = AllocT( RaySpaceObject, space->nobjects );
-    UFor( i, space->nobjects )
-    {
-        init_RaySpace (&space->objects[i].space);
-        good = readin_wavefront (&space->objects[i].space.scene,
-                                 "machine_1.obj");
-        if (!good)  return false;
-        init_filled_RaySpace (&space->objects[i].space);
-        zero_Point (&space->objects[i].centroid);
-        space->objects[i].centroid.coords[0] = 75 * i + 300;
-        identity_PointXfrm (&space->objects[i].orientation);
-    }
+    good = setup_racers (space);
+    if (!good)  return false;
 
     good = readin_wavefront (&space->scene, "track_1.obj");
     if (!good)  return false;
@@ -210,7 +263,6 @@ setup_testcase_sphere (RaySpace* space,
     bool good;
     FILE* out = stderr;
     uint nscenes = 2;
-    Scene scenes[2];
 
     init_RaySpace (space);
     identity_PointXfrm (view_basis);
@@ -223,23 +275,9 @@ setup_testcase_sphere (RaySpace* space,
     }
     else
     {
-        uint i;
+        const char* const paths[2] = { "sphere1.obj", "sphere2.obj" };
         const real dcoords[2] = { 0, 100 };
-        assert (NDimensions == 4);
-
-        good = readin_wavefront (&scenes[0], "sphere1.obj");
-        if (!good)  return false;
-        good = readin_wavefront (&scenes[1], "sphere2.obj");
-        if (!good)  return false;
-
-        UFor( i, nscenes )
-        {
-            uint j;
-            UFor( j, scenes[i].nverts )
-                scenes[i].verts[j].coords[3] = dcoords[i];
-        }
-
-        interpolate_Scene (&space->scene, NDimensions-1, nscenes, scenes);
+        interpolate_by_file (&space->scene, nscenes, paths, dcoords);
     }
 
     init_filled_RaySpace (space);
@@ -280,13 +318,14 @@ setup_testcase_4d_surface (RaySpace* space,
                            PointXfrm* view_basis,
                            real* view_angle)
 {
-    bool good;
-    uint nscenes = 2;
-    Scene scenes[2];
+    bool good = true;
 
     init_RaySpace (space);
     identity_PointXfrm (view_basis);
     zero_Point (view_origin);
+
+    good = setup_racers (space);
+    if (!good)  return false;
 
     if (NDimensions == 3)
     {
@@ -295,23 +334,9 @@ setup_testcase_4d_surface (RaySpace* space,
     }
     else
     {
-        uint i;
+        const char* const paths[2] = { "sandbox.obj", "sandbox_flat.obj" };
         const real dcoords[2] = { -0.001, 1.001 };
-        assert (NDimensions == 4);
-
-        good = readin_wavefront (&scenes[0], "sandbox.obj");
-        if (!good)  return false;
-        good = readin_wavefront (&scenes[1], "sandbox_flat.obj");
-        if (!good)  return false;
-
-        UFor( i, nscenes )
-        {
-            uint j;
-            UFor( j, scenes[i].nverts )
-                scenes[i].verts[j].coords[3] = dcoords[i];
-        }
-
-        interpolate_Scene (&space->scene, NDimensions-1, nscenes, scenes);
+        good = interpolate_by_file (&space->scene, 2, paths, dcoords);
     }
 
     init_filled_RaySpace (space);
@@ -334,7 +359,7 @@ setup_testcase_4d_surface (RaySpace* space,
     if (NDimensions == 4)
     {
         swaprows_PointXfrm (view_basis, 2, 3);
-        view_origin->coords[3] = 7.5;
+        view_origin->coords[3] = 0.5;
     }
 #endif
 

@@ -145,6 +145,12 @@ bool even_uint (uint a)
     return 0 == (a & 1);
 }
 
+    uint
+ceil_uint (uint a, uint b)
+{
+    return (a + b - 1) / b;
+}
+
 tristate compare_real (real a, real b)
 {
     if (a > b)  return  1;

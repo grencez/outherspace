@@ -158,7 +158,7 @@ full_fill_between_simplices (SceneElement* dst_elems,
     uint ecount = 0;
     uint i;
     const uint nelems = 15;
-    uint elems[][4] =
+    const uint elems[][4] =
     {
         { 0, 1, 2,  3       },
         { 0, 1, 2,     4    },
@@ -176,9 +176,23 @@ full_fill_between_simplices (SceneElement* dst_elems,
         {    1,     3, 4, 5 },
         {       2,  3, 4, 5 }
     };
+    uint vertidcs[6], vnmlidcs[6];
     assert (NDimensions == 4);
     assert (k == 3);
     if (NDimensions != 4 || k != 3)  return 0;
+
+    UFor( i, k )  vertidcs[0+i] = a_vert_offset + a->pts[i];
+    UFor( i, k )  vertidcs[k+i] = b_vert_offset + b->pts[i];
+    UFor( i, k )
+    {
+        vnmlidcs[0+i] = a->vnmls[i];
+        if (vnmlidcs[0+i] < Max_uint)  vnmlidcs[0+i] += a_vnml_offset;
+    }
+    UFor( i, k )
+    {
+        vnmlidcs[k+i] = b->vnmls[i];
+        if (vnmlidcs[k+i] < Max_uint)  vnmlidcs[k+i] += b_vnml_offset;
+    }
 
     ecount = 0;
     UFor( i, nelems )
@@ -190,25 +204,15 @@ full_fill_between_simplices (SceneElement* dst_elems,
         elem = &dst_elems[ecount];
         init_SceneElement (elem);
 
-        UFor( j, NDimensions )
+        UFor( j, k+1 )
         {
-            uint vi, v, vn;
+            uint vi, v;
             vi = elems[i][j];
-            if (vi < 3)
-            {
-                v = a_vert_offset + a->pts[vi];
-                vn = a->vnmls[vi];
-                if (vn < Max_uint)  vn += a_vnml_offset;
-            }
-            else
-            {
-                v = b_vert_offset + b->pts[vi-3];
-                vn = b->vnmls[vi-3];
-                if (vn < Max_uint)  vn += b_vnml_offset;
-            }
+            v = vertidcs[vi];
 
             elem->pts[j] = v;
-            elem->vnmls[j] = vn;
+            elem->vnmls[j] = vnmlidcs[vi];
+
             copy_Point (&simplex.pts[j], &verts[v]);
         }
 
@@ -334,7 +338,8 @@ interpolate_Scene (Scene* dst, uint k, uint nscenes, const Scene* scenes)
             SceneElement* dst_elems;
             dst_elems = &dst->elems[ecount];
             if (use_full_fill)
-                x = full_fill_between_simplices (dst_elems, k,
+                x = full_fill_between_simplices (dst_elems,
+                                                 k,
                                                  &a->elems[ei], &b->elems[ei],
                                                  a_vert_offset, b_vert_offset,
                                                  a_vnml_offset, b_vnml_offset,

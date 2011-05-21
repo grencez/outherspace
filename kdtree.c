@@ -1,6 +1,7 @@
 
 #ifndef __OPENCL_VERSION__
 #include "kdtree.h"
+#include "order.h"
 #include "slist.h"
 
 #include <assert.h>
@@ -214,149 +215,6 @@ split_KDTreeGrid (KDTreeGrid* logrid, KDTreeGrid* higrid,
 
     split_BoundingBox (&logrid->box, &higrid->box, &grid->box,
                        split_dim, split_pos);
-}
-
-static
-    bool
-minimal_unique (uint n, const uint* a)
-{
-    uint i;
-    bool* hits;
-    bool pred = true;
-
-    hits = AllocT( bool, n );
-
-    UFor( i, n )  hits[i] = false;
-    UFor( i, n )
-    {
-        assert (a[i] < n);
-        hits[a[i]] = true;
-    }
-    UFor( i, n )
-    {
-        if (!hits[i])
-            pred = false;
-    }
-
-    if (hits)  free (hits);
-    return pred;
-}
-
-
-static
-    void
-swap_uint (uint* x, uint* y)
-{
-    uint tmp = *x;
-    *x = *y;
-    *y = tmp;
-}
-
-
-static
-    void
-partition_intervals (uint* intls, uint* ret_q, uint* ret_r,
-                     uint p, uint s, const real* coords)
-{
-    uint i, q, r, n;
-    real x;
-    assert (p < s);
-    swap_uint (&intls[s], &intls[p+(s-p)/2]);
-    x = coords[intls[s]];
-    q = p;
-    r = s;
-    i = p;
-    while (i < r)
-    {
-        real y;
-        y = coords[intls[i]];
-        if (y > x)
-        {
-            ++i;
-        }
-        else if (y < x)
-        {
-            swap_uint (&intls[q], &intls[i]);
-            ++q;
-            ++i;
-        }
-        else if (y == x)
-        {
-            --r;
-            swap_uint (&intls[r], &intls[i]);
-        }
-    }
-    assert (p <= q && q <= r && r <= s);
-    n = s - r + 1;
-    UFor( i, n )
-        swap_uint (&intls[q+i], &intls[r+i]);
-    *ret_q = q;
-    *ret_r = q + n;
-}
-
-
-static
-    void
-quicksort_intervals (uint* intls, uint p, uint s, const real* coords)
-{
-    if (p < s)
-    {
-        uint q, r;
-        partition_intervals (intls, &q, &r, p, s, coords);
-        if (q > 0)
-            quicksort_intervals (intls, p, q -1, coords);
-        quicksort_intervals (intls, r, s, coords);
-    }
-}
-
-static
-    void
-bubblesort_intervals (uint nintls, uint* intls, const real* coords)
-{
-    uint i;
-    UFor( i, nintls )
-    {
-        uint j, ti;
-        ti = intls[i];
-        UFor( j, i )
-        {
-            uint tj;
-            tj = intls[j];
-
-            if (coords[tj] > coords[ti])
-            {
-                intls[i] = tj;
-                intls[j] = ti;
-                ti = tj;
-                assert (intls[i] != intls[j]);
-            }
-        }
-    }
-}
-
-static
-    void
-sort_intervals (uint nintls, uint* intls, const real* coords)
-{
-    uint i;
-    const bool use_quicksort = true;
-    assert (even_uint (nintls));
-    assert (minimal_unique (nintls, intls));
-    if (use_quicksort)
-        quicksort_intervals (intls, 0, nintls-1, coords);
-    else
-        bubblesort_intervals (nintls, intls, coords);
-    assert (minimal_unique (nintls, intls));
-    if (nintls > 0)
-    {
-        UFor( i, nintls-1 )
-        {
-            uint ti, tj;
-            ti = intls[i];
-            tj = intls[i+1];
-            assert (coords[ti] <= coords[tj]);
-        }
-    }
 }
 
 
@@ -641,7 +499,7 @@ build_KDTree (KDTree* tree, KDTreeGrid* grid)
     SList nodelist, elemidxlist;
 
     UFor( i, NDimensions )
-        sort_intervals (grid->nintls, grid->intls[i], grid->coords[i]);
+        sort_indexed_reals (grid->nintls, grid->intls[i], grid->coords[i]);
     init_SList (&nodelist);
     init_SList (&elemidxlist);
     build_KDTreeNode (0, 0, grid, 0, &nodelist, &elemidxlist);
