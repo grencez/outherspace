@@ -21,9 +21,23 @@ static const bool ShowFrameRate = false;
 #ifdef NRacers
 static ObjectMotion racer_motions[NRacers];
     /* Reset every frame.*/
-static real view_azimuthcc = M_PI;
-static real view_zenith = M_PI / 2;
+static real view_azimuthcc_input = 0;
+static real view_zenith_input = 0;
 #endif
+
+typedef struct motion_input_struct MotionInput;
+
+struct motion_input_struct
+{
+    real t0;
+    real t1;
+    real vert;
+    real horz;
+    real drift;
+    tristate stride[NDimensions];
+    bool inv_vert;
+    bool use_roll;
+};
 
 static real stride_magnitude = 10;
 static real prev_time;
@@ -37,7 +51,23 @@ static RayImage ray_image;
 static real view_angle = 2 * M_PI / 3;
 static real view_width = 100;
 static bool needs_recast = true;
-static SDL_Joystick* joystick_handle; 
+static bool continue_running = true;
+static GMutex* update_lock = 0;
+
+
+static
+    void
+init_MotionInput (MotionInput* mot)
+{
+    uint i;
+    mot->t0 = 0;
+    mot->vert = 0;
+    mot->horz = 0;
+    mot->drift = 0.5;
+    UFor( i, NDimensions )  mot->stride[i] = 0;
+    mot->inv_vert = true;
+    mot->use_roll = false;
+}
 
 static gboolean delete_event (GtkWidget* widget,
                               GdkEvent* event,
@@ -56,12 +86,13 @@ static void destroy_app (GtkWidget* widget,
     (void) widget;
     (void) data;
     cleanup_RayImage (&ray_image);
+    continue_running = false;
     gtk_main_quit ();
 }
 
 static
     gboolean
-key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
+key_press_fn (GtkWidget* _widget, GdkEventKey* event, gpointer _data)
 {
     uint dim = NDimensions;
     tristate roll = 0;
@@ -80,6 +111,7 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
     bool shift_mod, ctrl_mod;
 
     (void) _data;
+    (void) _widget;
     out = stdout;
 
     shift_mod = event->state & GDK_SHIFT_MASK;
@@ -295,7 +327,6 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
 
 
     if (recast)  needs_recast = true;
-    gtk_widget_queue_draw (widget);
 
     return TRUE;
 }
@@ -318,115 +349,147 @@ set_rotate_view (real vert, real horz)
 }
 
 
-static gboolean poll_joystick (gpointer widget)
+static
+    void
+joystick_button_event (MotionInput* mot,
+                       uint devidx, uint btnidx, bool pressed)
 {
-    const int js_nil = 3000;  /* Dead zone!*/
-    const int js_max = 32767;
-    const bool inv_vert = true;
-    const bool use_roll = false;
-    int x, y;
-    tristate stride = 0;
-    real vert, horz, roll;
-
-    if (!joystick_handle)
-    {
-        gtk_widget_queue_draw ((GtkWidget*) widget);
-        needs_recast = true;
-        return TRUE;
-    }
-
-    SDL_JoystickUpdate ();
-
-    if (0 != SDL_JoystickGetButton (joystick_handle, 2))  stride =  1;
-    if (0 != SDL_JoystickGetButton (joystick_handle, 3))  stride = -1;
-
-    x = SDL_JoystickGetAxis (joystick_handle, 1);
-    y = SDL_JoystickGetAxis (joystick_handle, 0);
-
-    if (x > 0 && x <  js_nil)  x = 0;
-    if (x < 0 && x > -js_nil)  x = 0;
-    if (y > 0 && y <  js_nil)  y = 0;
-    if (y < 0 && y > -js_nil)  y = 0;
-
-    vert = (real) x / js_max;
-    horz = (real) y / js_max;
-
-#ifdef NRacers
-    x = SDL_JoystickGetAxis (joystick_handle, 4);
-    y = SDL_JoystickGetAxis (joystick_handle, 3);
-
-    if (x > 0 && x <  js_nil)  x = 0;
-    if (x < 0 && x > -js_nil)  x = 0;
-    if (y > 0 && y <  js_nil)  y = 0;
-    if (y < 0 && y > -js_nil)  y = 0;
-
-    view_zenith    = (M_PI / 2) * (1 - 1.0 * x / js_max);
-    view_azimuthcc =  M_PI      * (1 - 1.0 * y / js_max);
-#endif
-
-#if NDimensions == 4
-    x = SDL_JoystickGetAxis (joystick_handle, 2);
-    view_origin.coords[3] =
-        clamp_real ((real) (x + js_max) / (2 * js_max),
-                    0, 1);
-#endif
-
-    if (use_roll)
-    {
-        roll = horz;
-        horz = 0;
-    }
-
-    if (!inv_vert)
-        vert = - vert;
-
-#ifdef NRacers
-    rotate_object (&racer_motions[0], 0, DirDimension, - vert * M_PI / 2);
-    rotate_object (&racer_motions[0], 1, DirDimension, - horz * M_PI / 2);
-    if (use_roll)
-        rotate_object (&racer_motions[0], 0, 1, roll * M_PI / 2);
-
-    racer_motions[0].thrust = stride;
+    tristate value;
+#if 0
+    FILE* out = stderr;
+    fprintf (out, "\rdevidx:%u  btnidx:%u  pressed:%u",
+             devidx, btnidx, (uint) pressed);
 #else
-    set_rotate_view (vert, horz);
-
-    if (use_roll)
-    {
-        PointXfrm rotation, tmp;
-        rotation_PointXfrm (&rotation, 0, 1, - roll * M_PI / 5);
-        xfrm_PointXfrm (&tmp, &rotation, &view_basis);
-        orthonormalize_PointXfrm (&view_basis, &tmp);
-    }
-
-    if (stride != 0)
-    {
-        Point diff;
-        scale_Point (&diff, &view_basis.pts[DirDimension],
-                     stride_magnitude * stride);
-        summ_Point (&view_origin, &view_origin, &diff);
-    }
+    (void) devidx;
 #endif
 
-    if (false)
-        fprintf (stderr, "vert:%f  horz:%f  roll:%f  stride:%d\n",
-                 vert, horz, roll, stride);
-    if (false)
-    {
-        int nbuttons;
-        int i;
-        nbuttons = SDL_JoystickNumButtons (joystick_handle);
-        for (i = 0; i < nbuttons; ++i)
-        {
-            uint state;
-            state = SDL_JoystickGetButton (joystick_handle, i);
-            fprintf (stderr, "button %d has state %u\n", i, state);
-        }
-    }
+    value = pressed ? 1 : 0;
 
-    gtk_widget_queue_draw ((GtkWidget*) widget);
+    if (btnidx == 2)  mot->stride[DirDimension] =  value;
+    if (btnidx == 3)  mot->stride[DirDimension] = -value;
+}
+
+static
+    void
+joystick_axis_event (MotionInput* mot, uint devidx, uint axisidx, int value)
+{
+    const int js_max =  32767;
+    const int js_min = -32768;
+    const int js_nil = 3000;  /* Dead zone!*/
+    real x = 0;
+#if 0
+    FILE* out = stderr;
+    fprintf (out, "\rdevidx:%u  axisidx:%u  value:%d",
+             devidx, axisidx, value);
+#else
+    (void) devidx;
+#endif
+
+    if (value < 0)  { if (value < -js_nil)  x = - (real) value / js_min; }
+    else            { if (value > +js_nil)  x = + (real) value / js_max; }
+
+    if (axisidx == 0)  mot->horz = -x;
+    if (axisidx == 1)  mot->vert = -x;
+    if (axisidx == 2)  mot->drift = x;
+#ifdef NRacers
+    if (axisidx == 3)  view_azimuthcc_input = -x;
+    if (axisidx == 4)  view_zenith_input = -x;
+#endif
+}
+
+
+    /* Global effects!*/
+    /* A call to this better be in a mutex!*/
+static
+    void
+update_object_locations (RaySpace* space, MotionInput* mot)
+{
+    const uint dir_dim = DirDimension;
+    real x, dt;
+#ifndef NRacers
+    PointXfrm rotation, tmp_basis;
+    uint i;
+    (void) space;
+#endif
+
+    dt = mot->t1 - mot->t0;
+    if (dt == 0)  return;
+    mot->t0 = mot->t1;
     needs_recast = true;
 
-    return TRUE;
+    x = mot->vert;
+    if (!mot->inv_vert) x = - x;
+
+#ifdef NRacers
+    rotate_object (&racer_motions[0], 0, dir_dim, x * M_PI / 2);
+
+#if NDimensions == 4
+    x = (1 + mot->drift) / 2;
+    x = clamp_real (x, 0, 1);
+    space->objects[0].centroid.coords[3] = x;
+#endif
+
+    if (mot->use_roll)
+        rotate_object (&racer_motions[0], 1, 0,       mot->horz * M_PI / 2);
+    else
+        rotate_object (&racer_motions[0], 1, dir_dim, mot->horz * M_PI / 2);
+
+    racer_motions[0].thrust = mot->stride[dir_dim];
+
+    move_objects (space, racer_motions, dt);
+#else /* ^ #ifdef NRacers ^ */
+
+        /* /x/ comes in as the vertical rotation.*/
+    rotation_PointXfrm (&rotation, 0, dir_dim, x * dt *  M_PI / 2);
+    trxfrm_PointXfrm (&tmp_basis, &rotation, &view_basis);
+
+    if (mot->use_roll)
+        rotation_PointXfrm (&rotation, 1, 0,       mot->horz * dt * M_PI / 2);
+    else
+        rotation_PointXfrm (&rotation, 1, dir_dim, mot->horz * dt * M_PI / 2);
+
+    trxfrm_PointXfrm (&view_basis, &rotation, &tmp_basis);
+    orthonormalize_PointXfrm (&tmp_basis, &view_basis);
+    copy_PointXfrm (&view_basis, &tmp_basis);
+
+    UFor( i, NDimensions )
+    {
+        Point diff;
+        scale_Point (&diff, &view_basis.pts[i],
+                     stride_magnitude * dt * mot->stride[i]);
+        summ_Point (&view_origin, &view_origin, &diff);
+    }
+
+#if NDimensions == 4
+    view_origin.coords[3] = mot->drift;
+#endif
+#endif
+}
+
+
+    /* Global effects!*/
+static
+    void
+update_view_params (const RaySpace* space)
+{
+#ifdef NRacers
+    const RaySpaceObject* object;
+    PointXfrm rotation;
+    real view_zenith, view_azimuthcc;
+
+    object = &space->objects[0];
+
+    view_zenith    = (M_PI / 2) * (1 + view_zenith_input);
+    view_azimuthcc =  M_PI      * (1 + view_azimuthcc_input);
+
+    spherical3_PointXfrm (&rotation, view_zenith, view_azimuthcc - M_PI);
+    xfrm_PointXfrm (&view_basis, &rotation, &object->orientation);
+
+    scale_Point (&view_origin, &view_basis.pts[DirDimension], -130);
+    summ_Point (&view_origin, &view_origin, &object->centroid);
+#else
+    (void) space;
+#endif
 }
 
 
@@ -485,7 +548,6 @@ static gboolean grab_mouse_fn (GtkWidget* da,
         output_PointXfrm (out, &view_basis);
         fputc ('\n', out);
         needs_recast = true;
-        gtk_widget_queue_draw (da);
 
 #if 0
         cursor = gdk_cursor_new (GDK_GUMBY);
@@ -584,7 +646,7 @@ render_pattern (byte* data, void* state, int height, int width, int stride)
 
 static
     void
-render_RaySpace (byte* data, RaySpace* space,
+render_RaySpace (byte* data, RaySpace* volatile_space,
                  uint nrows, uint ncols, uint stride)
 {
     uint row;
@@ -592,6 +654,10 @@ render_RaySpace (byte* data, RaySpace* space,
     if (needs_recast)
     {
         real time, dt;
+        RaySpace space_copy;
+        RaySpace* space;
+        PointXfrm basis;
+        Point origin;
 
         time = monotime ();
         dt = time - prev_time;
@@ -599,60 +665,33 @@ render_RaySpace (byte* data, RaySpace* space,
         if (ShowFrameRate)
             fprintf (stderr, "FPS:%f\n", 1 / dt);
 
-#ifdef NRacers
-        move_objects (space, racer_motions, dt);
-
-        {
-            Point tmp;
-            const RaySpaceObject* object;
-#if 0
-            PointXfrm basis;
-            const ObjectMotion* motion;
-            motion = &racer_motions[0];
-            object = &space->objects[0];
-            scale_Point (&tmp, &object->orientation.pts[DirDimension],
-                         1 + magnitude_Point (&motion->veloc));
-            summ_Point (&tmp, &tmp, &motion->veloc);
-                /* summ_Point (&tmp, &motion->veloc, &object->orientation.pts[DirDimension]); */
-
-            normalize_Point (&tmp, &tmp);
-            copy_PointXfrm (&basis, &object->orientation);
-            copy_Point (&basis.pts[DirDimension], &tmp);
-            orthorotate_PointXfrm (&view_basis, &basis, DirDimension);
-
-            scale_Point (&view_origin, &tmp, -130);
-            scale_Point (&tmp, &object->orientation.pts[0], 70);
-            summ_Point (&view_origin, &view_origin, &tmp);
-            summ_Point (&view_origin, &view_origin, &object->centroid);
-#else
-            PointXfrm rotation;
-            object = &space->objects[0];
-
-            spherical3_PointXfrm (&rotation, view_zenith,
-                                  view_azimuthcc - M_PI);
-            xfrm_PointXfrm (&view_basis, &rotation, &object->orientation);
-
-            scale_Point (&tmp, &view_basis.pts[DirDimension], -130);
-            summ_Point (&view_origin, &object->centroid, &tmp);
-#endif
-        }
-#endif
+        g_mutex_lock (update_lock);
+        space = &space_copy;
+        CopyT( RaySpace, space, volatile_space, 0, 1 );
+        space->objects = AllocT( RaySpaceObject, space->nobjects );
+        CopyT( RaySpaceObject, space->objects, volatile_space->objects,
+               0, space->nobjects );
+        update_view_params (space);
+        copy_Point (&origin, &view_origin);
+        copy_PointXfrm (&basis, &view_basis);
+        needs_recast = false;
+        g_mutex_unlock (update_lock);
 
         if (ray_image.perspective)  ray_image.hifov = view_angle;
         else                        ray_image.hifov = view_width;
 
 #ifdef DistribCompute
-        compute_rays_to_hits (&ray_image, space, &view_origin, &view_basis);
+        compute_rays_to_hits (&ray_image, space, &origin, &basis);
 #else
         if (ForceFauxFishEye)
             rays_to_hits_fish (&ray_image, space,
-                               &view_origin, &view_basis, view_angle);
+                               &origin, &basis, view_angle);
         else
-            cast_RayImage (&ray_image, space, &view_origin, &view_basis);
+            cast_RayImage (&ray_image, space, &origin, &basis);
 #endif
         prev_time = time;
+        if (space->objects)  free (space->objects);
     }
-    needs_recast = false;
 
     assert (ray_image.pixels);
 
@@ -715,19 +754,20 @@ render_expose (GtkWidget* da,
     return TRUE;
 }
 
+static
+    gboolean
+update_rendering (gpointer widget)
+{
+    if (needs_recast)
+        gtk_widget_queue_draw ((GtkWidget*)widget);
+    return TRUE;
+}
 
 static
     void
 gui_main (int argc, char* argv[], RaySpace* space)
 {
     GtkWidget *window;
-
-    SDL_Init (SDL_INIT_JOYSTICK);
-    SDL_JoystickEventState (SDL_QUERY);
-    joystick_handle = SDL_JoystickOpen (0);
-    fprintf (stderr, "Joystick has %d buttons!\n",
-             SDL_JoystickNumButtons (joystick_handle));
-
     gtk_init (&argc, &argv);
 
     window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
@@ -743,7 +783,7 @@ gui_main (int argc, char* argv[], RaySpace* space)
                       G_CALLBACK(key_press_fn), NULL);
     g_signal_connect (window, "button-press-event",
                       G_CALLBACK(grab_mouse_fn), space);
-    g_timeout_add (1000 / 60, &poll_joystick, window);
+    g_timeout_add (1000 / 100, update_rendering, window);
 
 
     gtk_window_set_position (GTK_WINDOW(window), GTK_WIN_POS_CENTER);
@@ -752,6 +792,94 @@ gui_main (int argc, char* argv[], RaySpace* space)
 
     gtk_widget_show_all (window);
     gtk_main ();
+}
+
+    Uint32
+keepalive_sdl_event_fn (Uint32 interval,  void* param)
+{
+    SDL_Event event;
+    (void) param;
+    event.type = SDL_USEREVENT;
+    event.user.code = 2;
+    event.user.data1 = 0;
+    event.user.data2 = 0;
+    SDL_PushEvent (&event);
+    return interval;
+}
+
+    gpointer
+sdl_main (gpointer data)
+{
+    SDL_TimerID timer;
+    int ret;
+    SDL_Joystick* joystick_handle; 
+    SDL_Event event;
+    RaySpace* space;
+    MotionInput motion_input;
+
+    space = (RaySpace*) data;
+
+        /* Note: SDL_INIT_VIDEO is required for some silly reason!*/
+    ret = SDL_Init (SDL_INIT_EVENTTHREAD |
+                    SDL_INIT_JOYSTICK |
+                    SDL_INIT_TIMER |
+                    SDL_INIT_VIDEO);
+    assert (ret == 0);
+
+    SDL_JoystickEventState (SDL_ENABLE);
+    joystick_handle = SDL_JoystickOpen (0);
+    fprintf (stderr, "Joystick has %d buttons!\n",
+             SDL_JoystickNumButtons (joystick_handle));
+
+        /* Add a timer to assure the event loop has
+         * an event to process when we should exit.
+         * Also, so updates can occur.
+         */
+    timer = SDL_AddTimer (40, keepalive_sdl_event_fn, 0);
+    assert (timer);
+
+    init_MotionInput (&motion_input);
+    motion_input.t0 = (real) SDL_GetTicks () / 1000;
+    while (continue_running && SDL_WaitEvent (&event))
+    {
+        motion_input.t1 = (real) SDL_GetTicks () / 1000;
+        if (motion_input.t1 > .05 + motion_input.t0)
+        {
+            g_mutex_lock (update_lock);
+            update_object_locations (space, &motion_input);
+            g_mutex_unlock (update_lock);
+        }
+        switch (event.type)
+        {
+            case SDL_JOYAXISMOTION:
+                {
+                    SDL_JoyAxisEvent* je;
+                    je = &event.jaxis;
+                    joystick_axis_event (&motion_input,
+                                         je->which, je->axis, je->value);
+                }
+                break;
+            case SDL_JOYBUTTONUP:
+            case SDL_JOYBUTTONDOWN:
+                {
+                    SDL_JoyButtonEvent* je;
+                    je = &event.jbutton;
+                    joystick_button_event (&motion_input,
+                                           je->which, je->button,
+                                           je->state == SDL_PRESSED);
+                }
+                break;
+            case SDL_USEREVENT:
+            default:
+                break;
+
+        }
+    }
+
+    SDL_RemoveTimer (timer);
+    SDL_JoystickClose (joystick_handle);
+    SDL_Quit ();
+    return 0;
 }
 
 
@@ -794,12 +922,17 @@ int main (int argc, char* argv[])
         return 1;
     }
 
+#ifdef NRacers
+    assert (NRacers == space.nobjects);
+#endif
+
 #ifdef DistribCompute
     call_gui = !rays_to_hits_computeloop (&space);
 #endif
 
     if (call_gui)
     {
+        GThread* sdl_thread;
         init_RayImage (&ray_image);
         ray_image.nrows = view_nrows;
         ray_image.ncols = view_ncols;
@@ -811,7 +944,15 @@ int main (int argc, char* argv[])
         ray_image.color_distance_on = true;
 
         prev_time = monotime ();
+
+        g_thread_init (0);
+        update_lock = g_mutex_new ();
+        sdl_thread = g_thread_create (sdl_main, &space, true, 0);
+
         gui_main (argc, argv, &space);
+
+        g_thread_join (sdl_thread);
+        g_mutex_free (update_lock);
 #ifdef DistribCompute
         stop_computeloop ();
 #endif
@@ -822,5 +963,4 @@ int main (int argc, char* argv[])
 #endif
     return 0;
 }
-
 

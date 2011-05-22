@@ -43,17 +43,6 @@ sort_few_uints (uint n, uint* a)
     }
 }
 
-
-static
-    void
-swap_uint (uint* x, uint* y)
-{
-    uint tmp = *x;
-    *x = *y;
-    *y = tmp;
-}
-
-
 static
     void
 partition_indexed_reals (uint* indices, uint* ret_q, uint* ret_r,

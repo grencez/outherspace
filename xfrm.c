@@ -61,8 +61,8 @@ void rotation_PointXfrm (PointXfrm* xfrm, uint xdim, uint ydim, real angle)
 
     xfrm->pts[xdim].coords[xdim] =   tcos;
     xfrm->pts[xdim].coords[ydim] = - tsin;
-    xfrm->pts[ydim].coords[ydim] =   tcos;
     xfrm->pts[ydim].coords[xdim] =   tsin;
+    xfrm->pts[ydim].coords[ydim] =   tcos;
 }
 
 void col_PointXfrm (Point* dst, const PointXfrm* xfrm, uint col)
@@ -72,7 +72,8 @@ void col_PointXfrm (Point* dst, const PointXfrm* xfrm, uint col)
         dst->coords[i] = xfrm->pts[i].coords[col];
 }
 
-void xfrm_Point (Point* dst, const PointXfrm* xfrm, const Point* src)
+    void
+xfrm_Point (Point* dst, const PointXfrm* xfrm, const Point* src)
 {
     uint i;
     assert (dst != src);
@@ -80,7 +81,8 @@ void xfrm_Point (Point* dst, const PointXfrm* xfrm, const Point* src)
         dst->coords[i] = dot_Point (src, &xfrm->pts[i]);
 }
 
-void trxfrm_Point (Point* dst, const PointXfrm* xfrm, const Point* src)
+    void
+trxfrm_Point (Point* dst, const PointXfrm* xfrm, const Point* src)
 {
     uint i;
     assert (dst != src);
@@ -95,7 +97,8 @@ void trxfrm_Point (Point* dst, const PointXfrm* xfrm, const Point* src)
     }
 }
 
-void xfrm_PointXfrm (PointXfrm* dst, const PointXfrm* A, const PointXfrm* B)
+    void
+xfrm_PointXfrm (PointXfrm* dst, const PointXfrm* A, const PointXfrm* B)
 {
     uint j;
     assert (dst != A);
@@ -108,6 +111,26 @@ void xfrm_PointXfrm (PointXfrm* dst, const PointXfrm* A, const PointXfrm* B)
         col_PointXfrm (&B_col, B, j);
 
         xfrm_Point (&dst_col, A, &B_col);
+
+        UFor( i, NDimensions )
+            dst->pts[i].coords[j] = dst_col.coords[i];
+    }
+}
+
+    void
+trxfrm_PointXfrm (PointXfrm* dst, const PointXfrm* A, const PointXfrm* B)
+{
+    uint j;
+    assert (dst != A);
+    assert (dst != B);
+
+    UFor( j, NDimensions )
+    {
+        uint i;
+        Point B_col, dst_col;
+        col_PointXfrm (&B_col, B, j);
+
+        trxfrm_Point (&dst_col, A, &B_col);
 
         UFor( i, NDimensions )
             dst->pts[i].coords[j] = dst_col.coords[i];
@@ -166,6 +189,7 @@ void transpose_PointXfrm (PointXfrm* dst, const PointXfrm* xfrm)
     UFor( i, NDimensions )
     {
         uint j;
+        dst->pts[i].coords[i] = xfrm->pts[i].coords[i];
         UFor( j, i )
         {
             real x, y;
@@ -268,16 +292,10 @@ real det3_PointXfrm (const PointXfrm* xfrm,
 
 real det_PointXfrm (const PointXfrm* xfrm)
 {
-    uint i;
-    real det;
     Point p;
-
     row_minors_PointXfrm (&p, xfrm, 0);
     checker_negate_Point (&p);
-    det = 0;
-    UFor( i, NDimensions )
-        det += p.coords[i] * xfrm->pts[i].coords[0];
-    return det;
+    return  dot_Point (&p, &xfrm->pts[0]);
 }
 
 void row_minors_PointXfrm (Point* dst, const PointXfrm* xfrm, uint row)
@@ -306,7 +324,6 @@ void row_minors_PointXfrm (Point* dst, const PointXfrm* xfrm, uint row)
     assert (0 && "Not implemented.");
 #endif
 }
-
 
     void
 spherical3_PointXfrm (PointXfrm* dst, real zenith, real azimuthcc)

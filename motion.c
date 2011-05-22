@@ -29,8 +29,11 @@ init_ObjectMotion (ObjectMotion* motion)
     void
 rotate_object (ObjectMotion* motion, uint xdim, uint ydim, real angle)
 {
-    assert (xdim < ydim);
-    motion->rots[xdim * (NDimensions - 2) + ydim - 1] += angle;
+    assert (xdim != ydim);
+    if (xdim < ydim)
+        motion->rots[xdim * (NDimensions - 2) + ydim - 1] += angle;
+    else
+        motion->rots[ydim * (NDimensions - 2) + xdim - 1] -= angle;
 }
 
     void
@@ -119,8 +122,7 @@ move_object (RaySpace* space, ObjectMotion* motion, uint objidx, real dt)
             rotation_PointXfrm (&rotation, j, i, angle);
 
             copy_PointXfrm (&basis, &new_orientation);
-            transpose_PointXfrm (&rotation, &rotation);
-            xfrm_PointXfrm (&new_orientation, &rotation, &basis);
+            trxfrm_PointXfrm (&new_orientation, &rotation, &basis);
         }
     }
 

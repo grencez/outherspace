@@ -18,7 +18,6 @@ static const bool BarycentricRayTrace = false;
 #else
 static const bool BarycentricRayTrace = true;
 #endif
-    /* #define TrivialMpiRayTrace */
 
 #ifdef TrivialMpiRayTrace
 #include <mpi.h>

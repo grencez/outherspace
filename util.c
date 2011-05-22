@@ -151,6 +151,14 @@ ceil_uint (uint a, uint b)
     return (a + b - 1) / b;
 }
 
+    void
+swap_uint (uint* x, uint* y)
+{
+    uint tmp = *x;
+    *x = *y;
+    *y = tmp;
+}
+
 tristate compare_real (real a, real b)
 {
     if (a > b)  return  1;

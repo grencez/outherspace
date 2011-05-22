@@ -120,7 +120,11 @@ void compute_rays_to_hits (RayImage* image,
             AssertStatus( ret, "" );
         }
     }
+#ifdef TrivialMpiRayTrace
+    cast_RayImage (image, space, origin, view_basis);
+#else
     rays_to_hits_balancer (image);
+#endif
 }
 
 
@@ -134,6 +138,7 @@ simple_checksum (uint nbytes, const byte* bytes)
     return x;
 }
 
+#ifdef CompressBigCompute
 static
     void
 output_bytes (FILE* out, uint nbytes, const byte* bytes)
@@ -147,6 +152,7 @@ output_bytes (FILE* out, uint nbytes, const byte* bytes)
     i = fwrite (buf, (2 * nbytes + 1) * sizeof(char), 1, out);
     assert (i == 1);
 }
+#endif
 
     void
 big_compute_send (uint nbytes, byte* bytes, uint proc)
@@ -235,7 +241,7 @@ big_compute_send (uint nbytes, byte* bytes, uint proc)
 #endif
 
     deflateEnd (&strm);
-#else
+#else  /*^ #ifdef CompressBigCompute ^*/
     ret = MPI_Send (bytes, nbytes, MPI_BYTE,
                     proc, StdMsgTag, MPI_COMM_WORLD);
     AssertStatus( ret, "" );
@@ -392,7 +398,11 @@ bool rays_to_hits_computeloop (const RaySpace* restrict space)
                             &xfer_objects[i].orientation);
         }
 
+#ifdef TrivialMpiRayTrace
+        cast_RayImage (&image, space, &origin, &view_basis);
+#else
         rays_to_hits_computer (&image, space, &origin, &view_basis);
+#endif
         cleanup_RayImage (&image);
     }
 

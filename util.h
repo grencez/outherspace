@@ -34,12 +34,6 @@ typedef byte bool;
 #define restrict __restrict
 #endif
 
-#ifdef BENCHMARKING
-#ifndef NDEBUG
-#define NDEBUG
-#endif
-#endif
-
 #define __global
 
 #else  /* #ifndef __OPENCL_VERSION__ */
@@ -49,6 +43,10 @@ typedef byte bool;
 
 
 #define UFor( i, bel )  for (i = 0; i < bel; ++i)
+
+    /* Does not scope /j/.*/
+#define UUFor( i, ibel, j, jbel )  UFor( i, ibel )  UFor( j, jbel )
+
 
 #if 0
 typedef double real;
@@ -86,9 +84,12 @@ typedef float real;
 
 typedef int tristate;
 
+    /* Note: All functions below are ideally inline'd!*/
 bool even_uint (uint a);
 uint
 ceil_uint (uint a, uint b);
+void
+swap_uint (uint* x, uint* y);
 tristate compare_real (real a, real b);
 real match_real (real a, real b);
 real

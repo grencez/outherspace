@@ -3,30 +3,28 @@
 #CC = gcc
 #CC = llvm-gcc
 
-DFLAGS += -DNDimensions=4
-
-CONFIG = fast
-CONFIG = fast openmp
-#CONFIG = fast openmp benchmark
-#CONFIG = fast openmp noassert
-#CONFIG = fast mpi
-#CONFIG = fast mpi openmp
-#CONFIG = mpi debug
-#CONFIG = debug
-#CONFIG = fast noassert
-#CONFIG = noassert snappy debug
-#CONFIG = benchmark snappy debug openmp
-#CONFIG = ultradebug
+DFLAGS += -DNDimensions=3
 
 #CONFIG += c++
 CONFIG += ansi
 #CONFIG += c99
+CONFIG += fast
+#CONFIG += snappy
+#CONFIG += debug
+#CONFIG += ultradebug  # -fast -snappy -debug
+CONFIG += openmp
+#CONFIG += mpi  # -ansi
+#CONFIG += trivialmpi  # +mpi
+#CONFIG += profile
+#CONFIG += benchmark  # +noassert
+#CONFIG += noassert
 
 
 #LD_PRELOAD=$(pfx)/lib/valgrind/libmpiwrap-x86-linux.so \
 #	mpirun -np 3 valgrind ./cli 2>&1 | tee out
 
 #valgrind --num-callers=50 --db-attach=yes --db-command='cgdb -- %f %p'
+
 
 ifeq ($(CC),g++)
 	CONFIG += c++
@@ -38,12 +36,12 @@ DFLAGS += -DINCLUDE_SOURCE
 
 
 ## Serious debugging is about to happen.
-ifneq (,$(findstring ultradebug,$(CONFIG)))
+ifneq (,$(filter ultradebug,$(CONFIG)))
 	CONFIG := $(filter-out snappy fast debug,$(CONFIG))
 	CFLAGS += -g3
 endif
 ## Go really fast.
-ifneq (,$(findstring fast,$(CONFIG)))
+ifneq (,$(filter fast,$(CONFIG)))
 	CFLAGS += -O3
 	#CFLAGS += -Ofast
 	#CFLAGS += -march=native
@@ -51,50 +49,61 @@ ifneq (,$(findstring fast,$(CONFIG)))
 	#CFLAGS += -march=native -mtune=native
 endif
 ## Go pretty fast.
-ifneq (,$(findstring snappy,$(CONFIG)))
+ifneq (,$(filter snappy,$(CONFIG)))
 	CFLAGS += -O2
 endif
 ## Add debugging symbols.
-ifneq (,$(findstring debug,$(CONFIG)))
+ifneq (,$(filter debug,$(CONFIG)))
 	CFLAGS += -g
 endif
+ifneq (,$(filter profile,$(CONFIG)))
+	CFLAGS += -pg
+	LFLAGS += -pg
+endif
 
-## Enable benchmarking.
-ifneq (,$(findstring benchmark,$(CONFIG)))
+## Enable benchmarking. (take out file writes)
+ifneq (,$(filter benchmark,$(CONFIG)))
 	CFLAGS += -DBENCHMARKING
+	CONFIG += noassert
 endif
 ## Disable assertions.
-ifneq (,$(findstring noassert,$(CONFIG)))
+ifneq (,$(filter noassert,$(CONFIG)))
 	CFLAGS += -DNDEBUG
 endif
 ## Do we have bool type?
-ifneq (,$(findstring c++,$(CONFIG)))
+ifneq (,$(filter c++,$(CONFIG)))
 	CC = $(CXX)
 	#CFLAGS += -fno-rtti
 	CFLAGS += -DCOMPILER_HAS_BOOL
 endif
 ## Allow distributed parallelism.
-ifneq (,$(findstring mpi,$(CONFIG)))
-	ifneq (,$(findstring c++,$(CONFIG)))
+ifneq (,$(filter mpi trivialmpi,$(CONFIG)))
+	ifneq (,$(filter c++,$(CONFIG)))
 		CC = mpicxx
 	else
 		CC = mpicc
 	endif
 	# OpenMPI headers currently don't play well with C89.
 	CONFIG := $(filter-out ansi,$(CONFIG))
-	CFLAGS += -DDistribCompute -DCompressBigCompute
-	LFLAGS += -lz
+	DFLAGS += -DDistribCompute
+	# Use the ray tracer that disregards load balancing and compression.
+	ifneq (,$(filter trivialmpi,$(CONFIG)))
+		DFLAGS += -DTrivialMpiRayTrace
+	else
+		DFLAGS += -DCompressBigCompute
+		LFLAGS += -lz
+	endif
 endif
 ## Use the C99 standard.
-ifneq (,$(findstring c99,$(CONFIG)))
+ifneq (,$(filter c99,$(CONFIG)))
 	CFLAGS += -std=c99
 endif
 ## Stick to the ANSI standard.
-ifneq (,$(findstring ansi,$(CONFIG)))
+ifneq (,$(filter ansi,$(CONFIG)))
 	CFLAGS += -ansi -pedantic
 endif
 ## Allow parallelism.
-ifneq (,$(findstring openmp,$(CONFIG)))
+ifneq (,$(filter openmp,$(CONFIG)))
 	CFLAGS += -fopenmp
 endif
 
@@ -120,6 +129,7 @@ LFLAGS += -lm
 all: cli gui verify
 	# Done!
 
+# Note: OpenCL code does not function at this time, don't bother.
 OpenCLPath = /home/grencez/ati-stream-sdk-v2.3-lnx64
 OpenCLLibPath = $(OpenCLPath)/lib/x86_64
 hello: hello.c $(CSources)

@@ -88,6 +88,10 @@ setup_racers (RaySpace* space)
     UFor( i, space->nobjects )
     {
         init_RaySpace (&space->objects[i].space);
+        zero_Point (&space->objects[i].centroid);
+        identity_PointXfrm (&space->objects[i].orientation);
+
+        space->objects[i].centroid.coords[0] = 75 * i + 300;
 
         if (NDimensions == 3)
         {
@@ -101,12 +105,11 @@ setup_racers (RaySpace* space)
             const real dcoords[2] = { -0.1, 0.1 };
             interpolate_by_file (&space->objects[i].space.scene,
                                  2, paths, dcoords);
+            swaprows_PointXfrm (&space->objects[i].orientation, 2, 3);
+            space->objects[i].centroid.coords[3] = .5;
         }
 
         init_filled_RaySpace (&space->objects[i].space);
-        zero_Point (&space->objects[i].centroid);
-        space->objects[i].centroid.coords[0] = 75 * i + 300;
-        identity_PointXfrm (&space->objects[i].orientation);
     }
     return good;
 }
