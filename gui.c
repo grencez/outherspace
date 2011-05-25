@@ -40,7 +40,6 @@ struct motion_input_struct
 };
 
 static real stride_magnitude = 10;
-static real prev_time;
 static Point view_origin;
 static PointXfrm view_basis;
 static uint view_nrows = 400;
@@ -52,7 +51,7 @@ static real view_angle = 2 * M_PI / 3;
 static real view_width = 100;
 static bool needs_recast = true;
 static bool continue_running = true;
-static GMutex* update_lock = 0;
+static MotionInput motion_input;
 
 
 static
@@ -61,6 +60,7 @@ init_MotionInput (MotionInput* mot)
 {
     uint i;
     mot->t0 = 0;
+    mot->t1 = 0;
     mot->vert = 0;
     mot->horz = 0;
     mot->drift = 0.5;
@@ -195,8 +195,7 @@ key_press_fn (GtkWidget* _widget, GdkEventKey* event, gpointer _data)
 
         fprintf (out, "view_light:%f\n", ray_image.view_light);
     }
-
-    if (stride != 0)
+    else if (stride != 0)
     {
         Point diff;
         scale_Point (&diff, &view_basis.pts[dim], stride_magnitude * stride);
@@ -206,7 +205,7 @@ key_press_fn (GtkWidget* _widget, GdkEventKey* event, gpointer _data)
         output_Point (out, &view_origin);
         fputc ('\n', out);
     }
-    if (stride_mag_change != 0)
+    else if (stride_mag_change != 0)
     {
         if (stride_mag_change > 0)  stride_magnitude *= 2;
         else                        stride_magnitude /= 2;
@@ -415,7 +414,6 @@ update_object_locations (RaySpace* space, MotionInput* mot)
     dt = mot->t1 - mot->t0;
     if (dt == 0)  return;
     mot->t0 = mot->t1;
-    needs_recast = true;
 
     x = mot->vert;
     if (!mot->inv_vert) x = - x;
@@ -473,7 +471,7 @@ static
 update_view_params (const RaySpace* space)
 {
 #ifdef NRacers
-    const RaySpaceObject* object;
+    const ObjectRaySpace* object;
     PointXfrm rotation;
     real view_zenith, view_azimuthcc;
 
@@ -571,36 +569,41 @@ static gboolean grab_mouse_fn (GtkWidget* da,
         RayCastAPriori priori;
         uint hit_idx;
         real hit_mag;
-        const RaySpace* hit_space;
+        uint hit_object;
         Point hit_origin, hit_dir;
         Point origin, dir;
         bool inside_box;
 
         setup_RayCastAPriori (&priori, &ray_image,
                               &view_origin, &view_basis,
-                              &space->box);
+                              &space->main.box);
 
         copy_Point (&origin, &view_origin);
         copy_Point (&dir, &view_basis.pts[DirDimension]);
 
-        inside_box = inside_BoundingBox (&space->box, &origin);
+        inside_box = priori.inside_box;
 
         ray_from_RayCastAPriori (&origin, &dir,
                                  &priori, row, col, &ray_image);
 
-        cast_recurse (&hit_idx, &hit_mag, &hit_space,
+        cast_recurse (&hit_idx, &hit_mag, &hit_object,
                       &hit_origin, &hit_dir,
                       space, &origin, &dir,
                       inside_box, Max_uint);
-        if (hit_idx < space->nelems)
+        if (hit_object <= space->nobjects)
         {
+            const ObjectRaySpace* object;
             Point isect;
             scale_Point (&isect, &dir, hit_mag);
             summ_Point (&isect, &origin, &isect);
             fprintf (out, "Elem:%u  Intersect:", hit_idx);
             output_Point (out, &isect);
             fputc ('\n', out);
-            output_SceneElement (out, &hit_space->scene, hit_idx);
+            if (hit_object < space->nobjects)
+                object = &space->objects[hit_object];
+            else
+                object = &space->main;
+            output_SceneElement (out, &object->scene, hit_idx);
             fputc ('\n', out);
         }
         else
@@ -646,36 +649,36 @@ render_pattern (byte* data, void* state, int height, int width, int stride)
 
 static
     void
-render_RaySpace (byte* data, RaySpace* volatile_space,
+render_RaySpace (byte* data, RaySpace* space,
                  uint nrows, uint ncols, uint stride)
 {
     uint row;
 
     if (needs_recast)
     {
-        real time, dt;
-        RaySpace space_copy;
-        RaySpace* space;
         PointXfrm basis;
         Point origin;
 
-        time = monotime ();
-        dt = time - prev_time;
+        motion_input.t1 = (real) SDL_GetTicks () / 1000;
+        if (motion_input.t0 == 0)
+        {
+            motion_input.t0 = motion_input.t1;
+        }
+        else
+        {
+            if (ShowFrameRate)
+            {
+                real dt;
+                dt = motion_input.t1 - motion_input.t0;
+                fprintf (stderr, "FPS:%f\n", 1 / dt);
+            }
+            update_object_locations (space, &motion_input);
+        }
 
-        if (ShowFrameRate)
-            fprintf (stderr, "FPS:%f\n", 1 / dt);
-
-        g_mutex_lock (update_lock);
-        space = &space_copy;
-        CopyT( RaySpace, space, volatile_space, 0, 1 );
-        space->objects = AllocT( RaySpaceObject, space->nobjects );
-        CopyT( RaySpaceObject, space->objects, volatile_space->objects,
-               0, space->nobjects );
         update_view_params (space);
         copy_Point (&origin, &view_origin);
         copy_PointXfrm (&basis, &view_basis);
         needs_recast = false;
-        g_mutex_unlock (update_lock);
 
         if (ray_image.perspective)  ray_image.hifov = view_angle;
         else                        ray_image.hifov = view_width;
@@ -683,14 +686,13 @@ render_RaySpace (byte* data, RaySpace* volatile_space,
 #ifdef DistribCompute
         compute_rays_to_hits (&ray_image, space, &origin, &basis);
 #else
+        update_dynamic_RaySpace (space);
         if (ForceFauxFishEye)
             rays_to_hits_fish (&ray_image, space,
                                &origin, &basis, view_angle);
         else
             cast_RayImage (&ray_image, space, &origin, &basis);
 #endif
-        prev_time = time;
-        if (space->objects)  free (space->objects);
     }
 
     assert (ray_image.pixels);
@@ -811,25 +813,22 @@ keepalive_sdl_event_fn (Uint32 interval,  void* param)
 sdl_main (gpointer data)
 {
     SDL_TimerID timer;
-    int ret;
     SDL_Joystick* joystick_handle; 
     SDL_Event event;
     RaySpace* space;
-    MotionInput motion_input;
 
     space = (RaySpace*) data;
-
-        /* Note: SDL_INIT_VIDEO is required for some silly reason!*/
-    ret = SDL_Init (SDL_INIT_EVENTTHREAD |
-                    SDL_INIT_JOYSTICK |
-                    SDL_INIT_TIMER |
-                    SDL_INIT_VIDEO);
-    assert (ret == 0);
 
     SDL_JoystickEventState (SDL_ENABLE);
     joystick_handle = SDL_JoystickOpen (0);
     fprintf (stderr, "Joystick has %d buttons!\n",
              SDL_JoystickNumButtons (joystick_handle));
+
+    if (!joystick_handle)
+    {
+        return 0;
+        SDL_Quit ();
+    }
 
         /* Add a timer to assure the event loop has
          * an event to process when we should exit.
@@ -838,17 +837,8 @@ sdl_main (gpointer data)
     timer = SDL_AddTimer (40, keepalive_sdl_event_fn, 0);
     assert (timer);
 
-    init_MotionInput (&motion_input);
-    motion_input.t0 = (real) SDL_GetTicks () / 1000;
     while (continue_running && SDL_WaitEvent (&event))
     {
-        motion_input.t1 = (real) SDL_GetTicks () / 1000;
-        if (motion_input.t1 > .05 + motion_input.t0)
-        {
-            g_mutex_lock (update_lock);
-            update_object_locations (space, &motion_input);
-            g_mutex_unlock (update_lock);
-        }
         switch (event.type)
         {
             case SDL_JOYAXISMOTION:
@@ -874,6 +864,7 @@ sdl_main (gpointer data)
                 break;
 
         }
+        needs_recast = true;
     }
 
     SDL_RemoveTimer (timer);
@@ -933,6 +924,7 @@ int main (int argc, char* argv[])
     if (call_gui)
     {
         GThread* sdl_thread;
+        int ret;
         init_RayImage (&ray_image);
         ray_image.nrows = view_nrows;
         ray_image.ncols = view_ncols;
@@ -943,16 +935,21 @@ int main (int argc, char* argv[])
         ray_image.view_light = 0;
         ray_image.color_distance_on = true;
 
-        prev_time = monotime ();
-
         g_thread_init (0);
-        update_lock = g_mutex_new ();
+
+        init_MotionInput (&motion_input);
+            /* Note: SDL_INIT_VIDEO is required for some silly reason!*/
+        ret = SDL_Init (SDL_INIT_EVENTTHREAD |
+                        SDL_INIT_JOYSTICK |
+                        SDL_INIT_TIMER |
+                        SDL_INIT_VIDEO);
+        assert (ret == 0);
+
         sdl_thread = g_thread_create (sdl_main, &space, true, 0);
 
         gui_main (argc, argv, &space);
 
         g_thread_join (sdl_thread);
-        g_mutex_free (update_lock);
 #ifdef DistribCompute
         stop_computeloop ();
 #endif

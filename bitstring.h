@@ -5,7 +5,7 @@
 
 #include "util.h"
 
-typedef size_t bitstring_t;
+typedef unsigned int bitstring_t;
 typedef bitstring_t BitString;
 
 BitString*

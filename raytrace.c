@@ -33,6 +33,11 @@ computer_triv_sync_mpi_RayImage (const RayImage* image,
 
 
 static void
+partition_ObjectRaySpace (ObjectRaySpace* space);
+static void
+init_RaySpace_KDTreeGrid (KDTreeGrid* grid, const RaySpace* space);
+
+static void
 setup_ray_pixel_deltas_orthographic (Point* dir_start,
                                      Point* row_delta,
                                      Point* col_delta,
@@ -60,17 +65,39 @@ cast_row_perspective (RayImage* image, uint row,
                       const Point* restrict origin);
 
 
-void init_RaySpace (RaySpace* space)
+    void
+init_RaySpace (RaySpace* space)
 {
+    init_ObjectRaySpace (&space->main);
+    space->nobjects = 0;
+    init_KDTree (&space->object_tree);
+    space->partition = true;
+    zero_Point (&space->box.min_corner);
+    zero_Point (&space->box.max_corner);
+}
+
+    void
+init_ObjectRaySpace (ObjectRaySpace* space)
+{
+    zero_Point (&space->centroid);
+    identity_PointXfrm (&space->orientation);
+
     init_Scene (&space->scene);
     space->nelems = 0;
-    space->tree.nnodes = 0;
-    space->nobjects = 0;
-    space->object_tree.nnodes = 0;
+    init_KDTree (&space->tree);
 }
 
     void
 init_filled_RaySpace (RaySpace* space)
+{
+    uint i;
+    init_filled_ObjectRaySpace (&space->main);
+    UFor( i, space->nobjects )
+        init_filled_ObjectRaySpace (&space->objects[i]);
+}
+
+    void
+init_filled_ObjectRaySpace (ObjectRaySpace* space)
 {
     uint ei;
     const Scene* scene;
@@ -109,10 +136,22 @@ init_filled_RaySpace (RaySpace* space)
         assert (good);
     }
 
-    partition_RaySpace (space);
+    partition_ObjectRaySpace (space);
 }
 
-void cleanup_RaySpace (RaySpace* space)
+    void
+cleanup_RaySpace (RaySpace* space)
+{
+    uint i;
+    cleanup_ObjectRaySpace (&space->main);
+    UFor( i, space->nobjects )
+        cleanup_ObjectRaySpace (&space->objects[i]);
+    if (space->nobjects > 0)  free (space->objects);
+    cleanup_KDTree (&space->object_tree);
+}
+
+    void
+cleanup_ObjectRaySpace (ObjectRaySpace* space)
 {
     cleanup_Scene (&space->scene);
     cleanup_KDTree (&space->tree);
@@ -121,23 +160,31 @@ void cleanup_RaySpace (RaySpace* space)
         free (space->elems);
         free (space->simplices);
     }
-    if (space->nobjects > 0)
+}
+
+    /* Partition the space containing dynamic objects.*/
+    void
+update_dynamic_RaySpace (RaySpace* space)
+{
+    if (space->partition && space->nobjects > 0)
     {
-        free (space->objects);
+        KDTreeGrid grid;
+        init_RaySpace_KDTreeGrid (&grid, space);
+        copy_BoundingBox (&space->box, &grid.box);
+            /* Since it's a regeneration, clean up the previous version.*/
+        cleanup_KDTree (&space->object_tree);
+        build_KDTree (&space->object_tree, &grid);
+        cleanup_KDTreeGrid (&grid);
     }
 }
 
-void partition_RaySpace (RaySpace* space)
+    void
+partition_ObjectRaySpace (ObjectRaySpace* space)
 {
     KDTreeGrid grid;
-    uint i;
-
     init_Scene_KDTreeGrid (&grid, &space->scene, &space->box);
     build_KDTree (&space->tree, &grid);
     cleanup_KDTreeGrid (&grid);
-
-    UFor( i, space->nobjects )
-        partition_RaySpace (&space->objects[i].space);
 }
 
     void
@@ -199,6 +246,62 @@ init_Scene_KDTreeGrid (KDTreeGrid* grid, const Scene* scene,
     copy_BoundingBox (&grid->box, box);
 }
 
+    void
+init_RaySpace_KDTreeGrid (KDTreeGrid* grid, const RaySpace* space)
+{
+    uint i;
+    grid->nintls = 2 * (1 + space->nobjects);
+    grid->intls[0] = AllocT( uint, NDimensions * grid->nintls );
+    grid->coords[0] = AllocT( real, NDimensions * grid->nintls );
+
+    copy_BoundingBox (&grid->box, &space->main.box);
+
+    UFor( i, NDimensions )
+    {
+        grid->intls[i] = &grid->intls[0][i * grid->nintls];
+        grid->coords[i] = &grid->coords[0][i * grid->nintls];
+        grid->box.min_corner.coords[i] = Max_real;
+        grid->box.max_corner.coords[i] = Min_real;
+
+            /* Main case (special).*/
+        grid->intls[i][0] = 0;
+        grid->intls[i][1] = 1;
+        grid->coords[i][0] = space->main.box.min_corner.coords[i];
+        grid->coords[i][1] = space->main.box.max_corner.coords[i];
+    }
+
+    UFor( i, space->nobjects )
+    {
+        uint dim, ti;
+        const ObjectRaySpace* object;
+        Point diff, tmp;
+
+        ti = 2 * (1 + i);
+        object = &space->objects[i];
+        
+        diff_Point (&diff, &object->box.max_corner, &object->box.min_corner);
+        scale_Point (&diff, &diff, .5);
+        trxfrm_Point (&tmp, &object->orientation, &diff);
+
+        UFor( dim, NDimensions )
+        {
+            real lo, hi;
+            lo = - tmp.coords[i] + object->centroid.coords[i];
+            hi = + tmp.coords[i] + object->centroid.coords[i];
+            if (lo > hi)  swap_real (&lo, &hi);
+            grid->intls[dim][ti] = ti;
+            grid->intls[dim][ti+1] = ti+1;
+            grid->coords[dim][ti] = lo;
+            grid->coords[dim][ti+1] = hi;
+            if (lo < grid->box.min_corner.coords[dim])
+                grid->box.min_corner.coords[dim] = lo;
+            if (hi > grid->box.max_corner.coords[dim])
+                grid->box.max_corner.coords[dim] = hi;
+        }
+    }
+}
+
+
 void init_RayImage (RayImage* image)
 {
     uint i;
@@ -240,7 +343,7 @@ void downsample_RayImage (RayImage* image, uint inv)
     o_ncols = i_ncols / inv;
 
     inv2 = inv * inv;
-    
+
     o_pixline = AllocT( byte, 3 * (1 + o_ncols) );
     o_fracline = AllocT( byte, 3 * (1 + o_ncols) );
 
@@ -302,24 +405,6 @@ void cleanup_RayImage (RayImage* image)
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
 
-void dir_from_MultiRayCastParams (Point* dir, uint row, uint col,
-                                  const MultiRayCastParams* params)
-{
-    Point partial_dir;
-
-    copy_Point (dir, &params->dir_start);
-
-    partial_dir = params->dir_delta[0];
-    scale_Point (&partial_dir, &partial_dir, row);
-    summ_Point (dir, dir, &partial_dir);
-
-    partial_dir = params->dir_delta[1];
-    scale_Point (&partial_dir, &partial_dir, col);
-    summ_Point (dir, dir, &partial_dir);
-    normalize_Point (dir, dir);
-}
-
-
 static
     void
 map_vertex_normal (Point* normal,
@@ -346,26 +431,30 @@ fill_pixel (byte* ret_red, byte* ret_green, byte* ret_blue,
             const RayImage* image,
             const Point* origin,
             const Point* dir,
-            const BarySimplex* simplex,
-            const Scene* scene)
+            const ObjectRaySpace* object)
 {
     const bool shade_by_element = false;
     const bool color_by_element = false;
     const bool compute_bary_coords = true;
     const uint nincs = 256;
     byte rgb[3];
+    const BarySimplex* simplex;
+    const Scene* scene;
     const SceneElement* elem;
     const Material* material = 0;
     Point bpoint, normal;
     uint i;
 
-    if (!simplex)
+    if (!object)
     {
         *ret_red = 0;
         *ret_green = 0;
         *ret_blue = 0;
         return;
     }
+
+    simplex = &object->simplices[hit_idx];
+    scene = &object->scene;
 
     elem = &scene->elems[hit_idx];
     if (elem->material != Max_uint)
@@ -563,7 +652,7 @@ test_intersections (uint* ret_hit,
             didhit = hit_BarySimplex (&tmp_mag, origin, dir,
                                       &simplices[tmp_hit]);
         }
-        else 
+        else
         {
             const Simplex* restrict tri;
             tmp_hit = elemidcs[i];
@@ -689,7 +778,7 @@ static
     void
 cast_recurse (uint* ret_hit,
               real* ret_mag,
-              const RaySpace** ret_space,
+              uint* ret_object,
               Point* ret_origin,
               Point* ret_dir,
               const RaySpace* restrict space,
@@ -698,36 +787,37 @@ cast_recurse (uint* ret_hit,
               bool inside_box,
               uint ignore_object)
 {
+    uint i;
     uint hit_idx;
     real hit_mag;
     Point hit_origin, hit_dir;
-    const RaySpace* hit_space;
-    uint i;
+    uint hit_object;
 
-    hit_space = space;
+    hit_object = Max_uint;
+    copy_Point (&hit_origin, origin);
+    copy_Point (&hit_dir, dir);
 
     cast_ray (&hit_idx, &hit_mag, origin, dir,
-              space->nelems, space->tree.elemidcs,
-              space->tree.nodes,
-              space->simplices, space->elems,
-              &space->box, inside_box);
+              space->main.nelems,
+              space->main.tree.elemidcs,
+              space->main.tree.nodes,
+              space->main.simplices,
+              space->main.elems,
+              &space->main.box,
+              inside_box);
 
-    if (hit_idx < hit_space->nelems)
-    {
-        copy_Point (&hit_origin, origin);
-        copy_Point (&hit_dir, dir);
-    }
+    if (hit_idx < space->main.nelems)
+        hit_object = space->nobjects;
+        
 
     UFor( i, space->nobjects )
     {
         Point diff, rel_origin, rel_dir;
-        const RaySpaceObject* object;
+        const ObjectRaySpace* object;
         bool rel_inside_box;
             /* Returns from ray cast.*/
         uint tmp_hit;
         real tmp_mag;
-        Point tmp_origin, tmp_dir;
-        const RaySpace* tmp_space;
 
         if (i == ignore_object)  continue;
 
@@ -735,42 +825,42 @@ cast_recurse (uint* ret_hit,
 
         diff_Point (&diff, origin, &object->centroid);
         xfrm_Point (&rel_origin, &object->orientation, &diff);
-        summ_Point (&diff, &object->space.box.min_corner, 
-                    &object->space.box.max_corner);
+        summ_Point (&diff, &object->box.min_corner,
+                    &object->box.max_corner);
         scale_Point (&diff, &diff, 0.5);
         summ_Point (&rel_origin, &rel_origin, &diff);
 
         xfrm_Point (&rel_dir, &object->orientation, dir);
 
         rel_inside_box =
-            inside_BoundingBox (&object->space.box, &rel_origin);
+            inside_BoundingBox (&object->box, &rel_origin);
 
-        cast_recurse (&tmp_hit, &tmp_mag, &tmp_space,
-                      &tmp_origin, &tmp_dir,
-                      &object->space,
-                      &rel_origin, &rel_dir, rel_inside_box,
-                      Max_uint);
+        cast_ray (&tmp_hit, &tmp_mag, &rel_origin, &rel_dir,
+                  object->nelems, object->tree.elemidcs,
+                  object->tree.nodes,
+                  object->simplices, object->elems,
+                  &object->box, rel_inside_box);
 
         if (tmp_mag < hit_mag)
         {
             hit_idx = tmp_hit;
             hit_mag = tmp_mag;
-            hit_space = tmp_space;
-            copy_Point (&hit_origin, &tmp_origin);
-            copy_Point (&hit_dir, &tmp_dir);
+            hit_object = i;
+            copy_Point (&hit_origin, &rel_origin);
+            copy_Point (&hit_dir, &rel_dir);
         }
     }
 
     *ret_hit = hit_idx;
     *ret_mag = hit_mag;
-    *ret_space = hit_space;
-    if (hit_idx < hit_space->nelems)
+    *ret_object = hit_object;
+    if (hit_object <= space->nobjects)
     {
         copy_Point (ret_origin, &hit_origin);
         copy_Point (ret_dir, &hit_dir);
     }
 }
-              
+
 
 static
     void
@@ -786,11 +876,11 @@ cast_record (uint* hitline,
 {
     uint hit_idx;
     real hit_mag;
-    const RaySpace* hit_space;
+    uint hit_object;
     Point hit_origin;
     Point hit_dir;
 
-    cast_recurse (&hit_idx, &hit_mag, &hit_space,
+    cast_recurse (&hit_idx, &hit_mag, &hit_object,
                   &hit_origin, &hit_dir,
                   space, origin, dir, inside_box,
                   Max_uint);
@@ -799,13 +889,15 @@ cast_record (uint* hitline,
     if (magline)  magline[col] = hit_mag;
     if (pixline)
     {
+        const ObjectRaySpace* object = 0;
         byte red, green, blue;
-        const BarySimplex* simplex = 0;
-        if (hit_idx < hit_space->nelems)
-            simplex = &hit_space->simplices[hit_idx];
+        if (hit_object < space->nobjects)
+            object = &space->objects[hit_object];
+        else if (hit_object == space->nobjects)
+            object = &space->main;
         fill_pixel (&red, &green, &blue,
                     hit_idx, hit_mag, image, &hit_origin, &hit_dir,
-                    simplex, &hit_space->scene);
+                    object);
         pixline[3*col+0] = red;
         pixline[3*col+1] = green;
         pixline[3*col+2] = blue;
@@ -841,7 +933,7 @@ rays_to_hits_fish (RayImage* image,
     col_delta = view_angle / ncols;
     col_start += col_delta / 2;
 
-    inside_box = inside_BoundingBox (&space->box, origin);
+    inside_box = inside_BoundingBox (&space->main.box, origin);
 
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic)
@@ -909,10 +1001,12 @@ rays_to_hits_fixed_plane (uint* hits, real* mags,
     real col_start, row_start;
     real col_delta, row_delta;
     const BoundingBox* box;
+    const ObjectRaySpace* object;
 
-    box = &space->box;
+    object = &space->main;
+    box = &object->box;
 
-    row_start = space->box.min_corner.coords[row_dim];
+    row_start = box->min_corner.coords[row_dim];
     row_delta = (box->max_corner.coords[row_dim] - row_start) / nrows;
     row_start += row_delta / 2;
 
@@ -926,7 +1020,7 @@ rays_to_hits_fixed_plane (uint* hits, real* mags,
     origin.coords[dir_dim] = zpos;
     origin.coords[row_dim] = 50;
     origin.coords[col_dim] = 50;
-    
+
     inside_box = inside_BoundingBox (box, &origin);
 
 #ifdef _OPENMP
@@ -957,11 +1051,12 @@ rays_to_hits_fixed_plane (uint* hits, real* mags,
 
             cast_ray (&hit, &mag,
                       &origin, &dir,
-                      space->nelems,
-                      space->tree.elemidcs,
-                      space->tree.nodes,
-                      space->simplices, space->elems,
-                      &space->box, inside_box);
+                      object->nelems,
+                      object->tree.elemidcs,
+                      object->tree.nodes,
+                      object->simplices,
+                      object->elems,
+                      box, inside_box);
             hitline[col] = hit;
             magline[col] = mag;
 
@@ -1291,33 +1386,11 @@ cast_RayImage (RayImage* restrict image,
                const PointXfrm* restrict view_basis)
 {
     RayCastAPriori known;
-    setup_RayCastAPriori (&known, image, origin, view_basis, &space->box);
+    setup_RayCastAPriori (&known, image, origin, view_basis,
+                          &space->main.box);
     cast_partial_RayImage (image, 0, image->nrows,
                            space, &known,
                            origin, view_basis);
-}
-
-
-void build_MultiRayCastParams (MultiRayCastParams* params,
-                               uint nrows, uint ncols,
-                               const RaySpace* space,
-                               const Point* origin,
-                               const PointXfrm* view_basis,
-                               real view_angle)
-{
-    const uint row_dim = 0;
-    const uint col_dim = 1;
-    setup_ray_pixel_deltas_perspective (&params->dir_start,
-                                        &params->dir_delta[row_dim],
-                                        &params->dir_delta[col_dim],
-                                        nrows, ncols,
-                                        view_basis, view_angle);
-
-    copy_BoundingBox (&params->box, &space->box);
-    params->nelems = space->nelems;
-    params->npixels[row_dim] = nrows;
-    params->npixels[col_dim] = ncols;
-    params->inside_box = inside_BoundingBox (&params->box, origin);
 }
 
 #endif  /* #ifndef __OPENCL_VERSION__ */

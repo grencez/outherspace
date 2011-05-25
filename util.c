@@ -159,6 +159,14 @@ swap_uint (uint* x, uint* y)
     *y = tmp;
 }
 
+    void
+swap_real (real* x, real* y)
+{
+    real tmp = *x;
+    *x = *y;
+    *y = tmp;
+}
+
 tristate compare_real (real a, real b)
 {
     if (a > b)  return  1;

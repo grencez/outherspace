@@ -108,14 +108,20 @@ static void cleanup_KDTreeNode (uint node_idx, KDTree* tree)
     }
 }
 
+void init_KDTree (KDTree* tree)
+{
+    tree->nnodes = 0;
+    tree->nelemidcs = 0;
+}
+
 void cleanup_KDTree (KDTree* tree)
 {
-    if (tree->nodes)
+    if (tree->nnodes > 0)
     {
         cleanup_KDTreeNode (0, tree);
         free (tree->nodes);
     }
-    if (tree->elemidcs)
+    if (tree->nelemidcs > 0)
         free (tree->elemidcs);
 }
 

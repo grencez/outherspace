@@ -65,13 +65,9 @@ void scale_Point (Point* dst, const Point* a, real k)
 
 void zero_Point (Point* a)
 {
-#ifdef __OPENCL_VERSION__
     uint i;
     UFor( i, NDimensions )
         a->coords[i] = 0;
-#else
-    memset (a, 0, sizeof (Point));
-#endif
 }
 
 void copy_Point (Point* dst, const Point* src)
@@ -79,7 +75,9 @@ void copy_Point (Point* dst, const Point* src)
 #ifdef __OPENCL_VERSION__
     *dst = *src;
 #else
-    memcpy (dst, src, sizeof (Point));
+    uint i;
+    UFor( i, NDimensions )
+        dst->coords[i] = src->coords[i];
 #endif
 }
 
@@ -88,7 +86,12 @@ void copy_BoundingBox (BoundingBox* dst, const BoundingBox* src)
 #ifdef __OPENCL_VERSION__
     *dst = *src;
 #else
-    memcpy (dst, src, sizeof (BoundingBox));
+    uint i;
+    UFor( i, NDimensions )
+    {
+        dst->min_corner.coords[i] = src->min_corner.coords[i];
+        dst->max_corner.coords[i] = src->max_corner.coords[i];
+    }
 #endif
 }
 

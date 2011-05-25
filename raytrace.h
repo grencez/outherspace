@@ -10,35 +10,35 @@
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
 struct ray_space_struct;
-struct ray_space_object_struct;
+struct object_ray_space_struct;
 struct ray_image_struct;
 struct ray_cast_a_priori_struct;
-struct multi_ray_cast_params_struct;
 typedef struct ray_space_struct RaySpace;
-typedef struct ray_space_object_struct RaySpaceObject;
+typedef struct object_ray_space_struct ObjectRaySpace;
 typedef struct ray_image_struct RayImage;
 typedef struct ray_cast_a_priori_struct RayCastAPriori;
-typedef struct multi_ray_cast_params_struct MultiRayCastParams;
 
-struct ray_space_struct
+struct object_ray_space_struct
 {
+    Point centroid;
+    PointXfrm orientation;
     uint nelems;
     Simplex* elems;
     BarySimplex* simplices;
     Scene scene;
     BoundingBox box;
     KDTree tree;
-    uint nobjects;
-    RaySpaceObject* objects;
-    KDTree object_tree;
 };
 
-struct ray_space_object_struct
+struct ray_space_struct
 {
-    real radius;
-    Point centroid;
-    PointXfrm orientation;
-    RaySpace space;
+    ObjectRaySpace main;
+    uint nobjects;
+    ObjectRaySpace* objects;
+
+    bool partition;  /* When false, the below two are unused.*/
+    KDTree object_tree;
+    BoundingBox box;
 };
 
 struct ray_image_struct
@@ -64,28 +64,15 @@ struct ray_cast_a_priori_struct
     bool inside_box;
 };
 
-struct multi_ray_cast_params_struct
-{
-    Point origin;
-    Point dir_start;
-    Point dir_delta[2];
-    BoundingBox box;
-    uint nelems;
-    uint npixels[2];
-    bool inside_box;
-};
 
-void dir_from_MultiRayCastParams (Point* dir, uint row, uint col,
-                                  const MultiRayCastParams* params);
-    void
+void
 fill_pixel (byte* ret_red, byte* ret_green, byte* ret_blue,
             uint hit_idx,
             real mag,
             const RayImage* image,
             const Point* origin,
             const Point* dir,
-            const BarySimplex* simplex,
-            const Scene* scene);
+            const ObjectRaySpace* object);
 
 #ifndef __OPENCL_VERSION__
 void
@@ -122,16 +109,20 @@ cast_RayImage (RayImage* restrict image,
                const Point* restrict origin,
                const PointXfrm* restrict view_basis);
 
-void build_MultiRayCastParams (MultiRayCastParams* params,
-                               uint nrows, uint ncols,
-                               const RaySpace* space,
-                               const Point* origin,
-                               const PointXfrm* view_basis,
-                               real view_angle);
-
-void init_RaySpace (RaySpace* space);
-void cleanup_RaySpace (RaySpace* space);
-void partition_RaySpace (RaySpace* space);
+void
+init_RaySpace (RaySpace* space);
+void
+init_ObjectRaySpace (ObjectRaySpace* object);
+void
+cleanup_RaySpace (RaySpace* space);
+void
+cleanup_ObjectRaySpace (ObjectRaySpace* object);
+void
+init_filled_RaySpace (RaySpace* space);
+void
+init_filled_ObjectRaySpace (ObjectRaySpace* object);
+void
+update_dynamic_RaySpace (RaySpace* space);
 void
 init_Scene_KDTreeGrid (KDTreeGrid* grid, const Scene* scene,
                        const BoundingBox* box);

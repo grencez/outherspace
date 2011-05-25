@@ -40,7 +40,7 @@ rotate_object (ObjectMotion* motion, uint xdim, uint ydim, real angle)
 move_objects (RaySpace* space, ObjectMotion* motions, real dt)
 {
     const uint nincs = 10;
-    RaySpaceObject* objects;
+    ObjectRaySpace* objects;
     real inc;
     uint i, nobjects;
     nobjects = space->nobjects;
@@ -83,9 +83,10 @@ move_object (RaySpace* space, ObjectMotion* motion, uint objidx, real dt)
     bool commit_move = true;
     PointXfrm basis, new_orientation;
     Point new_centroid;
-    RaySpaceObject* object;
+    ObjectRaySpace* object;
     Point dir, veloc;
 
+        /* assert (!space->partition && "Partitioning the space for movement takes too long!"); */
     object = &space->objects[objidx];
 
         /* Rotate object.*/
@@ -184,23 +185,23 @@ detect_collision (const RaySpace* space,
     uint i;
     uint hit_idx;
     real hit_mag;
-    const RaySpace* hit_space;
-    const RaySpaceObject* object;
+    uint hit_object;
+    const ObjectRaySpace* object;
     const Scene* scene;
 
     object = &space->objects[objidx];
-    scene = &object->space.scene;
+    scene = &object->scene;
 
-    hit_idx = space->nelems;
+    hit_idx = Max_uint;
     hit_mag = Max_real;
-    hit_space = space;
+    hit_object = Max_uint;
 
     UFor( i, scene->nverts )
     {
         Point diff, origin, destin;
         real distance;
 
-        centroid_BoundingBox (&diff, &object->space.box);
+        centroid_BoundingBox (&diff, &object->box);
         diff_Point (&diff, &scene->verts[i], &diff);
 
         trxfrm_Point (&origin, &object->orientation, &diff);
@@ -218,14 +219,14 @@ detect_collision (const RaySpace* space,
             uint tmp_hit;
             real tmp_mag;
             Point tmp_point;
-            const RaySpace* tmp_space;
+            uint tmp_object;
             bool inside_box;
             Point unit_dir;
 
             scale_Point (&unit_dir, &diff, 1 / distance);
-            inside_box = inside_BoundingBox (&space->box, &origin);
+            inside_box = inside_BoundingBox (&space->main.box, &origin);
 
-            cast_recurse (&tmp_hit, &tmp_mag, &tmp_space,
+            cast_recurse (&tmp_hit, &tmp_mag, &tmp_object,
                           &tmp_point, &tmp_point,
                           space, &origin, &unit_dir,
                           inside_box, objidx);
@@ -234,13 +235,13 @@ detect_collision (const RaySpace* space,
             {
                 hit_idx = tmp_hit;
                 hit_mag = tmp_mag;
-                hit_space = tmp_space;
+                hit_object = tmp_object;
             }
         }
 
     }
 
-    return hit_idx < hit_space->nelems;
+    return hit_object <= space->nobjects;
         /* Below here is scratch from the prototype!*/
 #if 0
     if (hit_idx < hit_space->nelems)

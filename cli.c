@@ -99,6 +99,7 @@ int main (int argc, char** argv)
     }
 #endif
 #else
+    update_dynamic_RaySpace (&space);
     cast_RayImage (&image, &space, &view_origin, &view_basis);
     printf ("sec:%f\n", monotime () - t0);
 #endif
@@ -109,9 +110,9 @@ int main (int argc, char** argv)
         if (image.hits)
         {
             output_PBM_image ("out.pbm", image.nrows, image.ncols,
-                              image.hits, space.nelems);
+                              image.hits, space.main.nelems);
             output_PGM_image ("out.pgm", image.nrows, image.ncols,
-                              image.hits, space.nelems);
+                              image.hits, space.main.nelems);
         }
         if (image.pixels)
         {

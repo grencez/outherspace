@@ -81,6 +81,7 @@ void output_KDTree (FILE* out, const KDTree* tree,
                     uint nelems, const Simplex* elems);
 void output_gv_KDTree (FILE* out, const KDTree* tree);
 
+void init_KDTree (KDTree* tree);
 void cleanup_KDTree (KDTree* tree);
 
 void

@@ -90,6 +90,8 @@ uint
 ceil_uint (uint a, uint b);
 void
 swap_uint (uint* x, uint* y);
+void
+swap_real (real* x, real* y);
 tristate compare_real (real a, real b);
 real match_real (real a, real b);
 real

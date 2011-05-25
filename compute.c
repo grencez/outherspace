@@ -114,7 +114,7 @@ void compute_rays_to_hits (RayImage* image,
         if (space->nobjects > 0)
         {
             ret = MPI_Send (space->objects,
-                            space->nobjects * sizeof (RaySpaceObject),
+                            space->nobjects * sizeof (ObjectRaySpace),
                             MPI_BYTE,
                             proc, StdMsgTag, MPI_COMM_WORLD);
             AssertStatus( ret, "" );
@@ -339,13 +339,13 @@ rays_to_hits_computer (RayImage* restrict image,
                        const Point* restrict origin,
                        const PointXfrm* restrict view_basis);
 
-bool rays_to_hits_computeloop (const RaySpace* restrict space)
+bool rays_to_hits_computeloop (RaySpace* restrict space)
 {
     uint proc = 0;
-    RaySpaceObject* xfer_objects = 0;
+    ObjectRaySpace* xfer_objects = 0;
 
     MPI_Comm_rank (MPI_COMM_WORLD, (int*) &proc);
-    xfer_objects = AllocT( RaySpaceObject, space->nobjects );
+    xfer_objects = AllocT( ObjectRaySpace, space->nobjects );
 
     if (proc == 0)  return false;
 
@@ -379,7 +379,7 @@ bool rays_to_hits_computeloop (const RaySpace* restrict space)
         if (space->nobjects > 0)
         {
             ret = MPI_Recv (xfer_objects,
-                            space->nobjects * sizeof (RaySpaceObject),
+                            space->nobjects * sizeof (ObjectRaySpace),
                             MPI_BYTE,
                         0, StdMsgTag, MPI_COMM_WORLD, &status);
             AssertStatus( ret, "" );
@@ -398,6 +398,7 @@ bool rays_to_hits_computeloop (const RaySpace* restrict space)
                             &xfer_objects[i].orientation);
         }
 
+        update_dynamic_RaySpace (space);
 #ifdef TrivialMpiRayTrace
         cast_RayImage (&image, space, &origin, &view_basis);
 #else
@@ -429,7 +430,7 @@ void rays_to_hits_computer (RayImage* restrict image,
     nrows = image->nrows;
     ncols = image->ncols;
 
-    setup_RayCastAPriori (&known, image, origin, view_basis, &space->box);
+    setup_RayCastAPriori (&known, image, origin, view_basis, &space->main.box);
 
     rows_computed = AllocT( uint, nrows );
 
