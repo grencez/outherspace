@@ -148,7 +148,7 @@ bool even_uint (uint a)
     uint
 ceil_uint (uint a, uint b)
 {
-    return (a + b - 1) / b;
+    return Ceil_uint (a, b);
 }
 
     void

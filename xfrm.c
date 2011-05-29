@@ -339,3 +339,52 @@ spherical3_PointXfrm (PointXfrm* dst, real zenith, real azimuthcc)
     xfrm_PointXfrm (dst, &tmp, &rotation);
 }
 
+/* Take a bounding box, rotate it from a basis,
+ * and reposition it around a new centroid.
+ * The bounding box volume will grow in most cases,
+ * as it is axis aligned and the axes have changed!
+ */
+    void
+trxfrm_BoundingBox (BoundingBox* dst,
+                    const PointXfrm* basis,
+                    const BoundingBox* box,
+                    const Point* new_centroid)
+{
+    uint i;
+    Point diff;
+    PointXfrm bbox, robox;
+
+    diff_Point (&diff, &box->max_corner, &box->min_corner);
+    scale_Point (&diff, &diff, .5);
+
+    UFor( i, NDimensions )
+    {
+        uint j;
+        UFor( j, NDimensions )
+        {
+            if (basis->pts[j].coords[i] >= 0)
+                bbox.pts[i].coords[j] = + diff.coords[j];
+            else
+                bbox.pts[i].coords[j] = - diff.coords[j];
+        }
+    }
+
+        /*    T   T T
+         *  (B * A )  = A * B
+         */
+    xfrm_PointXfrm (&robox, &bbox, basis);
+
+    UFor( i, NDimensions )
+    {
+        uint j;
+        real a, b;
+        a = robox.pts[i].coords[i];
+        b = new_centroid->coords[i];
+        dst->min_corner.coords[i] = - a + b;
+        dst->max_corner.coords[i] = + a + b;
+
+        UFor( j, NDimensions )
+            assert (a >= robox.pts[j].coords[i]);
+    }
+}
+

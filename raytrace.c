@@ -49,8 +49,7 @@ static void
 cast_row_orthographic (RayImage* restrict image,
                        uint row,
                        const RaySpace* restrict space,
-                       const RayCastAPriori* restrict known,
-                       const PointXfrm* restrict view_basis);
+                       const RayCastAPriori* restrict known);
 static void
 setup_ray_pixel_deltas_perspective (Point* dir_start,
                                     Point* row_delta,
@@ -61,8 +60,7 @@ setup_ray_pixel_deltas_perspective (Point* dir_start,
 static void
 cast_row_perspective (RayImage* image, uint row,
                       const RaySpace* restrict space,
-                      const RayCastAPriori* restrict known,
-                      const Point* restrict origin);
+                      const RayCastAPriori* restrict known);
 
 
     void
@@ -174,7 +172,14 @@ update_dynamic_RaySpace (RaySpace* space)
             /* Since it's a regeneration, clean up the previous version.*/
         cleanup_KDTree (&space->object_tree);
         build_KDTree (&space->object_tree, &grid);
+            /* output_KDTreeGrid (stderr, &grid); */
+            /* output_KDTree (stderr, &space->object_tree); */
         cleanup_KDTreeGrid (&grid);
+    }
+    else
+    {
+        space->partition = false;
+        copy_BoundingBox (&space->box, &space->main.box);
     }
 }
 
@@ -254,41 +259,42 @@ init_RaySpace_KDTreeGrid (KDTreeGrid* grid, const RaySpace* space)
     grid->intls[0] = AllocT( uint, NDimensions * grid->nintls );
     grid->coords[0] = AllocT( real, NDimensions * grid->nintls );
 
-    copy_BoundingBox (&grid->box, &space->main.box);
-
     UFor( i, NDimensions )
     {
+        uint ti;
+        ti = 2 * space->nobjects;
+
         grid->intls[i] = &grid->intls[0][i * grid->nintls];
         grid->coords[i] = &grid->coords[0][i * grid->nintls];
-        grid->box.min_corner.coords[i] = Max_real;
-        grid->box.max_corner.coords[i] = Min_real;
 
             /* Main case (special).*/
-        grid->intls[i][0] = 0;
-        grid->intls[i][1] = 1;
-        grid->coords[i][0] = space->main.box.min_corner.coords[i];
-        grid->coords[i][1] = space->main.box.max_corner.coords[i];
+        grid->intls[i][ti] = ti;
+        grid->intls[i][ti+1] = ti+1;
+        grid->coords[i][ti] = space->main.box.min_corner.coords[i];
+        grid->coords[i][ti+1] = space->main.box.max_corner.coords[i];
+        grid->box.min_corner.coords[i] = space->main.box.min_corner.coords[i];
+        grid->box.max_corner.coords[i] = space->main.box.max_corner.coords[i];
     }
 
     UFor( i, space->nobjects )
     {
         uint dim, ti;
         const ObjectRaySpace* object;
-        Point diff, tmp;
+        BoundingBox box;
 
-        ti = 2 * (1 + i);
+        ti = 2 * i;
         object = &space->objects[i];
         
-        diff_Point (&diff, &object->box.max_corner, &object->box.min_corner);
-        scale_Point (&diff, &diff, .5);
-        trxfrm_Point (&tmp, &object->orientation, &diff);
+        trxfrm_BoundingBox (&box,
+                            &object->orientation,
+                            &object->box,
+                            &object->centroid);
 
         UFor( dim, NDimensions )
         {
             real lo, hi;
-            lo = - tmp.coords[i] + object->centroid.coords[i];
-            hi = + tmp.coords[i] + object->centroid.coords[i];
-            if (lo > hi)  swap_real (&lo, &hi);
+            lo = box.min_corner.coords[dim];
+            hi = box.max_corner.coords[dim];
             grid->intls[dim][ti] = ti;
             grid->intls[dim][ti+1] = ti+1;
             grid->coords[dim][ti] = lo;
@@ -776,16 +782,16 @@ cast_ray (uint* restrict ret_hit, real* restrict ret_mag,
 
 static
     void
-cast_recurse (uint* ret_hit,
-              real* ret_mag,
-              uint* ret_object,
-              Point* ret_origin,
-              Point* ret_dir,
-              const RaySpace* restrict space,
-              const Point* restrict origin,
-              const Point* restrict dir,
-              bool inside_box,
-              uint ignore_object)
+cast_nopartition (uint* ret_hit,
+                  real* ret_mag,
+                  uint* ret_object,
+                  Point* ret_origin,
+                  Point* ret_dir,
+                  const RaySpace* restrict space,
+                  const Point* restrict origin,
+                  const Point* restrict dir,
+                  bool inside_box,
+                  uint ignore_object)
 {
     uint i;
     uint hit_idx;
@@ -863,6 +869,174 @@ cast_recurse (uint* ret_hit,
 
 
 static
+    bool
+test_object_intersections (uint* ret_hit,
+                           real* ret_mag,
+                           uint* ret_object,
+                           Point* ret_origin,
+                           Point* ret_dir,
+                           BitString* tested,
+                           const Point* origin,
+                           const Point* dir,
+                           uint nobjectidcs,
+                           const uint* objectidcs,
+                           const RaySpace* space,
+                           const BoundingBox* box)
+{
+    uint i;
+    UFor( i, nobjectidcs )
+    {
+        uint objidx;
+        Point diff, rel_origin, rel_dir;
+        const ObjectRaySpace* object;
+        bool rel_inside_box;
+            /* Returns from ray cast.*/
+        uint tmp_hit;
+        real tmp_mag;
+
+        objidx = objectidcs[i];
+        if (set1_BitString (tested, objidx))  continue;
+
+        if (objidx < space->nobjects)
+        {
+            object = &space->objects[objidx];
+            diff_Point (&diff, origin, &object->centroid);
+            xfrm_Point (&rel_origin, &object->orientation, &diff);
+            summ_Point (&diff, &object->box.min_corner,
+                        &object->box.max_corner);
+            scale_Point (&diff, &diff, 0.5);
+            summ_Point (&rel_origin, &rel_origin, &diff);
+
+            xfrm_Point (&rel_dir, &object->orientation, dir);
+
+        }
+        else
+        {
+            object = &space->main;
+            copy_Point (&rel_origin, origin);
+            copy_Point (&rel_dir, dir);
+        }
+
+        rel_inside_box =
+            inside_BoundingBox (&object->box, &rel_origin);
+
+        cast_ray (&tmp_hit, &tmp_mag, &rel_origin, &rel_dir,
+                  object->nelems, object->tree.elemidcs,
+                  object->tree.nodes,
+                  object->simplices, object->elems,
+                  &object->box, rel_inside_box);
+
+        if (tmp_mag < *ret_mag)
+        {
+            *ret_hit = tmp_hit;
+            *ret_mag = tmp_mag;
+            *ret_object = objidx;
+            copy_Point (ret_origin, &rel_origin);
+            copy_Point (ret_dir, &rel_dir);
+        }
+    }
+
+    if (*ret_mag != Max_real)
+    {
+        Point isect;
+        scale_Point (&isect, dir, *ret_mag);
+        summ_Point (&isect, &isect, origin);
+        return inside_BoundingBox (box, &isect);
+    }
+    return false;
+}
+
+
+static
+    void
+cast_partitioned (uint* ret_hit,
+                  real* ret_mag,
+                  uint* ret_object,
+                  Point* ret_origin,
+                  Point* ret_dir,
+                  const RaySpace* restrict space,
+                  const Point* restrict origin,
+                  const Point* restrict dir,
+                  bool inside_box,
+                  uint ignore_object)
+{
+    const uint ntestedbits = 128;
+    Declare_BitString( tested, 128 );
+    Point salo_entrance;
+    uint node_idx, parent = 0;
+    Point* restrict entrance;
+    const KDTreeNode* restrict nodes;
+    const uint* restrict elemidcs;
+    uint hit_idx;
+    real hit_mag;
+    Point hit_origin, hit_dir;
+    uint hit_object;
+
+    assert (space->nobjects < ntestedbits);
+    zero_BitString (tested, ntestedbits);
+    if (ignore_object <= space->nobjects)
+        set1_BitString (tested, ignore_object);
+
+    entrance = &salo_entrance;
+    nodes = space->object_tree.nodes;
+    elemidcs = space->object_tree.elemidcs;
+
+    hit_idx = Max_uint;
+    hit_mag = Max_real;
+    hit_object = Max_uint;
+    copy_Point (&hit_origin, origin);
+    copy_Point (&hit_dir, dir);
+
+    if (inside_box)
+    {
+        const BoundingBox* box;
+            /* Find the initial node.*/
+        node_idx = find_KDTreeNode (&parent, origin, nodes);
+        box = &nodes[node_idx].as.leaf.box;
+        assert (inside_BoundingBox (box, origin));
+    }
+    else
+    {
+        if (! hit_outer_BoundingBox (entrance, &space->box, origin, dir))
+        {
+            *ret_hit = hit_idx;
+            *ret_mag = hit_mag;
+            *ret_object = hit_object;
+            return;
+        }
+        node_idx = 0;
+    }
+
+    do
+    {
+        __global const KDTreeLeaf* restrict leaf;
+        bool hit_in_leaf;
+
+        node_idx = descend_KDTreeNode (&parent, entrance, node_idx, nodes);
+
+        leaf = &nodes[node_idx].as.leaf;
+        hit_in_leaf =
+            test_object_intersections (&hit_idx, &hit_mag, &hit_object,
+                                       &hit_origin, &hit_dir, tested,
+                                       origin, dir, leaf->nelems,
+                                       &elemidcs[leaf->elemidcs],
+                                       space, &leaf->box);
+        if (hit_in_leaf)  break;
+
+        node_idx = upnext_KDTreeNode (entrance, &parent,
+                                      origin, dir, node_idx, nodes);
+    }
+    while (node_idx != parent);
+
+    *ret_hit = hit_idx;
+    *ret_mag = hit_mag;
+    *ret_object = hit_object;
+    copy_Point (ret_origin, &hit_origin);
+    copy_Point (ret_dir, &hit_dir);
+}
+
+
+static
     void
 cast_record (uint* hitline,
              real* magline,
@@ -880,10 +1054,18 @@ cast_record (uint* hitline,
     Point hit_origin;
     Point hit_dir;
 
-    cast_recurse (&hit_idx, &hit_mag, &hit_object,
-                  &hit_origin, &hit_dir,
-                  space, origin, dir, inside_box,
-                  Max_uint);
+    copy_Point (&hit_origin, origin);
+    copy_Point (&hit_dir, dir);
+    if (space->partition)
+        cast_partitioned (&hit_idx, &hit_mag, &hit_object,
+                          &hit_origin, &hit_dir,
+                          space, origin, dir, inside_box,
+                          Max_uint);
+    else
+        cast_nopartition (&hit_idx, &hit_mag, &hit_object,
+                          &hit_origin, &hit_dir,
+                          space, origin, dir, inside_box,
+                          Max_uint);
 
     if (hitline)  hitline[col] = hit_idx;
     if (magline)  magline[col] = hit_mag;
@@ -933,7 +1115,7 @@ rays_to_hits_fish (RayImage* image,
     col_delta = view_angle / ncols;
     col_start += col_delta / 2;
 
-    inside_box = inside_BoundingBox (&space->main.box, origin);
+    inside_box = inside_BoundingBox (&space->box, origin);
 
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic)
@@ -958,6 +1140,7 @@ rays_to_hits_fish (RayImage* image,
             real col_angle;
             col_angle = col_start + col_delta * col;
 
+            zero_Point (&dir);
             dir.coords[row_dim] = sin (row_angle);
             dir.coords[col_dim] = sin (col_angle);
             dir.coords[dir_dim] = cos (row_angle) + cos (col_angle);
@@ -1042,7 +1225,7 @@ rays_to_hits_fixed_plane (uint* hits, real* mags,
 
                 /* if (! (row == 333 && col == 322))  continue; */
 
-            dir.coords[dir_dim] = 0;
+            zero_Point (&dir);
             dir.coords[row_dim] = row_start + row * row_delta;
             dir.coords[col_dim] = col_start + col * col_delta;
 
@@ -1101,11 +1284,11 @@ setup_ray_pixel_deltas_orthographic (Point* dir_start,
 cast_row_orthographic (RayImage* restrict image,
                        uint row,
                        const RaySpace* restrict space,
-                       const RayCastAPriori* restrict known,
-                       const PointXfrm* restrict view_basis)
+                       const RayCastAPriori* restrict known)
 {
     uint col, ncols;
     const BoundingBox* box;
+    const Point* dir;
     Point partial_ray_origin;
     uint* hitline = 0;
     real* magline = 0;
@@ -1118,6 +1301,8 @@ cast_row_orthographic (RayImage* restrict image,
     if (image->mags)  magline = &image->mags[row * ncols];
     if (image->pixels)  pixline = &image->pixels[row * 3 * ncols];
 
+        /* For orthographic view, origin and direction storage are swapped.*/
+    dir = &known->origin;
     scale_Point (&partial_ray_origin, &known->row_delta, row);
     summ_Point (&partial_ray_origin, &partial_ray_origin, &known->dir_start);
 
@@ -1132,7 +1317,7 @@ cast_row_orthographic (RayImage* restrict image,
 
         cast_record (hitline, magline, pixline, col,
                      space, image,
-                     &ray_origin, &view_basis->pts[DirDimension],
+                     &ray_origin, dir,
                      inside_box);
     }
 }
@@ -1176,10 +1361,10 @@ setup_ray_pixel_deltas_perspective (Point* dir_start,
     void
 cast_row_perspective (RayImage* image, uint row,
                       const RaySpace* restrict space,
-                      const RayCastAPriori* restrict known,
-                      const Point* restrict origin)
+                      const RayCastAPriori* restrict known)
 {
     uint col, ncols;
+    const Point* origin;
     Point partial_dir;
     uint* hitline = 0;
     real* magline = 0;
@@ -1191,6 +1376,7 @@ cast_row_perspective (RayImage* image, uint row,
     if (image->mags)  magline = &image->mags[row * ncols];
     if (image->pixels)  pixline = &image->pixels[row * 3 * ncols];
 
+    origin = &known->origin;
     scale_Point (&partial_dir, &known->row_delta, row);
     summ_Point (&partial_dir, &partial_dir, &known->dir_start);
 
@@ -1288,6 +1474,7 @@ setup_RayCastAPriori (RayCastAPriori* dst,
 {
     if (image->perspective)
     {
+        copy_Point (&dst->origin, origin);
         setup_ray_pixel_deltas_perspective (&dst->dir_start,
                                             &dst->row_delta,
                                             &dst->col_delta,
@@ -1298,6 +1485,7 @@ setup_RayCastAPriori (RayCastAPriori* dst,
     }
     else
     {
+        copy_Point (&dst->origin, &view_basis->pts[DirDimension]);
         setup_ray_pixel_deltas_orthographic (&dst->dir_start,
                                              &dst->row_delta,
                                              &dst->col_delta,
@@ -1320,6 +1508,8 @@ ray_from_RayCastAPriori (Point* origin, Point* dir,
     if (!image->perspective)
     {
         Point partial_ray_origin;
+        copy_Point (dir, &known->origin);
+
         scale_Point (&partial_ray_origin, &known->row_delta, row);
         summ_Point (&partial_ray_origin, &partial_ray_origin, &known->dir_start);
 
@@ -1329,6 +1519,8 @@ ray_from_RayCastAPriori (Point* origin, Point* dir,
     else
     {
         Point partial_dir;
+        copy_Point (origin, &known->origin);
+
         scale_Point (&partial_dir, &known->row_delta, row);
         summ_Point (&partial_dir, &partial_dir, &known->dir_start);
         scale_Point (dir, &known->col_delta, col);
@@ -1343,9 +1535,7 @@ cast_partial_RayImage (RayImage* restrict image,
                        uint row_off,
                        uint row_nul,
                        const RaySpace* restrict space,
-                       const RayCastAPriori* restrict known,
-                       const Point* restrict origin,
-                       const PointXfrm* restrict view_basis)
+                       const RayCastAPriori* restrict known)
 {
     uint i, nprocs, myrank;
 
@@ -1363,10 +1553,9 @@ cast_partial_RayImage (RayImage* restrict image,
     for (i = myrank; i < row_nul; i += nprocs)
     {
         if (image->perspective)
-            cast_row_perspective (image, row_off + i, space, known, origin);
+            cast_row_perspective (image, row_off + i, space, known);
         else
-            cast_row_orthographic (image, row_off + i,
-                                   space, known, view_basis);
+            cast_row_orthographic (image, row_off + i, space, known);
     }
 
 #ifdef TrivialMpiRayTrace
@@ -1387,10 +1576,9 @@ cast_RayImage (RayImage* restrict image,
 {
     RayCastAPriori known;
     setup_RayCastAPriori (&known, image, origin, view_basis,
-                          &space->main.box);
+                          &space->box);
     cast_partial_RayImage (image, 0, image->nrows,
-                           space, &known,
-                           origin, view_basis);
+                           space, &known);
 }
 
 #endif  /* #ifndef __OPENCL_VERSION__ */

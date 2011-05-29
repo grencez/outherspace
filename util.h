@@ -19,6 +19,9 @@
 #define CopyT( Type, dst, src, lo, count ) \
     (array_cpy (dst, src, lo, count, sizeof (Type)))
 
+#define Ceil_uint( a, b ) \
+    (((a) + (b) - 1) / (b))
+
 typedef unsigned int uint;
 typedef unsigned char byte;
 

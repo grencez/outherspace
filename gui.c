@@ -52,6 +52,8 @@ static real view_width = 100;
 static bool needs_recast = true;
 static bool continue_running = true;
 static MotionInput motion_input;
+static real framerate_report_dt = 0;
+static uint framerate_report_count = 0;
 
 
 static
@@ -92,7 +94,7 @@ static void destroy_app (GtkWidget* widget,
 
 static
     gboolean
-key_press_fn (GtkWidget* _widget, GdkEventKey* event, gpointer _data)
+key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
 {
     uint dim = NDimensions;
     tristate roll = 0;
@@ -111,7 +113,6 @@ key_press_fn (GtkWidget* _widget, GdkEventKey* event, gpointer _data)
     bool shift_mod, ctrl_mod;
 
     (void) _data;
-    (void) _widget;
     out = stdout;
 
     shift_mod = event->state & GDK_SHIFT_MASK;
@@ -280,6 +281,7 @@ key_press_fn (GtkWidget* _widget, GdkEventKey* event, gpointer _data)
             ray_image.ncols = view_ncols;
             resize_RayImage (&ray_image);
         }
+        gtk_window_resize (GTK_WINDOW(widget), view_nrows, view_ncols);
     }
     else if (reflect)
     {
@@ -572,24 +574,19 @@ static gboolean grab_mouse_fn (GtkWidget* da,
         uint hit_object;
         Point hit_origin, hit_dir;
         Point origin, dir;
-        bool inside_box;
 
         setup_RayCastAPriori (&priori, &ray_image,
                               &view_origin, &view_basis,
-                              &space->main.box);
-
-        copy_Point (&origin, &view_origin);
-        copy_Point (&dir, &view_basis.pts[DirDimension]);
-
-        inside_box = priori.inside_box;
+                              &space->box);
 
         ray_from_RayCastAPriori (&origin, &dir,
                                  &priori, row, col, &ray_image);
 
-        cast_recurse (&hit_idx, &hit_mag, &hit_object,
-                      &hit_origin, &hit_dir,
-                      space, &origin, &dir,
-                      inside_box, Max_uint);
+        cast_nopartition (&hit_idx, &hit_mag, &hit_object,
+                          &hit_origin, &hit_dir,
+                          space, &origin, &dir,
+                          priori.inside_box,
+                          Max_uint);
         if (hit_object <= space->nobjects)
         {
             const ObjectRaySpace* object;
@@ -668,9 +665,16 @@ render_RaySpace (byte* data, RaySpace* space,
         {
             if (ShowFrameRate)
             {
-                real dt;
-                dt = motion_input.t1 - motion_input.t0;
-                fprintf (stderr, "FPS:%f\n", 1 / dt);
+                framerate_report_dt += motion_input.t1 - motion_input.t0;
+                framerate_report_count += 1;
+                if (framerate_report_dt >= 1)
+                {
+                    real fps;
+                    fps = framerate_report_count / framerate_report_dt;
+                    fprintf (stderr, "FPS:%f\n", fps);
+                    framerate_report_dt = 0;
+                    framerate_report_count = 0;
+                }
             }
             update_object_locations (space, &motion_input);
         }

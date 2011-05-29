@@ -77,8 +77,13 @@ descend_KDTreeNode (uint* ret_parent,
                     __global const KDTreeNode* nodes);
 
 #ifndef __OPENCL_VERSION__
-void output_KDTree (FILE* out, const KDTree* tree,
-                    uint nelems, const Simplex* elems);
+void
+output_KDTreeGrid (FILE* out, const KDTreeGrid* grid);
+void
+output_KDTree (FILE* out, const KDTree* tree);
+void
+output_simplex_KDTree (FILE* out, const KDTree* tree,
+                       uint nelems, const Simplex* elems);
 void output_gv_KDTree (FILE* out, const KDTree* tree);
 
 void init_KDTree (KDTree* tree);

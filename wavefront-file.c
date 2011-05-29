@@ -72,6 +72,7 @@ readin_wavefront (Scene* scene, const char* filename)
         {
             Point* normal;
             normal = AllocT( Point, 1 );
+            zero_Point (normal);
             app_SList (&vnmllist, normal);
             line = &line[2];
             UFor( i, ndims )

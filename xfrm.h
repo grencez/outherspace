@@ -44,6 +44,11 @@ det_PointXfrm (const PointXfrm* xfrm);
 void row_minors_PointXfrm (Point* dst, const PointXfrm* xfrm, uint row);
 void
 spherical3_PointXfrm (PointXfrm* dst, real zenith, real azimuthcc);
+void
+trxfrm_BoundingBox (BoundingBox* dst,
+                    const PointXfrm* basis,
+                    const BoundingBox* box,
+                    const Point* new_centroid);
 
 #ifndef __OPENCL_VERSION__
 void output_PointXfrm (FILE* out, const PointXfrm* xfrm);

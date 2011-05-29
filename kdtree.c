@@ -10,6 +10,25 @@
 #define MaxKDTreeDepth 50
     /* #define MaxKDTreeDepth 0 */
 
+    void
+output_KDTreeGrid (FILE* out, const KDTreeGrid* grid)
+{
+    uint i;
+    fputs ("-- KDTreeGrid --", out);
+    fprintf (out, "nintls:%u\n", grid->nintls);
+    UFor( i, NDimensions )
+    {
+        uint j;
+        UFor( j, grid->nintls )
+        {
+            fprintf (out, "dim:%u  intl:%u  coord:%f\n",
+                     i, grid->intls[i][j], grid->coords[i][j]);
+        }
+    }
+    output_BoundingBox (out, &grid->box);
+    fputc ('\n', out);
+}
+
 static
     void
 output_KDTreeNode (FILE* out, uint node_idx,
@@ -48,8 +67,17 @@ output_KDTreeNode (FILE* out, uint node_idx,
     }
 }
 
-void output_KDTree (FILE* out, const KDTree* tree,
-                    uint nelems, const Simplex* elems)
+    void
+output_KDTree (FILE* out, const KDTree* tree)
+{
+    fputs ("-- KDTree --\n", out);
+    fputs ("\n- Nodes -\n", out);
+    output_KDTreeNode (out, 0, 0, tree);
+}
+
+    void
+output_simplex_KDTree (FILE* out, const KDTree* tree,
+                       uint nelems, const Simplex* elems)
 {
     uint i;
     fputs ("-- KDTree --\n", out);
@@ -231,16 +259,20 @@ kdtree_cost_fn (uint split_dim, real split_pos,
                 const BoundingBox* box)
 {
     const real cost_it = 1;  /* Cost of intersection test.*/
-    const real cost_tr = 8;  /* Cost of traversal.*/
+    const real cost_tr = 4;  /* Cost of traversal.*/
     BoundingBox lo_box, hi_box;
+    real area;
 
     split_BoundingBox (&lo_box, &hi_box, box, split_dim, split_pos);
+
+    area = surface_area_BoundingBox (box);
+    if (area < Epsilon_real)  return Max_real;
 
     return (cost_tr
             + cost_it
             * (nlo * surface_area_BoundingBox (&lo_box) +
                nhi * surface_area_BoundingBox (&hi_box))
-            / surface_area_BoundingBox (box));
+            / area);
 }
 
 static
@@ -354,6 +386,7 @@ determine_split (KDTreeGrid* logrid, KDTreeGrid* higrid, KDTreeGrid* grid)
         assert (nhi == 0);
     }
 
+        /* printf ("cost:%f  cost_nosplit:%f\n", cost_split, cost_nosplit); */
     if (cost_split > cost_nosplit)  return NDimensions;
 
         /* At this point, the split is known.*/

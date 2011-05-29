@@ -27,6 +27,15 @@ free_BitString (BitString* bs)
     free (bs);
 }
 
+    void
+zero_BitString (BitString* bs, uint n)
+{
+    const uint nblockbits = sizeof (bitstring_t) * NBitsInByte;
+    uint i;
+    n = ceil_uint (n, nblockbits);
+    UFor( i, n )  bs[i] = 0;
+}
+
     bool
 test_BitString (BitString* bs, uint i)
 {

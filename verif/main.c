@@ -33,6 +33,39 @@ testfn_BitString ()
     }
 }
 
+    /* This mimics the dirty bit in a set associative cache,
+     * but is unrealistic since it disregards any values.
+     * Now, if all values fall inside [0..255], then we have a useful tool,
+     * but then LowBits() would not be tested.
+     */
+    void
+testfn_BitString_cache ()
+{
+    uint i;
+    bool flag;
+    Declare_BitString( cache, 256 );
+    const uint nslots = 256;
+    const uint nbits = 8;
+
+    set1_BitString (cache, 100);
+    zero_BitString (cache, 256);
+    UFor( i, nslots )
+        assert (!test_BitString (cache, i));
+
+    i = LowBits( uint, nbits, nslots+1 );
+    flag = set1_BitString (cache, i);
+    assert (i == 1 && !flag);
+    i = LowBits( uint, nbits, nslots-1 );
+    flag = set1_BitString (cache, i);
+    assert (i == nslots-1 && !flag);
+    i = LowBits( uint, nbits, 3*(nslots-1) );
+    flag = set1_BitString (cache, i);
+    assert (i == nslots-3 && !flag);
+    i = LowBits( uint, nbits, 5*nslots-3 );
+    flag = set1_BitString (cache, i);
+    assert (i == nslots-3 && flag);
+}
+
     void
 testfn_PointXfrm ()
 {
@@ -95,6 +128,7 @@ testfn_PointXfrm ()
 int main ()
 {
     testfn_BitString ();
+    testfn_BitString_cache ();
     testfn_PointXfrm ();
     return 0;
 }

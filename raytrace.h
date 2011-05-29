@@ -58,6 +58,7 @@ struct ray_image_struct
 
 struct ray_cast_a_priori_struct
 {
+    Point origin;
     Point dir_start;
     Point row_delta;
     Point col_delta;
@@ -100,9 +101,7 @@ void
 cast_partial_RayImage (RayImage* restrict image,
                        uint row_off, uint row_nul,
                        const RaySpace* restrict space,
-                       const RayCastAPriori* restrict known,
-                       const Point* restrict origin,
-                       const PointXfrm* restrict view_basis);
+                       const RayCastAPriori* restrict known);
 void
 cast_RayImage (RayImage* restrict image,
                const RaySpace* restrict space,

@@ -276,8 +276,10 @@ setup_testcase_sphere (RaySpace* space,
     {
         const uint nscenes = 2;
         const char* const paths[2] = { "sphere1.obj", "sphere2.obj" };
-        const real dcoords[2] = { 0, 100 };
-        interpolate_by_file (&space->main.scene, nscenes, paths, dcoords);
+        const real dcoords[2] = { -0.001, 1.001 };
+        good = interpolate_by_file (&space->main.scene,
+                                    nscenes, paths, dcoords);
+        if (!good)  return false;
     }
 
     init_filled_RaySpace (space);

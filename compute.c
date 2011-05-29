@@ -121,6 +121,7 @@ void compute_rays_to_hits (RayImage* image,
         }
     }
 #ifdef TrivialMpiRayTrace
+    update_dynamic_RaySpace (space);
     cast_RayImage (image, space, origin, view_basis);
 #else
     rays_to_hits_balancer (image);
@@ -430,7 +431,7 @@ void rays_to_hits_computer (RayImage* restrict image,
     nrows = image->nrows;
     ncols = image->ncols;
 
-    setup_RayCastAPriori (&known, image, origin, view_basis, &space->main.box);
+    setup_RayCastAPriori (&known, image, origin, view_basis, &space->box);
 
     rows_computed = AllocT( uint, nrows );
 
@@ -456,9 +457,7 @@ void rays_to_hits_computer (RayImage* restrict image,
         UFor( i, row_nul )
             rows_computed[nrows_computed++] = row_off + i;
 
-        cast_partial_RayImage (image, row_off, row_nul,
-                               space, &known,
-                               origin, view_basis);
+        cast_partial_RayImage (image, row_off, row_nul, space, &known);
 
         dt = monotime () - t0;
 

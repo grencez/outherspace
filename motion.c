@@ -43,8 +43,10 @@ move_objects (RaySpace* space, ObjectMotion* motions, real dt)
     ObjectRaySpace* objects;
     real inc;
     uint i, nobjects;
+
     nobjects = space->nobjects;
     objects = space->objects;
+    update_dynamic_RaySpace (space);
 
     inc = dt / nincs;
 
@@ -86,7 +88,6 @@ move_object (RaySpace* space, ObjectMotion* motion, uint objidx, real dt)
     ObjectRaySpace* object;
     Point dir, veloc;
 
-        /* assert (!space->partition && "Partitioning the space for movement takes too long!"); */
     object = &space->objects[objidx];
 
         /* Rotate object.*/
@@ -224,12 +225,12 @@ detect_collision (const RaySpace* space,
             Point unit_dir;
 
             scale_Point (&unit_dir, &diff, 1 / distance);
-            inside_box = inside_BoundingBox (&space->main.box, &origin);
+            inside_box = inside_BoundingBox (&space->box, &origin);
 
-            cast_recurse (&tmp_hit, &tmp_mag, &tmp_object,
-                          &tmp_point, &tmp_point,
-                          space, &origin, &unit_dir,
-                          inside_box, objidx);
+            cast_nopartition (&tmp_hit, &tmp_mag, &tmp_object,
+                              &tmp_point, &tmp_point,
+                              space, &origin, &unit_dir,
+                              inside_box, objidx);
             if (tmp_mag < distance &&
                 tmp_mag < hit_mag)
             {
