@@ -9,6 +9,8 @@ static Point*
 random_Points (uint npts, const BoundingBox* box);
 static void
 random_Scene (Scene* scene, uint nelems, const BoundingBox* box);
+static void
+setup_camera_light (RaySpace* space, const Point* origin);
 
     bool
 setup_testcase_triangles (RaySpace* space,
@@ -43,6 +45,7 @@ setup_testcase_triangles (RaySpace* space,
          * (Obtained by pressing 'P' in the GUI.)
          */
     }
+    setup_camera_light (space, view_origin);
     return true;
 }
 
@@ -144,6 +147,7 @@ setup_testcase_track (RaySpace* space,
     view_basis->pts[2].coords[1] = (real) -0.57446;
     view_basis->pts[2].coords[2] = (real) -0.515942;
 
+    setup_camera_light (space, view_origin);
     return good;
 }
 
@@ -250,7 +254,7 @@ setup_testcase_manual_interp (RaySpace* space,
 #elif 0
 #endif
 
-
+    setup_camera_light (space, view_origin);
     return true;
 }
 
@@ -309,6 +313,7 @@ setup_testcase_sphere (RaySpace* space,
     }
 #endif
 
+    setup_camera_light (space, view_origin);
     output_BoundingBox (out, &space->main.box);
     return good;
 }
@@ -366,6 +371,8 @@ setup_testcase_4d_surface (RaySpace* space,
         view_origin->coords[3] = 0.5;
     }
 #endif
+
+    setup_camera_light (space, view_origin);
 
     return good;
 }
@@ -432,5 +439,16 @@ random_Scene (Scene* scene, uint nelems, const BoundingBox* box)
         UFor( pi, NDimensions )
             scene->elems[i].pts[pi] = pi + offset;
     }
+}
+
+
+    void
+setup_camera_light (RaySpace* space, const Point* origin)
+{
+    assert (space->nlights == 0);
+    space->nlights = 1;
+    space->lights = AllocT( PointLightSource, space->nlights );
+    init_PointLightSource (&space->lights[0]);
+    copy_Point (&space->lights[0].location, origin);
 }
 

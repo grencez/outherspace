@@ -11,10 +11,12 @@
 
 struct ray_space_struct;
 struct object_ray_space_struct;
+struct point_light_source_struct;
 struct ray_image_struct;
 struct ray_cast_a_priori_struct;
 typedef struct ray_space_struct RaySpace;
 typedef struct object_ray_space_struct ObjectRaySpace;
+typedef struct point_light_source_struct PointLightSource;
 typedef struct ray_image_struct RayImage;
 typedef struct ray_cast_a_priori_struct RayCastAPriori;
 
@@ -30,11 +32,19 @@ struct object_ray_space_struct
     KDTree tree;
 };
 
+struct point_light_source_struct
+{
+    Point location;
+    real intensity;
+};
+
 struct ray_space_struct
 {
     ObjectRaySpace main;
     uint nobjects;
+    uint nlights;
     ObjectRaySpace* objects;
+    PointLightSource* lights;
 
     bool partition;  /* When false, the below two are unused.*/
     KDTree object_tree;
@@ -65,15 +75,10 @@ struct ray_cast_a_priori_struct
     bool inside_box;
 };
 
-
-void
-fill_pixel (byte* ret_red, byte* ret_green, byte* ret_blue,
-            uint hit_idx,
-            real mag,
-            const RayImage* image,
-            const Point* origin,
-            const Point* dir,
-            const ObjectRaySpace* object);
+const ObjectRaySpace*
+ray_to_ObjectRaySpace (Point* ret_origin, Point* ret_dir,
+                       const Point* origin, const Point* dir,
+                       const RaySpace* space, uint objidx);
 
 #ifndef __OPENCL_VERSION__
 void
@@ -112,6 +117,8 @@ void
 init_RaySpace (RaySpace* space);
 void
 init_ObjectRaySpace (ObjectRaySpace* object);
+void
+init_PointLightSource (PointLightSource* light);
 void
 cleanup_RaySpace (RaySpace* space);
 void

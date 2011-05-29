@@ -12,7 +12,7 @@
 #include <gdk/gdkkeysyms.h>
 #include <SDL.h>
 
-    /* #define NRacers 10 */
+#define NRacers 10
 
 static const bool RenderDrawsPattern = false;
 static const bool ForceFauxFishEye = false;
@@ -572,18 +572,16 @@ static gboolean grab_mouse_fn (GtkWidget* da,
         uint hit_idx;
         real hit_mag;
         uint hit_object;
-        Point hit_origin, hit_dir;
         Point origin, dir;
 
         setup_RayCastAPriori (&priori, &ray_image,
                               &view_origin, &view_basis,
-                              &space->box);
+                              &space->main.box);
 
         ray_from_RayCastAPriori (&origin, &dir,
                                  &priori, row, col, &ray_image);
 
         cast_nopartition (&hit_idx, &hit_mag, &hit_object,
-                          &hit_origin, &hit_dir,
                           space, &origin, &dir,
                           priori.inside_box,
                           Max_uint);
@@ -898,9 +896,9 @@ int main (int argc, char* argv[])
 
     good =
 #if 0
-#elif 1
-        setup_testcase_triangles
 #elif 0
+        setup_testcase_triangles
+#elif 1
         setup_testcase_track
 #elif 0
         setup_testcase_4d_surface

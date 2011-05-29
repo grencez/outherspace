@@ -46,7 +46,6 @@ move_objects (RaySpace* space, ObjectMotion* motions, real dt)
 
     nobjects = space->nobjects;
     objects = space->objects;
-    update_dynamic_RaySpace (space);
 
     inc = dt / nincs;
 
@@ -219,16 +218,14 @@ detect_collision (const RaySpace* space,
         {
             uint tmp_hit;
             real tmp_mag;
-            Point tmp_point;
             uint tmp_object;
             bool inside_box;
             Point unit_dir;
 
             scale_Point (&unit_dir, &diff, 1 / distance);
-            inside_box = inside_BoundingBox (&space->box, &origin);
+            inside_box = inside_BoundingBox (&space->main.box, &origin);
 
             cast_nopartition (&tmp_hit, &tmp_mag, &tmp_object,
-                              &tmp_point, &tmp_point,
                               space, &origin, &unit_dir,
                               inside_box, objidx);
             if (tmp_mag < distance &&

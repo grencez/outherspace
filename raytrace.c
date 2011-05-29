@@ -68,6 +68,7 @@ init_RaySpace (RaySpace* space)
 {
     init_ObjectRaySpace (&space->main);
     space->nobjects = 0;
+    space->nlights = 0;
     init_KDTree (&space->object_tree);
     space->partition = true;
     zero_Point (&space->box.min_corner);
@@ -83,6 +84,13 @@ init_ObjectRaySpace (ObjectRaySpace* space)
     init_Scene (&space->scene);
     space->nelems = 0;
     init_KDTree (&space->tree);
+}
+
+    void
+init_PointLightSource (PointLightSource* light)
+{
+    zero_Point (&light->location);
+    light->intensity = 1;
 }
 
     void
@@ -145,6 +153,7 @@ cleanup_RaySpace (RaySpace* space)
     UFor( i, space->nobjects )
         cleanup_ObjectRaySpace (&space->objects[i]);
     if (space->nobjects > 0)  free (space->objects);
+    if (space->nlights > 0)  free (space->lights);
     cleanup_KDTree (&space->object_tree);
 }
 
@@ -430,14 +439,42 @@ map_vertex_normal (Point* normal,
     normalize_Point (normal, normal);
 }
 
+const ObjectRaySpace*
+ray_to_ObjectRaySpace (Point* ret_origin,
+                       Point* ret_dir,
+                       const Point* origin,
+                       const Point* dir,
+                       const RaySpace* space,
+                       uint objidx)
+{
+    const ObjectRaySpace* object;
+    assert (objidx <= space->nobjects);
+    if (objidx < space->nobjects)
+    {
+        object = &space->objects[objidx];
+        ray_to_basis (ret_origin, ret_dir,
+                      &object->orientation,
+                      origin, dir,
+                      &object->centroid,
+                      &object->box);
+    }
+    else
+    {
+        object = &space->main;
+        copy_Point (ret_origin, origin);
+        copy_Point (ret_dir, dir);
+    }
+    return object;
+}
+
+static
     void
 fill_pixel (byte* ret_red, byte* ret_green, byte* ret_blue,
-            uint hit_idx,
-            real mag,
+            uint hitidx, real mag, uint objidx,
             const RayImage* image,
             const Point* origin,
             const Point* dir,
-            const ObjectRaySpace* object)
+            const RaySpace* space)
 {
     const bool shade_by_element = false;
     const bool color_by_element = false;
@@ -445,13 +482,16 @@ fill_pixel (byte* ret_red, byte* ret_green, byte* ret_blue,
     const uint nincs = 256;
     byte rgb[3];
     const BarySimplex* simplex;
+    const ObjectRaySpace* object;
+    Point rel_origin, rel_dir;
     const Scene* scene;
     const SceneElement* elem;
     const Material* material = 0;
+    real cos_normal;
     Point bpoint, normal;
     uint i;
 
-    if (!object)
+    if (objidx > space->nobjects)
     {
         *ret_red = 0;
         *ret_green = 0;
@@ -459,10 +499,13 @@ fill_pixel (byte* ret_red, byte* ret_green, byte* ret_blue,
         return;
     }
 
-    simplex = &object->simplices[hit_idx];
+    object = ray_to_ObjectRaySpace (&rel_origin, &rel_dir,
+                                    origin, dir, space, objidx);
+                                    
+    simplex = &object->simplices[hitidx];
     scene = &object->scene;
 
-    elem = &scene->elems[hit_idx];
+    elem = &scene->elems[hitidx];
     if (elem->material != Max_uint)
         material = &scene->matls[elem->material];
 
@@ -503,27 +546,43 @@ fill_pixel (byte* ret_red, byte* ret_green, byte* ret_blue,
 
     if (compute_bary_coords)
     {
-        Point isect;
-
-        scale_Point (&isect, dir, mag);
-        summ_Point (&isect, &isect, origin);
+        Point rel_isect;
+        scale_Point (&rel_isect, &rel_dir, mag);
+        summ_Point (&rel_isect, &rel_isect, &rel_origin);
         bpoint.coords[0] = 1;
         UFor( i, NDimensions-1 )
         {
-            bpoint.coords[i+1] = distance_Plane (&simplex->barys[i], &isect);
+            bpoint.coords[i+1] =
+                distance_Plane (&simplex->barys[i], &rel_isect);
             bpoint.coords[0] -= bpoint.coords[i+1];
         }
     }
+
+        /* Get the normal.*/
     if (compute_bary_coords && 0 < scene->nvnmls)
         map_vertex_normal (&normal, scene->vnmls, elem, &bpoint);
     else
         copy_Point (&normal, &simplex->plane.normal);
+        /* Rotate it when necessary.*/
+    if (objidx != space->nobjects)
+    {
+        Point tmp;
+        trxfrm_Point (&tmp, &object->orientation, &normal);
+        copy_Point (&normal, &tmp);
+    }
+
+        /* Assure the normal is in our direction.*/
+    cos_normal = dot_Point (dir, &normal);
+    if (cos_normal < 0)
+        cos_normal = - cos_normal;
+    else
+        negate_Point (&normal, &normal);
 
     if (color_by_element)
     {
         uint color_diff, x, y;
         color_diff = 0xFFFFFF / scene->nelems;
-        x = color_diff * (scene->nelems - hit_idx);
+        x = color_diff * (scene->nelems - hitidx);
         y = 0;
 
         UFor( i, 3 )
@@ -564,32 +623,49 @@ fill_pixel (byte* ret_red, byte* ret_green, byte* ret_blue,
     if (shade_by_element)
     {
         real scale = 0;
-        scale = 1 - (real) hit_idx / scene->nelems;
+        scale = 1 - (real) hitidx / scene->nelems;
         UFor( i, 3 )
             rgb[i] *= scale;
     }
     else if (image->shading_on)
     {
-        real dscale, sscale;
+        Point isect, refldir;
+        real dscale = 0, sscale = 0;
 
-        dscale = dot_Point (dir, &normal);
-        if (dscale < 0)  dscale = -dscale;
-        if (dscale > 1)  dscale = 1;
+        scale_Point (&isect, dir, mag);
+        summ_Point (&isect, &isect, origin);
 
-            /* Specular */
-        if (material)
+        scale_Point (&refldir, &normal, 2 * cos_normal);
+        summ_Point (&refldir, dir, &refldir);
+
+        UFor( i, space->nlights )
         {
-            Point refldir;
-            scale_Point (&refldir, &normal,
-                         2 * dot_Point (&normal, dir));
-            diff_Point (&refldir, dir, &refldir);
-            sscale = - dot_Point (&refldir, dir);
-            sscale = clamp_real (sscale, 0, 1);
-            sscale = pow (sscale, material->shininess);
-        }
-        else
-        {
-            sscale = 0;
+            real tscale;
+            Point tolight;
+            const PointLightSource* light;
+
+            light = &space->lights[i];
+            diff_Point (&tolight, &light->location, &isect);
+            normalize_Point (&tolight, &tolight);
+
+            tscale = dot_Point (&tolight, &normal);
+            if (tscale > 0)
+            {
+                    /* Add diffuse portion.*/
+                dscale += tscale * light->intensity;
+
+                    /* Specular */
+                if (material)
+                {
+                    real dot;
+                    dot = dot_Point (&refldir, &tolight);
+                    if (dot > 0)
+                    {
+                        tscale = pow (dot, material->shininess);
+                        sscale += tscale * light->intensity;
+                    }
+                }
+            }
         }
 
         UFor( i, 3 )
@@ -610,8 +686,8 @@ fill_pixel (byte* ret_red, byte* ret_green, byte* ret_blue,
 
             if (material)
             {
-                ambient *= material->ambient[i];
-                diffuse *= material->diffuse[i];
+                ambient = material->ambient[i];
+                diffuse = material->diffuse[i];
                 specular = material->specular[i];
             }
 
@@ -785,8 +861,6 @@ static
 cast_nopartition (uint* ret_hit,
                   real* ret_mag,
                   uint* ret_object,
-                  Point* ret_origin,
-                  Point* ret_dir,
                   const RaySpace* restrict space,
                   const Point* restrict origin,
                   const Point* restrict dir,
@@ -796,12 +870,9 @@ cast_nopartition (uint* ret_hit,
     uint i;
     uint hit_idx;
     real hit_mag;
-    Point hit_origin, hit_dir;
     uint hit_object;
 
     hit_object = Max_uint;
-    copy_Point (&hit_origin, origin);
-    copy_Point (&hit_dir, dir);
 
     cast_ray (&hit_idx, &hit_mag, origin, dir,
               space->main.nelems,
@@ -818,7 +889,7 @@ cast_nopartition (uint* ret_hit,
 
     UFor( i, space->nobjects )
     {
-        Point diff, rel_origin, rel_dir;
+        Point rel_origin, rel_dir;
         const ObjectRaySpace* object;
         bool rel_inside_box;
             /* Returns from ray cast.*/
@@ -827,16 +898,8 @@ cast_nopartition (uint* ret_hit,
 
         if (i == ignore_object)  continue;
 
-        object = &space->objects[i];
-
-        diff_Point (&diff, origin, &object->centroid);
-        xfrm_Point (&rel_origin, &object->orientation, &diff);
-        summ_Point (&diff, &object->box.min_corner,
-                    &object->box.max_corner);
-        scale_Point (&diff, &diff, 0.5);
-        summ_Point (&rel_origin, &rel_origin, &diff);
-
-        xfrm_Point (&rel_dir, &object->orientation, dir);
+        object = ray_to_ObjectRaySpace (&rel_origin, &rel_dir,
+                                        origin, dir, space, i);
 
         rel_inside_box =
             inside_BoundingBox (&object->box, &rel_origin);
@@ -852,19 +915,12 @@ cast_nopartition (uint* ret_hit,
             hit_idx = tmp_hit;
             hit_mag = tmp_mag;
             hit_object = i;
-            copy_Point (&hit_origin, &rel_origin);
-            copy_Point (&hit_dir, &rel_dir);
         }
     }
 
     *ret_hit = hit_idx;
     *ret_mag = hit_mag;
     *ret_object = hit_object;
-    if (hit_object <= space->nobjects)
-    {
-        copy_Point (ret_origin, &hit_origin);
-        copy_Point (ret_dir, &hit_dir);
-    }
 }
 
 
@@ -873,8 +929,6 @@ static
 test_object_intersections (uint* ret_hit,
                            real* ret_mag,
                            uint* ret_object,
-                           Point* ret_origin,
-                           Point* ret_dir,
                            BitString* tested,
                            const Point* origin,
                            const Point* dir,
@@ -887,7 +941,7 @@ test_object_intersections (uint* ret_hit,
     UFor( i, nobjectidcs )
     {
         uint objidx;
-        Point diff, rel_origin, rel_dir;
+        Point rel_origin, rel_dir;
         const ObjectRaySpace* object;
         bool rel_inside_box;
             /* Returns from ray cast.*/
@@ -897,25 +951,8 @@ test_object_intersections (uint* ret_hit,
         objidx = objectidcs[i];
         if (set1_BitString (tested, objidx))  continue;
 
-        if (objidx < space->nobjects)
-        {
-            object = &space->objects[objidx];
-            diff_Point (&diff, origin, &object->centroid);
-            xfrm_Point (&rel_origin, &object->orientation, &diff);
-            summ_Point (&diff, &object->box.min_corner,
-                        &object->box.max_corner);
-            scale_Point (&diff, &diff, 0.5);
-            summ_Point (&rel_origin, &rel_origin, &diff);
-
-            xfrm_Point (&rel_dir, &object->orientation, dir);
-
-        }
-        else
-        {
-            object = &space->main;
-            copy_Point (&rel_origin, origin);
-            copy_Point (&rel_dir, dir);
-        }
+        object = ray_to_ObjectRaySpace (&rel_origin, &rel_dir,
+                                        origin, dir, space, objidx);
 
         rel_inside_box =
             inside_BoundingBox (&object->box, &rel_origin);
@@ -931,8 +968,6 @@ test_object_intersections (uint* ret_hit,
             *ret_hit = tmp_hit;
             *ret_mag = tmp_mag;
             *ret_object = objidx;
-            copy_Point (ret_origin, &rel_origin);
-            copy_Point (ret_dir, &rel_dir);
         }
     }
 
@@ -952,8 +987,6 @@ static
 cast_partitioned (uint* ret_hit,
                   real* ret_mag,
                   uint* ret_object,
-                  Point* ret_origin,
-                  Point* ret_dir,
                   const RaySpace* restrict space,
                   const Point* restrict origin,
                   const Point* restrict dir,
@@ -969,7 +1002,6 @@ cast_partitioned (uint* ret_hit,
     const uint* restrict elemidcs;
     uint hit_idx;
     real hit_mag;
-    Point hit_origin, hit_dir;
     uint hit_object;
 
     assert (space->nobjects < ntestedbits);
@@ -984,8 +1016,6 @@ cast_partitioned (uint* ret_hit,
     hit_idx = Max_uint;
     hit_mag = Max_real;
     hit_object = Max_uint;
-    copy_Point (&hit_origin, origin);
-    copy_Point (&hit_dir, dir);
 
     if (inside_box)
     {
@@ -1017,7 +1047,7 @@ cast_partitioned (uint* ret_hit,
         leaf = &nodes[node_idx].as.leaf;
         hit_in_leaf =
             test_object_intersections (&hit_idx, &hit_mag, &hit_object,
-                                       &hit_origin, &hit_dir, tested,
+                                       tested,
                                        origin, dir, leaf->nelems,
                                        &elemidcs[leaf->elemidcs],
                                        space, &leaf->box);
@@ -1031,8 +1061,6 @@ cast_partitioned (uint* ret_hit,
     *ret_hit = hit_idx;
     *ret_mag = hit_mag;
     *ret_object = hit_object;
-    copy_Point (ret_origin, &hit_origin);
-    copy_Point (ret_dir, &hit_dir);
 }
 
 
@@ -1051,19 +1079,13 @@ cast_record (uint* hitline,
     uint hit_idx;
     real hit_mag;
     uint hit_object;
-    Point hit_origin;
-    Point hit_dir;
 
-    copy_Point (&hit_origin, origin);
-    copy_Point (&hit_dir, dir);
     if (space->partition)
         cast_partitioned (&hit_idx, &hit_mag, &hit_object,
-                          &hit_origin, &hit_dir,
                           space, origin, dir, inside_box,
                           Max_uint);
     else
         cast_nopartition (&hit_idx, &hit_mag, &hit_object,
-                          &hit_origin, &hit_dir,
                           space, origin, dir, inside_box,
                           Max_uint);
 
@@ -1071,15 +1093,10 @@ cast_record (uint* hitline,
     if (magline)  magline[col] = hit_mag;
     if (pixline)
     {
-        const ObjectRaySpace* object = 0;
         byte red, green, blue;
-        if (hit_object < space->nobjects)
-            object = &space->objects[hit_object];
-        else if (hit_object == space->nobjects)
-            object = &space->main;
         fill_pixel (&red, &green, &blue,
-                    hit_idx, hit_mag, image, &hit_origin, &hit_dir,
-                    object);
+                    hit_idx, hit_mag, hit_object,
+                    image, origin, dir, space);
         pixline[3*col+0] = red;
         pixline[3*col+1] = green;
         pixline[3*col+2] = blue;
