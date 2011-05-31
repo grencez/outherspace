@@ -4,7 +4,7 @@
 #include "scene.h"
 
 bool
-readin_wavefront (Scene* scene, const char* filename);
+readin_wavefront (Scene* scene, const char* pathname, const char* filename);
 
 #ifdef INCLUDE_SOURCE
 #include "wavefront-file.c"

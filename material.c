@@ -14,15 +14,16 @@ void init_Material (Material* mat)
         mat->transmission[i] = 1;
     }
 
-    mat->alpha = 1;
+    mat->opacity = 1;
     mat->shininess = 0;
+    mat->optical_density = 1;
     mat->illumination = 1;
     mat->ambient_texture = Max_uint;
     mat->diffuse_texture = Max_uint;
 }
 
     void
-map_Texture (byte* colors, const Texture* texture, const BaryPoint* p)
+map_Texture (real* colors, const Texture* texture, const BaryPoint* p)
 {
     uint i, row, col;
     const byte* pixels;
@@ -41,6 +42,6 @@ map_Texture (byte* colors, const Texture* texture, const BaryPoint* p)
 
     pixels = &texture->pixels[NColors * (col + row * texture->ncols)];
     UFor( i, NColors )
-        colors[i] = pixels[i];
+        colors[i] = (real) pixels[i] / 255;
 }
 

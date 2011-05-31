@@ -19,8 +19,9 @@ struct material_struct
     real diffuse[NColors]; /* Kd */
     real specular[NColors]; /* Ks */
     real transmission[NColors]; /* Tf */
-    real alpha; /* d */
+    real opacity; /* d */
     real shininess; /* Ns */
+    real optical_density; /* Ni */
     bool illumination;
     uint ambient_texture;
     uint diffuse_texture;
@@ -29,7 +30,7 @@ typedef struct material_struct Material;
     
 void init_Material (Material* mat);
 void
-map_Texture (byte* colors, const Texture* texture, const BaryPoint* p);
+map_Texture (real* colors, const Texture* texture, const BaryPoint* p);
 
 #ifdef INCLUDE_SOURCE
 #include "material.c"

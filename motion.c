@@ -183,18 +183,14 @@ detect_collision (const RaySpace* space,
                   const PointXfrm* new_orientation)
 {
     uint i;
-    uint hit_idx;
-    real hit_mag;
-    uint hit_object;
+    uint hit_idx = Max_uint;
+    real hit_mag = Max_real;
+    uint hit_object = Max_uint;
     const ObjectRaySpace* object;
     const Scene* scene;
 
     object = &space->objects[objidx];
     scene = &object->scene;
-
-    hit_idx = Max_uint;
-    hit_mag = Max_real;
-    hit_object = Max_uint;
 
     UFor( i, scene->nverts )
     {
@@ -225,6 +221,9 @@ detect_collision (const RaySpace* space,
             scale_Point (&unit_dir, &diff, 1 / distance);
             inside_box = inside_BoundingBox (&space->main.box, &origin);
 
+            tmp_hit = Max_uint;
+            tmp_mag = distance;
+            tmp_object = Max_uint;
             cast_nopartition (&tmp_hit, &tmp_mag, &tmp_object,
                               space, &origin, &unit_dir,
                               inside_box, objidx);

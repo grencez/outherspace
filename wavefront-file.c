@@ -9,12 +9,14 @@
 
 static bool
 streql (const void* a, const void* b);
+static void
+fixup_wavefront_Point (Point* p);
 static bool
 strto_real_colors (real* a, const char* line);
 static bool
 readin_materials (SList* matlist, SList* namelist,
                   SList* texlist, SList* texnamelist,
-                  const char* filename);
+                  const char* pathname, const char* filename);
 
 static const char*
 parse_face_field (uint* v, uint* vt, uint* vn, const char* line);
@@ -28,8 +30,28 @@ streql (const void* a, const void* b)
     return 0 == strcmp ((char*) a, (char*) b);
 }
 
+    void
+fixup_wavefront_Point (Point* p)
+{
+    Point a;
+    copy_Point (&a, p);
+    p->coords[0] = a.coords[1];
+    p->coords[1] = a.coords[2];
+    p->coords[2] = a.coords[0];
+}
+
+    void
+fixup_wavefront_Scene (Scene* scene)
+{
+    uint i;
+    UFor( i, scene->nverts )
+        fixup_wavefront_Point (&scene->verts[i]);
+    UFor( i, scene->nvnmls )
+        fixup_wavefront_Point (&scene->vnmls[i]);
+}
+
     bool
-readin_wavefront (Scene* scene, const char* filename)
+readin_wavefront (Scene* scene, const char* pathname, const char* filename)
 {
     const uint ndims = 3;
     uint line_no = 0;
@@ -46,7 +68,7 @@ readin_wavefront (Scene* scene, const char* filename)
 
     buf[len-1] = 0;
 
-    in = fopen (filename, "rb");
+    in = fopen_path (pathname, filename, "rb");
     if (!in)  return false;
 
     init_SList (&elemlist);
@@ -151,12 +173,15 @@ readin_wavefront (Scene* scene, const char* filename)
                 elem.pts[1] = elem.pts[2];
                 elem.txpts[1] = elem.txpts[2];
             }
+            if (!good)
+                fprintf (stderr, "Line:%u  Failed to read face!\n", line_no);
         }
         else if (0 == strncmp (line, "mtllib", 6))
         {
             line = strskip_ws (&line[6]);
             good = readin_materials (&matlist, &matnamelist,
-                                     &texlist, &texnamelist, line);
+                                     &texlist, &texnamelist,
+                                     pathname, line);
             if (!good)
             {
                 fprintf (stderr, "Line:%u  Failed to read materials!\n",
@@ -241,7 +266,13 @@ parse_face_field (uint* v, uint* vt, uint* vn, const char* line)
     {
         *v -= 1;
         if (line[0] == '/')
-            line = strto_uint (vt, &line[1]);
+        {
+            const char* tmpline;
+            tmpline = strto_uint (vt, &line[1]);
+                /* Skip texture coord if need be.*/
+            if (tmpline)  line = tmpline;
+            else          line = &line[1];
+        }
     }
     if (line)
     {
@@ -278,7 +309,7 @@ strto_real_colors (real* a, const char* line)
     bool
 readin_materials (SList* matlist, SList* namelist,
                   SList* texlist, SList* texnamelist,
-                  const char* filename)
+                  const char* pathname, const char* filename)
 {
     uint line_no = 0;
     uint len = BUFSIZ;
@@ -293,10 +324,10 @@ readin_materials (SList* matlist, SList* namelist,
     init_Material (material);
 
     assert (matlist->nmembs == namelist->nmembs);
-    in = fopen (filename, "rb");
+    in = fopen_path (pathname, filename, "rb");
     if (!in)
     {
-        fprintf (stderr, "Could not open file:%s\n", filename);
+        fprintf (stderr, "Could not open file:%s/%s\n", pathname, filename);
         return false;
     }
 
@@ -330,9 +361,14 @@ readin_materials (SList* matlist, SList* namelist,
             line = strto_real (&material->shininess, &line[2]);
             if (!line)  good = false;
         }
+        else if (0 == strncmp (line, "Ni", 2))
+        {
+            line = strto_real (&material->optical_density, &line[2]);
+            if (!line)  good = false;
+        }
         else if (0 == strncmp (line, "d", 1))
         {
-            line = strto_real (&material->alpha, &line[1]);
+            line = strto_real (&material->opacity, &line[1]);
             if (!line)  good = false;
         }
         else if (0 == strncmp (line, "Tf", 2))

@@ -38,6 +38,19 @@ static void
 init_RaySpace_KDTreeGrid (KDTreeGrid* grid, const RaySpace* space);
 
 static void
+cast_colors (real* ret_colors,
+             const RaySpace* restrict space,
+             const RayImage* restrict image,
+             const Point* restrict origin,
+             const Point* restrict dir,
+             const real* factors,
+             uint nbounces);
+static bool
+cast_to_light (const RaySpace* restrict space,
+               const Point* restrict origin,
+               const Point* restrict dir,
+               real magtolight);
+static void
 setup_ray_pixel_deltas_orthographic (Point* dir_start,
                                      Point* row_delta,
                                      Point* col_delta,
@@ -332,6 +345,7 @@ void init_RayImage (RayImage* image)
     image->view_light = 0;
     image->shading_on = true;
     image->color_distance_on = false;
+    image->nbounces_max = 2;
 }
 
 void resize_RayImage (RayImage* image)
@@ -469,78 +483,111 @@ ray_to_ObjectRaySpace (Point* ret_origin,
 
 static
     void
-fill_pixel (byte* ret_red, byte* ret_green, byte* ret_blue,
+refraction_ray (Point* dst, const Point* dir, const Point* normal,
+                real r, bool entering, real cos_normal)
+{
+    Point a, b;
+    real d;
+    if (r == 1)
+    {
+        copy_Point (dst, dir);
+        return;
+    }
+        /*        dir
+         *  A = -------
+         *      ||N*D||
+         */
+    scale_Point (&a, dir, 1 / cos_normal);
+        /* B = A + N */
+    summ_Point (&b, &a, normal);
+        /*                    1
+         *  d = ------------------------------------
+         *      sqrt(((r1/r2)^2 * ||A||^2) - ||B||^2)
+         */
+    if (!entering)  r = 1 / r;
+    d = r * r * dot_Point (&a, &a) - dot_Point (&b, &b);
+    d = 1 / sqrt (d);
+        /* dst = d*A + (1-d)(-N) */
+    scale_Point (&a, &a, d);
+    scale_Point (&b, normal, d-1);
+    summ_Point (dst, &a, &b);
+}
+
+static
+    void
+fill_pixel (real* ret_colors,
             uint hitidx, real mag, uint objidx,
             const RayImage* image,
             const Point* origin,
             const Point* dir,
-            const RaySpace* space)
+            const RaySpace* space,
+            uint nbounces)
 {
+    const real offset_factor = 1e2 * Epsilon_real;
+    real offset;
     const bool shade_by_element = false;
     const bool color_by_element = false;
     const bool compute_bary_coords = true;
-    const uint nincs = 256;
-    byte rgb[3];
+    real colors[NColors];
     const BarySimplex* simplex;
     const ObjectRaySpace* object;
     Point rel_origin, rel_dir;
     const Scene* scene;
     const SceneElement* elem;
     const Material* material = 0;
+    bool hit_front;
     real cos_normal;
     Point bpoint, normal;
     uint i;
 
     if (objidx > space->nobjects)
     {
-        *ret_red = 0;
-        *ret_green = 0;
-        *ret_blue = 0;
+        UFor( i, NColors )  ret_colors[i] = 0;
         return;
     }
+
+    if (mag <= 1)  offset = offset_factor;
+    else           offset = mag * offset_factor;
 
     object = ray_to_ObjectRaySpace (&rel_origin, &rel_dir,
                                     origin, dir, space, objidx);
                                     
     simplex = &object->simplices[hitidx];
+    hit_front = (0 >= dot_Point (&rel_dir, &simplex->plane.normal));
+
     scene = &object->scene;
 
     elem = &scene->elems[hitidx];
     if (elem->material != Max_uint)
         material = &scene->matls[elem->material];
 
-    UFor( i, 3 )  rgb[i] = nincs-1;
+    UFor( i, NColors )  colors[i] = 1;
 
     if (image->color_distance_on && mag < image->view_light)
     {
-        uint val;
-        UFor( i, 3 )  rgb[i] = 0;
+        real val;
             /* Distance color scale.*/
-        val = (uint) (5 * nincs * (mag / image->view_light));
-        if (val < nincs)
+        UFor( i, NColors )  colors[i] = 0;
+        val = 2 * NColors * mag / image->view_light;
+        UFor( i, 2*NColors )
         {
-            rgb[0] = nincs - 1;
-            rgb[1] = val - 0 * nincs;
-        }
-        else if (val < 2 * nincs)
-        {
-            rgb[0] =  2 * nincs - val - 1;
-            rgb[1] =  nincs - 1;
-        }
-        else if (val < 3 * nincs)
-        {
-            rgb[1] = nincs - 1;
-            rgb[2] = val - 2 * nincs;
-        }
-        else if (val < 4 * nincs)
-        {
-            rgb[1] = 4 * nincs - val - 1;
-            rgb[2] = nincs - 1;
-        }
-        else if (val < 5 * nincs)
-        {
-            rgb[2] = nincs - 1;
-            rgb[0] = val - 4 * nincs;
+            if (val < i+1)
+            {
+                uint idx1, idx2;
+                idx1 = i / 2;
+                idx2 = (idx1 + 1) % NColors;
+                if (even_uint (i))
+                {
+                    colors[idx1] = 1;
+                    colors[idx2] = val - i;
+                }
+                else
+                {
+                    colors[idx1] = i+1 - val;
+                    colors[idx2] = 1;
+                }
+                break;
+            }
         }
     }
 
@@ -573,7 +620,7 @@ fill_pixel (byte* ret_red, byte* ret_green, byte* ret_blue,
 
         /* Assure the normal is in our direction.*/
     cos_normal = dot_Point (dir, &normal);
-    if (cos_normal < 0)
+    if (hit_front)
         cos_normal = - cos_normal;
     else
         negate_Point (&normal, &normal);
@@ -581,6 +628,8 @@ fill_pixel (byte* ret_red, byte* ret_green, byte* ret_blue,
     if (color_by_element)
     {
         uint color_diff, x, y;
+        const uint nincs = 256;
+        assert (NColors == 3);
         color_diff = 0xFFFFFF / scene->nelems;
         x = color_diff * (scene->nelems - hitidx);
         y = 0;
@@ -594,16 +643,16 @@ fill_pixel (byte* ret_red, byte* ret_green, byte* ret_blue,
                     y |= (1 << (8*i + j));
             }
         }
-        rgb[0] = (byte) ((y & 0xFF0000) >> 16);
-        rgb[1] = (byte) ((y & 0x00FF00) >>  8);
-        rgb[2] = (byte) ((y & 0x0000FF) >>  0);
+        colors[0] *= (real) ((y & 0xFF0000) >> 16) / (nincs-1);
+        colors[1] *= (real) ((y & 0x00FF00) >>  8) / (nincs-1);
+        colors[2] *= (real) ((y & 0x0000FF) >>  0) / (nincs-1);
     }
     else if (material && material->ambient_texture != Max_uint)
     {
             /* Texture mapping.*/
         const Texture* ambient_texture;
         BaryPoint texpoint;
-
+        assert (NColors == 3);
         ambient_texture = &scene->txtrs[material->ambient_texture];
         UFor( i, NDimensions-1 )
             texpoint.coords[i] = 0;
@@ -617,18 +666,20 @@ fill_pixel (byte* ret_red, byte* ret_green, byte* ret_blue,
             UFor( j, NDimensions-1 )
                 texpoint.coords[j] += bpoint.coords[i] * tmp->coords[j];
         }
-        map_Texture (rgb, ambient_texture, &texpoint);
+        map_Texture (colors, ambient_texture, &texpoint);
     }
 
     if (shade_by_element)
     {
         real scale = 0;
         scale = 1 - (real) hitidx / scene->nelems;
-        UFor( i, 3 )
-            rgb[i] *= scale;
+        UFor( i, NColors )
+            colors[i] *= scale;
     }
     else if (image->shading_on)
     {
+        bool transparent = false;
+        bool reflective = false;
         Point isect, refldir;
         real dscale = 0, sscale = 0;
 
@@ -640,35 +691,44 @@ fill_pixel (byte* ret_red, byte* ret_green, byte* ret_blue,
 
         UFor( i, space->nlights )
         {
-            real tscale;
+            real tscale, magtolight;
             Point tolight;
             const PointLightSource* light;
 
             light = &space->lights[i];
             diff_Point (&tolight, &light->location, &isect);
-            normalize_Point (&tolight, &tolight);
+
+            magtolight = magnitude_Point (&tolight);
+            scale_Point (&tolight, &tolight, 1 / magtolight);
 
             tscale = dot_Point (&tolight, &normal);
             if (tscale > 0)
             {
-                    /* Add diffuse portion.*/
-                dscale += tscale * light->intensity;
-
-                    /* Specular */
-                if (material)
+                Point tmp_origin;
+                scale_Point (&tmp_origin, &tolight, offset);
+                magtolight -= offset;
+                summ_Point (&tmp_origin, &tmp_origin, &isect);
+                if (cast_to_light (space, &tmp_origin, &tolight, magtolight))
                 {
-                    real dot;
-                    dot = dot_Point (&refldir, &tolight);
-                    if (dot > 0)
+                        /* Add diffuse portion.*/
+                    dscale += tscale * light->intensity;
+
+                        /* Specular */
+                    if (material)
                     {
-                        tscale = pow (dot, material->shininess);
-                        sscale += tscale * light->intensity;
+                        real dot;
+                        dot = dot_Point (&refldir, &tolight);
+                        if (dot > 0)
+                        {
+                            tscale = pow (dot, material->shininess);
+                            sscale += tscale * light->intensity;
+                        }
                     }
                 }
             }
         }
 
-        UFor( i, 3 )
+        UFor( i, NColors )
         {
             real ambient, diffuse, specular;
             real tscale;
@@ -689,18 +749,49 @@ fill_pixel (byte* ret_red, byte* ret_green, byte* ret_blue,
                 ambient = material->ambient[i];
                 diffuse = material->diffuse[i];
                 specular = material->specular[i];
+                if (specular > 0)  reflective = true;
             }
 
             tscale = ambient + diffuse * dscale + specular * sscale;
+            if (material && material->opacity > 0)
+            {
+                transparent = true;
+                tscale *= material->opacity;
+            }
             tscale = clamp_real (tscale, 0, 1);
 
-            rgb[i] = (byte) (tscale * rgb[i]);
+            colors[i] *= tscale;
+        }
+
+        if (transparent)
+        {
+            Point tmp_origin, tmp_dir;
+            real factors[NColors];
+            UFor( i, NColors )
+                factors[i] = ((1-material->opacity)
+                              * material->transmission[i]);
+            refraction_ray (&tmp_dir, dir, &normal,
+                            material->optical_density, hit_front, cos_normal);
+
+            scale_Point (&tmp_origin, &tmp_dir, offset);
+            summ_Point (&tmp_origin, &tmp_origin, &isect);
+            cast_colors (colors, space, image, &tmp_origin, &tmp_dir,
+                         factors, nbounces);
+        }
+        if (reflective)
+        {
+            Point tmp_origin;
+            real factors[NColors];
+            UFor( i, NColors )
+                factors[i] = (material->opacity * material->specular[i]);
+            scale_Point (&tmp_origin, &refldir, offset);
+            summ_Point (&tmp_origin, &tmp_origin, &isect);
+            cast_colors (colors, space, image, &tmp_origin, &refldir,
+                         factors, nbounces);
         }
     }
 
-    *ret_red = rgb[0];
-    *ret_green = rgb[1];
-    *ret_blue = rgb[2];
+    UFor( i, NColors )  ret_colors[i] += colors[i];
 }
 
 
@@ -801,8 +892,8 @@ cast_ray (uint* restrict ret_hit, real* restrict ret_mag,
 
     entrance = &salo_entrance;
 
-    hit_mag = Max_real;
-    hit_idx = nelems;
+    hit_idx = *ret_hit;
+    hit_mag = *ret_mag;
 
     if (!KDTreeRayTrace)
     {
@@ -824,11 +915,7 @@ cast_ray (uint* restrict ret_hit, real* restrict ret_mag,
     else
     {
         if (! hit_outer_BoundingBox (entrance, box, origin, dir))
-        {
-            *ret_hit = nelems;
-            *ret_mag = Max_real;
             return;
-        }
         node_idx = 0;
     }
 
@@ -872,7 +959,9 @@ cast_nopartition (uint* ret_hit,
     real hit_mag;
     uint hit_object;
 
-    hit_object = Max_uint;
+    hit_idx = *ret_hit;
+    hit_mag = *ret_mag;
+    hit_object = *ret_object;
 
     cast_ray (&hit_idx, &hit_mag, origin, dir,
               space->main.nelems,
@@ -904,6 +993,8 @@ cast_nopartition (uint* ret_hit,
         rel_inside_box =
             inside_BoundingBox (&object->box, &rel_origin);
 
+        tmp_hit = Max_uint;
+        tmp_mag = *ret_mag;
         cast_ray (&tmp_hit, &tmp_mag, &rel_origin, &rel_dir,
                   object->nelems, object->tree.elemidcs,
                   object->tree.nodes,
@@ -957,6 +1048,8 @@ test_object_intersections (uint* ret_hit,
         rel_inside_box =
             inside_BoundingBox (&object->box, &rel_origin);
 
+        tmp_hit = Max_uint;
+        tmp_mag = *ret_mag;
         cast_ray (&tmp_hit, &tmp_mag, &rel_origin, &rel_dir,
                   object->nelems, object->tree.elemidcs,
                   object->tree.nodes,
@@ -1013,9 +1106,9 @@ cast_partitioned (uint* ret_hit,
     nodes = space->object_tree.nodes;
     elemidcs = space->object_tree.elemidcs;
 
-    hit_idx = Max_uint;
-    hit_mag = Max_real;
-    hit_object = Max_uint;
+    hit_idx = *ret_hit;;
+    hit_mag = *ret_mag;
+    hit_object = *ret_object;
 
     if (inside_box)
     {
@@ -1028,12 +1121,7 @@ cast_partitioned (uint* ret_hit,
     else
     {
         if (! hit_outer_BoundingBox (entrance, &space->box, origin, dir))
-        {
-            *ret_hit = hit_idx;
-            *ret_mag = hit_mag;
-            *ret_object = hit_object;
             return;
-        }
         node_idx = 0;
     }
 
@@ -1063,6 +1151,74 @@ cast_partitioned (uint* ret_hit,
     *ret_object = hit_object;
 }
 
+    void
+cast_colors (real* ret_colors,
+             const RaySpace* restrict space,
+             const RayImage* restrict image,
+             const Point* restrict origin,
+             const Point* restrict dir,
+             const real* factors,
+             uint nbounces)
+{
+    uint i;
+    real colors[NColors];
+    uint hit_idx = Max_uint;
+    real hit_mag = Max_real;
+    uint hit_object = Max_uint;
+    bool inside_box;
+
+    if (nbounces >= image->nbounces_max)  return;
+
+    if (space->partition)
+    {
+        inside_box = inside_BoundingBox (&space->box, origin);
+        cast_partitioned (&hit_idx, &hit_mag, &hit_object,
+                          space, origin, dir, inside_box,
+                          Max_uint);
+    }
+    else
+    {
+        inside_box = inside_BoundingBox (&space->main.box, origin);
+        cast_nopartition (&hit_idx, &hit_mag, &hit_object,
+                          space, origin, dir, inside_box,
+                          Max_uint);
+    }
+
+    UFor( i, NColors )  colors[i] = 0;
+    fill_pixel (colors, hit_idx, hit_mag, hit_object,
+                image, origin, dir, space, nbounces+1);
+    UFor( i, NColors )  ret_colors[i] += factors[i] * colors[i];
+}
+
+    bool
+cast_to_light (const RaySpace* restrict space,
+               const Point* restrict origin,
+               const Point* restrict dir,
+               real magtolight)
+{
+    uint hit_idx = Max_uint;
+    real hit_mag;
+    uint hit_object = Max_uint;
+    bool inside_box;
+    hit_mag = magtolight;
+
+    if (space->partition)
+    {
+        inside_box = inside_BoundingBox (&space->box, origin);
+        cast_partitioned (&hit_idx, &hit_mag, &hit_object,
+                          space, origin, dir, inside_box,
+                          Max_uint);
+    }
+    else
+    {
+        inside_box = inside_BoundingBox (&space->main.box, origin);
+        cast_nopartition (&hit_idx, &hit_mag, &hit_object,
+                          space, origin, dir, inside_box,
+                          Max_uint);
+    }
+    return hit_object > space->nobjects;
+}
+
 
 static
     void
@@ -1076,9 +1232,9 @@ cast_record (uint* hitline,
              const Point* restrict dir,
              bool inside_box)
 {
-    uint hit_idx;
-    real hit_mag;
-    uint hit_object;
+    uint hit_idx = Max_uint;
+    real hit_mag = Max_real;
+    uint hit_object = Max_uint;
 
     if (space->partition)
         cast_partitioned (&hit_idx, &hit_mag, &hit_object,
@@ -1093,13 +1249,16 @@ cast_record (uint* hitline,
     if (magline)  magline[col] = hit_mag;
     if (pixline)
     {
-        byte red, green, blue;
-        fill_pixel (&red, &green, &blue,
-                    hit_idx, hit_mag, hit_object,
-                    image, origin, dir, space);
-        pixline[3*col+0] = red;
-        pixline[3*col+1] = green;
-        pixline[3*col+2] = blue;
+        uint i;
+        real colors[NColors];
+        UFor( i, NColors )  colors[i] = 0;
+        fill_pixel (colors, hit_idx, hit_mag, hit_object,
+                    image, origin, dir, space, 0);
+        UFor( i, NColors )
+        {
+            pixline[3*col+i] = (byte)
+                clamp_real (255.5 * colors[i], 0, 255.5);
+        }
     }
 }
 
@@ -1249,6 +1408,8 @@ rays_to_hits_fixed_plane (uint* hits, real* mags,
             diff_Point (&dir, &dir, &origin);
             normalize_Point (&dir, &dir);
 
+            hit = object->nelems;
+            mag = Max_real;
             cast_ray (&hit, &mag,
                       &origin, &dir,
                       object->nelems,

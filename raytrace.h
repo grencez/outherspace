@@ -64,6 +64,7 @@ struct ray_image_struct
     real view_light;
     bool shading_on;
     bool color_distance_on;
+    uint nbounces_max;
 };
 
 struct ray_cast_a_priori_struct

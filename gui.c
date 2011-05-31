@@ -569,9 +569,9 @@ static gboolean grab_mouse_fn (GtkWidget* da,
     else if (do_raycast)
     {
         RayCastAPriori priori;
-        uint hit_idx;
-        real hit_mag;
-        uint hit_object;
+        uint hit_idx = Max_uint;
+        real hit_mag = Max_real;
+        uint hit_object = Max_uint;
         Point origin, dir;
 
         setup_RayCastAPriori (&priori, &ray_image,
@@ -900,6 +900,8 @@ int main (int argc, char* argv[])
         setup_testcase_triangles
 #elif 1
         setup_testcase_track
+#elif 0
+        setup_testcase_bouncethru
 #elif 0
         setup_testcase_4d_surface
 #elif 0

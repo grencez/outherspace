@@ -103,6 +103,20 @@ uint readin_whitesep (char* buf, FILE* in, uint capacity, uint len)
     return len;
 }
 
+    FILE*
+fopen_path (const char* pathname, const char* filename, const char* mode)
+{
+    uint len;
+    char* path;
+    FILE* f;
+    len = strlen (pathname) + 1 + strlen (filename);
+    path = AllocT( char, len+1 );
+    sprintf (path, "%s/%s", pathname, filename);
+    f = fopen (path, mode);
+    free (path);
+    return f;
+}
+
 real monotime ()
 {
 #if defined(DistribCompute)
