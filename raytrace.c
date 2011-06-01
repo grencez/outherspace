@@ -546,8 +546,20 @@ fill_pixel (real* ret_colors,
         return;
     }
 
-    if (mag <= 1)  offset = offset_factor;
-    else           offset = mag * offset_factor;
+        /* Use 1 + the L1 (taxicab) norm to scale the offset of the origin of
+         * subsequent rays (reflection, to-light, etc.) from the computed
+         * intersection point so those rays do not hit this object.
+         * The 1 is added in case the L1 norm is less than 1.
+         * In the end, a very small factor relating to floating point precision
+         * is multiplied on, so we should get a small offset magnitude.
+         */
+    offset = 1;
+    UFor( i, NDimensions )
+    {
+        if (origin->coords[i] < 0)  offset -= origin->coords[i];
+        else                        offset += origin->coords[i];
+    }
+    offset *= offset_factor;
 
     object = ray_to_ObjectRaySpace (&rel_origin, &rel_dir,
                                     origin, dir, space, objidx);
