@@ -12,6 +12,7 @@ typedef struct object_motion_struct ObjectMotion;
 
 struct object_motion_struct
 {
+    real mass;
     Point veloc;
     tristate thrust;
     real rots[N2DimRotations];

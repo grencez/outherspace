@@ -17,6 +17,16 @@ setup_testcase_bouncethru (RaySpace* space,
                            PointXfrm* view_basis,
                            real* view_angle);
 bool
+setup_testcase_smoothsphere (RaySpace* space,
+                             Point* view_origin,
+                             PointXfrm* view_basis,
+                             real* view_angle);
+bool
+setup_testcase_4d_normals (RaySpace* space,
+                           Point* view_origin,
+                           PointXfrm* view_basis,
+                           real* view_angle);
+bool
 setup_testcase_manual_interp (RaySpace* space,
                               Point* view_origin,
                               PointXfrm* view_basis,

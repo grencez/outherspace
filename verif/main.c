@@ -1,5 +1,7 @@
 
 #include "bitstring.h"
+#include "kdtree.h"
+#include "order.h"
 #include "util.h"
 #include "xfrm.h"
 
@@ -31,6 +33,7 @@ testfn_BitString ()
         x = set1_BitString (bs, i);
         assert (x == y);
     }
+    free (bs);
 }
 
     /* This mimics the dirty bit in a set associative cache,
@@ -47,8 +50,9 @@ testfn_BitString_cache ()
     const uint nslots = 256;
     const uint nbits = 8;
 
+    zero_BitString (cache, nslots);
     set1_BitString (cache, 100);
-    zero_BitString (cache, 256);
+    zero_BitString (cache, nslots);
     UFor( i, nslots )
         assert (!test_BitString (cache, i));
 
@@ -64,6 +68,76 @@ testfn_BitString_cache ()
     i = LowBits( uint, nbits, 5*nslots-3 );
     flag = set1_BitString (cache, i);
     assert (i == nslots-3 && flag);
+}
+
+    void
+testfn_KPTree ()
+{
+    uint i;
+    KPTree tree;
+    KPTreeGrid grid;
+    uint indices[6] = { 0, 1, 2, 3, 4, 5 };
+    real coords[3][6] =
+    {
+        { 0, 1, 2, 3, 4, 5 },
+        { 0, 1, 2, 3, 4, 5 },
+        { 0, 0, 0, 0, 0, 0 }
+    };
+    Point loc;
+
+    grid.npts = 6;
+
+    grid.indices = indices;
+
+    grid.coords[0] = coords[0];
+    grid.coords[1] = coords[1];
+    UFor( i, NDimensions-2 )
+        grid.coords[2+i] = coords[2];  /* Zero'd out.*/
+    zero_Point (&grid.box.min_corner);
+    zero_Point (&grid.box.max_corner);
+    grid.box.max_corner.coords[0] = grid.npts-1;
+    grid.box.max_corner.coords[1] = grid.npts-1;
+
+    build_KPTree (&tree, &grid);
+
+    zero_Point (&loc);
+    i = nearest_neighbor_KPTree (&tree, &loc);
+    i = tree.nodes[i].idx;
+    assert (i == 0);
+
+    loc.coords[0] = 1;
+    loc.coords[1] = 1.9;
+    i = nearest_neighbor_KPTree (&tree, &loc);
+    i = tree.nodes[i].idx;
+    assert (i == 1);
+
+    loc.coords[0] = 1;
+    loc.coords[1] = 2.1;
+    i = nearest_neighbor_KPTree (&tree, &loc);
+    i = tree.nodes[i].idx;
+    assert (i == 2);
+
+    loc.coords[0] = 2;
+    loc.coords[1] = 6;
+    i = nearest_neighbor_KPTree (&tree, &loc);
+    i = tree.nodes[i].idx;
+    assert (i == 4);
+
+    loc.coords[0] = 6;
+    loc.coords[1] = 2;
+    i = nearest_neighbor_KPTree (&tree, &loc);
+    i = tree.nodes[i].idx;
+    assert (i == 4);
+}
+
+    void
+testfn_partition ()
+{
+    uint indices[] = { 0, 1, 2, 3, 4, 5 };
+    const real membs[] = { 10, 112, 333, 254, 305, 406 };
+    uint q, r;
+    partition_indexed_reals (indices, &q, &r, membs, 0, 4, 6);
+    assert (indices[3] == 4);
 }
 
     void
@@ -125,11 +199,32 @@ testfn_PointXfrm ()
     AssertApprox( 6, det, 6, 1e0 );
 }
 
+    void
+testfn_select ()
+{
+    uint i;
+    const uint nmembs = 7;
+    uint indices[7];
+    const uint ordered[] = { 0, 6, 1, 3, 4, 2, 5 };
+    const real membs[] = { 10, 112, 333, 254, 305, 406, 19 };
+
+    UFor( i, nmembs )
+    {
+        uint j;
+        UFor( j, nmembs )  indices[j] = j;
+        select_indexed_reals (indices, membs, 0, i, nmembs);
+        assert (indices[i] == ordered[i]);
+    }
+}
+
 int main ()
 {
     testfn_BitString ();
     testfn_BitString_cache ();
+    testfn_KPTree ();
+    testfn_partition ();
     testfn_PointXfrm ();
+    testfn_select ();
     return 0;
 }
 

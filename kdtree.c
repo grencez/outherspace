@@ -142,6 +142,12 @@ void init_KDTree (KDTree* tree)
     tree->nelemidcs = 0;
 }
 
+    void
+init_KPTree (KPTree* tree)
+{
+    tree->nnodes = 0;
+}
+
 void cleanup_KDTree (KDTree* tree)
 {
     if (tree->nnodes > 0)
@@ -153,7 +159,6 @@ void cleanup_KDTree (KDTree* tree)
         free (tree->elemidcs);
 }
 
-static
     void
 cleanup_KDTreeGrid (KDTreeGrid* grid)
 {
@@ -162,6 +167,12 @@ cleanup_KDTreeGrid (KDTreeGrid* grid)
         free (grid->intls[0]);
         free (grid->coords[0]);
     }
+}
+
+    void
+cleanup_KPTree (KPTree* tree)
+{
+    if (tree->nnodes > 0)  free (tree->nodes);
 }
 
 static
@@ -566,6 +577,73 @@ build_KDTree (KDTree* tree, KDTreeGrid* grid)
     assert (complete_KDTree (tree, grid->nintls / 2));
 }
 
+static
+    void
+build_KPTreeNode (KPTree* tree, KPTreeGrid* grid,
+                  uint nodeidx, uint p, uint s)
+{
+    uint i, n, mididx;
+    uint split_dim;
+    KPTreeNode* node;
+    KPTreeGrid logrid, higrid;
+
+    if (nodeidx >= tree->nnodes)  return;
+    n = s - p;
+    assert (n > 0);
+
+    node = &tree->nodes[nodeidx];
+    split_dim = 0;
+    mididx = p + n / 2;
+
+    if (n > 1)
+    {
+        real max_length = 0;
+        UFor( i, NDimensions )
+        {
+            real len;
+            len = (grid->box.max_corner.coords[i]
+                   - grid->box.min_corner.coords[i]);
+            if (len > max_length)
+            {
+                split_dim = i;
+                max_length = len;
+            }
+        }
+    }
+
+    select_indexed_reals (grid->indices, grid->coords[split_dim],
+                          p, mididx, s);
+
+    node->dim = split_dim;
+    node->idx = mididx;
+    UFor( i, NDimensions )
+    {
+        node->loc.coords[i] = grid->coords[i][mididx];
+        logrid.coords[i] = grid->coords[i];
+        higrid.coords[i] = grid->coords[i];
+    }
+
+    logrid.npts = grid->npts;
+    higrid.npts = grid->npts;
+    logrid.indices = grid->indices;
+    higrid.indices = grid->indices;
+        /* Only bother splitting if the lower nodes are not leaves.*/
+    if (n > 3)
+        split_BoundingBox (&logrid.box, &higrid.box, &grid->box,
+                           split_dim, node->loc.coords[split_dim]);
+
+    build_KPTreeNode (tree, &logrid, 2*nodeidx+1, p, mididx);
+    build_KPTreeNode (tree, &higrid, 2*nodeidx+2, mididx+1, s);
+}
+
+    void
+build_KPTree (KPTree* tree, KPTreeGrid* grid)
+{
+    tree->nnodes = grid->npts;
+    tree->nodes = AllocT( KPTreeNode, tree->nnodes );
+    build_KPTreeNode (tree, grid, 0, 0, tree->nnodes);
+}
+
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
 
@@ -690,5 +768,64 @@ descend_KDTreeNode (uint* ret_parent,
     }
 
     return node_idx;
+}
+
+    uint
+descend_KPTree (const KPTree* tree, const Point* loc, uint i)
+{
+    while (i < tree->nnodes)
+    {
+        const KPTreeNode* node;
+        node = &tree->nodes[i];
+        if (loc->coords[node->dim] <= node->loc.coords[node->dim])
+            i = 2 * i + 1;
+        else
+            i = 2 * i + 2;
+    }
+    return i;
+}
+
+    uint
+nearest_neighbor_KPTree (const KPTree* tree, const Point* loc)
+{
+    uint i;
+    uint best = Max_uint;
+    real mag2 = Max_real;
+    Point diff;
+
+    i = descend_KPTree (tree, loc, 0);
+
+    while (i > 0)
+    {
+        bool fromlo;
+        const KPTreeNode* node;
+        uint previ;
+        real magtosplit;
+
+        previ = i;
+        i = (i - 1) / 2;
+        node = &tree->nodes[i];
+
+        magtosplit = node->loc.coords[node->dim] - loc->coords[node->dim];
+        fromlo = magtosplit >= 0;
+
+        if (fromlo != even_uint (previ) && magtosplit * magtosplit < mag2)
+        {
+            real tmpmag2;
+            diff_Point (&diff, &node->loc, loc);
+            tmpmag2 = dot_Point (&diff, &diff);
+            if (tmpmag2 < mag2)
+            {
+                best = i;
+                mag2 = tmpmag2;
+            }
+
+            if (fromlo)  i = 2 * i + 2;  /* From lo side -> go to hi side.*/
+            else         i = 2 * i + 1;  /* From hi side -> go to lo side.*/
+            i = descend_KPTree (tree, loc, i);
+        }
+    }
+
+    return best;
 }
 

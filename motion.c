@@ -6,17 +6,20 @@
 static void
 zero_rotations (ObjectMotion* motion);
 static void
-move_object (RaySpace* space, ObjectMotion* motion, uint objidx, real dt);
+move_object (RaySpace* space, ObjectMotion* motions, uint objidx, real dt);
 static bool
-detect_collision (const RaySpace* space,
+detect_collision (ObjectMotion* motions,
+                  const RaySpace* space,
                   uint objidx,
                   const Point* new_centroid,
-                  const PointXfrm* new_orientation);
+                  const PointXfrm* new_orientation,
+                  real dt);
 
     void
 init_ObjectMotion (ObjectMotion* motion)
 {
     uint i;
+    motion->mass = 1;
     zero_Point (&motion->veloc);
     motion->thrust = 0;
     UFor( i, N2DimRotations )
@@ -53,7 +56,7 @@ move_objects (RaySpace* space, ObjectMotion* motions, real dt)
     {
         uint j;
         UFor( j, nobjects )
-            move_object (space, &motions[j], j, inc);
+            move_object (space, motions, j, inc);
     }
 
     UFor( i, nobjects )
@@ -78,16 +81,18 @@ zero_rotations (ObjectMotion* motion)
 }
 
     void
-move_object (RaySpace* space, ObjectMotion* motion, uint objidx, real dt)
+move_object (RaySpace* space, ObjectMotion* motions, uint objidx, real dt)
 {
     uint i;
     bool commit_move = true;
     PointXfrm basis, new_orientation;
     Point new_centroid;
     ObjectRaySpace* object;
+    ObjectMotion* motion;
     Point dir, veloc;
 
     object = &space->objects[objidx];
+    motion = &motions[objidx];
 
         /* Rotate object.*/
     dir.coords[DirDimension] = 1;
@@ -127,15 +132,15 @@ move_object (RaySpace* space, ObjectMotion* motion, uint objidx, real dt)
         }
     }
 
-        /* Assume full grip causes orthogonal motion to be lost.*/
-    proj_Point (&veloc, &motion->veloc, &new_orientation.pts[DirDimension]);
-
     if (motion->thrust != 0)
     {
         const real alpha = 5;  /* Arbitrary coefficient.*/
         const real vthrust = 733;  /* Velocity of thrusters.*/
         real accel, mag;
         Point tmp;
+
+            /* Assume full grip causes orthogonal motion to be lost.*/
+        proj_Point (&veloc, &motion->veloc, &new_orientation.pts[DirDimension]);
 
         mag = magnitude_Point (&veloc);
         accel = alpha * (vthrust - mag);
@@ -146,6 +151,7 @@ move_object (RaySpace* space, ObjectMotion* motion, uint objidx, real dt)
     }
     else
     {
+        copy_Point (&veloc, &motion->veloc);
             /* HACK to make racer stop fast!*/
             /* Half the speed every second.*/
         scale_Point (&veloc, &veloc, pow (0.5, dt));
@@ -158,13 +164,14 @@ move_object (RaySpace* space, ObjectMotion* motion, uint objidx, real dt)
     if (motion->collide)
     {
         bool hit;
-        hit = detect_collision (space, objidx,
+        hit = detect_collision (motions,
+                                space, objidx,
                                 &new_centroid,
-                                &new_orientation);
+                                &new_orientation,
+                                dt);
         if (hit)
         {
             commit_move = false;
-            negate_Point (&motion->veloc, &motion->veloc);
         }
     }
 
@@ -177,20 +184,27 @@ move_object (RaySpace* space, ObjectMotion* motion, uint objidx, real dt)
 
 
     bool
-detect_collision (const RaySpace* space,
+detect_collision (ObjectMotion* motions,
+                  const RaySpace* space,
                   uint objidx,
                   const Point* new_centroid,
-                  const PointXfrm* new_orientation)
+                  const PointXfrm* new_orientation,
+                  real dt)
 {
     uint i;
     uint hit_idx = Max_uint;
     real hit_mag = Max_real;
-    uint hit_object = Max_uint;
+    uint hit_objidx = Max_uint;
+    real hit_dx = 0;
+    Point hit_dir, reflveloc;
     const ObjectRaySpace* object;
     const Scene* scene;
+    bool colliding;
 
+    assert (objidx < space->nobjects);
     object = &space->objects[objidx];
     scene = &object->scene;
+    zero_Point (&hit_dir);
 
     UFor( i, scene->nverts )
     {
@@ -232,41 +246,94 @@ detect_collision (const RaySpace* space,
             {
                 hit_idx = tmp_hit;
                 hit_mag = tmp_mag;
-                hit_object = tmp_object;
+                hit_objidx = tmp_object;
+                hit_dx = distance;
+                copy_Point (&hit_dir, &unit_dir);
             }
         }
-
     }
 
-    return hit_object <= space->nobjects;
-        /* Below here is scratch from the prototype!*/
-#if 0
-    if (hit_idx < hit_space->nelems)
+    colliding = false;
+    if (hit_objidx <= space->nobjects)
     {
-        Point tdir;
-        const Plane* plane;
-        plane = &hit_space->simplices[hit_idx].plane;
+        const Point* rel_normal;
+        Point normal;
+        real cos_normal;
+        real hit_speed;
+        const ObjectRaySpace* hit_object;
 
-        proj_Plane (&motion->veloc, &motion->veloc, plane);
-            /* diff_Point (&tdir, &motion->veloc, &dir); */
-            /* summ_Point (&motion->veloc, &motion->veloc, &tdir); */
+        hit_speed = hit_dx / dt;
+        colliding = true;
 
-        scale_Point (&dir, &motion->veloc,
-                     dt - dt * hit_mag / magnitude_Point (&dir));
+        if (hit_objidx < space->nobjects)
+            hit_object = &space->objects[hit_objidx];
+        else
+            hit_object = &space->main;
 
-#if 1
-            /*
-               scale_Point (&dir, &dir, -1);
-               scale_Point (&tdir, &tdir, 2);
-               summ_Point (&dir, &dir, &tdir);
-               scale_Point (&motion->veloc, &dir, -1);
-             */
-            /* zero_Point (&dir); */
-#else
-        zero_Point (&motion->veloc);
-#endif
-            /* scale_Point (&tdir, &unit_dir, hit_mag*.9); */
+        rel_normal = &hit_object->simplices[hit_idx].plane.normal;
+        if (hit_objidx < space->nobjects)
+            xfrm_Point (&normal, &hit_object->orientation, rel_normal);
+        else
+            copy_Point (&normal, rel_normal);
+
+        cos_normal = dot_Point (&hit_dir, &normal);
+        if (cos_normal < 0)
+            cos_normal = - cos_normal;
+        else
+            negate_Point (&normal, &normal);
+
+        if (hit_objidx < space->nobjects)
+        {
+            real m1, m2, invavg;
+            Point u1, u2;  /* Initial velocities.*/
+            Point w1, w2;
+            Point v1, v2;  /* Final velocities.*/
+            Point v;  /* Average velocity.*/
+
+
+            m1 = motions[objidx].mass;
+            m2 = motions[hit_objidx].mass;
+            invavg = 2 / (m1+m2);
+            scale_Point (&u1, &normal, - cos_normal * hit_speed);
+            copy_Point (&u2, &motions[hit_objidx].veloc);
+
+            scale_Point (&w1, &u1, m1 * invavg);
+            scale_Point (&w2, &u2, m2 * invavg);
+
+            summ_Point (&v, &w1, &w2);
+            diff_Point (&v1, &v, &u1);
+            diff_Point (&v2, &v, &u2);
+
+            if (false)
+            {
+                FILE* out = stderr;
+                fprintf (out, "objidx:%u\n", objidx);
+                fputs ("v1:", out);
+                output_Point (out, &v1);
+                fputs ("  v2:", out);
+                output_Point (out, &v2);
+                fputc ('\n', out);
+            }
+
+            copy_Point (&motions[hit_objidx].veloc, &v2);
+            
+                /* Project reflection onto plane.*/
+            scale_Point (&reflveloc, &hit_dir, hit_speed);
+            diff_Point (&reflveloc, &reflveloc, &u1);
+                /* Add in the velocity. Reflection probably
+                 * does not lie on the plane after this point.
+                 */
+            summ_Point (&reflveloc, &reflveloc, &v1);
+        }
+        else
+        {
+            scale_Point (&reflveloc, &normal, 2 * cos_normal);
+            summ_Point (&reflveloc, &hit_dir, &reflveloc);
+            scale_Point (&reflveloc, &reflveloc, hit_speed);
+        }
+        scale_Point (&motions[objidx].veloc, &reflveloc, 1);
     }
-#endif
+
+    return colliding;
 }
 

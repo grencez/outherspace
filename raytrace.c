@@ -716,14 +716,22 @@ fill_pixel (real* ret_colors,
             tscale = dot_Point (&tolight, &normal);
             if (tscale > 0)
             {
+                real offset_magtolight;
                 Point tmp_origin;
+
+                offset_magtolight = magtolight - offset;
                 scale_Point (&tmp_origin, &tolight, offset);
-                magtolight -= offset;
                 summ_Point (&tmp_origin, &tmp_origin, &isect);
-                if (cast_to_light (space, &tmp_origin, &tolight, magtolight))
+
+                if (cast_to_light (space, &tmp_origin, &tolight,
+                                   offset_magtolight))
                 {
+                    real intensity;
+                    intensity = light->intensity;
+                        /* intensity *= 1 / (magtolight * magtolight); */
+
                         /* Add diffuse portion.*/
-                    dscale += tscale * light->intensity;
+                    dscale += tscale * intensity;
 
                         /* Specular */
                     if (material)
@@ -733,7 +741,7 @@ fill_pixel (real* ret_colors,
                         if (dot > 0)
                         {
                             tscale = pow (dot, material->shininess);
-                            sscale += tscale * light->intensity;
+                            sscale += tscale;
                         }
                     }
                 }

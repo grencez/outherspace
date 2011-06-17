@@ -12,7 +12,7 @@
 #include <gdk/gdkkeysyms.h>
 #include <SDL.h>
 
-#define NRacers 10
+    /* #define NRacers 10 */
 
 static const bool RenderDrawsPattern = false;
 static const bool ForceFauxFishEye = false;
@@ -211,6 +211,7 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
         if (stride_mag_change > 0)  stride_magnitude *= 2;
         else                        stride_magnitude /= 2;
         fprintf (out, "stride_magnitude: %f\n", stride_magnitude);
+        recast = false;
     }
     else if (roll != 0)
     {
@@ -461,7 +462,9 @@ update_object_locations (RaySpace* space, MotionInput* mot)
     }
 
 #if NDimensions == 4
+#ifdef NRacers
     view_origin.coords[3] = mot->drift;
+#endif
 #endif
 #endif
 }
@@ -902,6 +905,10 @@ int main (int argc, char* argv[])
         setup_testcase_track
 #elif 0
         setup_testcase_bouncethru
+#elif 0
+        setup_testcase_smoothsphere
+#elif 0
+        setup_testcase_4d_normals
 #elif 0
         setup_testcase_4d_surface
 #elif 0
