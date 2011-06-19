@@ -93,10 +93,10 @@ testfn_KPTree ()
     grid.coords[1] = coords[1];
     UFor( i, NDimensions-2 )
         grid.coords[2+i] = coords[2];  /* Zero'd out.*/
-    zero_Point (&grid.box.min_corner);
-    zero_Point (&grid.box.max_corner);
-    grid.box.max_corner.coords[0] = grid.npts-1;
-    grid.box.max_corner.coords[1] = grid.npts-1;
+    zero_Point (&grid.box.min);
+    zero_Point (&grid.box.max);
+    grid.box.max.coords[0] = grid.npts-1;
+    grid.box.max.coords[1] = grid.npts-1;
 
     build_KPTree (&tree, &grid);
 
@@ -128,6 +128,16 @@ testfn_KPTree ()
     i = nearest_neighbor_KPTree (&tree, &loc);
     i = tree.nodes[i].idx;
     assert (i == 4);
+
+    {
+        BoundingBox box;
+        UFor( i, NDimensions )
+        {
+            box.min.coords[i] = 1.5;
+            box.max.coords[i] = 4.1;
+        }
+        inside_BoundingBox_KPTree (&tree, &box);
+    }
 }
 
     void

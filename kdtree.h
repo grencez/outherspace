@@ -106,6 +106,8 @@ uint
 descend_KPTree (const KPTree* tree, const Point* loc, uint i);
 uint
 nearest_neighbor_KPTree (const KPTree* tree, const Point* loc);
+void
+inside_BoundingBox_KPTree (const KPTree* tree, const BoundingBox* box);
 #ifndef __OPENCL_VERSION__
 void
 output_KDTreeGrid (FILE* out, const KDTreeGrid* grid);

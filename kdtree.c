@@ -315,8 +315,8 @@ determine_split (KDTreeGrid* logrid, KDTreeGrid* higrid, KDTreeGrid* grid)
 
         nlo = 0;
         nhi = nelems;
-        lo_box = grid->box.min_corner.coords[dim];
-        hi_box = grid->box.max_corner.coords[dim];
+        lo_box = grid->box.min.coords[dim];
+        hi_box = grid->box.max.coords[dim];
         intls = grid->intls[dim];
         coords = grid->coords[dim];
 
@@ -463,7 +463,7 @@ build_KDTreeNode (uint node_idx, uint parent,
         KDTreeInner* inner;
         inner = &node->as.inner;
         inner->parent = parent;
-        inner->split_pos = logrid.box.max_corner.coords[node->split_dim];
+        inner->split_pos = logrid.box.max.coords[node->split_dim];
 
 #if 0
         {
@@ -601,8 +601,8 @@ build_KPTreeNode (KPTree* tree, KPTreeGrid* grid,
         UFor( i, NDimensions )
         {
             real len;
-            len = (grid->box.max_corner.coords[i]
-                   - grid->box.min_corner.coords[i]);
+            len = (grid->box.max.coords[i]
+                   - grid->box.min.coords[i]);
             if (len > max_length)
             {
                 split_dim = i;
@@ -791,16 +791,16 @@ nearest_neighbor_KPTree (const KPTree* tree, const Point* loc)
     uint i;
     uint best = Max_uint;
     real mag2 = Max_real;
-    Point diff;
 
     i = descend_KPTree (tree, loc, 0);
 
     while (i > 0)
     {
         bool fromlo;
-        const KPTreeNode* node;
         uint previ;
         real magtosplit;
+        Point diff;
+        const KPTreeNode* node;
 
         previ = i;
         i = (i - 1) / 2;
@@ -827,5 +827,51 @@ nearest_neighbor_KPTree (const KPTree* tree, const Point* loc)
     }
 
     return best;
+}
+
+    void
+inside_BoundingBox_KPTree (const KPTree* tree, const BoundingBox* box)
+{
+    uint i;
+    Point loc;
+
+    centroid_BoundingBox (&loc, box);
+    i = descend_KPTree (tree, &loc, 0);
+
+    while (i > 0)
+    {
+        bool fromlo;
+        bool descending = false;
+        uint previ;
+        uint split_dim;
+        real split_loc;
+        const KPTreeNode* node;
+
+        previ = i;
+        i = (i - 1) / 2;
+        node = &tree->nodes[i];
+
+        split_dim = node->dim;
+        split_loc = node->loc.coords[split_dim];
+        fromlo = loc.coords[split_dim] <= split_loc;
+        if (fromlo != even_uint (previ))
+        {
+            if (fromlo)
+                descending = box->max.coords[split_dim] >= split_loc;
+            else
+                descending = box->min.coords[split_dim] <= split_loc;
+        }
+
+        if (descending)
+        {
+            FILE* out = stderr;
+            output_Point (out, &node->loc);
+            fputc ('\n', out);
+
+            if (fromlo)  i = 2 * i + 2;  /* From lo side -> go to hi side.*/
+            else         i = 2 * i + 1;  /* From hi side -> go to lo side.*/
+            i = descend_KPTree (tree, &loc, i);
+        }
+    }
 }
 

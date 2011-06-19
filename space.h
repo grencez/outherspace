@@ -19,8 +19,8 @@ typedef struct point_struct Point;
 
 struct bounding_box_struct
 {
-    Point min_corner;
-    Point max_corner;
+    Point min;
+    Point max;
 };
 typedef struct bounding_box_struct BoundingBox;
 
@@ -29,6 +29,8 @@ real dot_Point (const Point* a, const Point* b);
 void summ_Point (Point* dst, const Point* a, const Point* b);
 void scale_Point (Point* dst, const Point* a, real k);
 void zero_Point (Point* a);
+void
+zero_BoundingBox (BoundingBox* box);
 void copy_Point (Point* dst, const Point* src);
 void copy_BoundingBox (BoundingBox* dst, const BoundingBox* src);
 void negate_Point (Point* dst, const Point* src);
@@ -58,6 +60,10 @@ real surface_area_BoundingBox (const BoundingBox* box);
 void split_BoundingBox (BoundingBox* lo_box, BoundingBox* hi_box,
                         const BoundingBox* box,
                         uint split_dim, real split_pos);
+void
+merge_BoundingBox (BoundingBox* dst,
+                   const BoundingBox* a,
+                   const BoundingBox* b);
 
 #ifndef __OPENCL_VERSION__
 void output_Point (FILE* out, const Point* point);

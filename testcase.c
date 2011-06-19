@@ -26,8 +26,8 @@ setup_testcase_triangles (RaySpace* space,
 
     UFor( i, NDimensions )
     {
-        space->main.box.min_corner.coords[i] = 0;
-        space->main.box.max_corner.coords[i] = 100;
+        space->main.box.min.coords[i] = 0;
+        space->main.box.max.coords[i] = 100;
     }
     random_Scene (&space->main.scene, 50, &space->main.box);
     init_filled_RaySpace (space);
@@ -633,8 +633,8 @@ random_Point (Point* p, const BoundingBox* box)
     UFor( ci, NDimensions )
     {
         real x, lo, hi;
-        lo = box->min_corner.coords[ci];
-        hi = box->max_corner.coords[ci];
+        lo = box->min.coords[ci];
+        hi = box->max.coords[ci];
         if (ci < dim_cutoff)
             x = lo + (hi - lo) * ((real) rand () / RAND_MAX);
         else

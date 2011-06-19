@@ -17,6 +17,12 @@ void zero_PointXfrm (PointXfrm* xfrm);
 void copy_PointXfrm (PointXfrm* dst, const PointXfrm* src);
 void identity_PointXfrm (PointXfrm* xfrm);
 void rotation_PointXfrm (PointXfrm* xfrm, uint xdim, uint ydim, real angle);
+void
+rotate_PointXfrm (PointXfrm* xfrm, uint xdim, uint ydim, real angle);
+void
+trrotate_PointXfrm (PointXfrm* basis, uint xdim, uint ydim, real angle);
+void
+rotatetr_PointXfrm (PointXfrm* basis, uint xdim, uint ydim, real angle);
 void col_PointXfrm (Point* dst, const PointXfrm* xfrm, uint col);
 void
 xfrm_Point (Point* dst, const PointXfrm* xfrm, const Point* src);

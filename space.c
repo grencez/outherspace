@@ -24,9 +24,9 @@ void output_Point (FILE* out, const Point* point)
 void output_BoundingBox (FILE* out, const BoundingBox* box)
 {
     fputs ("BoundingBox: ", out);
-    output_Point (out, &box->min_corner);
+    output_Point (out, &box->min);
     fputs (" to ", out);
-    output_Point (out, &box->max_corner);
+    output_Point (out, &box->max);
 }
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
@@ -70,6 +70,13 @@ void zero_Point (Point* a)
         a->coords[i] = 0;
 }
 
+    void
+zero_BoundingBox (BoundingBox* box)
+{
+    zero_Point (&box->min);
+    zero_Point (&box->max);
+}
+
 void copy_Point (Point* dst, const Point* src)
 {
 #ifdef __OPENCL_VERSION__
@@ -89,8 +96,8 @@ void copy_BoundingBox (BoundingBox* dst, const BoundingBox* src)
     uint i;
     UFor( i, NDimensions )
     {
-        dst->min_corner.coords[i] = src->min_corner.coords[i];
-        dst->max_corner.coords[i] = src->max_corner.coords[i];
+        dst->min.coords[i] = src->min.coords[i];
+        dst->max.coords[i] = src->max.coords[i];
     }
 #endif
 }
@@ -157,15 +164,15 @@ bool hit_inner_BoundingPlane (Point* entrance,
             {
                 entrance->coords[i] = origin->coords[i];
             }
-            else if (origin->coords[i] < box->min_corner.coords[i])
+            else if (origin->coords[i] < box->min.coords[i])
             {
                 if (dir->coords[i] <= 0)  didhit = false;
-                else  entrance->coords[i] = box->min_corner.coords[i];
+                else  entrance->coords[i] = box->min.coords[i];
             }
-            else if (origin->coords[i] > box->max_corner.coords[i])
+            else if (origin->coords[i] > box->max.coords[i])
             {
                 if (dir->coords[i] >= 0)  didhit = false;
-                else  entrance->coords[i] = box->max_corner.coords[i];
+                else  entrance->coords[i] = box->max.coords[i];
             }
             else
             {
@@ -187,15 +194,15 @@ bool hit_inner_BoundingPlane (Point* entrance,
         else
         {
             x = origin->coords[i] + coeff * dir->coords[i];
-            if (x < box->min_corner.coords[i])
+            if (x < box->min.coords[i])
             {
                 if (dir->coords[i] < 0)  didhit = false;
-                else  x = box->min_corner.coords[i];
+                else  x = box->min.coords[i];
             }
-            else if (x > box->max_corner.coords[i])
+            else if (x > box->max.coords[i])
             {
                 if (dir->coords[i] > 0)  didhit = false;
-                else  x = box->max_corner.coords[i];
+                else  x = box->max.coords[i];
             }
         }
         entrance->coords[i] = x;
@@ -217,23 +224,23 @@ bool hit_outer_BoundingBox (Point* entrance,
     {
         if (dir->coords[dim] > 0)
         {
-            if (origin->coords[dim] > box->max_corner.coords[dim])
+            if (origin->coords[dim] > box->max.coords[dim])
                 return false;
-            if (origin->coords[dim] > box->min_corner.coords[dim])
+            if (origin->coords[dim] > box->min.coords[dim])
                 cost.coords[dim] = Small_real;
             else
-                cost.coords[dim] = ((box->min_corner.coords[dim]
+                cost.coords[dim] = ((box->min.coords[dim]
                                      - origin->coords[dim])
                                     / dir->coords[dim]);
         }
         else if (dir->coords[dim] < 0)
         {
-            if (origin->coords[dim] < box->min_corner.coords[dim])
+            if (origin->coords[dim] < box->min.coords[dim])
                 return false;
-            if (origin->coords[dim] < box->max_corner.coords[dim])
+            if (origin->coords[dim] < box->max.coords[dim])
                 cost.coords[dim] = Small_real;
             else
-                cost.coords[dim] = ((box->max_corner.coords[dim]
+                cost.coords[dim] = ((box->max.coords[dim]
                                      - origin->coords[dim])
                                     / dir->coords[dim]);
         }
@@ -260,9 +267,9 @@ bool hit_outer_BoundingBox (Point* entrance,
         if (dim == hit_dim)
         {
             if (dir->coords[dim] > 0)
-                entrance->coords[dim] = box->min_corner.coords[dim];
+                entrance->coords[dim] = box->min.coords[dim];
             else
-                entrance->coords[dim] = box->max_corner.coords[dim];
+                entrance->coords[dim] = box->max.coords[dim];
         }
         else
         {
@@ -270,12 +277,12 @@ bool hit_outer_BoundingBox (Point* entrance,
                                      + hit_cost * dir->coords[dim]);
             if (dir->coords[dim] > 0)
             {
-                if (entrance->coords[dim] > box->max_corner.coords[dim])
+                if (entrance->coords[dim] > box->max.coords[dim])
                     return false;
             }
             else
             {
-                if (entrance->coords[dim] < box->min_corner.coords[dim])
+                if (entrance->coords[dim] < box->min.coords[dim])
                     return false;
             }
         }
@@ -297,12 +304,12 @@ bool hit_BoundingBox (Point* entrance,
         if (dir->coords[dim] > 0)
         {
             real bound;
-            if (origin->coords[dim] > box->max_corner.coords[dim])
+            if (origin->coords[dim] > box->max.coords[dim])
                 return false;
-            if (origin->coords[dim] > box->min_corner.coords[dim])
-                bound = box->max_corner.coords[dim];
+            if (origin->coords[dim] > box->min.coords[dim])
+                bound = box->max.coords[dim];
             else
-                bound = box->min_corner.coords[dim];
+                bound = box->min.coords[dim];
 
             cost.coords[dim] = ((bound - origin->coords[dim])
                                 / dir->coords[dim]);
@@ -310,12 +317,12 @@ bool hit_BoundingBox (Point* entrance,
         else if (dir->coords[dim] < 0)
         {
             real bound;
-            if (origin->coords[dim] < box->min_corner.coords[dim])
+            if (origin->coords[dim] < box->min.coords[dim])
                 return false;
-            if (origin->coords[dim] < box->max_corner.coords[dim])
-                bound = box->min_corner.coords[dim];
+            if (origin->coords[dim] < box->max.coords[dim])
+                bound = box->min.coords[dim];
             else
-                bound = box->max_corner.coords[dim];
+                bound = box->max.coords[dim];
 
             cost.coords[dim] = ((bound - origin->coords[dim])
                                 / dir->coords[dim]);
@@ -344,13 +351,13 @@ void init_BoundingBox (BoundingBox* box, uint npoints, const Point* points)
 
     if (npoints == 0)
     {
-        zero_Point (&box->min_corner);
-        zero_Point (&box->max_corner);
+        zero_Point (&box->min);
+        zero_Point (&box->max);
     }
     else
     {
-        copy_Point (&box->min_corner, &points[0]);
-        copy_Point (&box->max_corner, &points[0]);
+        copy_Point (&box->min, &points[0]);
+        copy_Point (&box->max, &points[0]);
     }
 
     UFor( i, npoints )
@@ -362,17 +369,17 @@ void adjust_BoundingBox (BoundingBox* box, const Point* point)
     uint i;
     UFor( i, NDimensions )
     {
-        if (point->coords[i] < box->min_corner.coords[i])
-            box->min_corner.coords[i] = point->coords[i];
-        else if (point->coords[i] > box->max_corner.coords[i])
-            box->max_corner.coords[i] = point->coords[i];
+        if (point->coords[i] < box->min.coords[i])
+            box->min.coords[i] = point->coords[i];
+        else if (point->coords[i] > box->max.coords[i])
+            box->max.coords[i] = point->coords[i];
     }
 }
 
     void
 centroid_BoundingBox (Point* dst, const BoundingBox* box)
 {
-    summ_Point (dst, &box->min_corner, &box->max_corner);
+    summ_Point (dst, &box->min, &box->max);
     scale_Point (dst, dst, .5);
 }
 
@@ -382,8 +389,8 @@ bool inside_BoundingBox (__global const BoundingBox* box, const Point* point)
     uint i;
     UFor( i, NDimensions )
     {
-        if (!(box->min_corner.coords[i] <= point->coords[i] &&
-              box->max_corner.coords[i] >= point->coords[i]))
+        if (!(box->min.coords[i] <= point->coords[i] &&
+              box->max.coords[i] >= point->coords[i]))
             inside = false;
     }
     return inside;
@@ -395,7 +402,7 @@ real surface_area_BoundingBox (const BoundingBox* box)
     real sum = 0;
     uint i;
 
-    diff_Point (&delta, &box->max_corner, &box->min_corner);
+    diff_Point (&delta, &box->max, &box->min);
 
     UFor( i, NDimensions )
     {
@@ -417,13 +424,33 @@ void split_BoundingBox (BoundingBox* lo_box, BoundingBox* hi_box,
                         const BoundingBox* box,
                         uint split_dim, real split_pos)
 {
-    assert (split_pos < box->max_corner.coords[split_dim]);
-    assert (split_pos > box->min_corner.coords[split_dim]);
+    assert (split_pos < box->max.coords[split_dim]);
+    assert (split_pos > box->min.coords[split_dim]);
 
     copy_BoundingBox (lo_box, box);
     copy_BoundingBox (hi_box, box);
 
-    lo_box->max_corner.coords[split_dim] = split_pos;
-    hi_box->min_corner.coords[split_dim] = split_pos;
+    lo_box->max.coords[split_dim] = split_pos;
+    hi_box->min.coords[split_dim] = split_pos;
+}
+
+    void
+merge_BoundingBox (BoundingBox* dst,
+                   const BoundingBox* a,
+                   const BoundingBox* b)
+{
+    uint i;
+    UFor( i, NDimensions)
+    {
+        if (a->min.coords[i] <= b->min.coords[i])
+            dst->min.coords[i] = a->min.coords[i];
+        else
+            dst->min.coords[i] = b->min.coords[i];
+
+        if (a->max.coords[i] >= b->max.coords[i])
+            dst->max.coords[i] = a->max.coords[i];
+        else
+            dst->max.coords[i] = b->max.coords[i];
+    }
 }
 

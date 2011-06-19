@@ -84,8 +84,8 @@ init_RaySpace (RaySpace* space)
     space->nlights = 0;
     init_KDTree (&space->object_tree);
     space->partition = true;
-    zero_Point (&space->box.min_corner);
-    zero_Point (&space->box.max_corner);
+    zero_Point (&space->box.min);
+    zero_Point (&space->box.max);
 }
 
     void
@@ -292,10 +292,10 @@ init_RaySpace_KDTreeGrid (KDTreeGrid* grid, const RaySpace* space)
             /* Main case (special).*/
         grid->intls[i][ti] = ti;
         grid->intls[i][ti+1] = ti+1;
-        grid->coords[i][ti] = space->main.box.min_corner.coords[i];
-        grid->coords[i][ti+1] = space->main.box.max_corner.coords[i];
-        grid->box.min_corner.coords[i] = space->main.box.min_corner.coords[i];
-        grid->box.max_corner.coords[i] = space->main.box.max_corner.coords[i];
+        grid->coords[i][ti] = space->main.box.min.coords[i];
+        grid->coords[i][ti+1] = space->main.box.max.coords[i];
+        grid->box.min.coords[i] = space->main.box.min.coords[i];
+        grid->box.max.coords[i] = space->main.box.max.coords[i];
     }
 
     UFor( i, space->nobjects )
@@ -315,16 +315,16 @@ init_RaySpace_KDTreeGrid (KDTreeGrid* grid, const RaySpace* space)
         UFor( dim, NDimensions )
         {
             real lo, hi;
-            lo = box.min_corner.coords[dim];
-            hi = box.max_corner.coords[dim];
+            lo = box.min.coords[dim];
+            hi = box.max.coords[dim];
             grid->intls[dim][ti] = ti;
             grid->intls[dim][ti+1] = ti+1;
             grid->coords[dim][ti] = lo;
             grid->coords[dim][ti+1] = hi;
-            if (lo < grid->box.min_corner.coords[dim])
-                grid->box.min_corner.coords[dim] = lo;
-            if (hi > grid->box.max_corner.coords[dim])
-                grid->box.max_corner.coords[dim] = hi;
+            if (lo < grid->box.min.coords[dim])
+                grid->box.min.coords[dim] = lo;
+            if (hi > grid->box.max.coords[dim])
+                grid->box.max.coords[dim] = hi;
         }
     }
 }
@@ -1385,16 +1385,16 @@ rays_to_hits_fixed_plane (uint* hits, real* mags,
     object = &space->main;
     box = &object->box;
 
-    row_start = box->min_corner.coords[row_dim];
-    row_delta = (box->max_corner.coords[row_dim] - row_start) / nrows;
+    row_start = box->min.coords[row_dim];
+    row_delta = (box->max.coords[row_dim] - row_start) / nrows;
     row_start += row_delta / 2;
 
-    col_start = box->min_corner.coords[col_dim];
-    col_delta = (box->max_corner.coords[col_dim] - col_start) / ncols;
+    col_start = box->min.coords[col_dim];
+    col_delta = (box->max.coords[col_dim] - col_start) / ncols;
     col_start += col_delta / 2;
 
-    inside_box = (zpos > box->min_corner.coords[dir_dim] &&
-                  zpos < box->max_corner.coords[dir_dim]);
+    inside_box = (zpos > box->min.coords[dir_dim] &&
+                  zpos < box->max.coords[dir_dim]);
 
     origin.coords[dir_dim] = zpos;
     origin.coords[row_dim] = 50;

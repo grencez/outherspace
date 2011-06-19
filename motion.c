@@ -120,15 +120,11 @@ move_object (RaySpace* space, ObjectMotion* motions, uint objidx, real dt)
         {
             uint idx;
             real angle;
-            PointXfrm rotation;
             idx = j * (NDimensions - 2) + i - 1;
             angle = motion->rots[idx] * dt;
             assert (angle < + M_PI / 2);
             assert (angle > - M_PI / 2);
-            rotation_PointXfrm (&rotation, j, i, angle);
-
-            copy_PointXfrm (&basis, &new_orientation);
-            trxfrm_PointXfrm (&new_orientation, &rotation, &basis);
+            trrotate_PointXfrm (&new_orientation, j, i, angle);
         }
     }
 

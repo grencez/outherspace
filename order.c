@@ -137,7 +137,7 @@ static
     void
 quicksort_indexed_reals (uint* indices, uint p, uint s, const real* membs)
 {
-    if (p + 2 < s)
+    if (p + 1 < s)
     {
         uint q, r;
         partition_indexed_reals (indices, &q, &r, membs,

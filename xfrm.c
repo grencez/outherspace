@@ -65,6 +65,55 @@ void rotation_PointXfrm (PointXfrm* xfrm, uint xdim, uint ydim, real angle)
     xfrm->pts[ydim].coords[ydim] =   tcos;
 }
 
+    void
+rotate_PointXfrm (PointXfrm* xfrm, uint xdim, uint ydim, real angle)
+{
+    uint i;
+    real tcos, tsin;
+    Point* u;
+    Point* v;
+
+    tcos = cos (angle);
+    tsin = sin (angle);
+
+    u = &xfrm->pts[xdim];
+    v = &xfrm->pts[ydim];
+
+    UFor( i, NDimensions )
+    {
+        real x, y;
+        x = u->coords[i];
+        y = v->coords[i];
+        u->coords[i] = tcos * x - tsin * y;
+        v->coords[i] = tsin * x + tcos * y;
+    }
+}
+
+    void
+trrotate_PointXfrm (PointXfrm* basis, uint xdim, uint ydim, real angle)
+{
+    rotate_PointXfrm (basis, xdim, ydim, -angle);
+}
+
+    void
+rotatetr_PointXfrm (PointXfrm* basis, uint xdim, uint ydim, real angle)
+{
+    uint i;
+    real tcos, tsin;
+
+    tcos = cos (angle);
+    tsin = sin (angle);
+
+    UFor( i, NDimensions )
+    {
+        real x, y;
+        x = basis->pts[i].coords[xdim];
+        y = basis->pts[i].coords[ydim];
+        basis->pts[i].coords[xdim] = tcos * x - tsin * y;
+        basis->pts[i].coords[ydim] = tsin * x + tcos * y;
+    }
+}
+
 void col_PointXfrm (Point* dst, const PointXfrm* xfrm, uint col)
 {
     uint i;
@@ -328,15 +377,9 @@ void row_minors_PointXfrm (Point* dst, const PointXfrm* xfrm, uint row)
     void
 spherical3_PointXfrm (PointXfrm* dst, real zenith, real azimuthcc)
 {
-    PointXfrm rotation, tmp;
-
     identity_PointXfrm (dst);
-
-    rotation_PointXfrm (&rotation, 0, DirDimension, M_PI / 2 - zenith);
-    xfrm_PointXfrm (&tmp, &rotation, dst);
-
-    rotation_PointXfrm (&rotation, 1, DirDimension, azimuthcc);
-    xfrm_PointXfrm (dst, &tmp, &rotation);
+    rotate_PointXfrm (dst, 1, DirDimension, azimuthcc);
+    rotate_PointXfrm (dst, 0, DirDimension, M_PI / 2 - zenith);
 }
 
 /* Take a bounding box, rotate it from a basis,
@@ -354,7 +397,7 @@ trxfrm_BoundingBox (BoundingBox* dst,
     Point diff;
     PointXfrm bbox, robox;
 
-    diff_Point (&diff, &box->max_corner, &box->min_corner);
+    diff_Point (&diff, &box->max, &box->min);
     scale_Point (&diff, &diff, .5);
 
     UFor( i, NDimensions )
@@ -380,8 +423,8 @@ trxfrm_BoundingBox (BoundingBox* dst,
         real a, b;
         a = robox.pts[i].coords[i];
         b = new_centroid->coords[i];
-        dst->min_corner.coords[i] = - a + b;
-        dst->max_corner.coords[i] = + a + b;
+        dst->min.coords[i] = - a + b;
+        dst->max.coords[i] = + a + b;
 
         UFor( j, NDimensions )
             assert (a >= robox.pts[j].coords[i]);

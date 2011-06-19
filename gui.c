@@ -215,10 +215,10 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
     }
     else if (roll != 0)
     {
-        PointXfrm rotation, tmp;
-        rotation_PointXfrm (&rotation, 0, 1, roll * M_PI / 8);
-        xfrm_PointXfrm (&tmp, &rotation, &view_basis);
-        orthonormalize_PointXfrm (&view_basis, &tmp);
+        PointXfrm tmp_basis;
+        copy_PointXfrm (&tmp_basis, &view_basis);
+        rotate_PointXfrm (&tmp_basis, 0, 1, roll * M_PI / 8);
+        orthonormalize_PointXfrm (&view_basis, &tmp_basis);
 
         fputs ("basis:", out);
         output_PointXfrm (out, &view_basis);
@@ -409,7 +409,7 @@ update_object_locations (RaySpace* space, MotionInput* mot)
     const uint dir_dim = DirDimension;
     real x, dt;
 #ifndef NRacers
-    PointXfrm rotation, tmp_basis;
+    PointXfrm tmp_basis;
     uint i;
     (void) space;
 #endif
@@ -440,18 +440,16 @@ update_object_locations (RaySpace* space, MotionInput* mot)
     move_objects (space, racer_motions, dt);
 #else /* ^ #ifdef NRacers ^ */
 
+    copy_PointXfrm (&tmp_basis, &view_basis);
         /* /x/ comes in as the vertical rotation.*/
-    rotation_PointXfrm (&rotation, 0, dir_dim, x * dt *  M_PI / 2);
-    trxfrm_PointXfrm (&tmp_basis, &rotation, &view_basis);
+    trrotate_PointXfrm (&tmp_basis, 0, dir_dim, x * dt *  M_PI / 2);
 
     if (mot->use_roll)
-        rotation_PointXfrm (&rotation, 1, 0,       mot->horz * dt * M_PI / 2);
+        trrotate_PointXfrm (&tmp_basis, 1, 0,       mot->horz * dt * M_PI / 2);
     else
-        rotation_PointXfrm (&rotation, 1, dir_dim, mot->horz * dt * M_PI / 2);
+        trrotate_PointXfrm (&tmp_basis, 1, dir_dim, mot->horz * dt * M_PI / 2);
 
-    trxfrm_PointXfrm (&view_basis, &rotation, &tmp_basis);
-    orthonormalize_PointXfrm (&tmp_basis, &view_basis);
-    copy_PointXfrm (&view_basis, &tmp_basis);
+    orthonormalize_PointXfrm (&view_basis, &tmp_basis);
 
     UFor( i, NDimensions )
     {
