@@ -13,6 +13,8 @@ detect_collision (ObjectMotion* motions,
                   uint objidx,
                   const Point* new_centroid,
                   const PointXfrm* new_orientation,
+                  const Point* displacement,
+                  const PointXfrm* rotation,
                   real dt);
 
     void
@@ -83,37 +85,21 @@ zero_rotations (ObjectMotion* motion)
     void
 move_object (RaySpace* space, ObjectMotion* motions, uint objidx, real dt)
 {
-    uint i;
     bool commit_move = true;
-    PointXfrm basis, new_orientation;
+    uint i;
+    Point veloc;
     Point new_centroid;
+    PointXfrm basis;
+    PointXfrm new_orientation, rotation;
     ObjectRaySpace* object;
     ObjectMotion* motion;
-    Point dir, veloc;
 
     object = &space->objects[objidx];
     motion = &motions[objidx];
+    identity_PointXfrm (&rotation);
 
         /* Rotate object.*/
-    dir.coords[DirDimension] = 1;
-    UFor( i, NDimensions - 1 )
-    {
-        uint idx;
-        real angle;
-        idx = i * (NDimensions - 2) + DirDimension - 1;
-        angle = - motion->rots[idx] * dt;
-        assert (angle < + M_PI / 2);
-        assert (angle > - M_PI / 2);
-            /* Find the directional components.*/
-        dir.coords[i] = tan (angle);
-    }
-        /* Rotate relative to the direction.*/
-    copy_PointXfrm (&basis, &object->orientation);
-    trxfrm_Point (&basis.pts[DirDimension], &object->orientation, &dir);
-    orthorotate_PointXfrm (&new_orientation, &basis, DirDimension);
-
-        /* Add in various other rotations.*/
-    UFor( i, NDimensions - 1 )
+    UFor( i, NDimensions )
     {
         uint j;
         UFor( j, i )
@@ -124,9 +110,12 @@ move_object (RaySpace* space, ObjectMotion* motions, uint objidx, real dt)
             angle = motion->rots[idx] * dt;
             assert (angle < + M_PI / 2);
             assert (angle > - M_PI / 2);
-            trrotate_PointXfrm (&new_orientation, j, i, angle);
+            rotate_PointXfrm (&rotation, j, i, angle);
         }
     }
+
+    trxfrm_PointXfrm (&basis, &rotation, &object->orientation);
+    orthonormalize_PointXfrm (&new_orientation, &basis);
 
     if (motion->thrust != 0)
     {
@@ -164,6 +153,8 @@ move_object (RaySpace* space, ObjectMotion* motions, uint objidx, real dt)
                                 space, objidx,
                                 &new_centroid,
                                 &new_orientation,
+                                &veloc,
+                                &rotation,
                                 dt);
         if (hit)
         {
@@ -178,13 +169,14 @@ move_object (RaySpace* space, ObjectMotion* motions, uint objidx, real dt)
     }
 }
 
-
     bool
 detect_collision (ObjectMotion* motions,
                   const RaySpace* space,
                   uint objidx,
                   const Point* new_centroid,
                   const PointXfrm* new_orientation,
+                  const Point* displacement,
+                  const PointXfrm* rotation,
                   real dt)
 {
     uint i;
@@ -196,6 +188,9 @@ detect_collision (ObjectMotion* motions,
     const ObjectRaySpace* object;
     const Scene* scene;
     bool colliding;
+
+    (void) displacement;
+    (void) rotation;
 
     assert (objidx < space->nobjects);
     object = &space->objects[objidx];
@@ -246,6 +241,51 @@ detect_collision (ObjectMotion* motions,
                 hit_dx = distance;
                 copy_Point (&hit_dir, &unit_dir);
             }
+        }
+    }
+
+    UFor( i, space->nobjects )
+    {
+        uint j;
+        BoundingBox box, tmpbox;
+        PointXfrm basis;
+        Point cent, centoff;
+        const ObjectRaySpace* query_object;
+
+        if (i == objidx)
+        {
+            query_object = &space->main;
+            zero_Point (&centoff);
+        }
+        else
+        {
+            query_object = &space->objects[i];
+            centroid_BoundingBox (&centoff, &query_object->box);
+            diff_Point (&centoff, &centoff, &query_object->centroid);
+        }
+
+        xfrm_PointXfrm (&basis, &query_object->orientation,
+                        &object->orientation);
+        summ_Point (&cent, &centoff, &object->centroid);
+        trxfrm_BoundingBox (&box, &basis, &object->box, &cent);
+
+
+        xfrm_PointXfrm (&basis, &query_object->orientation,
+                        new_orientation);
+        summ_Point (&cent, &centoff, new_centroid);
+        trxfrm_BoundingBox (&tmpbox, &basis, &object->box, &cent);
+
+        merge_BoundingBox (&box, &box, &tmpbox);
+
+        j = inside_BoundingBox_KPTree (&query_object->verttree,
+                                       &box, Max_uint);
+        while (j != Max_uint)
+        {
+            FILE* out = stderr;
+            output_Point (out, &object->verttree.nodes[j].loc);
+            fputc ('\n', out);
+            j = inside_BoundingBox_KPTree (&query_object->verttree,
+                                           &box, j);
         }
     }
 

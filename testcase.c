@@ -163,9 +163,18 @@ setup_testcase_track (RaySpace* space,
         view_origin->coords[3] = .5;
     }
 
+#if 1
     setup_camera_light (space, view_origin);
     space->lights[0].intensity = .5;
         /* space->lights[0].intensity = 1e6; */
+#else
+    space->nlights = 2;
+    space->lights = AllocT( PointLightSource, space->nlights );
+    copy_Point (&space->lights[0].location, view_origin);
+    copy_Point (&space->lights[1].location, &space->main.box.max);
+    space->lights[0].intensity = .5;
+    space->lights[1].intensity = .1;
+#endif
     return good;
 }
 
@@ -596,23 +605,18 @@ setup_testcase_4d_surface (RaySpace* space,
 #if 0
 #elif 1
     *view_angle = 1.0472;
-    view_origin->coords[0] = -21322.4;
-    view_basis->pts[0].coords[0] = -0.0701899;
-    view_basis->pts[0].coords[1] = -0.997534;
-    view_basis->pts[0].coords[2] = 3.35915e-05;
-    view_origin->coords[1] = 1885.96;
-    view_basis->pts[1].coords[0] = 0.00932495;
-    view_basis->pts[1].coords[1] = -0.000689809;
-    view_basis->pts[1].coords[2] = -0.999956;
-    view_origin->coords[2] = -343.056;
-    view_basis->pts[2].coords[0] = 0.99749;
-    view_basis->pts[2].coords[1] = -0.0701865;
-    view_basis->pts[2].coords[2] = 0.00935037;
-    if (NDimensions == 4)
-    {
-        swaprows_PointXfrm (view_basis, 2, 3);
-        view_origin->coords[3] = 0.5;
-    }
+    view_origin->coords[0] = -4818.89;
+    view_basis->pts[0].coords[0] = -0.987767;
+    view_basis->pts[0].coords[1] = -0.146868;
+    view_basis->pts[0].coords[2] = -0.0524107;
+    view_origin->coords[1] = -2013.33;
+    view_basis->pts[1].coords[0] = -0.0790953;
+    view_basis->pts[1].coords[1] = 0.182214;
+    view_basis->pts[1].coords[2] = 0.980073;
+    view_origin->coords[2] = -1762.03;
+    view_basis->pts[2].coords[0] = -0.134392;
+    view_basis->pts[2].coords[1] = 0.972228;
+    view_basis->pts[2].coords[2] = -0.191601;
 #endif
 
     setup_camera_light (space, view_origin);

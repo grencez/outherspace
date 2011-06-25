@@ -30,6 +30,7 @@ struct object_ray_space_struct
     Scene scene;
     BoundingBox box;
     KDTree tree;
+    KPTree verttree;
 };
 
 struct point_light_source_struct

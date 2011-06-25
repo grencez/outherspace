@@ -165,6 +165,27 @@ ceil_uint (uint a, uint b)
     return Ceil_uint (a, b);
 }
 
+    uint
+log2_uint (uint a)
+{
+    uint p = 0;
+    assert (a > 0);
+    do
+    {
+        a >>= 1;
+        ++p;
+    }
+    while (a > 0);
+    return p-1;
+}
+
+    uint
+pow2_uint (uint p)
+{
+    assert (p < 32);
+    return 1 << p;
+}
+
     void
 swap_uint (uint* x, uint* y)
 {

@@ -460,9 +460,9 @@ update_object_locations (RaySpace* space, MotionInput* mot)
     }
 
 #if NDimensions == 4
-#ifdef NRacers
-    view_origin.coords[3] = mot->drift;
-#endif
+    x = (1 + mot->drift) / 2;
+    x = clamp_real (x, 0, 1);
+    view_origin.coords[3] = x;
 #endif
 #endif
 }
@@ -477,6 +477,7 @@ update_view_params (const RaySpace* space)
     const ObjectRaySpace* object;
     PointXfrm rotation;
     real view_zenith, view_azimuthcc;
+    Point raise;
 
     object = &space->objects[0];
 
@@ -488,6 +489,9 @@ update_view_params (const RaySpace* space)
 
     scale_Point (&view_origin, &view_basis.pts[DirDimension], -130);
     summ_Point (&view_origin, &view_origin, &object->centroid);
+
+    scale_Point (&raise, &view_basis.pts[0], 50);
+    summ_Point (&view_origin, &view_origin, &raise);
 #else
     (void) space;
 #endif

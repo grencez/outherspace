@@ -424,8 +424,8 @@ void split_BoundingBox (BoundingBox* lo_box, BoundingBox* hi_box,
                         const BoundingBox* box,
                         uint split_dim, real split_pos)
 {
-    assert (split_pos < box->max.coords[split_dim]);
-    assert (split_pos > box->min.coords[split_dim]);
+    assert (split_pos <= box->max.coords[split_dim]);
+    assert (split_pos >= box->min.coords[split_dim]);
 
     copy_BoundingBox (lo_box, box);
     copy_BoundingBox (hi_box, box);

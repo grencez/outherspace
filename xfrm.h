@@ -5,7 +5,8 @@
 #include "space.h"
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
-#define DirDimension (NDimensions - 1)
+    /* #define DirDimension (NDimensions - 1) */
+#define DirDimension 2
 
 struct point_xfrm_struct
 {
@@ -32,6 +33,8 @@ void
 xfrm_PointXfrm (PointXfrm* dst, const PointXfrm* A, const PointXfrm* B);
 void
 trxfrm_PointXfrm (PointXfrm* dst, const PointXfrm* A, const PointXfrm* B);
+void
+xfrmtr_PointXfrm (PointXfrm* dst, const PointXfrm* A, const PointXfrm* B);
 void reflect_PointXfrm (PointXfrm* xfrm, uint j, uint k);
 void swaprows_PointXfrm (PointXfrm* xfrm, uint j, uint k);
 void to_basis_PointXfrm (PointXfrm* dst, const PointXfrm* xfrm,

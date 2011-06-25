@@ -7,7 +7,9 @@ fill_between_simplices (SceneElement* elems,
                         const SceneElement* a,
                         const SceneElement* b,
                         uint a_vert_offset,
-                        uint b_vert_offset);
+                        uint b_vert_offset,
+                        uint a_vnml_offset,
+                        uint b_vnml_offset);
 static uint
 full_fill_between_simplices (SceneElement* dst_elems,
                              uint k,
@@ -125,7 +127,9 @@ fill_between_simplices (SceneElement* elems,
                         const SceneElement* a,
                         const SceneElement* b,
                         uint a_vert_offset,
-                        uint b_vert_offset)
+                        uint b_vert_offset,
+                        uint a_vnml_offset,
+                        uint b_vnml_offset)
 {
     uint i;
     UFor( i, k )
@@ -136,8 +140,16 @@ fill_between_simplices (SceneElement* elems,
         init_SceneElement (elem);
         UFor( j, k )
         {
-            if (j <= i)  elem->pts[j]   = a_vert_offset + a->pts[j];
-            if (j >= i)  elem->pts[j+1] = b_vert_offset + b->pts[j];
+            if (j <= i)
+            {
+                elem->pts[j] = a_vert_offset + a->pts[j];
+                elem->vnmls[j] = a_vnml_offset + a->vnmls[j];
+            }
+            if (j >= i)
+            {
+                elem->pts[j+1] = b_vert_offset + b->pts[j];
+                elem->vnmls[j] = b_vnml_offset + b->vnmls[j];
+            }
         }
     }
     return k;
@@ -347,7 +359,8 @@ interpolate_Scene (Scene* dst, uint k, uint nscenes, const Scene* scenes)
             else
                 x = fill_between_simplices (dst_elems, k,
                                             &a->elems[ei], &b->elems[ei],
-                                            a_vert_offset, b_vert_offset);
+                                            a_vert_offset, b_vert_offset,
+                                            a_vnml_offset, b_vnml_offset);
             ecount += x;
         }
     }

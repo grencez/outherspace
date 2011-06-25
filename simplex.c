@@ -20,6 +20,9 @@ void output_Simplex (FILE* out, const Simplex* elem)
 }
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
+#if NDimensions != 4
+    /* But really only works for 3D!*/
+
 static
     void
 cross_Point (Point* restrict dst,
@@ -33,7 +36,6 @@ cross_Point (Point* restrict dst,
     for (i = 3; i < NDimensions; ++i)
         dst->coords[i] = 0;
 }
-
 
     bool
 hit_Simplex (real* restrict ret_dist,
@@ -90,6 +92,137 @@ hit_Simplex (real* restrict ret_dist,
 
     return *ret_dist >= 0;
 }
+
+#else  /*V NDimensions == 4 V*/
+
+static
+    void
+solve_3x3 (real x[3], const PointXfrm* A, const real b[3])
+{
+    uint i;
+    real det, invdet;
+
+    det = det3_PointXfrm (A, 0, 1, 2, 0, 1, 2);
+    if (-Epsilon_real < det && det < Epsilon_real)
+    {
+        x[0] = -1;
+            /* puts ("A"); */
+        return;
+    }
+
+    invdet = 1/det;
+    UFor( i, 3 )
+    {
+        uint j;
+        PointXfrm S;
+        copy_PointXfrm (&S, A);
+        UFor( j, 3 )
+            S.pts[j].coords[i] = b[j];
+        x[i] = invdet * det3_PointXfrm (&S, 0, 1, 2, 0, 1, 2);
+    }
+}
+
+    /* BROKE! */
+    bool
+hit_Simplex (real* restrict ret_dist,
+             const Point* restrict origin,
+             const Point* restrict direct,
+             const Simplex* restrict elem)
+{
+    uint i;
+    uint axes[3];
+    real b[3];
+    real rayt;
+    real offset;
+    real x[3];
+    PointXfrm A, B;
+    Point normal, isect;
+        /* puts ("Z"); */
+
+    diff_Point (&B.pts[1], &elem->pts[1], &elem->pts[0]);
+    diff_Point (&B.pts[2], &elem->pts[2], &elem->pts[0]);
+    diff_Point (&B.pts[3], &elem->pts[3], &elem->pts[0]);
+
+    row_minors_PointXfrm (&normal, &B, 0);
+    checker_negate_Point (&normal);
+
+    {
+        uint maxidx = 0;
+        real maxcoord;
+        maxcoord = fabs (normal.coords[maxidx]);
+        UFor( i, NDimensions-1 )
+        {
+            real a;
+            a = fabs (normal.coords[i+1]);
+            if (a > maxcoord)
+            {
+                maxidx = i=1;
+                maxcoord = a;
+            }
+        }
+
+        UFor( i, NDimensions )
+        {
+            if (i < maxidx)  axes[i] = i;
+            if (i > maxidx)  axes[i-1] = i;
+        }
+        normal.coords[maxidx] = 0;
+    }
+
+    normalize_Point (&normal, &normal);
+
+    rayt = dot_Point (&normal, direct);
+    if (-Epsilon_real < rayt && rayt < Epsilon_real)
+    {
+            /* puts ("B"); */
+        return false;
+    }
+
+    
+    offset = - dot_Point (&elem->pts[0], &normal);
+    rayt = - (offset + dot_Point (&normal, origin)) / rayt;
+    if (rayt < 0)
+    {
+            /* puts ("E"); */
+        return false;
+    }
+
+        /* Calculate the intersection point of
+         * the ray and embedding hyperplane.
+         */
+    scale_Point (&isect, direct, rayt);
+    summ_Point (&isect, &isect, origin);
+
+        /* Calculate the equation result values. Note that the dominant
+         * axes are precomputed and stored in tet.axes.
+         */
+    UFor( i, 3 )
+    {
+        b[i] = isect.coords[axes[i]] - elem->pts[0].coords[axes[i]];
+    }
+
+    
+    zero_PointXfrm (&A);
+    UFor( i, 3 )
+    {
+        uint j;
+        UFor( j, 3 )
+            A.pts[i].coords[j] = B.pts[i+1].coords[axes[j]];
+    }
+
+
+        /* Solve the system of three equations and three unknowns.*/
+    solve_3x3 (x, &A, b);
+
+    if (x[0] < 0 || x[1] < 0 || x[2] < 0 || (x[0]+x[1]+x[2] > 1))
+    {
+            /* puts ("C"); */
+        return false;
+    }
+    *ret_dist = rayt;
+    return true;
+}
+#endif
 
 
 static void cross3 (real dst[3], const real a[3], const real b[3])

@@ -76,6 +76,7 @@ testfn_KPTree ()
     uint i;
     KPTree tree;
     KPTreeGrid grid;
+    BoundingBox box;
     uint indices[6] = { 0, 1, 2, 3, 4, 5 };
     real coords[3][6] =
     {
@@ -129,14 +130,21 @@ testfn_KPTree ()
     i = tree.nodes[i].idx;
     assert (i == 4);
 
+
+    zero_BoundingBox (&box);
+    UFor( i, 2 )
     {
-        BoundingBox box;
-        UFor( i, NDimensions )
-        {
-            box.min.coords[i] = 1.5;
-            box.max.coords[i] = 4.1;
-        }
-        inside_BoundingBox_KPTree (&tree, &box);
+        box.min.coords[i] = 1.5;
+        box.max.coords[i] = 4.1;
+    }
+
+    i = inside_BoundingBox_KPTree (&tree, &box, Max_uint);
+    while (i != Max_uint)
+    {
+        FILE* out = stderr;
+        output_Point (out, &tree.nodes[i].loc);
+        fputc ('\n', out);
+        i = inside_BoundingBox_KPTree (&tree, &box, i);
     }
 }
 

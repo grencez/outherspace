@@ -35,6 +35,11 @@ computer_triv_sync_mpi_RayImage (const RayImage* image,
 static void
 partition_ObjectRaySpace (ObjectRaySpace* space);
 static void
+partition_verts_ObjectRaySpace (ObjectRaySpace* space);
+static void
+init_Scene_KPTreeGrid (KPTreeGrid* grid, const Scene* scene,
+                       const BoundingBox* box);
+static void
 init_RaySpace_KDTreeGrid (KDTreeGrid* grid, const RaySpace* space);
 
 static void
@@ -97,6 +102,7 @@ init_ObjectRaySpace (ObjectRaySpace* space)
     init_Scene (&space->scene);
     space->nelems = 0;
     init_KDTree (&space->tree);
+    init_KPTree (&space->verttree);
 }
 
     void
@@ -156,6 +162,7 @@ init_filled_ObjectRaySpace (ObjectRaySpace* space)
     }
 
     partition_ObjectRaySpace (space);
+    partition_verts_ObjectRaySpace (space);
 }
 
     void
@@ -175,6 +182,7 @@ cleanup_ObjectRaySpace (ObjectRaySpace* space)
 {
     cleanup_Scene (&space->scene);
     cleanup_KDTree (&space->tree);
+    cleanup_KPTree (&space->verttree);
     if (space->nelems > 0)
     {
         free (space->elems);
@@ -212,6 +220,15 @@ partition_ObjectRaySpace (ObjectRaySpace* space)
     init_Scene_KDTreeGrid (&grid, &space->scene, &space->box);
     build_KDTree (&space->tree, &grid);
     cleanup_KDTreeGrid (&grid);
+}
+
+    void
+partition_verts_ObjectRaySpace (ObjectRaySpace* space)
+{
+    KPTreeGrid grid;
+    init_Scene_KPTreeGrid (&grid, &space->scene, &space->box);
+    build_KPTree (&space->verttree, &grid);
+    cleanup_KPTreeGrid (&grid);
 }
 
     void
@@ -271,6 +288,33 @@ init_Scene_KDTreeGrid (KDTreeGrid* grid, const Scene* scene,
         }
     }
     copy_BoundingBox (&grid->box, box);
+}
+
+    void
+init_Scene_KPTreeGrid (KPTreeGrid* grid, const Scene* scene,
+                       const BoundingBox* box)
+{
+    uint i;
+
+    grid->npts = scene->nverts;
+    grid->indices = AllocT( uint, grid->npts );
+    grid->coords[0] = AllocT( real, NDimensions * grid->npts );
+    copy_BoundingBox (&grid->box, box);
+
+    UFor( i, NDimensions-1 )
+        grid->coords[i+1] = &grid->coords[i][grid->npts];
+
+    UFor( i, grid->npts )
+    {
+        uint dim;
+        const Point* p;
+
+        grid->indices[i] = i;
+        p = &scene->verts[i];
+
+        UFor( dim, NDimensions )
+            grid->coords[dim][i] = p->coords[dim];
+    }
 }
 
     void

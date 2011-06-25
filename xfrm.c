@@ -186,6 +186,21 @@ trxfrm_PointXfrm (PointXfrm* dst, const PointXfrm* A, const PointXfrm* B)
     }
 }
 
+    void
+xfrmtr_PointXfrm (PointXfrm* dst, const PointXfrm* A, const PointXfrm* B)
+{
+    uint i;
+    assert (dst != A);
+    assert (dst != B);
+
+    UFor( i, NDimensions )
+    {
+        uint j;
+        UFor( j, NDimensions )
+            dst->pts[i].coords[j] = dot_Point (&A->pts[i], &B->pts[j]);
+    }
+}
+
 void reflect_PointXfrm (PointXfrm* xfrm, uint j, uint k)
 {
     Point rows[2];
@@ -430,6 +445,7 @@ trxfrm_BoundingBox (BoundingBox* dst,
             assert (a >= robox.pts[j].coords[i]);
     }
 }
+
 
     void
 ray_to_basis (Point* ret_origin, Point* ret_dir,

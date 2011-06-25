@@ -17,6 +17,9 @@ sort_indexed_reals (uint nmembs, uint* indices, const real* coords);
 void
 select_indexed_reals (uint* indices, const real* membs,
                       uint p, uint i, uint s);
+bool
+verify_select_indexed_reals (uint p, uint i, uint s,
+                             const uint* indices, const real* membs);
 
 #ifdef INCLUDE_SOURCE
 #include "order.c"

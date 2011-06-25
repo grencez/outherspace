@@ -175,6 +175,16 @@ cleanup_KPTree (KPTree* tree)
     if (tree->nnodes > 0)  free (tree->nodes);
 }
 
+    void
+cleanup_KPTreeGrid (KPTreeGrid* grid)
+{
+    if (grid->npts > 0)
+    {
+        free (grid->indices);
+        free (grid->coords[0]);
+    }
+}
+
 static
     void
 split_KDTreeGrid (KDTreeGrid* logrid, KDTreeGrid* higrid,
@@ -591,13 +601,27 @@ build_KPTreeNode (KPTree* tree, KPTreeGrid* grid,
     n = s - p;
     assert (n > 0);
 
+    mididx = p;
+    if (n > 1)
+    {
+        uint depth, lo, hi;
+        depth = log2_uint (n);
+        assert (depth > 0);
+        lo = (n+1) - pow2_uint (depth);
+        hi = pow2_uint (depth - 1);
+
+        mididx += (n-lo)/2;
+        if (lo < hi)  mididx += lo;
+        else          mididx += hi;
+    }
+
     node = &tree->nodes[nodeidx];
     split_dim = 0;
-    mididx = p + n / 2;
 
     if (n > 1)
     {
         real max_length = 0;
+
         UFor( i, NDimensions )
         {
             real len;
@@ -613,12 +637,15 @@ build_KPTreeNode (KPTree* tree, KPTreeGrid* grid,
 
     select_indexed_reals (grid->indices, grid->coords[split_dim],
                           p, mididx, s);
+    assert (verify_select_indexed_reals (p, mididx, s,
+                                         grid->indices,
+                                         grid->coords[split_dim]));
 
     node->dim = split_dim;
-    node->idx = mididx;
+    node->idx = grid->indices[mididx];
     UFor( i, NDimensions )
     {
-        node->loc.coords[i] = grid->coords[i][mididx];
+        node->loc.coords[i] = grid->coords[i][node->idx];
         logrid.coords[i] = grid->coords[i];
         higrid.coords[i] = grid->coords[i];
     }
@@ -829,49 +856,47 @@ nearest_neighbor_KPTree (const KPTree* tree, const Point* loc)
     return best;
 }
 
-    void
-inside_BoundingBox_KPTree (const KPTree* tree, const BoundingBox* box)
+    /* For each point found inside the bounding box,
+     * the KPTreeNode index representing it is returned.
+     *
+     * Initiallly, /i/ is /Max_uint/.
+     * Subsequently, /i/ is the previous return value.
+     * Terminate when the return value is /Max_uint/.
+     */
+    uint
+inside_BoundingBox_KPTree (const KPTree* tree, const BoundingBox* box, uint i)
 {
-    uint i;
-    Point loc;
-
-    centroid_BoundingBox (&loc, box);
-    i = descend_KPTree (tree, &loc, 0);
+    if (i < tree->nnodes)  i = 2 * i + 2;
+    else                   i = 0;
+    i = descend_KPTree (tree, &box->min, i);
 
     while (i > 0)
     {
-        bool fromlo;
-        bool descending = false;
         uint previ;
-        uint split_dim;
-        real split_loc;
-        const KPTreeNode* node;
 
         previ = i;
         i = (i - 1) / 2;
-        node = &tree->nodes[i];
 
-        split_dim = node->dim;
-        split_loc = node->loc.coords[split_dim];
-        fromlo = loc.coords[split_dim] <= split_loc;
-        if (fromlo != even_uint (previ))
+        if (!even_uint (previ))
         {
-            if (fromlo)
-                descending = box->max.coords[split_dim] >= split_loc;
-            else
-                descending = box->min.coords[split_dim] <= split_loc;
-        }
+            uint split_dim;
+            real split_loc;
+            const KPTreeNode* node;
 
-        if (descending)
-        {
-            FILE* out = stderr;
-            output_Point (out, &node->loc);
-            fputc ('\n', out);
+            node = &tree->nodes[i];
+            split_dim = node->dim;
+            split_loc = node->loc.coords[split_dim];
 
-            if (fromlo)  i = 2 * i + 2;  /* From lo side -> go to hi side.*/
-            else         i = 2 * i + 1;  /* From hi side -> go to lo side.*/
-            i = descend_KPTree (tree, &loc, i);
+            if (box->min.coords[split_dim] <= split_loc &&
+                box->max.coords[split_dim] >= split_loc)
+            {
+                if (inside_BoundingBox (box, &node->loc))  return i;
+
+                i = 2 * i + 2;
+                i = descend_KPTree (tree, &box->min, i);
+            }
         }
     }
+    return Max_uint;
 }
 

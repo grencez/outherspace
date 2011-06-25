@@ -201,7 +201,7 @@ static
 median5_indexed_reals (uint* indices, const real* membs, uint p, uint s)
 {
     uint q, i;
-    if (p + 5 > s)
+    if (p + 5 >= s)
     {
         uint n;
         real a[5];
@@ -247,4 +247,44 @@ select_indexed_reals (uint* indices, const real* membs,
     }
 }
 
+    bool
+verify_select_indexed_reals (uint p, uint i, uint s,
+                             const uint* indices, const real* membs)
+{
+    uint ith, n;
+    uint nlo = 0, neq = 0, nhi = 0;
+    real x;
+
+    ith = i - p;
+    n = s - p;
+    x = membs[indices[i]];
+
+    while (p < s)
+    {
+        real y;
+        y = membs[indices[p]];
+        if (y <  x)
+        {
+            if (p >= i)  return false;
+            ++ nlo;
+        }
+        else if (y == x)
+        {
+            ++ neq;
+        }
+        else if (y >  x)
+        {
+            if (p <= i)  return false;
+            ++ nhi;
+        }
+        else
+        {
+            return false;
+        }
+        ++ p;
+    }
+
+    assert (n == nlo + neq + nhi);
+    return (nlo <= ith && nhi <= (n - ith - 1));
+}
 
