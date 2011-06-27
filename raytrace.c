@@ -513,8 +513,7 @@ ray_to_ObjectRaySpace (Point* ret_origin,
         ray_to_basis (ret_origin, ret_dir,
                       &object->orientation,
                       origin, dir,
-                      &object->centroid,
-                      &object->box);
+                      &object->centroid);
     }
     else
     {

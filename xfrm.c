@@ -452,15 +452,12 @@ ray_to_basis (Point* ret_origin, Point* ret_dir,
               const PointXfrm* basis,
               const Point* origin,
               const Point* dir,
-              const Point* old_centroid,
-              const BoundingBox* box)
+              const Point* old_centroid)
 {
-    Point diff, new_centroid;
+    Point diff;
 
     diff_Point (&diff, origin, old_centroid);
     xfrm_Point (ret_origin, basis, &diff);
-    centroid_BoundingBox (&new_centroid, box);
-    summ_Point (ret_origin, ret_origin, &new_centroid);
 
     xfrm_Point (ret_dir, basis, dir);
 }

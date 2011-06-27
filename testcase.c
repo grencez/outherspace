@@ -89,10 +89,13 @@ setup_racers (RaySpace* space)
     bool good = true;
     UFor( i, space->nobjects )
     {
+        BoundingBox box;
+        Point displacement;
         ObjectRaySpace* object;
         object = &space->objects[i];
         init_ObjectRaySpace (object);
         object->centroid.coords[0] = 75 * i + 300;
+        object->centroid.coords[1] = 75 * i + 300;
 
         if (NDimensions == 3)
         {
@@ -107,6 +110,11 @@ setup_racers (RaySpace* space)
             interpolate_by_file (&object->scene, 2, "input", fnames, dcoords);
             object->centroid.coords[3] = .5;
         }
+
+        init_BoundingBox (&box, object->scene.nverts, object->scene.verts);
+        centroid_BoundingBox (&displacement, &box);
+        negate_Point (&displacement, &displacement);
+        xlate_Scene (&object->scene, &displacement);
     }
     return good;
 }

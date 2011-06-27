@@ -7,6 +7,13 @@ static void
 zero_rotations (ObjectMotion* motion);
 static void
 move_object (RaySpace* space, ObjectMotion* motions, uint objidx, real dt);
+static void
+apply_gravity (ObjectMotion* motion, const ObjectRaySpace* object, real dt);
+static void
+apply_thrust (Point* veloc,
+              PointXfrm* orientation,
+              const ObjectMotion* motion,
+              real dt);
 static bool
 detect_collision (ObjectMotion* motions,
                   const RaySpace* space,
@@ -24,11 +31,12 @@ init_ObjectMotion (ObjectMotion* motion)
     motion->mass = 1;
     zero_Point (&motion->veloc);
     motion->thrust = 0;
+    motion->boost = false;
     UFor( i, N2DimRotations )
         motion->rots[i] = 0;
     motion->collide = true;
-        /* Not implemented yet.*/
-    motion->gravity = false;
+    motion->gravity = true;
+    motion->stabilize = true;
 }
 
     void
@@ -89,7 +97,7 @@ move_object (RaySpace* space, ObjectMotion* motions, uint objidx, real dt)
     uint i;
     Point veloc;
     Point new_centroid;
-    PointXfrm basis;
+        /* PointXfrm basis; */
     PointXfrm new_orientation, rotation;
     ObjectRaySpace* object;
     ObjectMotion* motion;
@@ -114,33 +122,10 @@ move_object (RaySpace* space, ObjectMotion* motions, uint objidx, real dt)
         }
     }
 
-    trxfrm_PointXfrm (&basis, &rotation, &object->orientation);
-    orthonormalize_PointXfrm (&new_orientation, &basis);
-
-    if (motion->thrust != 0)
-    {
-        const real alpha = 5;  /* Arbitrary coefficient.*/
-        const real vthrust = 733;  /* Velocity of thrusters.*/
-        real accel, mag;
-        Point tmp;
-
-            /* Assume full grip causes orthogonal motion to be lost.*/
-        proj_Point (&veloc, &motion->veloc, &new_orientation.pts[DirDimension]);
-
-        mag = magnitude_Point (&veloc);
-        accel = alpha * (vthrust - mag);
-        if (motion->thrust < 0)  accel = - accel;
-
-        scale_Point (&tmp, &new_orientation.pts[DirDimension], accel * dt);
-        summ_Point (&veloc, &veloc, &tmp);
-    }
-    else
-    {
-        copy_Point (&veloc, &motion->veloc);
-            /* HACK to make racer stop fast!*/
-            /* Half the speed every second.*/
-        scale_Point (&veloc, &veloc, pow (0.5, dt));
-    }
+    trxfrm_PointXfrm (&new_orientation, &rotation, &object->orientation);
+    apply_gravity (motion, object, dt);
+    apply_thrust (&veloc, &new_orientation, motion, dt);
+        /* orthorotate_PointXfrm (&new_orientation, &basis, 0); */
 
     copy_Point (&motion->veloc, &veloc);
     scale_Point (&veloc, &veloc, dt);
@@ -160,6 +145,7 @@ move_object (RaySpace* space, ObjectMotion* motions, uint objidx, real dt)
         {
             commit_move = false;
         }
+
     }
 
     if (commit_move)
@@ -167,6 +153,94 @@ move_object (RaySpace* space, ObjectMotion* motions, uint objidx, real dt)
         copy_Point (&object->centroid, &new_centroid);
         copy_PointXfrm (&object->orientation, &new_orientation);
     }
+}
+
+    /* Gravity just shoots you at 500 m/s to a middle point.*/
+    void
+apply_gravity (ObjectMotion* motion, const ObjectRaySpace* object, real dt)
+{
+    real mag, accel;
+    if (!motion->gravity)  return;
+
+    mag = motion->veloc.coords[0];
+
+    accel = 2 * (-500 - mag);
+
+    if (object->centroid.coords[0] < 100)
+        accel = - accel;
+    motion->veloc.coords[0] += accel * dt;
+}
+
+    void
+apply_thrust (Point* veloc,
+              PointXfrm* orientation,
+              const ObjectMotion* motion,
+              real dt)
+{
+    const real alpha = 3;  /* Arbitrary coefficient.*/
+    real vthrust = 733;  /* Velocity of thrusters.*/
+    real accel, mag, magproj, magorth;
+    Point proj, orth, tmp;
+    PointXfrm basis;
+
+    if (motion->boost)  vthrust = 2000;
+
+    vthrust *= motion->thrust;
+
+    if (motion->stabilize)  orientation->pts[DirDimension].coords[0] = 0;
+    normalize_Point (&orientation->pts[0], &orientation->pts[0]);
+
+    copy_Point (veloc, &motion->veloc);
+
+    proj_Point (&proj, &motion->veloc, &orientation->pts[DirDimension]);
+    diff_Point (&orth, &motion->veloc, &proj);
+
+    mag = magnitude_Point (&proj);
+    magproj = mag;
+
+    if (0 > dot_Point (&orientation->pts[DirDimension], &proj))
+        mag = - mag;
+
+    accel = alpha * (vthrust - mag);
+
+    scale_Point (&tmp, &orientation->pts[DirDimension], accel * dt);
+    summ_Point (&proj, &proj, &tmp);
+
+    mag = magnitude_Point (&orth);
+    magorth = mag;
+#if 1
+    if (mag == 0)
+    {
+        zero_Point (&orth);
+    }
+    else
+    {
+        accel = - alpha * mag;
+
+        scale_Point (&tmp, &orth, 1 / mag);
+        scale_Point (&tmp, &tmp, accel * dt);
+        summ_Point (&orth, &orth, &tmp);
+    }
+#else
+        /* HACK to make racer stop fast!*/
+        /* Half the speed every second.*/
+    scale_Point (&orth, &orth, pow (0.5, dt));
+#endif
+
+    summ_Point (veloc, &proj, &orth);
+
+    if (motion->stabilize)
+    {
+        zero_Point (&orientation->pts[0]);
+        orientation->pts[0].coords[0] = 1+magproj+magorth;
+        diff_Point (&orientation->pts[0], &orientation->pts[0], &orth);
+        orthorotate_PointXfrm (&basis, orientation, 0);
+    }
+    else
+    {
+        orthonormalize_PointXfrm (&basis, orientation);
+    }
+    copy_PointXfrm (orientation, &basis);
 }
 
     bool
@@ -202,11 +276,8 @@ detect_collision (ObjectMotion* motions,
         Point diff, origin, destin;
         real distance;
 
-        centroid_BoundingBox (&diff, &object->box);
-        diff_Point (&diff, &scene->verts[i], &diff);
-
-        trxfrm_Point (&origin, &object->orientation, &diff);
-        trxfrm_Point (&destin, new_orientation, &diff);
+        trxfrm_Point (&origin, &object->orientation, &scene->verts[i]);
+        trxfrm_Point (&destin, new_orientation, &scene->verts[i]);
 
         summ_Point (&origin, &origin, &object->centroid);
         summ_Point (&destin, &destin, new_centroid);
@@ -260,8 +331,7 @@ detect_collision (ObjectMotion* motions,
         else
         {
             query_object = &space->objects[i];
-            centroid_BoundingBox (&centoff, &query_object->box);
-            diff_Point (&centoff, &centoff, &query_object->centroid);
+            negate_Point (&centoff, &query_object->centroid);
         }
 
         xfrm_PointXfrm (&basis, &query_object->orientation,
@@ -292,7 +362,6 @@ detect_collision (ObjectMotion* motions,
     colliding = false;
     if (hit_objidx <= space->nobjects)
     {
-        const Point* rel_normal;
         Point normal;
         real cos_normal;
         real hit_speed;
@@ -302,15 +371,22 @@ detect_collision (ObjectMotion* motions,
         colliding = true;
 
         if (hit_objidx < space->nobjects)
+        {
             hit_object = &space->objects[hit_objidx];
+#if 0
+            xfrm_Point (&normal, &hit_object->orientation,
+                        &hit_object->simplices[hit_idx].plane.normal);
+#else
+            diff_Point (&normal, &object->centroid, &hit_object->centroid);
+            normalize_Point (&normal, &normal);
+#endif
+        }
         else
+        {
             hit_object = &space->main;
-
-        rel_normal = &hit_object->simplices[hit_idx].plane.normal;
-        if (hit_objidx < space->nobjects)
-            xfrm_Point (&normal, &hit_object->orientation, rel_normal);
-        else
-            copy_Point (&normal, rel_normal);
+            copy_Point (&normal,
+                        &hit_object->simplices[hit_idx].plane.normal);
+        }
 
         cos_normal = dot_Point (&hit_dir, &normal);
         if (cos_normal < 0)

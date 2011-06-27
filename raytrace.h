@@ -4,6 +4,7 @@
 #define RAYTRACE_H_
 
 #include "kdtree.h"
+#include "kptree.h"
 #include "scene.h"
 #include "simplex.h"
 #include "xfrm.h"

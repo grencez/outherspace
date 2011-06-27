@@ -1,6 +1,7 @@
 
 #include "bitstring.h"
 #include "kdtree.h"
+#include "kptree.h"
 #include "order.h"
 #include "util.h"
 #include "xfrm.h"

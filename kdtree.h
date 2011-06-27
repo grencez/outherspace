@@ -12,16 +12,11 @@ struct kd_tree_inner_struct;
 struct kd_tree_node_struct;
 struct kd_tree_struct;
 struct kdtree_grid_struct;
-struct kp_tree_node_struct;
-struct kp_tree_struct;
 typedef struct kd_tree_leaf_struct  KDTreeLeaf;
 typedef struct kd_tree_inner_struct KDTreeInner;
 typedef struct kd_tree_node_struct  KDTreeNode;
 typedef struct kd_tree_struct KDTree;
 typedef struct kdtree_grid_struct KDTreeGrid;
-typedef struct kp_tree_node_struct KPTreeNode;
-typedef struct kp_tree_struct KPTree;
-typedef struct kptree_grid_struct KPTreeGrid;
 
 struct kd_tree_leaf_struct
 {
@@ -61,27 +56,6 @@ struct kdtree_grid_struct
     BoundingBox box;
 };
 
-struct kp_tree_node_struct
-{
-    uint dim;
-    uint idx;
-    Point loc;
-};
-
-struct kp_tree_struct
-{
-    uint nnodes;
-    KPTreeNode* nodes;
-};
-
-struct kptree_grid_struct
-{
-    uint npts;
-    uint* indices;
-    real* coords[NDimensions];
-    BoundingBox box;
-};
-
 
 bool leaf_KDTreeNode (__global const KDTreeNode* node);
 
@@ -102,14 +76,6 @@ descend_KDTreeNode (uint* ret_parent,
                     uint node_idx,
                     __global const KDTreeNode* nodes);
 
-uint
-descend_KPTree (const KPTree* tree, const Point* loc, uint i);
-uint
-nearest_neighbor_KPTree (const KPTree* tree, const Point* loc);
-uint
-inside_BoundingBox_KPTree (const KPTree* tree,
-                           const BoundingBox* box,
-                           uint i);
 #ifndef __OPENCL_VERSION__
 void
 output_KDTreeGrid (FILE* out, const KDTreeGrid* grid);
@@ -123,19 +89,11 @@ void output_gv_KDTree (FILE* out, const KDTree* tree);
 void
 init_KDTree (KDTree* tree);
 void
-init_KPTree (KPTree* tree);
-void
 cleanup_KDTree (KDTree* tree);
 void
 cleanup_KDTreeGrid (KDTreeGrid* grid);
 void
-cleanup_KPTree (KPTree* tree);
-void
-cleanup_KPTreeGrid (KPTreeGrid* grid);
-void
 build_KDTree (KDTree* tree, KDTreeGrid* grid);
-void
-build_KPTree (KPTree* tree, KPTreeGrid* grid);
 
 #ifdef INCLUDE_SOURCE
 #include "kdtree.c"

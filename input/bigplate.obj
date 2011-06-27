@@ -1,0 +1,20 @@
+# File Created: 26.03.2011 20:53:37
+
+mtllib track1.mtl
+
+#
+# object Loft001
+#
+
+v  -50  10000  10000
+v  -50 -10000  10000
+v  -50  10000 -10000
+v  -50 -10000 -10000
+# 4 vertices
+
+g Loft001
+usemtl wire_229166215
+f 1 2 3 
+f 2 3 4 
+# 2 faces
+

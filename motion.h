@@ -15,9 +15,11 @@ struct object_motion_struct
     real mass;
     Point veloc;
     tristate thrust;
+    bool boost;
     real rots[N2DimRotations];
     bool collide;
     bool gravity;
+    bool stabilize;
 };
 
 void

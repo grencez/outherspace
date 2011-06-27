@@ -23,6 +23,7 @@ static ObjectMotion racer_motions[NRacers];
     /* Reset every frame.*/
 static real view_azimuthcc_input = 0;
 static real view_zenith_input = 0;
+static const bool ShowSpeed = false;
 #endif
 
 typedef struct motion_input_struct MotionInput;
@@ -35,6 +36,7 @@ struct motion_input_struct
     real horz;
     real drift;
     tristate stride[NDimensions];
+    bool boost;
     bool inv_vert;
     bool use_roll;
 };
@@ -67,6 +69,7 @@ init_MotionInput (MotionInput* mot)
     mot->horz = 0;
     mot->drift = 0.5;
     UFor( i, NDimensions )  mot->stride[i] = 0;
+    mot->boost = false;
     mot->inv_vert = true;
     mot->use_roll = false;
 }
@@ -367,6 +370,7 @@ joystick_button_event (MotionInput* mot,
 
     value = pressed ? 1 : 0;
 
+    if (btnidx == 0)  mot->boost = pressed;
     if (btnidx == 2)  mot->stride[DirDimension] =  value;
     if (btnidx == 3)  mot->stride[DirDimension] = -value;
 }
@@ -436,6 +440,7 @@ update_object_locations (RaySpace* space, MotionInput* mot)
         rotate_object (&racer_motions[0], 1, dir_dim, mot->horz * M_PI / 2);
 
     racer_motions[0].thrust = mot->stride[dir_dim];
+    racer_motions[0].boost = mot->boost;
 
     move_objects (space, racer_motions, dt);
 #else /* ^ #ifdef NRacers ^ */
@@ -485,7 +490,21 @@ update_view_params (const RaySpace* space)
     view_azimuthcc =  M_PI      * (1 + view_azimuthcc_input);
 
     spherical3_PointXfrm (&rotation, view_zenith, view_azimuthcc - M_PI);
-    xfrm_PointXfrm (&view_basis, &rotation, &object->orientation);
+
+    if (racer_motions[0].stabilize)
+    {
+        PointXfrm basis;
+        copy_PointXfrm (&view_basis, &object->orientation);
+        zero_Point (&view_basis.pts[0]);
+        view_basis.pts[0].coords[0] = 1;
+
+        orthorotate_PointXfrm (&basis, &view_basis, 0);
+        xfrm_PointXfrm (&view_basis, &rotation, &basis);
+    }
+    else
+    {
+        xfrm_PointXfrm (&view_basis, &rotation, &object->orientation);
+    }
 
     scale_Point (&view_origin, &view_basis.pts[DirDimension], -130);
     summ_Point (&view_origin, &view_origin, &object->centroid);
@@ -656,6 +675,7 @@ render_RaySpace (byte* data, RaySpace* space,
 
     if (needs_recast)
     {
+        FILE* out = stderr;
         PointXfrm basis;
         Point origin;
 
@@ -674,13 +694,19 @@ render_RaySpace (byte* data, RaySpace* space,
                 {
                     real fps;
                     fps = framerate_report_count / framerate_report_dt;
-                    fprintf (stderr, "FPS:%f\n", fps);
+                    fprintf (out, "FPS:%f\n", fps);
                     framerate_report_dt = 0;
                     framerate_report_count = 0;
                 }
             }
             update_object_locations (space, &motion_input);
         }
+
+#ifdef NRacers
+        if (ShowSpeed)
+            fprintf (out, "SPEED:%f\n",
+                     magnitude_Point (&racer_motions[0].veloc));
+#endif
 
         update_view_params (space);
         copy_Point (&origin, &view_origin);

@@ -33,6 +33,9 @@ struct scene_struct
 };
 typedef struct scene_struct Scene;
 
+void
+xlate_Scene (Scene* scene, const Point* displacement);
+
 #ifndef __OPENCL_VERSION__
 void init_Scene (Scene* scene);
 void init_SceneElement (SceneElement* elem);

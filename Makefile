@@ -110,6 +110,7 @@ endif
 
 CSources = bitstring.c \
 		   kdtree.c \
+		   kptree.c \
 		   material.c \
 		   order.c \
 		   pnm-image.c \

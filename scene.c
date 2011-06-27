@@ -148,7 +148,7 @@ fill_between_simplices (SceneElement* elems,
             if (j >= i)
             {
                 elem->pts[j+1] = b_vert_offset + b->pts[j];
-                elem->vnmls[j] = b_vnml_offset + b->vnmls[j];
+                elem->vnmls[j+1] = b_vnml_offset + b->vnmls[j];
             }
         }
     }
@@ -176,17 +176,17 @@ full_fill_between_simplices (SceneElement* dst_elems,
         { 0, 1, 2,     4    },
         { 0, 1, 2,        5 },
         { 0, 1,     3, 4    },
-        { 0, 1,     3,    5 },
-        { 0, 1,        4, 5 },
-        { 0,    2,  3, 4    },
+        { 0, 1, 5,  3       },
+        { 0, 1, 5,     4    },
+        { 0, 4, 2,  3       },
         { 0,    2,  3,    5 },
-        { 0,    2,     4, 5 },
-        { 0,        3, 4, 5 },
-        {    1, 2,  3, 4    },
-        {    1, 2,  3,    5 },
+        { 0, 4, 2,        5 },
+        { 0, 4, 5,  3       },
+        { 3, 1, 2,     4    },
+        { 3, 1, 2,        5 },
         {    1, 2,     4, 5 },
-        {    1,     3, 4, 5 },
-        {       2,  3, 4, 5 }
+        { 3, 1, 5,     4,   },
+        { 3, 4, 2,        5 }
     };
     uint vertidcs[6], vnmlidcs[6];
     assert (NDimensions == 4);
@@ -367,5 +367,13 @@ interpolate_Scene (Scene* dst, uint k, uint nscenes, const Scene* scenes)
 
     dst->nelems = ecount;
     ResizeT( SceneElement, dst->elems, dst->nelems );
+}
+
+    void
+xlate_Scene (Scene* scene, const Point* displacement)
+{
+    uint i;
+    UFor( i, scene->nverts )
+        summ_Point (&scene->verts[i], &scene->verts[i], displacement);
 }
 
