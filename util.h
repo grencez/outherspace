@@ -94,7 +94,7 @@ ceil_uint (uint a, uint b);
 uint
 log2_uint (uint a);
 uint
-pow2_uint (uint p);
+exp2_uint (uint p);
 void
 swap_uint (uint* x, uint* y);
 void

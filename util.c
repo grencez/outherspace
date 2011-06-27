@@ -180,7 +180,7 @@ log2_uint (uint a)
 }
 
     uint
-pow2_uint (uint p)
+exp2_uint (uint p)
 {
     assert (p < 32);
     return 1 << p;

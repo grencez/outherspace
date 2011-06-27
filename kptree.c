@@ -40,26 +40,47 @@ build_KPTreeNode (KPTree* tree, KPTreeGrid* grid,
     KPTreeGrid logrid, higrid;
 
     if (nodeidx >= tree->nnodes)  return;
+    node = &tree->nodes[nodeidx];
     n = s - p;
     assert (n > 0);
 
+        /* Choose a proper split index, store in /mididx/.*/
     mididx = p;
     if (n > 1)
     {
         uint depth, lo, hi;
+
+            /* Max tree depth from this node.*/
         depth = log2_uint (n);
         assert (depth > 0);
-        lo = (n+1) - pow2_uint (depth);
-        hi = pow2_uint (depth - 1);
 
+            /* Count of leaf nodes at the max depth.
+             *   Node count above depth: 2^depth - 1
+             *   Node count total: n
+             */
+        lo = (n+1) - exp2_uint (depth);
+
+            /* Max possible count of leaf nodes of left subtree.
+             *   Max node count at depth: 2^depth
+             * Since we are concerned only with left subtree,
+             * split this in half.
+             */
+        hi = exp2_uint (depth - 1);
+
+            /* Set /mididx/ as median index,
+             * disregarding nodes at max depth.
+             */
         mididx += (n-lo)/2;
-        if (lo < hi)  mididx += lo;
-        else          mididx += hi;
+
+            /* Increment /mididx/ such that its left
+             * subtree is packed with nodes at max depth.
+             */
+        if (lo < hi)  mididx += lo;  /* Not completely filled, but packed.*/
+        else          mididx += hi;  /* Completely filled (also packed).*/
     }
 
-    node = &tree->nodes[nodeidx];
+        /* Pick the widest dimension to split.*/
     split_dim = 0;
-
     if (n > 1)
     {
         real max_length = 0;
@@ -77,30 +98,38 @@ build_KPTreeNode (KPTree* tree, KPTreeGrid* grid,
         }
     }
 
+        /* Find the split for /mididx/ between /p/ and /s/ indices.
+         * /grid->indices/ is partitioned accordingly within
+         * the range [p,..,s).
+         */
     select_indexed_reals (grid->indices, grid->coords[split_dim],
                           p, mididx, s);
     assert (verify_select_indexed_reals (p, mididx, s,
                                          grid->indices,
                                          grid->coords[split_dim]));
 
+        /* Assign this node's final values.*/
     node->dim = split_dim;
     node->idx = grid->indices[mididx];
     UFor( i, NDimensions )
-    {
         node->loc.coords[i] = grid->coords[i][node->idx];
-        logrid.coords[i] = grid->coords[i];
-        higrid.coords[i] = grid->coords[i];
-    }
 
+        /* Setup for recursion.*/
     logrid.npts = grid->npts;
     higrid.npts = grid->npts;
     logrid.indices = grid->indices;
     higrid.indices = grid->indices;
-        /* Only bother splitting if the lower nodes are not leaves.*/
+    UFor( i, NDimensions )
+    {
+        logrid.coords[i] = grid->coords[i];
+        higrid.coords[i] = grid->coords[i];
+    }
+        /* Only bother splitting the box if the lower nodes are not leaves.*/
     if (n > 3)
         split_BoundingBox (&logrid.box, &higrid.box, &grid->box,
                            split_dim, node->loc.coords[split_dim]);
 
+        /* Recurse for lo and hi sides of the split.*/
     build_KPTreeNode (tree, &logrid, 2*nodeidx+1, p, mididx);
     build_KPTreeNode (tree, &higrid, 2*nodeidx+2, mididx+1, s);
 }
@@ -156,7 +185,7 @@ nearest_neighbor_KPTree (const KPTree* tree, const Point* loc)
         const KPTreeNode* node;
 
         previ = i;
-        i = (i - 1) / 2;
+        i = (i - 1) / 2;  /* Ascend 1.*/
         node = &tree->nodes[i];
 
         magtosplit = node->loc.coords[node->dim] - loc->coords[node->dim];
