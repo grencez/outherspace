@@ -233,6 +233,27 @@ clamp_real (real x, real lo, real hi)
     return x;
 }
 
+    real
+atan2_real (real y, real x)
+{
+    real a = 0;
+        /* assert (y==y); */
+        /* assert (x==x); */
+    if (x > -Epsilon_real && x < Epsilon_real)
+    {
+            /* Equality case undefined... meh.*/
+        if (y >= 0)  return   M_PI / 2;
+        else         return - M_PI / 2;
+    }
+
+    if (x < 0)
+    {
+        if (y >= 0)  a =   M_PI;
+        else         a = - M_PI;
+    }
+    return a + atan (y / x);
+}
+
 real absolute_error (real expect, real result)
 {
     return result - expect;

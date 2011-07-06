@@ -103,6 +103,8 @@ tristate compare_real (real a, real b);
 real match_real (real a, real b);
 real
 clamp_real (real x, real lo, real hi);
+real
+atan2_real (real y, real x);
 real absolute_error (real expect, real result);
 real relative_error (real expect, real result, real large);
 real

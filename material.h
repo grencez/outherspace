@@ -31,6 +31,8 @@ typedef struct material_struct Material;
 void init_Material (Material* mat);
 void
 map_Texture (real* colors, const Texture* texture, const BaryPoint* p);
+void
+map_sky_Texture (real* colors, const Texture* texture, const Point* p);
 
 #ifdef INCLUDE_SOURCE
 #include "material.c"

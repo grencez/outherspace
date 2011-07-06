@@ -47,6 +47,7 @@ struct ray_space_struct
     uint nlights;
     ObjectRaySpace* objects;
     PointLightSource* lights;
+    uint skytxtr; /* Index of sky texture in main object.*/
 
     bool partition;  /* When false, the below two are unused.*/
     KDTree object_tree;

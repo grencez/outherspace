@@ -143,9 +143,9 @@ readin_PPM_image (const char* filename, uint* ret_nrows, uint* ret_ncols)
         else if (header_stage == 1)
         {
             header_stage += 1;
-            line = strto_uint (&nrows, line);
+            line = strto_uint (&ncols, line);
             if (line)
-                line = strto_uint (&ncols, line);
+                line = strto_uint (&nrows, line);
 
             good = (line != 0);
         }

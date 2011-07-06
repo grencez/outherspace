@@ -91,6 +91,7 @@ init_RaySpace (RaySpace* space)
     space->partition = true;
     zero_Point (&space->box.min);
     zero_Point (&space->box.max);
+    space->skytxtr = 0;
 }
 
     void
@@ -585,7 +586,16 @@ fill_pixel (real* ret_colors,
 
     if (objidx > space->nobjects)
     {
-        UFor( i, NColors )  ret_colors[i] = 0;
+        if (space->skytxtr < space->main.scene.ntxtrs)
+        {
+            map_sky_Texture (ret_colors,
+                             &space->main.scene.txtrs[space->skytxtr],
+                             dir);
+        }
+        else
+        {
+            UFor( i, NColors )  ret_colors[i] = 0;
+        }
         return;
     }
 

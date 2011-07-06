@@ -232,7 +232,7 @@ apply_thrust (Point* veloc,
     if (motion->stabilize)
     {
         zero_Point (&orientation->pts[0]);
-        orientation->pts[0].coords[0] = 1+magproj+magorth;
+        orientation->pts[0].coords[0] = 500+magorth;
         diff_Point (&orientation->pts[0], &orientation->pts[0], &orth);
         orthorotate_PointXfrm (&basis, orientation, 0);
     }
@@ -242,6 +242,7 @@ apply_thrust (Point* veloc,
     }
     copy_PointXfrm (orientation, &basis);
 }
+
 
     bool
 detect_collision (ObjectMotion* motions,
@@ -263,8 +264,6 @@ detect_collision (ObjectMotion* motions,
     const Scene* scene;
     bool colliding;
 
-    (void) displacement;
-    (void) rotation;
 
     assert (objidx < space->nobjects);
     object = &space->objects[objidx];
@@ -351,9 +350,68 @@ detect_collision (ObjectMotion* motions,
                                        &box, Max_uint);
         while (j != Max_uint)
         {
+            bool inside_box;
+            uint tmp_hit;
+            real tmp_mag;
+            Point p0, p1, direct;
+            Point tmp;
             FILE* out = stderr;
-            output_Point (out, &object->verttree.nodes[j].loc);
-            fputc ('\n', out);
+            if (i == objidx)
+            {
+                copy_Point (&p1,
+                            &query_object->verttree.nodes[j].loc);
+                copy_Point (&p0, &p1);
+            }
+            else
+            {
+                xfrm_Point (&p1, &query_object->orientation,
+                            &query_object->verttree.nodes[j].loc);
+                summ_Point (&p1, &p1, &query_object->centroid);
+                diff_Point (&p0, &p1, &object->centroid);
+            }
+
+            diff_Point (&p0, &p0, displacement);
+            
+            xfrm_Point (&tmp, rotation, &p0);
+            if (i == objidx)
+                copy_Point (&p0, &tmp);
+            else
+                summ_Point (&p0, &tmp, &object->centroid);
+                /* /p1/ and /p0/ are now in global coordinates.*/
+            
+            diff_Point (&tmp, &p1, &object->centroid);
+            trxfrm_Point (&p1, &object->orientation, &tmp);
+
+            diff_Point (&tmp, &p0, &object->centroid);
+            trxfrm_Point (&p0, &object->orientation, &tmp);
+                /* /p1/ and /p0/ are now in local coordinates.*/
+            
+            if (false)
+            {
+                output_Point (out, &p1);
+                fputs (" <- ", out);
+                output_Point (out, &p0);
+                fputc ('\n', out);
+            }
+
+            diff_Point (&direct, &p0, &p1);
+            normalize_Point (&direct, &direct);
+            inside_box = inside_BoundingBox (&object->box, &p1);
+            tmp_hit = Max_uint;
+            tmp_mag = Max_real;
+            cast_ray (&tmp_hit, &tmp_mag, &p1, &direct,
+                      object->nelems, object->tree.elemidcs,
+                      object->tree.nodes,
+                      object->simplices, object->elems,
+                      &object->box, inside_box);
+
+            if (tmp_mag < hit_mag)
+            {
+                hit_idx = tmp_hit;
+                hit_mag = tmp_mag;
+                hit_objidx = i;
+            }
+
             j = inside_BoundingBox_KPTree (&query_object->verttree,
                                            &box, j);
         }
@@ -366,6 +424,10 @@ detect_collision (ObjectMotion* motions,
         real cos_normal;
         real hit_speed;
         const ObjectRaySpace* hit_object;
+
+            /* OVERWRITE values!*/
+        hit_dx = magnitude_Point (displacement);
+        scale_Point (&hit_dir, displacement, 1 / hit_dx);
 
         hit_speed = hit_dx / dt;
         colliding = true;

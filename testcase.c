@@ -126,6 +126,7 @@ setup_testcase_track (RaySpace* space,
                       real* view_angle)
 {
     bool good;
+    uint i;
 
     init_RaySpace (space);
     identity_PointXfrm (view_basis);
@@ -145,6 +146,16 @@ setup_testcase_track (RaySpace* space,
         good = interpolate_by_file (&space->main.scene, 2, "input", fnames, dcoords);
     }
     if (!good)  return false;
+
+    i = space->main.scene.ntxtrs;
+    space->main.scene.ntxtrs = i+1;
+    ResizeT( Texture, space->main.scene.txtrs, i+1 );
+    space->main.scene.txtrs[i].pixels =
+        readin_PPM_image ("input/gradient-sky.ppm",
+                          &space->main.scene.txtrs[i].nrows,
+                          &space->main.scene.txtrs[i].ncols);
+    if (!space->main.scene.txtrs[i].pixels)  return false;
+    space->skytxtr = i;
 
     good = setup_racers (space);
     if (!good)  return false;
