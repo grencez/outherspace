@@ -88,12 +88,11 @@ dbgout_compute (const char* format, ...)
 static void rays_to_hits_balancer (RayImage* image);
 
 void compute_rays_to_hits (RayImage* image,
-                           const RaySpace* restrict space,
+                           RaySpace* restrict space,
                            const Point* restrict origin,
                            const PointXfrm* restrict view_basis)
 {
     uint i;
-    (void) space;
     UFor( i, nprocs -1 )
     {
         int ret;

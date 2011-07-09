@@ -123,7 +123,6 @@ move_object (RaySpace* space, ObjectMotion* motions, uint objidx, real dt)
     }
 
     trxfrm_PointXfrm (&new_orientation, &rotation, &object->orientation);
-    apply_gravity (motion, object, dt);
     apply_thrust (&veloc, &new_orientation, motion, dt);
         /* orthorotate_PointXfrm (&new_orientation, &basis, 0); */
 
@@ -152,6 +151,7 @@ move_object (RaySpace* space, ObjectMotion* motions, uint objidx, real dt)
     {
         copy_Point (&object->centroid, &new_centroid);
         copy_PointXfrm (&object->orientation, &new_orientation);
+        apply_gravity (motion, object, dt);
     }
 }
 
@@ -409,7 +409,8 @@ detect_collision (ObjectMotion* motions,
             {
                 hit_idx = tmp_hit;
                 hit_mag = tmp_mag;
-                hit_objidx = i;
+                if (i == objidx)  hit_objidx = space->nobjects;
+                else              hit_objidx = i;
             }
 
             j = inside_BoundingBox_KPTree (&query_object->verttree,
