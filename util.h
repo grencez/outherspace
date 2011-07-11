@@ -95,6 +95,10 @@ uint
 log2_uint (uint a);
 uint
 exp2_uint (uint p);
+uint
+incmod_uint (uint a, uint b, uint m);
+uint
+decmod_uint (uint a, uint b, uint m);
 void
 swap_uint (uint* x, uint* y);
 void

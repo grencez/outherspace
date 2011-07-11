@@ -149,9 +149,12 @@ quicksort_indexed_reals (uint* indices, uint p, uint s, const real* membs)
 
 static
     void
-bubblesort_indexed_reals (uint nmembs, uint* indices, const real* membs)
+bubblesort_indexed_reals (uint* indices, uint p, uint s, const real* membs)
 {
+    uint nmembs;
     uint i;
+    nmembs = s - p;
+    indices = &indices[p];
     UFor( i, nmembs )
     {
         uint j, ti;
@@ -173,26 +176,22 @@ bubblesort_indexed_reals (uint nmembs, uint* indices, const real* membs)
 }
 
     void
-sort_indexed_reals (uint nmembs, uint* indices, const real* membs)
+sort_indexed_reals (uint* indices, uint p, uint s, const real* membs)
 {
-    uint i;
     const bool use_quicksort = true;
-    assert (even_uint (nmembs));
-    assert (minimal_unique (nmembs, indices));
+    uint i;
+    assert (p <= s);
     if (use_quicksort)
-        quicksort_indexed_reals (indices, 0, nmembs, membs);
+        quicksort_indexed_reals (indices, p, s, membs);
     else
-        bubblesort_indexed_reals (nmembs, indices, membs);
-    assert (minimal_unique (nmembs, indices));
-    if (nmembs > 0)
+        bubblesort_indexed_reals (indices, p, s, membs);
+
+    for (i = p+1; i < s; ++i)
     {
-        UFor( i, nmembs-1 )
-        {
-            uint ti, tj;
-            ti = indices[i];
-            tj = indices[i+1];
-            assert (membs[ti] <= membs[tj]);
-        }
+        uint ti, tj;
+        ti = indices[i-1];
+        tj = indices[i];
+        assert (membs[ti] <= membs[tj]);
     }
 }
 
@@ -286,5 +285,18 @@ verify_select_indexed_reals (uint p, uint i, uint s,
 
     assert (n == nlo + neq + nhi);
     return (nlo <= ith && nhi <= (n - ith - 1));
+}
+
+    /* Returns the next unique real's index.*/
+    uint
+consecutive_indexed_reals (uint q, uint s, const uint* indices, const real* membs)
+{
+    real x;
+    uint r;
+    x = membs[indices[q]];
+    r = q+1;
+    while (r < s && x == membs[indices[r]])
+        ++r;
+    return r;
 }
 

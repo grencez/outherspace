@@ -35,6 +35,8 @@ typedef struct scene_struct Scene;
 
 void
 xlate_Scene (Scene* scene, const Point* displacement);
+void
+xfrm_Scene (Scene* scene, const PointXfrm* xfrm);
 
 #ifndef __OPENCL_VERSION__
 void init_Scene (Scene* scene);
@@ -48,6 +50,8 @@ void
 simplex_Scene (Simplex* dst, const Scene* scene, uint idx);
 void
 interpolate_Scene (Scene* dst, uint k, uint nscenes, const Scene* scenes);
+void
+condense_Scene (Scene* scene);
 #ifdef INCLUDE_SOURCE
 #include "scene.c"
 #endif

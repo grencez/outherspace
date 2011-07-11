@@ -542,7 +542,7 @@ build_KDTree (KDTree* tree, KDTreeGrid* grid)
     SList nodelist, elemidxlist;
 
     UFor( i, NDimensions )
-        sort_indexed_reals (grid->nintls, grid->intls[i], grid->coords[i]);
+        sort_indexed_reals (grid->intls[i], 0, grid->nintls, grid->coords[i]);
     init_SList (&nodelist);
     init_SList (&elemidxlist);
     build_KDTreeNode (0, 0, grid, 0, &nodelist, &elemidxlist);

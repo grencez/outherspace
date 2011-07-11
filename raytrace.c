@@ -159,6 +159,7 @@ init_filled_ObjectRaySpace (ObjectRaySpace* space)
         bool good;
         simplex_Scene (&raw, scene, ei);
         good = init_BarySimplex (&space->simplices[ei], &raw);
+        if (!good)  printf ("ei:%u\n", ei);
         assert (good);
     }
 

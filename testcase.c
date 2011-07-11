@@ -83,38 +83,83 @@ interpolate_by_file (Scene* dst,
 
 static
     bool
+read_racer (Scene* scene, uint idx)
+{
+    bool good;
+    char fname[20];
+    BoundingBox box;
+    Point displacement;
+    PointXfrm fix;
+
+    sprintf (fname, "machine%u.obj", idx);
+
+
+    if (NDimensions == 3)
+    {
+        good = readin_wavefront (scene, "input", fname);
+    }
+    else
+    {
+        const char* fnames[2];
+        const real dcoords[2] = { -0.1, 0.1 };
+        fnames[0] = fname;
+        fnames[1] = fname;
+        good = interpolate_by_file (scene, 2, "input", fnames, dcoords);
+    }
+    if (!good)  return false;
+
+    condense_Scene (scene);
+
+    switch (idx)
+    {
+        case 0:
+            fixup_wavefront_Scene (scene);
+            break;
+        case 2:
+            identity_PointXfrm (&fix);
+            rotate_PointXfrm (&fix, 1, 2, M_PI/2);
+            rotate_PointXfrm (&fix, 0, 1, M_PI/2);
+            scale_PointXfrm (&fix, &fix, 3);
+            xfrm_Scene (scene, &fix);
+            break;
+        case 3:
+            identity_PointXfrm (&fix);
+            rotate_PointXfrm (&fix, 1, 0, M_PI/3);
+            swaprows_PointXfrm (&fix, 0, 2);
+            xfrm_Scene (scene, &fix);
+            break;
+        default:
+            break;
+    }
+
+    init_BoundingBox (&box, scene->nverts, scene->verts);
+    centroid_BoundingBox (&displacement, &box);
+    negate_Point (&displacement, &displacement);
+    xlate_Scene (scene, &displacement);
+
+    return good;
+}
+
+static
+    bool
 setup_racers (RaySpace* space)
 {
     uint i;
     bool good = true;
     UFor( i, space->nobjects )
     {
-        BoundingBox box;
-        Point displacement;
         ObjectRaySpace* object;
         object = &space->objects[i];
+
         init_ObjectRaySpace (object);
         object->centroid.coords[0] = 75 * i + 300;
         object->centroid.coords[1] = 75 * i + 300;
 
-        if (NDimensions == 3)
-        {
-            good = readin_wavefront (&object->scene, "input", "machine1.obj");
-            if (!good)  return false;
-                /* fixup_wavefront_Scene (&object->scene); */
-        }
-        else
-        {
-            const char* const fnames[2] = { "machine1.obj", "machine1.obj" };
-            const real dcoords[2] = { -0.1, 0.1 };
-            interpolate_by_file (&object->scene, 2, "input", fnames, dcoords);
+        if (NDimensions == 4)
             object->centroid.coords[3] = .5;
-        }
 
-        init_BoundingBox (&box, object->scene.nverts, object->scene.verts);
-        centroid_BoundingBox (&displacement, &box);
-        negate_Point (&displacement, &displacement);
-        xlate_Scene (&object->scene, &displacement);
+        good = read_racer (&object->scene, 0);
+        if (!good)  return false;
     }
     return good;
 }

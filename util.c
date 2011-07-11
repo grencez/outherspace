@@ -186,6 +186,24 @@ exp2_uint (uint p)
     return 1 << p;
 }
 
+    uint
+incmod_uint (uint a, uint b, uint m)
+{
+    a += b;
+    if (a >= m)  a -= m;
+    assert (a < m);
+    return a;
+}
+
+    uint
+decmod_uint (uint a, uint b, uint m)
+{
+    if (a < b)  a += m - b;
+    else        a -= b;
+    assert (a < m);
+    return a;
+}
+
     void
 swap_uint (uint* x, uint* y)
 {

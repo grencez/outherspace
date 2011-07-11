@@ -8,6 +8,7 @@
 
 #include <assert.h>
 
+static
     void
 testfn_BitString ()
 {
@@ -42,6 +43,7 @@ testfn_BitString ()
      * Now, if all values fall inside [0..255], then we have a useful tool,
      * but then LowBits() would not be tested.
      */
+static
     void
 testfn_BitString_cache ()
 {
@@ -71,6 +73,7 @@ testfn_BitString_cache ()
     assert (i == nslots-3 && flag);
 }
 
+static
     void
 testfn_KPTree ()
 {
@@ -149,6 +152,7 @@ testfn_KPTree ()
     }
 }
 
+static
     void
 testfn_partition ()
 {
@@ -159,6 +163,7 @@ testfn_partition ()
     assert (indices[3] == 4);
 }
 
+static
     void
 testfn_PointXfrm ()
 {
@@ -218,6 +223,7 @@ testfn_PointXfrm ()
     AssertApprox( 6, det, 6, 1e0 );
 }
 
+static
     void
 testfn_select ()
 {

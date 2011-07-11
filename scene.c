@@ -377,3 +377,222 @@ xlate_Scene (Scene* scene, const Point* displacement)
         summ_Point (&scene->verts[i], &scene->verts[i], displacement);
 }
 
+    void
+xfrm_Scene (Scene* scene, const PointXfrm* xfrm)
+{
+    uint i;
+
+    UFor( i, scene->nverts )
+    {
+        Point* p;
+        Point tmp;
+        p = &scene->verts[i];
+        xfrm_Point (&tmp, xfrm, p);
+        copy_Point (p, &tmp);
+    }
+
+    UFor( i, scene->nvnmls )
+    {
+        Point* p;
+        Point tmp;
+        p = &scene->vnmls[i];
+        xfrm_Point (&tmp, xfrm, p);
+        copy_Point (p, &tmp);
+    }
+}
+
+static
+    void
+sort_indexed_Points (uint* jumps, uint* indices, real* coords,
+                     uint nmembs, const Point* pts)
+{
+    uint dim;
+
+    minimal_unique (nmembs, indices);
+
+    jumps[0] = nmembs;
+
+    UFor( dim, NDimensions )
+    {
+        uint q = 0;
+        while (q < nmembs)
+        {
+            uint i, s;
+
+            s = jumps[q];
+            for (i = q; i < s; ++i)
+                coords[indices[i]] = pts[indices[i]].coords[dim];
+            sort_indexed_reals (indices, q, s, coords);
+
+            while (q < s)
+            {
+                uint r;
+                r = consecutive_indexed_reals (q, s, indices, coords);
+                jumps[q] = r;
+                q = r;
+            }
+            assert (q == s);
+        }
+    }
+
+    minimal_unique (nmembs, indices);
+}
+
+static
+    uint
+condense_Points (uint n, Point* pts, uint* jumps, uint* indices, real* coords)
+{
+    uint i, q;
+
+    UFor( i, n )  indices[i] = i;
+    sort_indexed_Points (jumps, indices, coords, n, pts);
+
+    i = 0;
+    q = 0;
+    while (i < n)
+    {
+        uint r;
+        r = jumps[i];
+        assert (i < r);
+
+        jumps[i] = jumps[q];
+        jumps[q] = q;
+        swap_uint (&indices[q], &indices[i]);
+
+        ++i;
+        while (i < r)
+        {
+            assert (equal_Point (&pts[indices[q]],
+                                 &pts[indices[i]]));
+            jumps[i] = q;
+            ++i;
+        }
+        ++q;
+    }
+
+    UFor( i, n )
+        assert (equal_Point (&pts[indices[i]],
+                             &pts[indices[jumps[i]]]));
+
+
+        /* Fixup indices so points in range don't move.*/
+    UFor( i, q )
+    {
+        uint* e;
+        e = &indices[i];
+        while (*e < q && *e != i)
+        {
+            swap_uint (&jumps[jumps[*e]], &jumps[jumps[i]]);
+            swap_uint (&indices[*e], e);
+        }
+    }
+
+    minimal_unique (q, jumps);
+
+    for (i = q; i < n; ++i)
+        assert (equal_Point (&pts[indices[i]],
+                             &pts[indices[jumps[jumps[i]]]]));
+
+        /* Fixup duplicates' jumps to indices.*/
+    for (i = q; i < n; ++i)
+        jumps[i] = jumps[jumps[i]];
+
+        /* And make the uniques' jumps consistent.*/
+
+    UFor( i, q )
+        jumps[i] = i;
+
+    UFor( i, n )
+        assert (equal_Point (&pts[indices[i]],
+                             &pts[indices[jumps[i]]]));
+
+    UFor( i, q )
+    {
+        uint pi;
+        pi = indices[i];
+        if (pi != i)
+        {
+            assert (q <= pi);
+            copy_Point (&pts[i], &pts[pi]);
+        }
+    }
+
+    minimal_unique (n, indices);
+    UFor( i, n )
+    {
+        uint pi;
+        pi = indices[i];
+        indices[i] = n;  /* Never get info from this location again!*/
+        while (pi != i)
+        {
+            assert (i < pi);
+            swap_uint (&jumps[i], &jumps[pi]);
+            swap_uint (&pi, &indices[pi]);
+        }
+    }
+
+    return q;
+}
+
+    void
+condense_Scene (Scene* scene)
+{
+    uint i;
+    uint max_n;
+    uint* jumps;
+    uint* indices;
+    real* coords;
+
+    max_n = scene->nverts;
+    if (scene->nvnmls > max_n)  max_n = scene->nvnmls;
+
+    jumps  = AllocT( uint, max_n );
+    indices = AllocT( uint, max_n );
+    coords  = AllocT( real, max_n );
+
+    if (scene->nverts > 0)
+    {
+            /* printf ("Before nverts:%u\n", scene->nverts); */
+        scene->nverts = condense_Points (scene->nverts, scene->verts,
+                                         jumps, indices, coords);
+            /* printf ("After nverts:%u\n", scene->nverts); */
+        ResizeT( Point, scene->verts, scene->nverts );
+        UFor( i, scene->nelems )
+        {
+            uint dim;
+            UFor( dim, NDimensions )
+            {
+                uint* e;
+                e = &scene->elems[i].pts[dim];
+                *e = jumps[*e];
+            }
+        }
+    }
+
+    if (scene->nvnmls > 0)
+    {
+            /* printf ("Before nvnmls:%u\n", scene->nvnmls); */
+        scene->nvnmls = condense_Points (scene->nvnmls, scene->vnmls,
+                                         jumps, indices, coords);
+            /* printf ("After nvnmls:%u\n", scene->nvnmls); */
+        ResizeT( Point, scene->vnmls, scene->nvnmls );
+        UFor( i, scene->nelems )
+        {
+            uint dim;
+            UFor( dim, NDimensions )
+            {
+                uint* e;
+                e = &scene->elems[i].vnmls[dim];
+                *e = jumps[*e];
+            }
+        }
+    }
+
+    if (max_n > 0)
+    {
+        free (jumps);
+        free (indices);
+        free (coords);
+    }
+}
+

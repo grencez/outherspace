@@ -51,6 +51,14 @@ void identity_PointXfrm (PointXfrm* xfrm)
         xfrm->pts[i].coords[i] = 1;
 }
 
+    void
+scale_PointXfrm (PointXfrm* dst, const PointXfrm* src, real a)
+{
+    uint i;
+    UFor( i, NDimensions )
+        scale_Point (&dst->pts[i], &src->pts[i], a);
+}
+
 void rotation_PointXfrm (PointXfrm* xfrm, uint xdim, uint ydim, real angle)
 {
     real tcos, tsin;

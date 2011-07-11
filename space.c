@@ -70,6 +70,16 @@ void zero_Point (Point* a)
         a->coords[i] = 0;
 }
 
+    bool
+equal_Point (const Point* a, const Point* b)
+{
+    uint i;
+    UFor( i, NDimensions )
+        if (a->coords[i] != b->coords[i])
+            return false;
+    return true;
+}
+
     void
 zero_BoundingBox (BoundingBox* box)
 {
