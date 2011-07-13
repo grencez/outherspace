@@ -12,7 +12,7 @@
 #include <gdk/gdkkeysyms.h>
 #include <SDL.h>
 
-    /* #define NRacers 10 */
+#define NRacers 10
 
 static const bool RenderDrawsPattern = false;
 static const bool ForceFauxFishEye = false;
@@ -98,7 +98,7 @@ static void destroy_app (GtkWidget* widget,
 
 static
     gboolean
-key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
+key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer data)
 {
     uint dim = NDimensions;
     tristate roll = 0;
@@ -116,12 +116,13 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
     bool recast = true;
     FILE* out;
     bool shift_mod, ctrl_mod;
+    MotionInput* input;
 #ifdef NRacers
     ObjectMotion* racer_motion;
     racer_motion = &racer_motions[racer_idx];
 #endif
 
-    (void) _data;
+    input = (MotionInput*) data;
     out = stdout;
 
     shift_mod = event->state & GDK_SHIFT_MASK;
@@ -143,13 +144,13 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
             break;
         case GDK_Right:
             if (shift_mod) { dim = 1;  stride = 1; }
-            else if (ctrl_mod) { dim = 1;  turn = 1; }
-            else { roll = -1; }
+            else if (ctrl_mod) { roll = -1; }
+            else { dim = 1;  turn = 1; }
             break;
         case GDK_Left:
             if (shift_mod) { dim = 1;  stride = -1; }
-            else if (ctrl_mod) { dim = 1;  turn = -1; }
-            else { roll = 1; }
+            else if (ctrl_mod) { roll = 1; }
+            else { dim = 1;  turn = -1; }
             break;
         case GDK_Tab:
             switch_racer =  1; break;
@@ -213,6 +214,9 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
     }
     else if (stride != 0)
     {
+#ifdef NRacers
+        input->stride[dim] = stride;
+#else
         Point diff;
         scale_Point (&diff, &view_basis.pts[dim], stride_magnitude * stride);
         summ_Point (&view_origin, &view_origin, &diff);
@@ -220,6 +224,7 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
         fputs ("pos:", out);
         output_Point (out, &view_origin);
         fputc ('\n', out);
+#endif
     }
     else if (stride_mag_change != 0)
     {
@@ -245,6 +250,12 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
         if (turn < 0)  negdim = dim;
         else           negdim = DirDimension;
 
+#ifdef NRacers
+        if (dim == 1)
+            input->horz = - turn;
+        else
+            input->vert = turn;
+#else
         negate_Point (&view_basis.pts[negdim], &view_basis.pts[negdim]);
         swaprows_PointXfrm (&view_basis, dim, DirDimension);
         needs_recast = true;
@@ -252,6 +263,7 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
         fputs ("basis:", out);
         output_PointXfrm (out, &view_basis);
         fputc ('\n', out);
+#endif
     }
     else if (view_angle_change != 0)
     {
@@ -355,6 +367,29 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer _data)
 
     if (recast)  needs_recast = true;
 
+    return TRUE;
+}
+
+static
+    gboolean
+key_release_fn (GtkWidget* _widget, GdkEventKey* event, gpointer data)
+{
+    MotionInput* input;
+    (void) _widget;
+
+    input = (MotionInput*) data;
+
+    switch (event->keyval)
+    {
+        case GDK_Up:
+        case GDK_Down:
+            input->stride[DirDimension] = 0;
+            break;
+        case GDK_Right:
+        case GDK_Left:
+            input->horz = 0;
+            break;
+    }
     return TRUE;
 }
 
@@ -842,7 +877,9 @@ gui_main (int argc, char* argv[], RaySpace* space)
     g_signal_connect (window, "expose-event",
                       G_CALLBACK(render_expose), space);
     g_signal_connect (window, "key-press-event",
-                      G_CALLBACK(key_press_fn), NULL);
+                      G_CALLBACK(key_press_fn), &motion_input);
+    g_signal_connect (window, "key-release-event",
+                      G_CALLBACK(key_release_fn), &motion_input);
     g_signal_connect (window, "button-press-event",
                       G_CALLBACK(grab_mouse_fn), space);
     g_timeout_add (1000 / 100, update_rendering, window);
