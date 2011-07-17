@@ -99,6 +99,8 @@ uint
 incmod_uint (uint a, uint b, uint m);
 uint
 decmod_uint (uint a, uint b, uint m);
+uint
+assoc_index (uint n, uint a, uint b);
 void
 swap_uint (uint* x, uint* y);
 void

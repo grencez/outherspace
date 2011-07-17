@@ -467,6 +467,23 @@ ray_to_basis (Point* ret_origin, Point* ret_dir,
     diff_Point (&diff, origin, old_centroid);
     xfrm_Point (ret_origin, basis, &diff);
 
-    xfrm_Point (ret_dir, basis, dir);
+    copy_Point (&diff, dir);
+    xfrm_Point (ret_dir, basis, &diff);
+}
+
+    void
+ray_from_basis (Point* ret_origin, Point* ret_dir,
+                const PointXfrm* basis,
+                const Point* origin,
+                const Point* dir,
+                const Point* new_centroid)
+{
+    Point diff;
+
+    trxfrm_Point (&diff, basis, origin);
+    summ_Point (ret_origin, &diff, new_centroid);
+
+    copy_Point (&diff, dir);
+    trxfrm_Point (ret_dir, basis, &diff);
 }
 

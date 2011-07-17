@@ -66,6 +66,12 @@ ray_to_basis (Point* ret_origin, Point* ret_dir,
               const Point* origin,
               const Point* dir,
               const Point* old_centroid);
+void
+ray_from_basis (Point* ret_origin, Point* ret_dir,
+                const PointXfrm* basis,
+                const Point* origin,
+                const Point* dir,
+                const Point* new_centroid);
 
 #ifndef __OPENCL_VERSION__
 void output_PointXfrm (FILE* out, const PointXfrm* xfrm);

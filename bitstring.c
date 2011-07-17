@@ -37,7 +37,7 @@ zero_BitString (BitString* bs, uint n)
 }
 
     bool
-test_BitString (BitString* bs, uint i)
+test_BitString (const BitString* bs, uint i)
 {
     const uint nblockbits = sizeof (bitstring_t) * NBitsInByte;
     uint p, q;
@@ -66,6 +66,29 @@ set1_BitString (BitString* bs, uint i)
     {
         bs[p] = x | y;
         return false;
+    }
+}
+
+    bool
+set0_BitString (BitString* bs, uint i)
+{
+    const uint nblockbits = sizeof (bitstring_t) * NBitsInByte;
+    uint p, q;
+    bitstring_t x, y;
+
+    p = i / nblockbits;
+    q = i % nblockbits;
+    x = bs[p];
+    y = 1 << q;
+
+    if (0 == (x & y))
+    {
+        return false;
+    }
+    else
+    {
+        bs[p] = x & ~y;
+        return true;
     }
 }
 

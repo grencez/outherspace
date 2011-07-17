@@ -6,7 +6,9 @@
 static void
 zero_rotations (ObjectMotion* motion);
 static void
-move_object (RaySpace* space, ObjectMotion* motions, uint objidx, real dt);
+move_object (RaySpace* space, ObjectMotion* motions,
+             BitString* collisions, Point* refldirs,
+             uint objidx, real dt);
 static void
 apply_gravity (ObjectMotion* motion, const ObjectRaySpace* object, real dt);
 static void
@@ -14,8 +16,14 @@ apply_thrust (Point* veloc,
               PointXfrm* orientation,
               const ObjectMotion* motion,
               real dt);
+static void
+mark_colliding (BitString* collisions,
+                Point* refldirs,
+                ObjectMotion* motions,
+                uint objidx, const RaySpace* space);
 static bool
 detect_collision (ObjectMotion* motions,
+                  BitString* collisions,
                   const RaySpace* space,
                   uint objidx,
                   const Point* new_centroid,
@@ -44,9 +52,9 @@ rotate_object (ObjectMotion* motion, uint xdim, uint ydim, real angle)
 {
     assert (xdim != ydim);
     if (xdim < ydim)
-        motion->rots[xdim * (NDimensions - 2) + ydim - 1] += angle;
+        motion->rots[assoc_index (NDimensions, xdim, ydim)] += angle;
     else
-        motion->rots[ydim * (NDimensions - 2) + xdim - 1] -= angle;
+        motion->rots[assoc_index (NDimensions, ydim, xdim)] -= angle;
 }
 
     void
@@ -56,9 +64,19 @@ move_objects (RaySpace* space, ObjectMotion* motions, real dt)
     ObjectRaySpace* objects;
     real inc;
     uint i, nobjects;
+    BitString* collisions;
+    Point* refldirs;
 
     nobjects = space->nobjects;
     objects = space->objects;
+
+    i = 1 + space->nobjects;
+    i *= i;
+    collisions = alloc_BitString (i, false);
+    refldirs = AllocT( Point, i );
+
+    UFor( i, nobjects )
+        mark_colliding (collisions, refldirs, motions, i, space);
 
     inc = dt / nincs;
 
@@ -66,7 +84,7 @@ move_objects (RaySpace* space, ObjectMotion* motions, real dt)
     {
         uint j;
         UFor( j, nobjects )
-            move_object (space, motions, j, inc);
+            move_object (space, motions, collisions, refldirs, j, inc);
     }
 
     UFor( i, nobjects )
@@ -74,6 +92,9 @@ move_objects (RaySpace* space, ObjectMotion* motions, real dt)
         zero_rotations (&motions[i]);
         motions[i].thrust = 0;
     }
+
+    free_BitString (collisions);
+    free (refldirs);
 }
 
     void
@@ -82,16 +103,16 @@ zero_rotations (ObjectMotion* motion)
 #ifdef __OPENCL_VERSION__
     uint i;
     UFor( i, N2DimRotations )
-    {
         motion->rots[i] = 0;
-    }
 #else
     memset (motion->rots, 0, N2DimRotations * sizeof (real));
 #endif
 }
 
     void
-move_object (RaySpace* space, ObjectMotion* motions, uint objidx, real dt)
+move_object (RaySpace* space, ObjectMotion* motions,
+             BitString* collisions, Point* refldirs,
+             uint objidx, real dt)
 {
     bool commit_move = true;
     uint i;
@@ -114,7 +135,7 @@ move_object (RaySpace* space, ObjectMotion* motions, uint objidx, real dt)
         {
             uint idx;
             real angle;
-            idx = j * (NDimensions - 2) + i - 1;
+            idx = assoc_index (NDimensions, j, i);
             angle = motion->rots[idx] * dt;
             assert (angle < + M_PI / 2);
             assert (angle > - M_PI / 2);
@@ -126,6 +147,14 @@ move_object (RaySpace* space, ObjectMotion* motions, uint objidx, real dt)
     apply_thrust (&veloc, &new_orientation, motion, dt);
         /* orthorotate_PointXfrm (&new_orientation, &basis, 0); */
 
+    /* TODO: This applies the rotation early!
+     * If this choice is kept, some simplification can
+     * happen down in detect_collision().
+     */
+    identity_PointXfrm (&rotation);
+    copy_PointXfrm (&object->orientation, &new_orientation);
+    mark_colliding (collisions, refldirs, motions, objidx, space);
+
     copy_Point (&motion->veloc, &veloc);
     scale_Point (&veloc, &veloc, dt);
     summ_Point (&new_centroid, &object->centroid, &veloc);
@@ -133,7 +162,7 @@ move_object (RaySpace* space, ObjectMotion* motions, uint objidx, real dt)
     if (motion->collide)
     {
         bool hit;
-        hit = detect_collision (motions,
+        hit = detect_collision (motions, collisions,
                                 space, objidx,
                                 &new_centroid,
                                 &new_orientation,
@@ -159,15 +188,17 @@ move_object (RaySpace* space, ObjectMotion* motions, uint objidx, real dt)
     void
 apply_gravity (ObjectMotion* motion, const ObjectRaySpace* object, real dt)
 {
-    real mag, accel;
+        /* TODO: About to add magnetic track... or try to.*/
+        /* real mag; */
+    real accel;
     if (!motion->gravity)  return;
+    (void) object;
 
-    mag = motion->veloc.coords[0];
+        /* mag = motion->veloc.coords[0]; */
 
-    accel = 2 * (-500 - mag);
+    accel = -980;
 
-    if (object->centroid.coords[0] < 100)
-        accel = - accel;
+        /* if (object->centroid.coords[0] < 100) accel = - accel; */
     motion->veloc.coords[0] += accel * dt;
 }
 
@@ -243,9 +274,148 @@ apply_thrust (Point* veloc,
     copy_PointXfrm (orientation, &basis);
 }
 
+    void
+mark_colliding (BitString* collisions,
+                Point* refldirs,
+                ObjectMotion* motions,
+                uint objidx, const RaySpace* space)
+{
+    uint i, off, tmp_off, n;
+    const Scene* scene;
+    const ObjectRaySpace* object;
+    FILE* out = stderr;
+
+    object = &space->objects[objidx];
+    scene = &object->scene;
+
+    n = space->nobjects+1;
+    off = n * objidx;
+    tmp_off = n * space->nobjects;
+
+    UFor( i, n )
+    {
+        uint idx;
+        idx = tmp_off + i;
+        set0_BitString (collisions, idx);
+        zero_Point (&refldirs[idx]);
+    }
+
+    UFor( i, scene->nverts )
+    {
+        bool inside_box;
+        uint hit_idx = Max_uint;
+        real hit_mag;
+        uint hit_objidx = Max_uint;
+        Point origin, direct;
+
+        copy_Point (&origin, &scene->verts[i]);
+        hit_mag = magnitude_Point (&origin);
+        scale_Point (&direct, &origin, - 1 / hit_mag);
+
+        ray_from_basis (&origin, &direct, &object->orientation,
+                        &origin, &direct, &object->centroid);
+
+        inside_box = inside_BoundingBox (&space->main.box, &origin);
+        cast_nopartition (&hit_idx, &hit_mag, &hit_objidx,
+                          space, &origin, &direct,
+                          inside_box, objidx);
+
+        if (hit_objidx < n)
+        {
+            if (false)
+            {
+                output_Point (out, &origin);
+                fputc (' ', out);
+                output_Point (out, &direct);
+                fputc ('\n', out);
+            }
+
+            if (!test_BitString (collisions, off + hit_objidx) &&
+                !set1_BitString (collisions, tmp_off + hit_objidx))
+            {
+#if 0
+                Point veloc, normal;
+
+                negate_Point (&veloc, &motions[objidx].veloc);
+                diff_Point (&veloc, &veloc, &direct);
+                scale_Point (&normal, &direct, hit_mag);
+                summ_Point (&normal, &normal, &origin);
+                diff_Point (&normal, &object->centroid, &normal);
+                normalize_Point (&normal, &normal);
+
+                reflect_Point (&veloc, &veloc, &normal,
+                               dot_Point (&veloc, &normal));
+
+                copy_Point (&refldirs[tmp_off + hit_objidx], &veloc);
+#else
+                Point veloc, normal;
+
+                Op_Point_1200( &veloc,
+                               -, +, &motions[objidx].veloc, &direct );
+
+                Op_Point_202100( &normal,
+                                 -, &object->centroid,
+                                 +, hit_mag *, &direct, &origin );
+
+                normalize_Point (&normal, &normal);
+                reflect_Point (&veloc, &veloc, &normal,
+                               dot_Point (&veloc, &normal));
+
+                copy_Point (&refldirs[tmp_off + hit_objidx], &veloc);
+#if 0
+                    /* TODO: Need more samples than the first!
+                     * Do velocity stuff in loop below!
+                     */
+                summ_Point (&refldirs[tmp_off + hit_objidx],
+                            &refldirs[tmp_off + hit_objidx],
+                            &normal);
+#endif
+#endif
+            }
+        }
+    }
+
+    UFor( i, n )
+    {
+        bool collide;
+        collide = set0_BitString (collisions, tmp_off + i);
+
+        if (collide)
+        {
+            Point* veloc;
+
+            assert (i != objidx);
+            veloc = &motions[objidx].veloc;
+
+            if (set1_BitString (collisions, off + i))
+            {
+                real arbitrary_spring = 10;
+                real dot;
+                const Point* direct;
+                direct = &refldirs[off + i];
+
+                dot = dot_Point (veloc, direct);
+                if (dot < 0)
+                    dot = - dot;
+                
+                scale_Point (veloc, direct, dot + arbitrary_spring);
+            }
+            else
+            {
+                copy_Point (veloc, &refldirs[tmp_off + i]);
+                normalize_Point (&refldirs[off + i], &refldirs[tmp_off + i]);
+            }
+        }
+        else
+        {
+            set0_BitString (collisions, off + i);
+        }
+    }
+}
 
     bool
 detect_collision (ObjectMotion* motions,
+                  BitString* collisions,
                   const RaySpace* space,
                   uint objidx,
                   const Point* new_centroid,
@@ -258,6 +428,7 @@ detect_collision (ObjectMotion* motions,
     uint hit_idx = Max_uint;
     real hit_mag = Max_real;
     uint hit_objidx = Max_uint;
+    uint bs_offset;
     real hit_dx = 0;
     Point hit_dir, reflveloc;
     const ObjectRaySpace* object;
@@ -270,59 +441,23 @@ detect_collision (ObjectMotion* motions,
     scene = &object->scene;
     zero_Point (&hit_dir);
 
-    UFor( i, scene->nverts )
-    {
-        Point diff, origin, destin;
-        real distance;
-
-        trxfrm_Point (&origin, &object->orientation, &scene->verts[i]);
-        trxfrm_Point (&destin, new_orientation, &scene->verts[i]);
-
-        summ_Point (&origin, &origin, &object->centroid);
-        summ_Point (&destin, &destin, new_centroid);
-
-        diff_Point (&diff, &destin, &origin);
-        distance = magnitude_Point (&diff);
-
-
-        if (0 < distance)
-        {
-            uint tmp_hit;
-            real tmp_mag;
-            uint tmp_object;
-            bool inside_box;
-            Point unit_dir;
-
-            scale_Point (&unit_dir, &diff, 1 / distance);
-            inside_box = inside_BoundingBox (&space->main.box, &origin);
-
-            tmp_hit = Max_uint;
-            tmp_mag = distance;
-            tmp_object = Max_uint;
-            cast_nopartition (&tmp_hit, &tmp_mag, &tmp_object,
-                              space, &origin, &unit_dir,
-                              inside_box, objidx);
-            if (tmp_mag < distance &&
-                tmp_mag < hit_mag)
-            {
-                hit_idx = tmp_hit;
-                hit_mag = tmp_mag;
-                hit_objidx = tmp_object;
-                hit_dx = distance;
-                copy_Point (&hit_dir, &unit_dir);
-            }
-        }
-    }
+    bs_offset = objidx * (space->nobjects+1);
 
     UFor( i, space->nobjects )
     {
         uint j;
+        uint eff_objidx;
         BoundingBox box, tmpbox;
         PointXfrm basis;
         Point cent, centoff;
         const ObjectRaySpace* query_object;
 
-        if (i == objidx)
+        if (i == objidx)  eff_objidx = space->nobjects;
+        else              eff_objidx = i;
+
+            /* set0_BitString (collisions, bs_offset + eff_objidx); */
+
+        if (eff_objidx == space->nobjects)
         {
             query_object = &space->main;
             zero_Point (&centoff);
@@ -351,12 +486,13 @@ detect_collision (ObjectMotion* motions,
         while (j != Max_uint)
         {
             bool inside_box;
+            bool inside_object = false;
             uint tmp_hit;
             real tmp_mag;
             Point p0, p1, direct;
             Point tmp;
             FILE* out = stderr;
-            if (i == objidx)
+            if (eff_objidx == space->nobjects)
             {
                 copy_Point (&p1,
                             &query_object->verttree.nodes[j].loc);
@@ -373,7 +509,7 @@ detect_collision (ObjectMotion* motions,
             diff_Point (&p0, &p0, displacement);
             
             xfrm_Point (&tmp, rotation, &p0);
-            if (i == objidx)
+            if (eff_objidx == space->nobjects)
                 copy_Point (&p0, &tmp);
             else
                 summ_Point (&p0, &tmp, &object->centroid);
@@ -394,29 +530,100 @@ detect_collision (ObjectMotion* motions,
                 fputc ('\n', out);
             }
 
-            diff_Point (&direct, &p0, &p1);
-            normalize_Point (&direct, &direct);
-            inside_box = inside_BoundingBox (&object->box, &p1);
-            tmp_hit = Max_uint;
-            tmp_mag = Max_real;
-            cast_ray (&tmp_hit, &tmp_mag, &p1, &direct,
-                      object->nelems, object->tree.elemidcs,
-                      object->tree.nodes,
-                      object->simplices, object->elems,
-                      &object->box, inside_box);
 
-            if (tmp_mag < hit_mag)
+            inside_box = inside_BoundingBox (&object->box, &p0);
+            if (inside_box)
             {
-                hit_idx = tmp_hit;
-                hit_mag = tmp_mag;
-                if (i == objidx)  hit_objidx = space->nobjects;
-                else              hit_objidx = i;
+                tmp_hit = Max_uint;
+                tmp_mag = Max_real;
+                normalize_Point (&direct, &p0);
+
+                cast_ray (&tmp_hit, &tmp_mag, &p0, &direct,
+                          object->nelems, object->tree.elemidcs,
+                          object->tree.nodes,
+                          object->simplices, object->elems,
+                          &object->box, inside_box);
+
+                if (tmp_hit == Max_uint)
+                {
+                    inside_object = true;
+                    set1_BitString (collisions, bs_offset + eff_objidx);
+                }
             }
 
+            if (!inside_object)
+            {
+                diff_Point (&direct, &p0, &p1);
+                normalize_Point (&direct, &direct);
+                inside_box = inside_BoundingBox (&object->box, &p1);
+                tmp_hit = Max_uint;
+                tmp_mag = Max_real;
+                cast_ray (&tmp_hit, &tmp_mag, &p1, &direct,
+                          object->nelems, object->tree.elemidcs,
+                          object->tree.nodes,
+                          object->simplices, object->elems,
+                          &object->box, inside_box);
+
+                if (tmp_mag < hit_mag)
+                {
+                    hit_idx = tmp_hit;
+                    hit_mag = tmp_mag;
+                    hit_objidx = eff_objidx;
+                }
+
+            }
             j = inside_BoundingBox_KPTree (&query_object->verttree,
                                            &box, j);
         }
     }
+
+#if 1
+    UFor( i, scene->nverts )
+    {
+        Point diff, origin, destin;
+        real distance;
+
+        trxfrm_Point (&origin, &object->orientation, &scene->verts[i]);
+        trxfrm_Point (&destin, new_orientation, &scene->verts[i]);
+
+        summ_Point (&origin, &origin, &object->centroid);
+        summ_Point (&destin, &destin, new_centroid);
+
+        diff_Point (&diff, &destin, &origin);
+        distance = magnitude_Point (&diff);
+
+
+        if (0 < distance)
+        {
+            uint tmp_hit;
+            real tmp_mag;
+            uint tmp_objidx;
+            bool inside_box;
+            Point unit_dir;
+
+            scale_Point (&unit_dir, &diff, 1 / distance);
+            inside_box = inside_BoundingBox (&space->main.box, &origin);
+
+            tmp_hit = Max_uint;
+            tmp_mag = distance;
+            tmp_objidx = Max_uint;
+            cast_nopartition (&tmp_hit, &tmp_mag, &tmp_objidx,
+                              space, &origin, &unit_dir,
+                              inside_box, objidx);
+            if (tmp_mag < distance &&
+                tmp_mag < hit_mag &&
+                !test_BitString (collisions, bs_offset + tmp_objidx) &&
+                !test_BitString (collisions, tmp_objidx * (space->nobjects+1) + objidx))
+            {
+                hit_idx = tmp_hit;
+                hit_mag = tmp_mag;
+                hit_objidx = tmp_objidx;
+                hit_dx = distance;
+                copy_Point (&hit_dir, &unit_dir);
+            }
+        }
+    }
+#endif
 
     colliding = false;
     if (hit_objidx <= space->nobjects)

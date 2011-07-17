@@ -154,7 +154,7 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer data)
             break;
         case GDK_Tab:
             switch_racer =  1; break;
-        case GDK_KEY_ISO_Left_Tab:
+        case GDK_ISO_Left_Tab:
             switch_racer = -1; break;
         case GDK_Escape:
             gdk_pointer_ungrab (event->time);  break;
@@ -921,11 +921,13 @@ sdl_main (gpointer data)
     fprintf (stderr, "Joystick has %d buttons!\n",
              SDL_JoystickNumButtons (joystick_handle));
 
+    /*
     if (!joystick_handle)
     {
         return 0;
         SDL_Quit ();
     }
+    */
 
         /* Add a timer to assure the event loop has
          * an event to process when we should exit.

@@ -142,6 +142,16 @@ void proj_Point (Point* dst, const Point* a, const Point* b)
     scale_Point (dst, b, dot_Point (a, b) / dot_Point (b, b));
 }
 
+    /* /dot/ is the dot product of /p/ and /normal/ */
+    void
+reflect_Point (Point* refl, const Point* p,
+               const Point* normal, real dot)
+{
+    Point tmp;
+    scale_Point (&tmp, normal, 2 * dot);
+    diff_Point (refl, &tmp, p);
+}
+
 tristate facing_BoundingPlane (uint dim, real plane,
                                const Point* origin, const Point* dir)
 {

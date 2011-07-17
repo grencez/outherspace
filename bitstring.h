@@ -21,9 +21,11 @@ free_BitString (BitString* bs);
 void
 zero_BitString (BitString* bs, uint n);
 bool
-test_BitString (BitString* bs, uint i);
+test_BitString (const BitString* bs, uint i);
 bool
 set1_BitString (BitString* bs, uint i);
+bool
+set0_BitString (BitString* bs, uint i);
 
 #ifdef INCLUDE_SOURCE
 #include "bitstring.c"

@@ -204,6 +204,13 @@ decmod_uint (uint a, uint b, uint m)
     return a;
 }
 
+    uint
+assoc_index (uint n, uint a, uint b)
+{
+    assert (a < b);
+    return a * (n - 2) + b - 1;
+}
+
     void
 swap_uint (uint* x, uint* y)
 {
