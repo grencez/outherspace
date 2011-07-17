@@ -34,9 +34,7 @@ void output_BoundingBox (FILE* out, const BoundingBox* box)
     /* a - b */
 void diff_Point (Point* dst, const Point* a, const Point* b)
 {
-    uint i;
-    UFor( i, NDimensions )
-        dst->coords[i] = a->coords[i] - b->coords[i];
+    Op_Point_200( dst, -, a, b );
 }
 
 real dot_Point (const Point* a, const Point* b)
@@ -51,16 +49,12 @@ real dot_Point (const Point* a, const Point* b)
     /* a + b */
 void summ_Point (Point* dst, const Point* a, const Point* b)
 {
-    uint i;
-    UFor( i, NDimensions )
-        dst->coords[i] = a->coords[i] + b->coords[i];
+    Op_Point_200( dst ,+, a , b );
 }
 
 void scale_Point (Point* dst, const Point* a, real k)
 {
-    uint i;
-    UFor( i, NDimensions )
-        dst->coords[i] = k * a->coords[i];
+    Op_Point_10( dst ,k*, a );
 }
 
 void zero_Point (Point* a)
@@ -92,9 +86,7 @@ void copy_Point (Point* dst, const Point* src)
 #ifdef __OPENCL_VERSION__
     *dst = *src;
 #else
-    uint i;
-    UFor( i, NDimensions )
-        dst->coords[i] = src->coords[i];
+    Op_Point_0( dst , src );
 #endif
 }
 
@@ -114,9 +106,7 @@ void copy_BoundingBox (BoundingBox* dst, const BoundingBox* src)
 
 void negate_Point (Point* dst, const Point* src)
 {
-    uint i;
-    UFor( i, NDimensions )
-        dst->coords[i] = - src->coords[i];
+    Op_Point_10( dst ,-, src );
 }
 
     void
@@ -147,9 +137,11 @@ void proj_Point (Point* dst, const Point* a, const Point* b)
 reflect_Point (Point* refl, const Point* p,
                const Point* normal, real dot)
 {
-    Point tmp;
-    scale_Point (&tmp, normal, 2 * dot);
-    diff_Point (refl, &tmp, p);
+    real d2;
+    d2 = 2 * dot;
+    Op_Point_2100( refl
+                   ,-, d2*, normal
+                   ,   p );
 }
 
 tristate facing_BoundingPlane (uint dim, real plane,

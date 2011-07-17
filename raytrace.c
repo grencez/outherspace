@@ -491,10 +491,10 @@ map_vertex_normal (Point* normal,
     zero_Point (normal);
     UFor( i, NDimensions )
     {
-        Point tmp;
         assert (elem->vnmls[i] != Max_uint);
-        scale_Point (&tmp, &vnmls[elem->vnmls[i]], bpoint->coords[i]);
-        summ_Point (normal, normal, &tmp);
+        Op_Point_2010( normal
+                       ,+, normal
+                       ,   bpoint->coords[i]*, &vnmls[elem->vnmls[i]] );
     }
     normalize_Point (normal, normal);
 }
@@ -749,8 +749,7 @@ fill_pixel (real* ret_colors,
         Point isect, refldir;
         real dscale = 0, sscale = 0;
 
-        scale_Point (&isect, dir, mag);
-        summ_Point (&isect, &isect, origin);
+        Op_Point_2010( &isect ,+, origin ,mag*, dir );
 
         scale_Point (&refldir, &normal, 2 * cos_normal);
         summ_Point (&refldir, dir, &refldir);
@@ -774,8 +773,7 @@ fill_pixel (real* ret_colors,
                 Point tmp_origin;
 
                 offset_magtolight = magtolight - offset;
-                scale_Point (&tmp_origin, &tolight, offset);
-                summ_Point (&tmp_origin, &tmp_origin, &isect);
+                Op_Point_2010( &tmp_origin ,+, &isect ,offset*, &tolight );
 
                 if (cast_to_light (space, &tmp_origin, &tolight,
                                    offset_magtolight))
@@ -847,8 +845,7 @@ fill_pixel (real* ret_colors,
             refraction_ray (&tmp_dir, dir, &normal,
                             material->optical_density, hit_front, cos_normal);
 
-            scale_Point (&tmp_origin, &tmp_dir, offset);
-            summ_Point (&tmp_origin, &tmp_origin, &isect);
+            Op_Point_2010( &tmp_origin ,+, &isect ,offset*, &tmp_dir );
             cast_colors (colors, space, image, &tmp_origin, &tmp_dir,
                          factors, nbounces);
         }
@@ -858,8 +855,8 @@ fill_pixel (real* ret_colors,
             real factors[NColors];
             UFor( i, NColors )
                 factors[i] = (material->opacity * material->specular[i]);
-            scale_Point (&tmp_origin, &refldir, offset);
-            summ_Point (&tmp_origin, &tmp_origin, &isect);
+
+            Op_Point_2010( &tmp_origin ,+, &isect ,offset*, &refldir );
             cast_colors (colors, space, image, &tmp_origin, &refldir,
                          factors, nbounces);
         }
@@ -928,9 +925,9 @@ test_intersections (uint* ret_hit,
     if (hit_mag != Max_real)
     {
         Point isect;
-        scale_Point (&isect, dir, hit_mag);
-        summ_Point (&isect, &isect, origin);
-
+        Op_Point_2010( &isect
+                       ,+, origin
+                       ,   hit_mag*, dir );
         return inside_BoundingBox (box, &isect);
 #if 0
         output_BoundingBox (stderr, box);
@@ -1141,8 +1138,9 @@ test_object_intersections (uint* ret_hit,
     if (*ret_mag != Max_real)
     {
         Point isect;
-        scale_Point (&isect, dir, *ret_mag);
-        summ_Point (&isect, &isect, origin);
+        Op_Point_2010( &isect
+                       ,+, origin
+                       ,   (*ret_mag)*, dir );
         return inside_BoundingBox (box, &isect);
     }
     return false;
@@ -1629,8 +1627,9 @@ cast_row_perspective (RayImage* image, uint row,
     if (image->pixels)  pixline = &image->pixels[row * 3 * ncols];
 
     origin = &known->origin;
-    scale_Point (&partial_dir, &known->row_delta, row);
-    summ_Point (&partial_dir, &partial_dir, &known->dir_start);
+    Op_Point_2010( &partial_dir
+                   ,+, &known->dir_start
+                   ,   row*, &known->row_delta );
 
     UFor( col, ncols )
     {
@@ -1644,8 +1643,9 @@ cast_row_perspective (RayImage* image, uint row,
         }
 #endif
 
-        scale_Point (&dir, &known->col_delta, col);
-        summ_Point (&dir, &dir, &partial_dir);
+        Op_Point_2010( &dir
+                       ,+, &partial_dir
+                       ,   col*, &known->col_delta );
         normalize_Point (&dir, &dir);
 
         cast_record (hitline, magline, pixline, col,
@@ -1759,24 +1759,20 @@ ray_from_RayCastAPriori (Point* origin, Point* dir,
 {
     if (!image->perspective)
     {
-        Point partial_ray_origin;
         copy_Point (dir, &known->origin);
-
-        scale_Point (&partial_ray_origin, &known->row_delta, row);
-        summ_Point (&partial_ray_origin, &partial_ray_origin, &known->dir_start);
-
-        scale_Point (origin, &known->col_delta, col);
-        summ_Point (origin, origin, &partial_ray_origin);
+        Op_Point_2021010( origin
+                          ,+, &known->dir_start
+                          ,   +, row*, &known->row_delta
+                          ,      col*, &known->col_delta );
     }
     else
     {
-        Point partial_dir;
         copy_Point (origin, &known->origin);
 
-        scale_Point (&partial_dir, &known->row_delta, row);
-        summ_Point (&partial_dir, &partial_dir, &known->dir_start);
-        scale_Point (dir, &known->col_delta, col);
-        summ_Point (dir, dir, &partial_dir);
+        Op_Point_2021010( dir
+                          ,+, &known->dir_start
+                          ,   +, row*, &known->row_delta
+                          ,      col*, &known->col_delta );
         normalize_Point (dir, dir);
     }
 }

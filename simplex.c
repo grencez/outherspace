@@ -49,12 +49,16 @@ hit_Simplex (real* restrict ret_dist,
     real det, inv_det;
     real u, v;
 
+#if 0
     diff_Point (&tvec, origin, &elem->pts[0]);
-
     diff_Point (&edge2, &elem->pts[2], &elem->pts[0]);
-    cross_Point (&pvec, dir, &edge2);
-
     diff_Point (&edge1, &elem->pts[1], &elem->pts[0]);
+#else
+    Op_Point_200( &tvec  ,-, origin        , &elem->pts[0] );
+    Op_Point_200( &edge2 ,-, &elem->pts[2] , &elem->pts[0] );
+    Op_Point_200( &edge1 ,-, &elem->pts[1] , &elem->pts[0] );
+#endif
+    cross_Point (&pvec, dir, &edge2);
     u = dot_Point (&tvec, &pvec);
     det = dot_Point (&edge1, &pvec);
 
@@ -506,16 +510,12 @@ hit_BarySimplex (real* restrict ret_dist,
 #define NewMethod
 
 #ifdef NewMethod
-    scale_Point (&isect, dir, dist);
-    {
-        Point tmp;
-        scale_Point (&tmp, origin, dot);
-        summ_Point (&isect, &isect, &tmp);
-    }
+    Op_Point_21010( &isect
+                    ,+, dist*, dir
+                    ,   dot*, origin );
 #else
     dist *= 1 / dot;
-    scale_Point (&isect, dir, dist);
-    summ_Point (&isect, &isect, origin);
+    Op_Point_2010 ( &isect ,+, origin ,dist*, dir );
 #endif
     
     bcoord_sum = 0;

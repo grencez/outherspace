@@ -420,8 +420,7 @@ trxfrm_BoundingBox (BoundingBox* dst,
     Point diff;
     PointXfrm bbox, robox;
 
-    diff_Point (&diff, &box->max, &box->min);
-    scale_Point (&diff, &diff, .5);
+    Op_Point_1200( &diff ,.5*, -, &box->max , &box->min );
 
     UFor( i, NDimensions )
     {
