@@ -10,7 +10,8 @@ move_object (RaySpace* space, ObjectMotion* motions,
              BitString* collisions, Point* refldirs,
              uint objidx, real dt);
 static void
-apply_gravity (ObjectMotion* motion, const ObjectRaySpace* object, real dt);
+apply_gravity (ObjectMotion* motion, const RaySpace* space,
+               uint objidx, real dt);
 static void
 apply_thrust (Point* veloc,
               PointXfrm* orientation,
@@ -33,7 +34,7 @@ detect_collision (ObjectMotion* motions,
                   real dt);
 
     void
-init_ObjectMotion (ObjectMotion* motion)
+init_ObjectMotion (ObjectMotion* motion, const ObjectRaySpace* object)
 {
     uint i;
     motion->mass = 1;
@@ -45,6 +46,20 @@ init_ObjectMotion (ObjectMotion* motion)
     motion->collide = true;
     motion->gravity = true;
     motion->stabilize = true;
+
+    motion->flying = true;
+    motion->hover_height = 0;
+    UFor( i, NDimensions )
+    {
+        real x;
+        x = object->box.max.coords[i] - object->box.min.coords[i];
+        if (motion->hover_height < x)
+            motion->hover_height = x;
+    }
+    motion->hover_height *= .7;
+    motion->escape_height = 5 * motion->hover_height;
+    zero_Point (&motion->track_normal);
+    motion->track_normal.coords[0] = 1;
 }
 
     void
@@ -180,26 +195,92 @@ move_object (RaySpace* space, ObjectMotion* motions,
     {
         copy_Point (&object->centroid, &new_centroid);
         copy_PointXfrm (&object->orientation, &new_orientation);
-        apply_gravity (motion, object, dt);
+        apply_gravity (motion, space, objidx, dt);
     }
 }
 
     /* Gravity just shoots you at 500 m/s to a middle point.*/
     void
-apply_gravity (ObjectMotion* motion, const ObjectRaySpace* object, real dt)
+apply_gravity (ObjectMotion* motion, const RaySpace* space,
+               uint objidx, real dt)
 {
-        /* TODO: About to add magnetic track... or try to.*/
-        /* real mag; */
+    bool inside_box;
+    uint hit_idx;
+    real hit_mag;
     real accel;
-    if (!motion->gravity)  return;
-    (void) object;
+    Point origin, direct;
+    Point dv;
+    const ObjectRaySpace* object;
 
-        /* mag = motion->veloc.coords[0]; */
+    if (!motion->gravity)  return;
+
+    object = &space->objects[objidx];
+
+    if (motion->flying)
+        negate_Point (&direct, &space->objects[objidx].orientation.pts[0]);
+    else
+        negate_Point (&direct, &motion->track_normal);
+    copy_Point (&origin, &object->centroid);
+    inside_box = inside_BoundingBox (&space->main.box, &origin);
+
+    hit_idx = Max_uint;
+    hit_mag = motion->escape_height;
+    cast1_ObjectRaySpace (&hit_idx, &hit_mag,
+                          &origin, &direct,
+                          &space->main, inside_box);
+
+    motion->flying = hit_idx >= space->main.nelems;
+    if (!motion->flying)
+    {
+        Point normal;
+        const BarySimplex* simplex;
+        real cos_normal;
+        simplex = &space->main.simplices[hit_idx];
+        if (space->main.scene.nvnmls > 0)
+        {
+            Point isect, bpoint;
+            Op_Point_2010( &isect ,+, &origin ,hit_mag*, &direct );
+            barycentric_Point (&bpoint, &isect, simplex);
+
+            map_vertex_normal (&normal,
+                               space->main.scene.vnmls,
+                               &space->main.scene.elems[hit_idx],
+                               &bpoint);
+        }
+        else
+        {
+            copy_Point (&normal, &simplex->plane.normal);
+        }
+
+        cos_normal = dot_Point (&simplex->plane.normal, &direct);
+        if (0 > cos_normal)
+            cos_normal = - cos_normal;
+        else
+            negate_Point (&normal, &normal);
+
+        if (cos_normal < .1)
+            motion->flying = true;
+        else
+            copy_Point (&motion->track_normal, &normal);
+    }
 
     accel = -980;
+    zero_Point (&dv);
+    dv.coords[0] = accel * dt;
 
-        /* if (object->centroid.coords[0] < 100) accel = - accel; */
-    motion->veloc.coords[0] += accel * dt;
+    if (!motion->flying)
+    {
+        accel = -1000;
+        if (hit_mag < motion->hover_height)
+            accel = -accel;
+
+        Op_Point_2010( &motion->veloc
+                       ,+, &motion->veloc
+                       ,   accel*dt*, &motion->track_normal );
+        orth_Point (&dv, &dv, &motion->track_normal);
+    }
+
+    summ_Point (&motion->veloc, &motion->veloc, &dv);
 }
 
     void
@@ -218,8 +299,13 @@ apply_thrust (Point* veloc,
 
     vthrust *= motion->thrust;
 
-    if (motion->stabilize)  orientation->pts[DirDimension].coords[0] = 0;
-    normalize_Point (&orientation->pts[0], &orientation->pts[0]);
+    if (motion->stabilize && !motion->flying)
+    {
+        copy_PointXfrm (&basis, orientation);
+        proj_Point (&basis.pts[0], &basis.pts[0],
+                    &motion->track_normal);
+        orthorotate_PointXfrm (orientation, &basis, 0);
+    }
 
     copy_Point (veloc, &motion->veloc);
 
@@ -260,11 +346,11 @@ apply_thrust (Point* veloc,
 
     summ_Point (veloc, &proj, &orth);
 
-    if (motion->stabilize)
+    if (motion->stabilize && !motion->flying)
     {
-        zero_Point (&orientation->pts[0]);
-        orientation->pts[0].coords[0] = 500+magorth;
-        diff_Point (&orientation->pts[0], &orientation->pts[0], &orth);
+        Op_Point_2100( &orientation->pts[0]
+                       ,-, (500+magorth)*, &motion->track_normal
+                       ,   &orth );
         orthorotate_PointXfrm (&basis, orientation, 0);
     }
     else
@@ -350,12 +436,14 @@ mark_colliding (BitString* collisions,
 #else
                 Point veloc, normal;
 
-                Op_Point_1200( &veloc,
-                               -, +, &motions[objidx].veloc, &direct );
+                Op_Point_1200( &veloc
+                               ,-, +, &motions[objidx].veloc
+                               ,      &direct );
 
-                Op_Point_202100( &normal,
-                                 -, &object->centroid,
-                                 +, hit_mag *, &direct, &origin );
+                Op_Point_202100( &normal
+                                 ,-, &object->centroid
+                                 ,   +, hit_mag *, &direct
+                                 ,      &origin );
 
                 normalize_Point (&normal, &normal);
                 reflect_Point (&veloc, &veloc, &normal,
@@ -538,11 +626,8 @@ detect_collision (ObjectMotion* motions,
                 tmp_mag = Max_real;
                 normalize_Point (&direct, &p0);
 
-                cast_ray (&tmp_hit, &tmp_mag, &p0, &direct,
-                          object->nelems, object->tree.elemidcs,
-                          object->tree.nodes,
-                          object->simplices, object->elems,
-                          &object->box, inside_box);
+                cast1_ObjectRaySpace (&tmp_hit, &tmp_mag, &p0, &direct,
+                                      object, inside_box);
 
                 if (tmp_hit == Max_uint)
                 {
@@ -558,11 +643,8 @@ detect_collision (ObjectMotion* motions,
                 inside_box = inside_BoundingBox (&object->box, &p1);
                 tmp_hit = Max_uint;
                 tmp_mag = Max_real;
-                cast_ray (&tmp_hit, &tmp_mag, &p1, &direct,
-                          object->nelems, object->tree.elemidcs,
-                          object->tree.nodes,
-                          object->simplices, object->elems,
-                          &object->box, inside_box);
+                cast1_ObjectRaySpace (&tmp_hit, &tmp_mag, &p1, &direct,
+                                      object, inside_box);
 
                 if (tmp_mag < hit_mag)
                 {

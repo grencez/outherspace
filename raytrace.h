@@ -79,10 +79,21 @@ struct ray_cast_a_priori_struct
     bool inside_box;
 };
 
+void
+map_vertex_normal (Point* normal,
+                   const Point* vnmls,
+                   const SceneElement* elem,
+                   const Point* bpoint);
 const ObjectRaySpace*
 ray_to_ObjectRaySpace (Point* ret_origin, Point* ret_dir,
                        const Point* origin, const Point* dir,
                        const RaySpace* space, uint objidx);
+void
+cast1_ObjectRaySpace (uint* ret_hit, real* ret_mag,
+                      const Point* origin,
+                      const Point* direct,
+                      const ObjectRaySpace* object,
+                      bool inside_box);
 
 #ifndef __OPENCL_VERSION__
 void

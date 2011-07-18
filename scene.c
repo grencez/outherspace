@@ -401,6 +401,17 @@ xfrm_Scene (Scene* scene, const PointXfrm* xfrm)
     }
 }
 
+    void
+recenter_Scene (Scene* scene)
+{
+    BoundingBox box;
+    Point displacement;
+    init_BoundingBox (&box, scene->nverts, scene->verts);
+    centroid_BoundingBox (&displacement, &box);
+    negate_Point (&displacement, &displacement);
+    xlate_Scene (scene, &displacement);
+}
+
 static
     void
 sort_indexed_Points (uint* jumps, uint* indices, real* coords,

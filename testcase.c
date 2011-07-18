@@ -87,8 +87,6 @@ read_racer (Scene* scene, uint idx)
 {
     bool good;
     char fname[20];
-    BoundingBox box;
-    Point displacement;
     PointXfrm fix;
 
     sprintf (fname, "machine%u.obj", idx);
@@ -132,10 +130,7 @@ read_racer (Scene* scene, uint idx)
             break;
     }
 
-    init_BoundingBox (&box, scene->nverts, scene->verts);
-    centroid_BoundingBox (&displacement, &box);
-    negate_Point (&displacement, &displacement);
-    xlate_Scene (scene, &displacement);
+    recenter_Scene (scene);
 
     return good;
 }
@@ -183,6 +178,10 @@ setup_testcase_track (RaySpace* space,
     if (NDimensions == 3)
     {
         good = readin_wavefront (&space->main.scene, "input", "track1.obj");
+            /* fixup_wavefront_Scene (&space->main.scene); */
+            /* recenter_Scene (&space->main.scene); */
+            /* TODO: Why do you fail?*/
+            /* condense_Scene (&space->main.scene); */
     }
     else
     {

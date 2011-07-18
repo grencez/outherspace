@@ -480,7 +480,6 @@ void cleanup_RayImage (RayImage* image)
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
 
-static
     void
 map_vertex_normal (Point* normal,
                    const Point* vnmls,
@@ -499,7 +498,7 @@ map_vertex_normal (Point* normal,
     normalize_Point (normal, normal);
 }
 
-const ObjectRaySpace*
+    const ObjectRaySpace*
 ray_to_ObjectRaySpace (Point* ret_origin,
                        Point* ret_dir,
                        const Point* origin,
@@ -660,15 +659,8 @@ fill_pixel (real* ret_colors,
     if (compute_bary_coords)
     {
         Point rel_isect;
-        scale_Point (&rel_isect, &rel_dir, mag);
-        summ_Point (&rel_isect, &rel_isect, &rel_origin);
-        bpoint.coords[0] = 1;
-        UFor( i, NDimensions-1 )
-        {
-            bpoint.coords[i+1] =
-                distance_Plane (&simplex->barys[i], &rel_isect);
-            bpoint.coords[0] -= bpoint.coords[i+1];
-        }
+        Op_Point_2010( &rel_isect ,+, &rel_origin ,mag*, &rel_dir );
+        barycentric_Point (&bpoint, &rel_isect, simplex);
     }
 
         /* Get the normal.*/
@@ -1013,6 +1005,19 @@ cast_ray (uint* restrict ret_hit, real* restrict ret_mag,
     *ret_mag = hit_mag;
 }
 
+    void
+cast1_ObjectRaySpace (uint* ret_hit, real* ret_mag,
+                      const Point* origin,
+                      const Point* direct,
+                      const ObjectRaySpace* object,
+                      bool inside_box)
+{
+    cast_ray (ret_hit, ret_mag, origin, direct,
+              object->nelems,
+              object->tree.elemidcs, object->tree.nodes,
+              object->simplices, object->elems,
+              &object->box, inside_box);
+}
 
 static
     void
@@ -1034,14 +1039,8 @@ cast_nopartition (uint* ret_hit,
     hit_mag = *ret_mag;
     hit_object = *ret_object;
 
-    cast_ray (&hit_idx, &hit_mag, origin, dir,
-              space->main.nelems,
-              space->main.tree.elemidcs,
-              space->main.tree.nodes,
-              space->main.simplices,
-              space->main.elems,
-              &space->main.box,
-              inside_box);
+    cast1_ObjectRaySpace (&hit_idx, &hit_mag, origin, dir,
+                          &space->main, inside_box);
 
     if (hit_idx < space->main.nelems)
         hit_object = space->nobjects;
@@ -1066,11 +1065,9 @@ cast_nopartition (uint* ret_hit,
 
         tmp_hit = Max_uint;
         tmp_mag = *ret_mag;
-        cast_ray (&tmp_hit, &tmp_mag, &rel_origin, &rel_dir,
-                  object->nelems, object->tree.elemidcs,
-                  object->tree.nodes,
-                  object->simplices, object->elems,
-                  &object->box, rel_inside_box);
+        cast1_ObjectRaySpace (&tmp_hit, &tmp_mag,
+                              &rel_origin, &rel_dir,
+                              object, rel_inside_box);
 
         if (tmp_mag < hit_mag)
         {
@@ -1121,11 +1118,8 @@ test_object_intersections (uint* ret_hit,
 
         tmp_hit = Max_uint;
         tmp_mag = *ret_mag;
-        cast_ray (&tmp_hit, &tmp_mag, &rel_origin, &rel_dir,
-                  object->nelems, object->tree.elemidcs,
-                  object->tree.nodes,
-                  object->simplices, object->elems,
-                  &object->box, rel_inside_box);
+        cast1_ObjectRaySpace (&tmp_hit, &tmp_mag, &rel_origin, &rel_dir,
+                              object, rel_inside_box);
 
         if (tmp_mag < *ret_mag)
         {
@@ -1482,14 +1476,9 @@ rays_to_hits_fixed_plane (uint* hits, real* mags,
 
             hit = object->nelems;
             mag = Max_real;
-            cast_ray (&hit, &mag,
-                      &origin, &dir,
-                      object->nelems,
-                      object->tree.elemidcs,
-                      object->tree.nodes,
-                      object->simplices,
-                      object->elems,
-                      box, inside_box);
+            cast1_ObjectRaySpace (&hit, &mag,
+                                  &origin, &dir,
+                                  object, inside_box);
             hitline[col] = hit;
             magline[col] = mag;
 

@@ -434,6 +434,20 @@ void barycentric_Plane (Plane* dst, const Plane* plane, const Point* point)
 #endif
 }
 
+    void
+barycentric_Point (Point* bpoint, const Point* isect,
+                   const BarySimplex* simplex)
+{
+    uint i;
+    bpoint->coords[0] = 1;
+    UFor( i, NDimensions-1 )
+    {
+        bpoint->coords[i+1] =
+            distance_Plane (&simplex->barys[i], isect);
+        bpoint->coords[0] -= bpoint->coords[i+1];
+    }
+}
+
     bool
 degenerate_Simplex (const Simplex* raw)
 {

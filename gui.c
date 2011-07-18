@@ -540,24 +540,25 @@ static
 update_view_params (const RaySpace* space, uint idx)
 {
 #ifdef NRacers
-    const ObjectRaySpace* object;
-    PointXfrm rotation;
     real view_zenith, view_azimuthcc;
     Point raise;
+    PointXfrm rotation;
+    const ObjectRaySpace* object;
+    const ObjectMotion* motion;
 
     object = &space->objects[idx];
+    motion = &racer_motions[idx];
 
     view_zenith    = (M_PI / 2) * (1 + view_zenith_input);
     view_azimuthcc =  M_PI      * (1 + view_azimuthcc_input);
 
     spherical3_PointXfrm (&rotation, view_zenith, view_azimuthcc - M_PI);
 
-    if (racer_motions[idx].stabilize)
+    if (motion->stabilize && !motion->flying)
     {
         PointXfrm basis;
         copy_PointXfrm (&view_basis, &object->orientation);
-        zero_Point (&view_basis.pts[0]);
-        view_basis.pts[0].coords[0] = 1;
+        copy_Point (&view_basis.pts[0], &motion->track_normal);
 
         orthorotate_PointXfrm (&basis, &view_basis, 0);
         xfrm_PointXfrm (&view_basis, &rotation, &basis);
@@ -983,14 +984,6 @@ int main (int argc, char* argv[])
     init_compute (&argc, &argv);
 #endif
 
-#ifdef NRacers
-    {
-        uint i;
-        UFor( i, NRacers )
-            init_ObjectMotion (&racer_motions[i]);
-    }
-#endif
-
     good =
 #if 0
 #elif 0
@@ -1020,6 +1013,11 @@ int main (int argc, char* argv[])
 
 #ifdef NRacers
     assert (NRacers == space.nobjects);
+    {
+        uint i;
+        UFor( i, NRacers )
+            init_ObjectMotion (&racer_motions[i], &space.objects[i]);
+    }
 #endif
 
 #ifdef DistribCompute

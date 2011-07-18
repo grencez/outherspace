@@ -83,12 +83,11 @@ map_sky_Texture (real* colors, const Texture* texture, const Point* p)
 
 
 
+    x = 1 / M_PI * zenith;
 #if 0
-    x = zenith / (M_PI / 2);
-#else
-    x = zenith / M_PI;
+    x *= .5;
 #endif
-    y = azimuth / (2 * M_PI);
+    y = 1 / (2 * M_PI) * azimuth;
 
     /*
     assert (x > -0.01);

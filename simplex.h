@@ -51,6 +51,9 @@ void init_Plane (Plane* plane, const Point* normal, const Point* point);
 real distance_Plane (const Plane* plane, const Point* point);
 void proj_Plane (Point* dst, const Point* a, const Plane* plane);
 void barycentric_Plane (Plane* dst, const Plane* plane, const Point* point);
+void
+barycentric_Point (Point* bpoint, const Point* isect,
+                   const BarySimplex* simplex);
 
 bool
 degenerate_Simplex (const Simplex* raw);

@@ -37,6 +37,8 @@ void
 xlate_Scene (Scene* scene, const Point* displacement);
 void
 xfrm_Scene (Scene* scene, const PointXfrm* xfrm);
+void
+recenter_Scene (Scene* scene);
 
 #ifndef __OPENCL_VERSION__
 void init_Scene (Scene* scene);

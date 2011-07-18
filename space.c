@@ -132,6 +132,14 @@ void proj_Point (Point* dst, const Point* a, const Point* b)
     scale_Point (dst, b, dot_Point (a, b) / dot_Point (b, b));
 }
 
+    void
+orth_Point (Point* dst, const Point* a, const Point* b)
+{
+    Point tmp;
+    proj_Point (&tmp, a, b);
+    diff_Point (dst, a, &tmp);
+}
+
     /* /dot/ is the dot product of /p/ and /normal/ */
     void
 reflect_Point (Point* refl, const Point* p,

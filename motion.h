@@ -20,10 +20,15 @@ struct object_motion_struct
     bool collide;
     bool gravity;
     bool stabilize;
+
+    bool flying;
+    real hover_height;
+    real escape_height;
+    Point track_normal;
 };
 
 void
-init_ObjectMotion (ObjectMotion* motion);
+init_ObjectMotion (ObjectMotion* motion, const ObjectRaySpace* object);
 void
 rotate_object (ObjectMotion* motion, uint xdim, uint ydim, real angle);
 void

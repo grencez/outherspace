@@ -42,6 +42,7 @@ checker_negate_Point (Point* p);
 real magnitude_Point (const Point* a);
 void normalize_Point (Point* dst, const Point* a);
 void proj_Point (Point* dst, const Point* a, const Point* b);
+void orth_Point (Point* dst, const Point* a, const Point* b);
 void
 reflect_Point (Point* refl, const Point* p,
                const Point* normal, real dot);
