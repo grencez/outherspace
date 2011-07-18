@@ -17,6 +17,7 @@
 static const bool RenderDrawsPattern = false;
 static const bool ForceFauxFishEye = false;
 static const bool ShowFrameRate = false;
+static const bool LightAtCamera = false;
 
 static uint racer_idx = 0;
 #ifdef NRacers
@@ -145,12 +146,20 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer data)
         case GDK_Right:
             if (shift_mod) { dim = 1;  stride = 1; }
             else if (ctrl_mod) { roll = -1; }
+#ifdef NRacers
             else { dim = 1;  turn = 1; }
+#else
+            else { roll = -1; }
+#endif
             break;
         case GDK_Left:
             if (shift_mod) { dim = 1;  stride = -1; }
             else if (ctrl_mod) { roll = 1; }
+#ifdef NRacers
             else { dim = 1;  turn = -1; }
+#else
+            else { roll = 1; }
+#endif
             break;
         case GDK_Tab:
             switch_racer =  1; break;
@@ -384,6 +393,7 @@ key_release_fn (GtkWidget* _widget, GdkEventKey* event, gpointer data)
         case GDK_Up:
         case GDK_Down:
             input->stride[DirDimension] = 0;
+            input->vert = 0;
             break;
         case GDK_Right:
         case GDK_Left:
@@ -782,6 +792,12 @@ render_RaySpace (byte* data, RaySpace* space,
 #ifdef DistribCompute
         compute_rays_to_hits (&ray_image, space, &origin, &basis);
 #else
+        if (LightAtCamera)
+        {
+            assert (space->nlights > 0);
+            copy_Point (&space->lights[0].location, &origin);
+            space->lights[0].intensity = .5;
+        }
         update_dynamic_RaySpace (space);
         if (ForceFauxFishEye)
             rays_to_hits_fish (&ray_image, space,

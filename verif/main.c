@@ -150,6 +150,8 @@ testfn_KPTree ()
         fputc ('\n', out);
         i = inside_BoundingBox_KPTree (&tree, &box, i);
     }
+
+    cleanup_KPTree (&tree);
 }
 
 static
