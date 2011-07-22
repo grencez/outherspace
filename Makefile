@@ -149,6 +149,7 @@ gui: gui.c compute.c motion.c $(CSources)
 		`sdl-config --cflags` \
 		$< -o $@ \
 		`pkg-config --libs gtk+-2.0` \
+		`pkg-config --libs gthread-2.0` \
 		-lSDL \
 		$(LFLAGS)
 

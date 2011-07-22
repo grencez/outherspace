@@ -135,13 +135,21 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer data)
     {
         case GDK_Up:
             if (shift_mod) { dim = 0;  stride = 1; }
+#ifdef NRacers
+            else { dim = 0;  turn = 1; }
+#else
             else if (ctrl_mod) { dim = 0;  turn = 1; }
             else { dim = DirDimension;  stride = 1; }
+#endif
             break;
         case GDK_Down:
             if (shift_mod) { dim = 0;  stride = -1; }
+#ifdef NRacers
+            else { dim = 0;  turn = -1; }
+#else
             else if (ctrl_mod) { dim = 0;  turn = -1; }
             else { dim = DirDimension;  stride = -1; }
+#endif
             break;
         case GDK_Right:
             if (shift_mod) { dim = 1;  stride = 1; }
@@ -167,6 +175,8 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer data)
             switch_racer = -1; break;
         case GDK_Escape:
             gdk_pointer_ungrab (event->time);  break;
+        case GDK_a:
+            dim = DirDimension; stride = 1; break;
 #ifdef NRacers
         case GDK_c:
             racer_motion->collide = !racer_motion->collide;
@@ -179,6 +189,9 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer data)
         case GDK_d:
             if (ctrl_mod) { rotate_dir_dim = true; }
             else { dim = 2; stride = -1; }
+            break;
+        case GDK_e:
+            input->boost = true;
             break;
 #ifdef NRacers
         case GDK_g:
@@ -392,12 +405,17 @@ key_release_fn (GtkWidget* _widget, GdkEventKey* event, gpointer data)
     {
         case GDK_Up:
         case GDK_Down:
-            input->stride[DirDimension] = 0;
             input->vert = 0;
             break;
         case GDK_Right:
         case GDK_Left:
             input->horz = 0;
+            break;
+        case GDK_a:
+            input->stride[DirDimension] = 0;
+            break;
+        case GDK_e:
+            input->boost = false;
             break;
     }
     return TRUE;
