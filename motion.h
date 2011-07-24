@@ -8,6 +8,8 @@
 struct object_motion_struct;
 typedef struct object_motion_struct ObjectMotion;
 
+#define DriftDim 3
+
 #define N2DimRotations (NDimensions * (NDimensions - 1) / 2)
 
 struct object_motion_struct

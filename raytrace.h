@@ -38,6 +38,7 @@ struct point_light_source_struct
 {
     Point location;
     real intensity;
+    bool diffuse;
 };
 
 struct ray_space_struct
@@ -134,6 +135,8 @@ void
 init_ObjectRaySpace (ObjectRaySpace* object);
 void
 init_PointLightSource (PointLightSource* light);
+void
+copy_PointLightSource (PointLightSource* dst, const PointLightSource* src);
 void
 cleanup_RaySpace (RaySpace* space);
 void

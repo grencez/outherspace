@@ -99,7 +99,8 @@ void output_PPM_image (const char* filename, uint nrows, uint ncols,
 
 
     byte*
-readin_PPM_image (const char* filename, uint* ret_nrows, uint* ret_ncols)
+readin_PPM_image (uint* ret_nrows, uint* ret_ncols,
+                  const char* pathname, const char* filename)
 {
     uint row, nrows = 0, ncols = 0;
     bool good = true;
@@ -115,7 +116,7 @@ readin_PPM_image (const char* filename, uint* ret_nrows, uint* ret_ncols)
 
     t0 = monotime ();
 
-    in = fopen (filename, "rb");
+    in = fopen_path (pathname, filename, "rb");
     if (!in)
     {
         fprintf (stderr, "Cannot open file for reading:%s\n", filename);

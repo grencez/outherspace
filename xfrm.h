@@ -5,8 +5,10 @@
 #include "space.h"
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
-    /* #define DirDimension (NDimensions - 1) */
-#define DirDimension 2
+    /* #define ForwardDim (NDimensions - 1) */
+#define UpDim 0
+#define RightDim 1
+#define ForwardDim 2
 
 struct point_xfrm_struct
 {

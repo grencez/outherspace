@@ -74,6 +74,18 @@ equal_Point (const Point* a, const Point* b)
     return true;
 }
 
+    bool
+ordered_Point (const Point* a, const Point* b)
+{
+    uint i;
+    UFor( i, NDimensions )
+    {
+        if (a->coords[i] < b->coords[i])  return true;
+        if (a->coords[i] > b->coords[i])  return false;
+    }
+    return true;
+}
+
     void
 zero_BoundingBox (BoundingBox* box)
 {

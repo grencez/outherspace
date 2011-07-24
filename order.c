@@ -300,3 +300,29 @@ consecutive_indexed_reals (uint q, uint s, const uint* indices, const real* memb
     return r;
 }
 
+    /* For jumps[i] = j, set jumps[j] = i */
+    void
+invert_jump_table (uint n, uint* jumps)
+{
+    uint sweepi;
+    UFor( sweepi, n )
+    {
+        uint i, j;
+        i = sweepi;
+        j = jumps[i];
+        while (jumps[sweepi] < n)
+        {
+            uint i0;
+            assert (j < n);
+
+            i0 = i;
+            i = j;
+            j = jumps[i];
+            jumps[i] = i0 + n;
+        }
+    }
+
+    UFor( sweepi, n )
+        jumps[sweepi] -= n;
+}
+

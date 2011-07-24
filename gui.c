@@ -12,21 +12,19 @@
 #include <gdk/gdkkeysyms.h>
 #include <SDL.h>
 
-#define NRacers 10
+#define NRacersMax 10
+
+static const bool FollowRacer = true;
 
 static const bool RenderDrawsPattern = false;
 static const bool ForceFauxFishEye = false;
 static const bool ShowFrameRate = false;
 static const bool LightAtCamera = false;
+static const bool ShowSpeed = false;
 
 static uint racer_idx = 0;
-#ifdef NRacers
-static ObjectMotion racer_motions[NRacers];
-    /* Reset every frame.*/
-static real view_azimuthcc_input = 0;
-static real view_zenith_input = 0;
-static const bool ShowSpeed = false;
-#endif
+static uint nracers = 0;
+static ObjectMotion racer_motions[NRacersMax];  /* Reset every frame.*/
 
 typedef struct motion_input_struct MotionInput;
 
@@ -38,6 +36,8 @@ struct motion_input_struct
     real horz;
     real drift;
     tristate stride[NDimensions];
+    real view_azimuthcc;
+    real view_zenith;
     bool boost;
     bool inv_vert;
     bool use_roll;
@@ -69,7 +69,7 @@ init_MotionInput (MotionInput* mot)
     mot->t1 = 0;
     mot->vert = 0;
     mot->horz = 0;
-    mot->drift = 0.5;
+    mot->drift = 0;
     UFor( i, NDimensions )  mot->stride[i] = 0;
     mot->boost = false;
     mot->inv_vert = true;
@@ -118,10 +118,8 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer data)
     FILE* out;
     bool shift_mod, ctrl_mod;
     MotionInput* input;
-#ifdef NRacers
     ObjectMotion* racer_motion;
     racer_motion = &racer_motions[racer_idx];
-#endif
 
     input = (MotionInput*) data;
     out = stdout;
@@ -134,40 +132,28 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer data)
     switch (event->keyval)
     {
         case GDK_Up:
-            if (shift_mod) { dim = 0;  stride = 1; }
-#ifdef NRacers
-            else { dim = 0;  turn = 1; }
-#else
-            else if (ctrl_mod) { dim = 0;  turn = 1; }
-            else { dim = DirDimension;  stride = 1; }
-#endif
+            if (shift_mod) { dim = UpDim;  stride = 1; }
+            else if (FollowRacer) { dim = UpDim;  turn = 1; }
+            else if (ctrl_mod) { dim = UpDim;  turn = 1; }
+            else { dim = ForwardDim;  stride = 1; }
             break;
         case GDK_Down:
-            if (shift_mod) { dim = 0;  stride = -1; }
-#ifdef NRacers
-            else { dim = 0;  turn = -1; }
-#else
-            else if (ctrl_mod) { dim = 0;  turn = -1; }
-            else { dim = DirDimension;  stride = -1; }
-#endif
+            if (shift_mod) { dim = UpDim;  stride = -1; }
+            else if (FollowRacer) { dim = UpDim;  turn = -1; }
+            else if (ctrl_mod) { dim = UpDim;  turn = -1; }
+            else { dim = ForwardDim;  stride = -1; }
             break;
         case GDK_Right:
-            if (shift_mod) { dim = 1;  stride = 1; }
+            if (shift_mod) { dim = RightDim;  stride = 1; }
             else if (ctrl_mod) { roll = -1; }
-#ifdef NRacers
-            else { dim = 1;  turn = 1; }
-#else
+            else if (FollowRacer) { dim = RightDim;  turn = 1; }
             else { roll = -1; }
-#endif
             break;
         case GDK_Left:
-            if (shift_mod) { dim = 1;  stride = -1; }
+            if (shift_mod) { dim = RightDim;  stride = -1; }
             else if (ctrl_mod) { roll = 1; }
-#ifdef NRacers
-            else { dim = 1;  turn = -1; }
-#else
+            else if (FollowRacer) { dim = RightDim;  turn = -1; }
             else { roll = 1; }
-#endif
             break;
         case GDK_Tab:
             switch_racer =  1; break;
@@ -176,28 +162,24 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer data)
         case GDK_Escape:
             gdk_pointer_ungrab (event->time);  break;
         case GDK_a:
-            dim = DirDimension; stride = 1; break;
-#ifdef NRacers
+            dim = ForwardDim; stride = 1; break;
         case GDK_c:
             racer_motion->collide = !racer_motion->collide;
             break;
-#endif
         case GDK_D:
-            dim = 2;
+            dim = DriftDim;
             stride = 1;
             break;
         case GDK_d:
             if (ctrl_mod) { rotate_dir_dim = true; }
-            else { dim = 2; stride = -1; }
+            else { dim = DriftDim; stride = -1; }
             break;
         case GDK_e:
             input->boost = true;
             break;
-#ifdef NRacers
         case GDK_g:
             racer_motion->gravity = !racer_motion->gravity;
             break;
-#endif
         case GDK_L:
             view_light_change = 1;  break;
         case GDK_l:
@@ -234,11 +216,12 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer data)
 
         fprintf (out, "view_light:%f\n", ray_image.view_light);
     }
-    else if (stride != 0)
+    else if (stride != 0 && FollowRacer)
     {
-#ifdef NRacers
         input->stride[dim] = stride;
-#else
+    }
+    else if (stride != 0 && !FollowRacer)
+    {
         Point diff;
         scale_Point (&diff, &view_basis.pts[dim], stride_magnitude * stride);
         summ_Point (&view_origin, &view_origin, &diff);
@@ -246,7 +229,6 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer data)
         fputs ("pos:", out);
         output_Point (out, &view_origin);
         fputc ('\n', out);
-#endif
     }
     else if (stride_mag_change != 0)
     {
@@ -259,7 +241,7 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer data)
     {
         PointXfrm tmp_basis;
         copy_PointXfrm (&tmp_basis, &view_basis);
-        rotate_PointXfrm (&tmp_basis, 0, 1, roll * M_PI / 8);
+        rotate_PointXfrm (&tmp_basis, UpDim, RightDim, roll * M_PI / 8);
         orthonormalize_PointXfrm (&view_basis, &tmp_basis);
 
         fputs ("basis:", out);
@@ -270,22 +252,25 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer data)
     {
         uint negdim;
         if (turn < 0)  negdim = dim;
-        else           negdim = DirDimension;
+        else           negdim = ForwardDim;
 
-#ifdef NRacers
-        if (dim == 1)
-            input->horz = - turn;
+        if (FollowRacer)
+        {
+            if (dim == 1)
+                input->horz = - turn;
+            else
+                input->vert = turn;
+        }
         else
-            input->vert = turn;
-#else
-        negate_Point (&view_basis.pts[negdim], &view_basis.pts[negdim]);
-        swaprows_PointXfrm (&view_basis, dim, DirDimension);
-        needs_recast = true;
+        {
+            negate_Point (&view_basis.pts[negdim], &view_basis.pts[negdim]);
+            swaprows_PointXfrm (&view_basis, dim, ForwardDim);
+            needs_recast = true;
 
-        fputs ("basis:", out);
-        output_PointXfrm (out, &view_basis);
-        fputc ('\n', out);
-#endif
+            fputs ("basis:", out);
+            output_PointXfrm (out, &view_basis);
+            fputc ('\n', out);
+        }
     }
     else if (view_angle_change != 0)
     {
@@ -347,15 +332,13 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer data)
         UFor( i, n )
             swaprows_PointXfrm (&view_basis, 2+i, 3+i);
     }
-    else if (switch_racer != 0)
+    else if (FollowRacer && switch_racer != 0)
     {
-#ifdef NRacers
         if (switch_racer > 0)
-            racer_idx = incmod_uint (racer_idx, 1, NRacers);
+            racer_idx = incmod_uint (racer_idx, 1, nracers);
         else
-            racer_idx = decmod_uint (racer_idx, 1, NRacers);
+            racer_idx = decmod_uint (racer_idx, 1, nracers);
         printf ("racer_idx:%u\n", racer_idx);
-#endif
     }
     else if (change_cast_method)
     {
@@ -412,7 +395,7 @@ key_release_fn (GtkWidget* _widget, GdkEventKey* event, gpointer data)
             input->horz = 0;
             break;
         case GDK_a:
-            input->stride[DirDimension] = 0;
+            input->stride[ForwardDim] = 0;
             break;
         case GDK_e:
             input->boost = false;
@@ -428,7 +411,7 @@ set_rotate_view (real vert, real horz)
 {
     Point dir;
     PointXfrm tmp;
-    const uint dir_dim = DirDimension;
+    const uint dir_dim = ForwardDim;
     copy_PointXfrm (&tmp, &view_basis);
     zero_Point (&dir);
     dir.coords[0] = vert * sin (view_angle / 2);
@@ -456,8 +439,8 @@ joystick_button_event (MotionInput* mot,
     value = pressed ? 1 : 0;
 
     if (btnidx == 0)  mot->boost = pressed;
-    if (btnidx == 2)  mot->stride[DirDimension] =  value;
-    if (btnidx == 3)  mot->stride[DirDimension] = -value;
+    if (btnidx == 2)  mot->stride[ForwardDim] =  value;
+    if (btnidx == 3)  mot->stride[ForwardDim] = -value;
 }
 
 static
@@ -482,10 +465,8 @@ joystick_axis_event (MotionInput* mot, uint devidx, uint axisidx, int value)
     if (axisidx == 0)  mot->horz = -x;
     if (axisidx == 1)  mot->vert = -x;
     if (axisidx == 2)  mot->drift = x;
-#ifdef NRacers
-    if (axisidx == 3)  view_azimuthcc_input = -x;
-    if (axisidx == 4)  view_zenith_input = -x;
-#endif
+    if (axisidx == 3)  mot->view_azimuthcc = -x;
+    if (axisidx == 4)  mot->view_zenith = -x;
 }
 
 
@@ -493,55 +474,50 @@ joystick_axis_event (MotionInput* mot, uint devidx, uint axisidx, int value)
     /* A call to this better be in a mutex!*/
 static
     void
-update_object_locations (RaySpace* space, MotionInput* input, uint idx)
+update_object_locations (RaySpace* space, MotionInput* input,
+                         uint idx, real dt)
 {
-    const uint dir_dim = DirDimension;
-    real x, dt;
-#ifdef NRacers
+    real x;
     ObjectMotion* motion;
     motion = &racer_motions[idx];
-#else
-    PointXfrm tmp_basis;
-    uint i;
-    (void) space;
-    (void) idx;
-#endif
-
-    dt = input->t1 - input->t0;
-    if (dt == 0)  return;
-    input->t0 = input->t1;
 
     x = input->vert;
     if (!input->inv_vert) x = - x;
 
-#ifdef NRacers
-    rotate_object (motion, 0, dir_dim, x * M_PI / 2);
+    rotate_object (motion, UpDim, ForwardDim, x * (M_PI / 2));
 
-#if NDimensions == 4
-    x = (1 + input->drift) / 2;
-    x = clamp_real (x, 0, 1);
-    space->objects[idx].centroid.coords[3] = x;
-#endif
-
+    x = input->horz * (M_PI / 2);
     if (input->use_roll)
-        rotate_object (motion, 1, 0,       input->horz * M_PI / 2);
+        rotate_object (motion, RightDim, UpDim, x);
     else
-        rotate_object (motion, 1, dir_dim, input->horz * M_PI / 2);
+        rotate_object (motion, RightDim, ForwardDim, x);
 
-    motion->thrust = input->stride[dir_dim];
+    motion->thrust = input->stride[ForwardDim];
     motion->boost = input->boost;
 
     move_objects (space, racer_motions, dt);
-#else /* ^ #ifdef NRacers ^ */
+}
+
+static
+    void
+update_camera_location (MotionInput* input, real dt)
+{
+    uint i;
+    real x;
+    PointXfrm tmp_basis;
+
+    x = input->vert;
+    if (!input->inv_vert) x = - x;
 
     copy_PointXfrm (&tmp_basis, &view_basis);
         /* /x/ comes in as the vertical rotation.*/
-    trrotate_PointXfrm (&tmp_basis, 0, dir_dim, x * dt *  M_PI / 2);
+    trrotate_PointXfrm (&tmp_basis, UpDim, ForwardDim, x * dt * (M_PI / 2));
 
+    x = input->horz * dt * (M_PI / 2);
     if (input->use_roll)
-        trrotate_PointXfrm (&tmp_basis, 1, 0,       input->horz * dt*M_PI/2);
+        trrotate_PointXfrm (&tmp_basis, RightDim, UpDim, x);
     else
-        trrotate_PointXfrm (&tmp_basis, 1, dir_dim, input->horz * dt*M_PI/2);
+        trrotate_PointXfrm (&tmp_basis, RightDim, ForwardDim, x);
 
     orthonormalize_PointXfrm (&view_basis, &tmp_basis);
 
@@ -553,32 +529,33 @@ update_object_locations (RaySpace* space, MotionInput* input, uint idx)
         summ_Point (&view_origin, &view_origin, &diff);
     }
 
-#if NDimensions == 4
-    x = (1 + input->drift) / 2;
-    x = clamp_real (x, 0, 1);
-    view_origin.coords[3] = x;
-#endif
-#endif
+    if (NDimensions == 4)
+    {
+        x = (1 + input->drift) / 2;
+        x = clamp_real (x, 0, 1);
+        view_origin.coords[DriftDim] = x;
+    }
 }
 
 
     /* Global effects!*/
 static
     void
-update_view_params (const RaySpace* space, uint idx)
+update_view_params (const RaySpace* space, uint idx, const MotionInput* input)
 {
-#ifdef NRacers
     real view_zenith, view_azimuthcc;
     Point raise;
     PointXfrm rotation;
     const ObjectRaySpace* object;
     const ObjectMotion* motion;
 
+    if (!FollowRacer)  return;
+
     object = &space->objects[idx];
     motion = &racer_motions[idx];
 
-    view_zenith    = (M_PI / 2) * (1 + view_zenith_input);
-    view_azimuthcc =  M_PI      * (1 + view_azimuthcc_input);
+    view_zenith    = (M_PI / 2) * (1 + input->view_zenith);
+    view_azimuthcc =  M_PI      * (1 + input->view_azimuthcc);
 
     spherical3_PointXfrm (&rotation, view_zenith, view_azimuthcc - M_PI);
 
@@ -596,15 +573,11 @@ update_view_params (const RaySpace* space, uint idx)
         xfrm_PointXfrm (&view_basis, &rotation, &object->orientation);
     }
 
-    scale_Point (&view_origin, &view_basis.pts[DirDimension], -130);
+    scale_Point (&view_origin, &view_basis.pts[ForwardDim], -130);
     summ_Point (&view_origin, &view_origin, &object->centroid);
 
-    scale_Point (&raise, &view_basis.pts[0], 50);
+    scale_Point (&raise, &view_basis.pts[UpDim], 50);
     summ_Point (&view_origin, &view_origin, &raise);
-#else
-    (void) space;
-    (void) idx;
-#endif
 }
 
 
@@ -777,9 +750,13 @@ render_RaySpace (byte* data, RaySpace* space,
         }
         else
         {
+            real dt;
+            dt = motion_input.t1 - motion_input.t0;
+            motion_input.t0 = motion_input.t1;
+
             if (ShowFrameRate)
             {
-                framerate_report_dt += motion_input.t1 - motion_input.t0;
+                framerate_report_dt += dt;
                 framerate_report_count += 1;
                 if (framerate_report_dt >= 1)
                 {
@@ -790,16 +767,18 @@ render_RaySpace (byte* data, RaySpace* space,
                     framerate_report_count = 0;
                 }
             }
-            update_object_locations (space, &motion_input, racer_idx);
+
+            if (FollowRacer)
+                update_object_locations (space, &motion_input, racer_idx, dt);
+            else
+                update_camera_location (&motion_input, dt);
         }
 
-#ifdef NRacers
-        if (ShowSpeed)
+        if (FollowRacer && ShowSpeed)
             fprintf (out, "SPEED:%f\n",
                      magnitude_Point (&racer_motions[racer_idx].veloc));
-#endif
 
-        update_view_params (space, racer_idx);
+        update_view_params (space, racer_idx, &motion_input);
         copy_Point (&origin, &view_origin);
         copy_PointXfrm (&basis, &view_basis);
         needs_recast = false;
@@ -947,9 +926,12 @@ sdl_main (gpointer data)
     SDL_TimerID timer;
     SDL_Joystick* joystick_handle; 
     SDL_Event event;
+#if 0
     RaySpace* space;
-
     space = (RaySpace*) data;
+#else
+    (void) data;
+#endif
 
     SDL_JoystickEventState (SDL_ENABLE);
     joystick_handle = SDL_JoystickOpen (0);
@@ -1045,14 +1027,14 @@ int main (int argc, char* argv[])
         return 1;
     }
 
-#ifdef NRacers
-    assert (NRacers == space.nobjects);
+    if (FollowRacer)
     {
         uint i;
-        UFor( i, NRacers )
+        assert (space.nobjects <= NRacersMax);
+        nracers = space.nobjects;
+        UFor( i, space.nobjects )
             init_ObjectMotion (&racer_motions[i], &space.objects[i]);
     }
-#endif
 
 #ifdef DistribCompute
     call_gui = !rays_to_hits_computeloop (&space);

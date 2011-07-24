@@ -11,6 +11,14 @@ static void
 random_Scene (Scene* scene, uint nelems, const BoundingBox* box);
 static void
 setup_camera_light (RaySpace* space, const Point* origin);
+static void
+setup_box_lights (RaySpace* space,
+                  const PointLightSource* light,
+                  const BoundingBox* box);
+static bool
+add_sky_texture (RaySpace* space,
+                 const char* pathname,
+                 const char* filename);
 
     bool
 setup_testcase_triangles (RaySpace* space,
@@ -37,7 +45,7 @@ setup_testcase_triangles (RaySpace* space,
         *view_angle = M_PI / 3;
         UFor( i, NDimensions )
             view_origin->coords[i] = 50;
-        view_origin->coords[DirDimension] = -70;
+        view_origin->coords[ForwardDim] = -70;
     }
     else
     {
@@ -99,7 +107,7 @@ read_racer (Scene* scene, uint idx)
     else
     {
         const char* fnames[2];
-        const real dcoords[2] = { -0.1, 0.1 };
+        const real dcoords[2] = { 0, 1.0/16 };
         fnames[0] = fname;
         fnames[1] = fname;
         good = interpolate_by_file (scene, 2, "input", fnames, dcoords);
@@ -115,22 +123,22 @@ read_racer (Scene* scene, uint idx)
             break;
         case 2:
             identity_PointXfrm (&fix);
-            rotate_PointXfrm (&fix, 1, 2, M_PI/2);
-            rotate_PointXfrm (&fix, 0, 1, M_PI/2);
+            rotate_PointXfrm (&fix, RightDim, ForwardDim, M_PI/2);
+            rotate_PointXfrm (&fix, UpDim, RightDim, M_PI/2);
             scale_PointXfrm (&fix, &fix, 3);
             xfrm_Scene (scene, &fix);
             break;
         case 3:
             identity_PointXfrm (&fix);
-            rotate_PointXfrm (&fix, 1, 0, M_PI/3);
-            swaprows_PointXfrm (&fix, 0, 2);
+            rotate_PointXfrm (&fix, RightDim, UpDim, M_PI/3);
+            swaprows_PointXfrm (&fix, UpDim, ForwardDim);
             xfrm_Scene (scene, &fix);
             break;
         default:
             break;
     }
 
-    recenter_Scene (scene);
+    recenter_Scene (scene, 0);
 
     return good;
 }
@@ -151,7 +159,7 @@ setup_racers (RaySpace* space)
         object->centroid.coords[1] = 75 * i + 300;
 
         if (NDimensions == 4)
-            object->centroid.coords[3] = .5;
+            object->centroid.coords[3] = 0;
 
         good = read_racer (&object->scene, 0);
         if (!good)  return false;
@@ -166,7 +174,6 @@ setup_testcase_track (RaySpace* space,
                       real* view_angle)
 {
     bool good;
-    uint i;
 
     init_RaySpace (space);
     identity_PointXfrm (view_basis);
@@ -178,10 +185,6 @@ setup_testcase_track (RaySpace* space,
     if (NDimensions == 3)
     {
         good = readin_wavefront (&space->main.scene, "input", "track1.obj");
-            /* fixup_wavefront_Scene (&space->main.scene); */
-            /* recenter_Scene (&space->main.scene); */
-            /* TODO: Why do you fail?*/
-            /* condense_Scene (&space->main.scene); */
     }
     else
     {
@@ -190,16 +193,10 @@ setup_testcase_track (RaySpace* space,
         good = interpolate_by_file (&space->main.scene, 2, "input", fnames, dcoords);
     }
     if (!good)  return false;
+    condense_Scene (&space->main.scene);
 
-    i = space->main.scene.ntxtrs;
-    space->main.scene.ntxtrs = i+1;
-    ResizeT( Texture, space->main.scene.txtrs, i+1 );
-    space->main.scene.txtrs[i].pixels =
-        readin_PPM_image ("input/gradient-sky.ppm",
-                          &space->main.scene.txtrs[i].nrows,
-                          &space->main.scene.txtrs[i].ncols);
-    if (!space->main.scene.txtrs[i].pixels)  return false;
-    space->skytxtr = i;
+    good = add_sky_texture (space, "input", "gradient-sky.ppm");
+    if (!good)  return false;
 
     good = setup_racers (space);
     if (!good)  return false;
@@ -639,25 +636,35 @@ setup_testcase_4d_surface (RaySpace* space,
                            real* view_angle)
 {
     bool good = true;
+    Point new_centroid;
 
     init_RaySpace (space);
     identity_PointXfrm (view_basis);
     zero_Point (view_origin);
 
-    space->nobjects = 10;
+    space->nobjects = 1;
     space->objects = AllocT( ObjectRaySpace, space->nobjects );
 
+    zero_Point (&new_centroid);
     if (NDimensions == 3)
     {
         good = readin_wavefront (&space->main.scene, "input", "sandbox.obj");
     }
     else
     {
-        const char* const fnames[2] = { "sandbox.obj", "sandbox_flat.obj" };
-        const real dcoords[2] = { -0.001, 1.001 };
+        const char* const fnames[2] = { "sandbox_flat.obj", "sandbox.obj" };
+        const real dcoords[2] = { -0.001, 1000.001 };
         good = interpolate_by_file (&space->main.scene, 2,
                                     "input", fnames, dcoords);
+        new_centroid.coords[3] = (dcoords[0] + dcoords[1]) / 2;
     }
+    if (!good)  return false;
+
+    condense_Scene (&space->main.scene);
+    fixup_wavefront_Scene (&space->main.scene);
+    recenter_Scene (&space->main.scene, &new_centroid);
+
+    good = add_sky_texture (space, "input", "iras.ppm");
     if (!good)  return false;
 
     good = setup_racers (space);
@@ -666,7 +673,7 @@ setup_testcase_4d_surface (RaySpace* space,
     init_filled_RaySpace (space);
 
 #if 0
-#elif 1
+#elif 0
     *view_angle = 1.0472;
     view_origin->coords[0] = -4818.89;
     view_basis->pts[0].coords[0] = -0.987767;
@@ -680,9 +687,36 @@ setup_testcase_4d_surface (RaySpace* space,
     view_basis->pts[2].coords[0] = -0.134392;
     view_basis->pts[2].coords[1] = 0.972228;
     view_basis->pts[2].coords[2] = -0.191601;
+#elif 1
+    *view_angle = 2 * M_PI / 3;
+    view_origin->coords[UpDim] = 500;
 #endif
 
-    setup_camera_light (space, view_origin);
+    if (true)
+    {
+        Point p;
+        zero_Point (&p);
+        p.coords[0] = 5000;
+        setup_camera_light (space, &p);
+        space->lights[0].intensity = .8;
+        space->lights[0].diffuse = true;
+    }
+    else
+    {
+        BoundingBox box;
+        PointLightSource light;
+
+        copy_BoundingBox (&box, &space->main.box);
+        box.min.coords[UpDim] = box.max.coords[UpDim];
+        box.min.coords[UpDim] += 1000;
+        box.max.coords[UpDim] += 2000;
+
+        init_PointLightSource (&light);
+        light.intensity /= exp2_uint (NDimensions-1);
+        light.diffuse = true;
+
+        setup_box_lights (space, &light, &box);
+    }
 
     return good;
 }
@@ -760,5 +794,70 @@ setup_camera_light (RaySpace* space, const Point* origin)
     space->lights = AllocT( PointLightSource, space->nlights );
     init_PointLightSource (&space->lights[0]);
     copy_Point (&space->lights[0].location, origin);
+}
+
+    void
+setup_box_lights (RaySpace* space,
+                  const PointLightSource* light,
+                  const BoundingBox* box)
+{
+    uint i, ndims = 0;
+    uint dims[NDimensions];
+
+    UFor( i, NDimensions )
+    {
+        if (box->min.coords[i] != box->max.coords[i])
+        {
+            dims[ndims] = i;
+            ndims += 1;
+        }
+    }
+
+    space->nlights = exp2_uint (ndims);
+    space->lights = AllocT( PointLightSource, space->nlights );
+
+    UFor( i, space->nlights )
+    {
+        uint di, flags;
+        Point* loc;
+
+        flags = i;
+        loc = &space->lights[i].location;
+
+        copy_PointLightSource (&space->lights[i], light);
+        copy_Point (loc, &box->max);
+
+        UFor( di, ndims )
+        {
+            uint dim;
+            dim = dims[di];
+            if (even_uint (flags))
+                loc->coords[dim] = box->min.coords[dim];
+            else
+                loc->coords[dim] = box->max.coords[dim];
+            flags >>= 1;
+        }
+    }
+}
+
+    bool
+add_sky_texture (RaySpace* space,
+                 const char* pathname,
+                 const char* filename)
+{
+    uint i;
+    Scene* scene;
+    scene = &space->main.scene;
+    i = scene->ntxtrs;
+    if (i == 0)  scene->txtrs = 0;  /* Assure this is NULL.*/
+    scene->ntxtrs = i+1;
+    ResizeT( Texture, scene->txtrs, i+1 );
+    scene->txtrs[i].pixels =
+        readin_PPM_image (&scene->txtrs[i].nrows,
+                          &scene->txtrs[i].ncols,
+                          pathname, filename);
+    if (!scene->txtrs[i].pixels)  return false;
+    space->skytxtr = i;
+    return true;
 }
 

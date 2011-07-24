@@ -402,13 +402,16 @@ xfrm_Scene (Scene* scene, const PointXfrm* xfrm)
 }
 
     void
-recenter_Scene (Scene* scene)
+recenter_Scene (Scene* scene, const Point* new_centroid)
 {
     BoundingBox box;
     Point displacement;
     init_BoundingBox (&box, scene->nverts, scene->verts);
     centroid_BoundingBox (&displacement, &box);
-    negate_Point (&displacement, &displacement);
+    if (new_centroid)
+        diff_Point (&displacement, new_centroid, &displacement);
+    else
+        negate_Point (&displacement, &displacement);
     xlate_Scene (scene, &displacement);
 }
 
@@ -447,6 +450,13 @@ sort_indexed_Points (uint* jumps, uint* indices, real* coords,
     }
 
     minimal_unique (nmembs, indices);
+
+    if (nmembs > 0)
+    {
+        uint i;
+        UFor( i, nmembs-1 )
+            assert (ordered_Point (&pts[indices[i]], &pts[indices[i+1]]));
+    }
 }
 
 static
@@ -485,7 +495,6 @@ condense_Points (uint n, Point* pts, uint* jumps, uint* indices, real* coords)
         assert (equal_Point (&pts[indices[i]],
                              &pts[indices[jumps[i]]]));
 
-
         /* Fixup indices so points in range don't move.*/
     UFor( i, q )
     {
@@ -493,10 +502,12 @@ condense_Points (uint n, Point* pts, uint* jumps, uint* indices, real* coords)
         e = &indices[i];
         while (*e < q && *e != i)
         {
-            swap_uint (&jumps[jumps[*e]], &jumps[jumps[i]]);
+            swap_uint (&jumps[*e], &jumps[i]);
             swap_uint (&indices[*e], e);
         }
     }
+
+    invert_jump_table (q, jumps);
 
     minimal_unique (q, jumps);
 

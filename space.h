@@ -32,6 +32,8 @@ void scale_Point (Point* dst, const Point* a, real k);
 void zero_Point (Point* a);
 bool
 equal_Point (const Point* a, const Point* b);
+bool
+ordered_Point (const Point* a, const Point* b);
 void
 zero_BoundingBox (BoundingBox* box);
 void copy_Point (Point* dst, const Point* src);

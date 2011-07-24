@@ -22,7 +22,8 @@ static const char*
 parse_face_field (uint* v, uint* vt, uint* vn, const char* line);
 
 static uint
-parse_texture (SList* texlist, SList* texnamelist, const char* filename);
+parse_texture (SList* texlist, SList* texnamelist,
+               const char* pathname, const char* filename);
 
     bool
 streql (const void* a, const void* b)
@@ -35,9 +36,9 @@ fixup_wavefront_Point (Point* p)
 {
     Point a;
     copy_Point (&a, p);
-    p->coords[0] = a.coords[1];
-    p->coords[1] = a.coords[2];
-    p->coords[2] = a.coords[0];
+    p->coords[UpDim] = a.coords[1];
+    p->coords[RightDim] = a.coords[2];
+    p->coords[ForwardDim] = a.coords[0];
 }
 
     void
@@ -390,14 +391,16 @@ readin_materials (SList* matlist, SList* namelist,
         else if (0 == strncmp (line, "map_Ka", 6))
         {
             material->ambient_texture =
-                parse_texture (texlist, texnamelist, strskip_ws (&line[6]));
+                parse_texture (texlist, texnamelist,
+                               pathname, strskip_ws (&line[6]));
             if (material->ambient_texture == Max_uint)
                 good = false;
         }
         else if (0 == strncmp (line, "map_Kd", 6))
         {
             material->diffuse_texture =
-                parse_texture (texlist, texnamelist, strskip_ws (&line[6]));
+                parse_texture (texlist, texnamelist,
+                               pathname, strskip_ws (&line[6]));
             if (material->diffuse_texture == Max_uint)
                 good = false;
         }
@@ -414,7 +417,8 @@ readin_materials (SList* matlist, SList* namelist,
 
 
     uint
-parse_texture (SList* texlist, SList* texnamelist, const char* filename)
+parse_texture (SList* texlist, SList* texnamelist,
+               const char* pathname, const char* filename)
 {
     uint i;
     i = search_SList (texnamelist, filename, streql);
@@ -424,9 +428,8 @@ parse_texture (SList* texlist, SList* texnamelist, const char* filename)
         Texture* texture;
         texture = AllocT( Texture, 1 );
 
-        texture->pixels = readin_PPM_image (filename,
-                                            &texture->nrows,
-                                            &texture->ncols);
+        texture->pixels = readin_PPM_image (&texture->nrows, &texture->ncols,
+                                            pathname, filename);
 
         if (texture->pixels)
         {

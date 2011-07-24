@@ -15,6 +15,7 @@ apply_gravity (ObjectMotion* motion, const RaySpace* space,
 static void
 apply_thrust (Point* veloc,
               PointXfrm* orientation,
+              real* drift,
               const ObjectMotion* motion,
               real dt);
 static void
@@ -32,6 +33,9 @@ detect_collision (ObjectMotion* motions,
                   const Point* displacement,
                   const PointXfrm* rotation,
                   real dt);
+
+static void
+remove_4d_rotation (PointXfrm* basis);
 
     void
 init_ObjectMotion (ObjectMotion* motion, const ObjectRaySpace* object)
@@ -131,6 +135,7 @@ move_object (RaySpace* space, ObjectMotion* motions,
 {
     bool commit_move = true;
     uint i;
+    real drift;
     Point veloc;
     Point new_centroid;
         /* PointXfrm basis; */
@@ -159,7 +164,7 @@ move_object (RaySpace* space, ObjectMotion* motions,
     }
 
     trxfrm_PointXfrm (&new_orientation, &rotation, &object->orientation);
-    apply_thrust (&veloc, &new_orientation, motion, dt);
+    apply_thrust (&veloc, &new_orientation, &drift, motion, dt);
         /* orthorotate_PointXfrm (&new_orientation, &basis, 0); */
 
     /* TODO: This applies the rotation early!
@@ -173,6 +178,16 @@ move_object (RaySpace* space, ObjectMotion* motions,
     copy_Point (&motion->veloc, &veloc);
     scale_Point (&veloc, &veloc, dt);
     summ_Point (&new_centroid, &object->centroid, &veloc);
+
+    if (NDimensions == 4)
+    {
+        real offset, lo, hi;
+        offset = (object->box.max.coords[DriftDim] - object->box.min.coords[DriftDim]) / 2;
+        lo = space->main.box.min.coords[DriftDim] + offset;
+        hi = space->main.box.max.coords[DriftDim] - offset;
+        drift = clamp_real (drift, lo, hi);
+        new_centroid.coords[DriftDim] = drift;
+    }
 
     if (motion->collide)
     {
@@ -280,12 +295,19 @@ apply_gravity (ObjectMotion* motion, const RaySpace* space,
         orth_Point (&dv, &dv, &motion->track_normal);
     }
 
+    if (NDimensions == 4)
+    {
+        motion->track_normal.coords[DriftDim] = 0;
+        normalize_Point (&motion->track_normal, &motion->track_normal);
+    }
+
     summ_Point (&motion->veloc, &motion->veloc, &dv);
 }
 
     void
 apply_thrust (Point* veloc,
               PointXfrm* orientation,
+              real* drift,
               const ObjectMotion* motion,
               real dt)
 {
@@ -304,27 +326,31 @@ apply_thrust (Point* veloc,
         copy_PointXfrm (&basis, orientation);
         proj_Point (&basis.pts[0], &basis.pts[0],
                     &motion->track_normal);
+        remove_4d_rotation (&basis);
         orthorotate_PointXfrm (orientation, &basis, 0);
     }
 
     copy_Point (veloc, &motion->veloc);
 
-    proj_Point (&proj, &motion->veloc, &orientation->pts[DirDimension]);
+    proj_Point (&proj, &motion->veloc, &orientation->pts[ForwardDim]);
     diff_Point (&orth, &motion->veloc, &proj);
 
     mag = magnitude_Point (&proj);
     magproj = mag;
 
-    if (0 > dot_Point (&orientation->pts[DirDimension], &proj))
+    if (0 > dot_Point (&orientation->pts[ForwardDim], &proj))
         mag = - mag;
 
     accel = alpha * (vthrust - mag);
 
-    scale_Point (&tmp, &orientation->pts[DirDimension], accel * dt);
+    scale_Point (&tmp, &orientation->pts[ForwardDim], accel * dt);
     summ_Point (&proj, &proj, &tmp);
 
     mag = magnitude_Point (&orth);
     magorth = mag;
+
+    *drift = magorth;
+
 #if 1
     if (mag == 0)
     {
@@ -351,10 +377,12 @@ apply_thrust (Point* veloc,
         Op_Point_2100( &orientation->pts[0]
                        ,-, (500+magorth)*, &motion->track_normal
                        ,   &orth );
+        remove_4d_rotation (orientation);
         orthorotate_PointXfrm (&basis, orientation, 0);
     }
     else
     {
+        remove_4d_rotation (orientation);
         orthonormalize_PointXfrm (&basis, orientation);
     }
     copy_PointXfrm (orientation, &basis);
@@ -799,5 +827,20 @@ detect_collision (ObjectMotion* motions,
     }
 
     return colliding;
+}
+
+    void
+remove_4d_rotation (PointXfrm* basis)
+{
+    if (NDimensions == 4)
+    {
+        uint dim;
+        UFor( dim, NDimensions )
+        {
+            basis->pts[DriftDim].coords[dim] = 0;
+            basis->pts[dim].coords[DriftDim] = 0;
+        }
+        basis->pts[DriftDim].coords[DriftDim] = 1;
+    }
 }
 

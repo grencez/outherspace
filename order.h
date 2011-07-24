@@ -24,6 +24,8 @@ uint
 consecutive_indexed_reals (uint q, uint s,
                            const uint* indices,
                            const real* membs);
+void
+invert_jump_table (uint n, uint* jumps);
 #ifdef INCLUDE_SOURCE
 #include "order.c"
 #endif

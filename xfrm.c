@@ -401,8 +401,8 @@ void row_minors_PointXfrm (Point* dst, const PointXfrm* xfrm, uint row)
 spherical3_PointXfrm (PointXfrm* dst, real zenith, real azimuthcc)
 {
     identity_PointXfrm (dst);
-    rotate_PointXfrm (dst, 1, DirDimension, azimuthcc);
-    rotate_PointXfrm (dst, 0, DirDimension, M_PI / 2 - zenith);
+    rotate_PointXfrm (dst, RightDim, ForwardDim, azimuthcc);
+    rotate_PointXfrm (dst, UpDim,    ForwardDim, M_PI / 2 - zenith);
 }
 
 /* Take a bounding box, rotate it from a basis,

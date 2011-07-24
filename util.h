@@ -13,8 +13,17 @@
     (((capacity) == 0) ? (Type*) 0 : \
      (Type*) malloc ((capacity) * sizeof (Type)))
 
+#if 0
+#define ResizeT( Type, arr, old_capacity, new_capacity )  do \
+{ \
+    if (old_capacity == 0)  (arr) = AllocT( Type, new_capacity ); \
+    else if (new_capacity == 0)  free (arr); \
+    else  (arr) = (Type*) realloc (arr, (new_capacity) * sizeof (Type)); \
+} while (0)
+#else
 #define ResizeT( Type, arr, capacity ) \
     ((arr) = (Type*) realloc (arr, (capacity) * sizeof (Type)))
+#endif
 
 #define CopyT( Type, dst, src, lo, count ) \
     (array_cpy (dst, src, lo, count, sizeof (Type)))

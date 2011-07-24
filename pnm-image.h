@@ -11,7 +11,8 @@ void output_PPM_image (const char* filename, uint nrows, uint ncols,
                        const byte* pixels);
 
 byte*
-readin_PPM_image (const char* filename, uint* ret_nrows, uint* ret_ncols);
+readin_PPM_image (uint* ret_nrows, uint* ret_ncols,
+                  const char* pathname, const char* filename);
 
 #ifdef INCLUDE_SOURCE
 #include "pnm-image.c"

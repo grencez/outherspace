@@ -111,6 +111,15 @@ init_PointLightSource (PointLightSource* light)
 {
     zero_Point (&light->location);
     light->intensity = 1;
+    light->diffuse = false;
+}
+
+    void
+copy_PointLightSource (PointLightSource* dst, const PointLightSource* src)
+{
+    copy_Point (&dst->location, &src->location);
+    dst->intensity = src->intensity;
+    dst->diffuse = src->diffuse;
 }
 
     void
@@ -778,7 +787,7 @@ fill_pixel (real* ret_colors,
                     dscale += tscale * intensity;
 
                         /* Specular */
-                    if (material)
+                    if (!light->diffuse && material)
                     {
                         real dot;
                         dot = dot_Point (&refldir, &tolight);
@@ -1339,9 +1348,9 @@ rays_to_hits_fish (RayImage* image,
 {
     uint row;
     bool inside_box;
-    const uint row_dim = 0;
-    const uint col_dim = 1;
-    const uint dir_dim = DirDimension;
+    const uint row_dim = UpDim;
+    const uint col_dim = RightDim;
+    const uint dir_dim = ForwardDim;
     uint nrows, ncols;
     real col_start, row_start;
     real col_delta, row_delta;
@@ -1419,9 +1428,9 @@ rays_to_hits_fixed_plane (uint* hits, real* mags,
 {
     uint row;
     bool inside_box;
-    const uint row_dim = 0;
-    const uint col_dim = 1;
-    const uint dir_dim = DirDimension;
+    const uint row_dim = UpDim;
+    const uint col_dim = RightDim;
+    const uint dir_dim = ForwardDim;
     Point origin;
     real col_start, row_start;
     real col_delta, row_delta;
@@ -1497,7 +1506,7 @@ setup_ray_pixel_deltas_orthographic (Point* dir_start,
                                      const PointXfrm* view_basis,
                                      real view_width)
 {
-    const uint row_dim = 0, col_dim = 1;
+    const uint row_dim = UpDim, col_dim = RightDim;
     Point diff;
     real tstart, tdelta;
 
@@ -1570,9 +1579,9 @@ setup_ray_pixel_deltas_perspective (Point* dir_start,
                                     const PointXfrm* view_basis,
                                     real view_angle)
 {
-    const uint row_dim = 0;
-    const uint col_dim = 1;
-    const uint dir_dim = DirDimension;
+    const uint row_dim = UpDim;
+    const uint col_dim = RightDim;
+    const uint dir_dim = ForwardDim;
     Point dstart, rdelta, cdelta;
     real halflen;
     halflen = sin (view_angle / 2);
@@ -1726,7 +1735,7 @@ setup_RayCastAPriori (RayCastAPriori* dst,
     }
     else
     {
-        copy_Point (&dst->origin, &view_basis->pts[DirDimension]);
+        copy_Point (&dst->origin, &view_basis->pts[ForwardDim]);
         setup_ray_pixel_deltas_orthographic (&dst->dir_start,
                                              &dst->row_delta,
                                              &dst->col_delta,
