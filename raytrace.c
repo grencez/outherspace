@@ -507,6 +507,33 @@ map_vertex_normal (Point* normal,
     normalize_Point (normal, normal);
 }
 
+    /* TODO: Make this function useful.*/
+    void
+map_isect_height (Point* ret_isect,
+                  const Point* isect,
+                  const Point* bpoint,
+                  const SceneElement* elem,
+                  const Point* verts,
+                  const Point* vnmls)
+{
+    uint i;
+    Point tmp_isect;
+    zero_Point (&tmp_isect);
+    UFor( i, NDimensions )
+    {
+        Point tmp;
+        Plane plane;
+        assert (elem->vnmls[i] != Max_uint);
+        copy_Point (&plane.normal, &vnmls[elem->vnmls[i]]);
+        plane.offset = - dot_Point (&plane.normal, &verts[elem->pts[i]]);
+        proj_Plane (&tmp, isect, &plane);
+        Op_Point_2010( &tmp_isect
+                       ,+, &tmp_isect
+                       ,   bpoint->coords[i]*, &tmp);
+    }
+    copy_Point (ret_isect, &tmp_isect);
+}
+
     const ObjectRaySpace*
 ray_to_ObjectRaySpace (Point* ret_origin,
                        Point* ret_dir,
@@ -750,10 +777,21 @@ fill_pixel (real* ret_colors,
         Point isect, refldir;
         real dscale = 0, sscale = 0;
 
-        Op_Point_2010( &isect ,+, origin ,mag*, dir );
-
         scale_Point (&refldir, &normal, 2 * cos_normal);
         summ_Point (&refldir, dir, &refldir);
+
+        Op_Point_2010( &isect ,+, origin ,mag*, dir );
+        if (false && compute_bary_coords && 0 < scene->nvnmls)
+        {
+            real tmag;
+                /* TODO: Will proper bump mapping ever happen?*/
+            map_isect_height (&isect, &isect, &bpoint,
+                              elem, scene->verts, scene->vnmls);
+            if (hit_Plane (&tmag, &isect, &refldir, &simplex->plane))
+                Op_Point_2010( &isect
+                               ,+, &isect
+                               ,   tmag*, &refldir );
+        }
 
         UFor( i, space->nlights )
         {
@@ -826,7 +864,7 @@ fill_pixel (real* ret_colors,
             }
 
             tscale = ambient + diffuse * dscale + specular * sscale;
-            if (material && material->opacity > 0)
+            if (material && material->opacity < 1)
             {
                 transparent = true;
                 tscale *= material->opacity;
@@ -891,16 +929,16 @@ test_intersections (uint* ret_hit,
         uint tmp_hit;
         real tmp_mag;
 
+        tmp_hit = elemidcs[i];
+
         if (BarycentricRayTrace)
         {
-            tmp_hit = elemidcs[i];
             didhit = hit_BarySimplex (&tmp_mag, origin, dir,
                                       &simplices[tmp_hit]);
         }
         else
         {
             const Simplex* restrict tri;
-            tmp_hit = elemidcs[i];
 #if __OPENCL_VERSION__
             const Simplex stri = tris[tmp_hit];
             tri = &stri;

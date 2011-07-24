@@ -60,6 +60,11 @@ degenerate_Simplex (const Simplex* raw);
 bool
 init_BarySimplex (BarySimplex* elem, const Simplex* raw);
 bool
+hit_Plane (real* restrict ret_dist,
+           const Point* restrict origin,
+           const Point* restrict direct,
+           const Plane* restrict plane);
+bool
 hit_BarySimplex (real* restrict ret_dist,
                  const Point* restrict origin,
                  const Point* restrict dir,

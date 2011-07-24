@@ -491,6 +491,35 @@ init_BarySimplex (BarySimplex* elem, const Simplex* raw)
     return good;
 }
 
+    bool
+hit_Plane (real* restrict ret_dist,
+           const Point* restrict origin,
+           const Point* restrict direct,
+           const Plane* restrict plane)
+{
+    real dist, dot;
+
+    dist = distance_Plane (plane, origin);
+    dot = dot_Point (&plane->normal, direct);
+
+    if (dot < 0)
+    {
+        if (dist < 0)  return false;
+        dot = - dot;
+    }
+    else if (dot > 0)
+    {
+        if (dist > 0)  return false;
+        dist = - dist;
+    }
+    else
+    {
+        return false;
+    }
+
+    *ret_dist = (1/dot) * dist;
+    return true;
+}
 
     bool
 hit_BarySimplex (real* restrict ret_dist,

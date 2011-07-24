@@ -33,7 +33,6 @@ detect_collision (ObjectMotion* motions,
                   const Point* displacement,
                   const PointXfrm* rotation,
                   real dt);
-
 static void
 remove_4d_rotation (PointXfrm* basis);
 
@@ -182,7 +181,8 @@ move_object (RaySpace* space, ObjectMotion* motions,
     if (NDimensions == 4)
     {
         real offset, lo, hi;
-        offset = (object->box.max.coords[DriftDim] - object->box.min.coords[DriftDim]) / 2;
+        offset = .5 * (object->box.max.coords[DriftDim] -
+                       object->box.min.coords[DriftDim]);
         lo = space->main.box.min.coords[DriftDim] + offset;
         hi = space->main.box.max.coords[DriftDim] - offset;
         drift = clamp_real (drift, lo, hi);
@@ -279,15 +279,19 @@ apply_gravity (ObjectMotion* motion, const RaySpace* space,
             copy_Point (&motion->track_normal, &normal);
     }
 
-    accel = -980;
+    accel = -1980;
     zero_Point (&dv);
     dv.coords[0] = accel * dt;
 
     if (!motion->flying)
     {
-        accel = -1000;
-        if (hit_mag < motion->hover_height)
-            accel = -accel;
+        real h;
+        h = hit_mag - motion->hover_height;
+
+        if (h < 0)  h /= motion->hover_height;
+        else        h /= (motion->escape_height - motion->hover_height);
+
+        accel *= h;
 
         Op_Point_2010( &motion->veloc
                        ,+, &motion->veloc
@@ -324,8 +328,21 @@ apply_thrust (Point* veloc,
     if (motion->stabilize && !motion->flying)
     {
         copy_PointXfrm (&basis, orientation);
-        proj_Point (&basis.pts[0], &basis.pts[0],
-                    &motion->track_normal);
+        if (true)
+        {
+            real dot;
+            Point normal;
+            dot = dot_Point (&basis.pts[0], &motion->track_normal);
+            Op_Point_2010( &normal
+                           ,+, &basis.pts[0]
+                           ,   .01*(1-dot)*dt*, &motion->track_normal );
+            copy_Point (&basis.pts[0], &normal);
+        }
+        else
+        {
+            proj_Point (&basis.pts[0], &basis.pts[0],
+                        &motion->track_normal);
+        }
         remove_4d_rotation (&basis);
         orthorotate_PointXfrm (orientation, &basis, 0);
     }

@@ -85,6 +85,13 @@ map_vertex_normal (Point* normal,
                    const Point* vnmls,
                    const SceneElement* elem,
                    const Point* bpoint);
+void
+map_isect_height (Point* ret_isect,
+                  const Point* isect,
+                  const Point* bpoint,
+                  const SceneElement* elem,
+                  const Point* verts,
+                  const Point* vnmls);
 const ObjectRaySpace*
 ray_to_ObjectRaySpace (Point* ret_origin, Point* ret_dir,
                        const Point* origin, const Point* dir,

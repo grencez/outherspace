@@ -179,7 +179,7 @@ setup_testcase_track (RaySpace* space,
     identity_PointXfrm (view_basis);
     zero_Point (view_origin);
 
-    space->nobjects = 10;
+    space->nobjects = 2;
     space->objects = AllocT( ObjectRaySpace, space->nobjects );
 
     if (NDimensions == 3)

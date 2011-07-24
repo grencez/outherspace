@@ -414,8 +414,8 @@ set_rotate_view (real vert, real horz)
     const uint dir_dim = ForwardDim;
     copy_PointXfrm (&tmp, &view_basis);
     zero_Point (&dir);
-    dir.coords[0] = vert * sin (view_angle / 2);
-    dir.coords[1] = horz * sin (view_angle / 2);
+    dir.coords[UpDim]    = vert * sin (view_angle / 2);
+    dir.coords[RightDim] = horz * sin (view_angle / 2);
     dir.coords[dir_dim] = 1;
     trxfrm_Point (&tmp.pts[dir_dim], &view_basis, &dir);
     orthorotate_PointXfrm (&view_basis, &tmp, dir_dim);
@@ -500,7 +500,7 @@ update_object_locations (RaySpace* space, MotionInput* input,
 
 static
     void
-update_camera_location (MotionInput* input, real dt)
+update_camera_location (const MotionInput* input, real dt)
 {
     uint i;
     real x;
@@ -544,8 +544,8 @@ static
 update_view_params (const RaySpace* space, uint idx, const MotionInput* input)
 {
     real view_zenith, view_azimuthcc;
-    Point raise;
-    PointXfrm rotation;
+    Point veloc;
+    PointXfrm basis, rotation;
     const ObjectRaySpace* object;
     const ObjectMotion* motion;
 
@@ -554,30 +554,30 @@ update_view_params (const RaySpace* space, uint idx, const MotionInput* input)
     object = &space->objects[idx];
     motion = &racer_motions[idx];
 
+    copy_PointXfrm (&basis, &object->orientation);
+
+    copy_Point (&veloc, &motion->veloc);
+    if (NDimensions == 4)
+        veloc.coords[DriftDim] = 0;
+
+    Op_Point_2010( &basis.pts[ForwardDim]
+                   ,+, &basis.pts[ForwardDim]
+                   ,   .002*, &veloc );
+    orthorotate_PointXfrm (&view_basis, &basis, ForwardDim);
+    copy_PointXfrm (&basis, &view_basis);
+
     view_zenith    = (M_PI / 2) * (1 + input->view_zenith);
     view_azimuthcc =  M_PI      * (1 + input->view_azimuthcc);
 
     spherical3_PointXfrm (&rotation, view_zenith, view_azimuthcc - M_PI);
 
-    if (motion->stabilize && !motion->flying)
-    {
-        PointXfrm basis;
-        copy_PointXfrm (&view_basis, &object->orientation);
-        copy_Point (&view_basis.pts[0], &motion->track_normal);
+    xfrm_PointXfrm (&view_basis, &rotation, &basis);
 
-        orthorotate_PointXfrm (&basis, &view_basis, 0);
-        xfrm_PointXfrm (&view_basis, &rotation, &basis);
-    }
-    else
-    {
-        xfrm_PointXfrm (&view_basis, &rotation, &object->orientation);
-    }
 
-    scale_Point (&view_origin, &view_basis.pts[ForwardDim], -130);
-    summ_Point (&view_origin, &view_origin, &object->centroid);
-
-    scale_Point (&raise, &view_basis.pts[UpDim], 50);
-    summ_Point (&view_origin, &view_origin, &raise);
+    Op_Point_2021010( &view_origin
+                      ,+, &object->centroid
+                      ,   +, -130*, &view_basis.pts[ForwardDim]
+                      ,       50*,  &view_basis.pts[UpDim] );
 }
 
 
