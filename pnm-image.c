@@ -119,7 +119,8 @@ readin_PPM_image (uint* ret_nrows, uint* ret_ncols,
     in = fopen_path (pathname, filename, "rb");
     if (!in)
     {
-        fprintf (stderr, "Cannot open file for reading:%s\n", filename);
+        fprintf (stderr, "Cannot open file for reading:%s/%s\n",
+                 pathname, filename);
         return 0;
     }
 

@@ -18,6 +18,7 @@ CONFIG += openmp
 #CONFIG += profile
 #CONFIG += benchmark  # +noassert
 #CONFIG += noassert
+#CONFIG += macapp
 
 
 #LD_PRELOAD=$(pfx)/lib/valgrind/libmpiwrap-x86-linux.so \
@@ -34,6 +35,18 @@ CFLAGS += -fwhole-program
 CFLAGS += -Wall -Wextra
 DFLAGS += -DINCLUDE_SOURCE
 
+ifneq (,$(filter macapp,$(CONFIG)))
+	# Everything on this OS X setup is 32 bit.
+	CFLAGS += -m32
+	DFLAGS += -DRunFromMyMac
+	GuiCFlags += -I$(HOME)/gtk/inst/include \
+				 -I/Library/Frameworks/SDL.framework/Headers \
+				 -I/Library/Frameworks/SDL_mixer.framework/Headers
+	GuiLFlags += -framework SDL -framework SDL_mixer
+else
+	GuiCFlags += $(shell pkg-config --cflags sdl)
+	GuiLFlags += $(shell pkg-config --libs sdl) -lSDL_mixer
+endif
 
 ## Serious debugging is about to happen.
 ifneq (,$(filter ultradebug,$(CONFIG)))
@@ -145,13 +158,13 @@ cli: cli.c compute.c $(CSources)
 	$(CC) $(CFLAGS) $(DFLAGS) $< -o $@ $(LFLAGS)
 
 gui: gui.c compute.c motion.c $(CSources)
-	$(CC) $(CFLAGS) $(DFLAGS) `pkg-config --cflags gtk+-2.0` \
-		`sdl-config --cflags` \
+	$(CC) $(CFLAGS) $(DFLAGS) \
+		$(GuiCFlags) \
+	   	`pkg-config --cflags gtk+-2.0` \
 		$< -o $@ \
 		`pkg-config --libs gtk+-2.0` \
 		`pkg-config --libs gthread-2.0` \
-		-lSDL \
-		$(LFLAGS)
+		$(GuiLFlags) $(LFLAGS)
 
 verify: verif/main.c $(CSources)
 	$(CC) $(CFLAGS) $(DFLAGS) -I . $< -o $@ $(LFLAGS)

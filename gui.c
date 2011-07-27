@@ -11,6 +11,12 @@
 #include <gtk/gtk.h>
 #include <gdk/gdkkeysyms.h>
 #include <SDL.h>
+#include <SDL_mixer.h>
+
+    /* SDL on OS X does some weirdo bootstrapping by redefining /main/.*/
+#ifdef main
+#undef main
+#endif
 
 #define NRacersMax 10
 
@@ -21,6 +27,14 @@ static const bool ForceFauxFishEye = false;
 static const bool ShowFrameRate = false;
 static const bool LightAtCamera = false;
 static const bool ShowSpeed = false;
+
+static const bool
+#ifdef RunFromMyMac
+#undef RunFromMyMac
+RunFromMyMac = true;
+#else
+RunFromMyMac = false;
+#endif
 
 static uint racer_idx = 0;
 static uint nracers = 0;
@@ -167,12 +181,11 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer data)
             racer_motion->collide = !racer_motion->collide;
             break;
         case GDK_D:
-            dim = DriftDim;
-            stride = 1;
+            if (NDimensions == 4) { dim = DriftDim; stride = 1; }
             break;
         case GDK_d:
             if (ctrl_mod) { rotate_dir_dim = true; }
-            else { dim = DriftDim; stride = -1; }
+            else if (NDimensions == 4) { dim = DriftDim; stride = -1; }
             break;
         case GDK_e:
             input->boost = true;
@@ -573,7 +586,6 @@ update_view_params (const RaySpace* space, uint idx, const MotionInput* input)
 
     xfrm_PointXfrm (&view_basis, &rotation, &basis);
 
-
     Op_Point_2021010( &view_origin
                       ,+, &object->centroid
                       ,   +, -130*, &view_basis.pts[ForwardDim]
@@ -926,25 +938,41 @@ sdl_main (gpointer data)
     SDL_TimerID timer;
     SDL_Joystick* joystick_handle; 
     SDL_Event event;
-#if 0
-    RaySpace* space;
-    space = (RaySpace*) data;
-#else
-    (void) data;
-#endif
+    Mix_Chunk* tune = 0;
+    int ret;
+    int channel = -1;
+    FILE* out = stderr;
+    const char* pathname;
+
+    pathname = (char*) data;
 
     SDL_JoystickEventState (SDL_ENABLE);
     joystick_handle = SDL_JoystickOpen (0);
     fprintf (stderr, "Joystick has %d buttons!\n",
              SDL_JoystickNumButtons (joystick_handle));
 
-    /*
-    if (!joystick_handle)
+
+    ret = Mix_OpenAudio(22050, AUDIO_S16SYS, 2, 1024);
+    if (ret != 0)
     {
-        return 0;
-        SDL_Quit ();
+        fputs ("Could not open audio!\n", out);
     }
-    */
+    else
+    {
+        const char fname[] = "music0.ogg";
+        char* buf;
+
+        buf = AllocT( char, strlen (pathname) + 1 + strlen (fname) + 1 );
+        sprintf (buf, "%s/%s", pathname, fname);
+        tune = Mix_LoadWAV (buf);
+
+        if (!tune)
+            fprintf (out, "No input music file:%s!\n", buf);
+        else
+            channel = Mix_PlayChannel (-1, tune, -1);
+
+        free (buf);
+    }
 
         /* Add a timer to assure the event loop has
          * an event to process when we should exit.
@@ -984,6 +1012,13 @@ sdl_main (gpointer data)
     }
 
     SDL_RemoveTimer (timer);
+
+    if (channel >= 0)
+        Mix_HaltChannel (channel);
+    if (tune)
+        Mix_FreeChunk (tune);
+    Mix_CloseAudio();
+
     SDL_JoystickClose (joystick_handle);
     SDL_Quit ();
     return 0;
@@ -995,6 +1030,22 @@ int main (int argc, char* argv[])
     bool good = true;
     bool call_gui = true;
     RaySpace space;
+    char inpathname[1024];
+
+    sprintf (inpathname, "%s", "input");
+
+    if (RunFromMyMac)
+    {
+        char pathname[1024];
+        uint idx = 0;
+        const char* str;
+        str = strrchr (argv[0], '/');
+        if (str)  idx = index_of (str, argv[0], sizeof(char));
+        CopyT( char, pathname, argv[0], 0, idx );
+        pathname[idx] = 0;
+        sprintf (inpathname, "%s/../Resources/share/outherspace", pathname);
+    }
+
 
 #ifdef DistribCompute
     init_compute (&argc, &argv);
@@ -1019,7 +1070,8 @@ int main (int argc, char* argv[])
 #elif 1
         setup_testcase_sphere
 #endif
-        (&space, &view_origin, &view_basis, &view_angle);
+        (&space, &view_origin, &view_basis, &view_angle,
+         inpathname);
 
     if (!good)
     {
@@ -1058,13 +1110,14 @@ int main (int argc, char* argv[])
 
         init_MotionInput (&motion_input);
             /* Note: SDL_INIT_VIDEO is required for some silly reason!*/
-        ret = SDL_Init (SDL_INIT_EVENTTHREAD |
+        ret = SDL_Init (SDL_INIT_AUDIO |
+                        SDL_INIT_EVENTTHREAD |
                         SDL_INIT_JOYSTICK |
                         SDL_INIT_TIMER |
                         SDL_INIT_VIDEO);
         assert (ret == 0);
 
-        sdl_thread = g_thread_create (sdl_main, &space, true, 0);
+        sdl_thread = g_thread_create (sdl_main, inpathname, true, 0);
 
         gui_main (argc, argv, &space);
 

@@ -11,6 +11,7 @@
 
 int main (int argc, char** argv)
 {
+    const char pathname[] = "input";
     bool good = true;
     FILE* out;
     RaySpace space;
@@ -37,7 +38,8 @@ int main (int argc, char** argv)
     image.mags = AllocT( real, image.nrows * image.ncols );
     good = setup_testcase_triangles (&space,
                                      &view_origin, &view_basis,
-                                     &image.hifov);
+                                     &image.hifov,
+                                     pathname);
 #else
     image.nrows = 1000;
     image.ncols = 1000;
@@ -51,7 +53,8 @@ int main (int argc, char** argv)
 #elif 1
         setup_testcase_sphere
 #endif
-        (&space, &view_origin, &view_basis, &image.hifov);
+        (&space, &view_origin, &view_basis, &image.hifov,
+         pathname);
 #endif
 
     if (!good)

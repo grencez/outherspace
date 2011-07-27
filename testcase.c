@@ -23,10 +23,13 @@ add_sky_texture (RaySpace* space,
     bool
 setup_testcase_triangles (RaySpace* space,
                           Point* view_origin, PointXfrm* view_basis,
-                          real* view_angle)
+                          real* view_angle,
+                          const char* pathname)
 {
     uint i;
     const bool usual_view = true;
+
+    (void) pathname;
 
     init_RaySpace (space);
     identity_PointXfrm (view_basis);
@@ -91,7 +94,7 @@ interpolate_by_file (Scene* dst,
 
 static
     bool
-read_racer (Scene* scene, uint idx)
+read_racer (Scene* scene, uint idx, const char* pathname)
 {
     bool good;
     char fname[20];
@@ -102,7 +105,7 @@ read_racer (Scene* scene, uint idx)
 
     if (NDimensions == 3)
     {
-        good = readin_wavefront (scene, "input", fname);
+        good = readin_wavefront (scene, pathname, fname);
     }
     else
     {
@@ -110,7 +113,7 @@ read_racer (Scene* scene, uint idx)
         const real dcoords[2] = { 0, 1.0/16 };
         fnames[0] = fname;
         fnames[1] = fname;
-        good = interpolate_by_file (scene, 2, "input", fnames, dcoords);
+        good = interpolate_by_file (scene, 2, pathname, fnames, dcoords);
     }
     if (!good)  return false;
 
@@ -145,7 +148,7 @@ read_racer (Scene* scene, uint idx)
 
 static
     bool
-setup_racers (RaySpace* space)
+setup_racers (RaySpace* space, const char* pathname)
 {
     uint i;
     bool good = true;
@@ -161,7 +164,7 @@ setup_racers (RaySpace* space)
         if (NDimensions == 4)
             object->centroid.coords[3] = 0;
 
-        good = read_racer (&object->scene, 0);
+        good = read_racer (&object->scene, 0, pathname);
         if (!good)  return false;
     }
     return good;
@@ -171,7 +174,8 @@ setup_racers (RaySpace* space)
     bool
 setup_testcase_track (RaySpace* space,
                       Point* view_origin, PointXfrm* view_basis,
-                      real* view_angle)
+                      real* view_angle,
+                      const char* pathname)
 {
     bool good;
 
@@ -184,21 +188,21 @@ setup_testcase_track (RaySpace* space,
 
     if (NDimensions == 3)
     {
-        good = readin_wavefront (&space->main.scene, "input", "track1.obj");
+        good = readin_wavefront (&space->main.scene, pathname, "track1.obj");
     }
     else
     {
         const char* const fnames[2] = { "track1.obj", "track1.obj" };
         const real dcoords[2] = { -0.1, 1.1 };
-        good = interpolate_by_file (&space->main.scene, 2, "input", fnames, dcoords);
+        good = interpolate_by_file (&space->main.scene, 2, pathname, fnames, dcoords);
     }
     if (!good)  return false;
     condense_Scene (&space->main.scene);
 
-    good = add_sky_texture (space, "input", "gradient-sky.ppm");
+    good = add_sky_texture (space, pathname, "gradient-sky.ppm");
     if (!good)  return false;
 
-    good = setup_racers (space);
+    good = setup_racers (space, pathname);
     if (!good)  return false;
 
     init_filled_RaySpace (space);
@@ -242,7 +246,8 @@ setup_testcase_track (RaySpace* space,
 setup_testcase_bouncethru (RaySpace* space,
                            Point* view_origin,
                            PointXfrm* view_basis,
-                           real* view_angle)
+                           real* view_angle,
+                           const char* pathname)
 {
     bool good;
 
@@ -251,7 +256,7 @@ setup_testcase_bouncethru (RaySpace* space,
     zero_Point (view_origin);
     assert (NDimensions == 3);
 
-    good = readin_wavefront (&space->main.scene, "input", "reflection.obj");
+    good = readin_wavefront (&space->main.scene, pathname, "reflection.obj");
     if (!good)  return false;
     fixup_wavefront_Scene (&space->main.scene);
 
@@ -289,7 +294,8 @@ setup_testcase_bouncethru (RaySpace* space,
 setup_testcase_smoothsphere (RaySpace* space,
                              Point* view_origin,
                              PointXfrm* view_basis,
-                             real* view_angle)
+                             real* view_angle,
+                             const char* pathname)
 {
     uint i;
     bool good;
@@ -299,7 +305,7 @@ setup_testcase_smoothsphere (RaySpace* space,
     zero_Point (view_origin);
     assert (NDimensions == 3);
 
-    good = readin_wavefront (&space->main.scene, "input", "sphere.obj");
+    good = readin_wavefront (&space->main.scene, pathname, "sphere.obj");
     if (!good)  return false;
     fixup_wavefront_Scene (&space->main.scene);
 
@@ -314,7 +320,7 @@ setup_testcase_smoothsphere (RaySpace* space,
 
         if (NDimensions == 3)
         {
-            good = readin_wavefront (&object->scene, "input", "sphere.obj");
+            good = readin_wavefront (&object->scene, pathname, "sphere.obj");
             if (!good)  return false;
             fixup_wavefront_Scene (&object->scene);
         }
@@ -355,13 +361,15 @@ setup_testcase_smoothsphere (RaySpace* space,
 setup_testcase_4d_normals (RaySpace* space,
                            Point* view_origin,
                            PointXfrm* view_basis,
-                           real* view_angle)
+                           real* view_angle,
+                           const char* pathname)
 {
 #if NDimensions != 4
     (void) space;
     (void) view_origin;
     (void) view_basis;
     (void) view_angle;
+    (void) pathname;
     assert (0);
     return false;
 #else
@@ -412,6 +420,7 @@ setup_testcase_4d_normals (RaySpace* space,
 #endif
     uint i;
     Scene* scene;
+    (void) pathname;
 
     *view_angle = 1.0472;
     copy_Point (view_origin, &salo_origin);
@@ -466,7 +475,8 @@ setup_testcase_4d_normals (RaySpace* space,
 setup_testcase_manual_interp (RaySpace* space,
                               Point* view_origin,
                               PointXfrm* view_basis,
-                              real* view_angle)
+                              real* view_angle,
+                              const char* pathname)
 {
     FILE* out;
     uint i;
@@ -506,6 +516,8 @@ setup_testcase_manual_interp (RaySpace* space,
         { 0, 0, 0, 0 }
     };
     Scene* scene;
+
+    (void) pathname;
 
     assert (NDimensions == ndims);
 
@@ -573,7 +585,8 @@ setup_testcase_manual_interp (RaySpace* space,
 setup_testcase_sphere (RaySpace* space,
                        Point* view_origin,
                        PointXfrm* view_basis,
-                       real* view_angle)
+                       real* view_angle,
+                       const char* pathname)
 {
     bool good;
     FILE* out = stderr;
@@ -584,7 +597,7 @@ setup_testcase_sphere (RaySpace* space,
 
     if (NDimensions == 3)
     {
-        good = readin_wavefront (&space->main.scene, "input", "sphere1.obj");
+        good = readin_wavefront (&space->main.scene, pathname, "sphere1.obj");
         if (!good)  return false;
     }
     else
@@ -593,7 +606,7 @@ setup_testcase_sphere (RaySpace* space,
         const char* const fnames[2] = { "sphere1.obj", "sphere2.obj" };
         const real dcoords[2] = { -0.001, 1.001 };
         good = interpolate_by_file (&space->main.scene,
-                                    nscenes, "input", fnames, dcoords);
+                                    nscenes, pathname, fnames, dcoords);
         if (!good)  return false;
     }
 
@@ -633,7 +646,8 @@ setup_testcase_sphere (RaySpace* space,
 setup_testcase_4d_surface (RaySpace* space,
                            Point* view_origin,
                            PointXfrm* view_basis,
-                           real* view_angle)
+                           real* view_angle,
+                           const char* pathname)
 {
     bool good = true;
     Point new_centroid;
@@ -648,14 +662,14 @@ setup_testcase_4d_surface (RaySpace* space,
     zero_Point (&new_centroid);
     if (NDimensions == 3)
     {
-        good = readin_wavefront (&space->main.scene, "input", "sandbox.obj");
+        good = readin_wavefront (&space->main.scene, pathname, "sandbox.obj");
     }
     else
     {
         const char* const fnames[2] = { "sandbox_flat.obj", "sandbox.obj" };
         const real dcoords[2] = { -0.001, 1000.001 };
         good = interpolate_by_file (&space->main.scene, 2,
-                                    "input", fnames, dcoords);
+                                    pathname, fnames, dcoords);
         new_centroid.coords[3] = (dcoords[0] + dcoords[1]) / 2;
     }
     if (!good)  return false;
@@ -664,10 +678,10 @@ setup_testcase_4d_surface (RaySpace* space,
     fixup_wavefront_Scene (&space->main.scene);
     recenter_Scene (&space->main.scene, &new_centroid);
 
-    good = add_sky_texture (space, "input", "iras.ppm");
+    good = add_sky_texture (space, pathname, "iras.ppm");
     if (!good)  return false;
 
-    good = setup_racers (space);
+    good = setup_racers (space, pathname);
     if (!good)  return false;
 
     init_filled_RaySpace (space);
