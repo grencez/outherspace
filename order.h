@@ -3,6 +3,8 @@
 #define ORDER_H_
 #include "util.h"
 
+void
+fill_minimal_unique (uint* a, uint n);
 bool
 minimal_unique (uint n, const uint* a);
 void

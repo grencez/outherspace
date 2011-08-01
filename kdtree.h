@@ -50,7 +50,9 @@ struct kd_tree_struct
 
 struct kdtree_grid_struct
 {
-    uint nintls;
+    uint nelems;
+    uint* elemidcs;
+        /* /intls[dim]/ and /coords[dim]/ are sized to 2*nelems.*/
     uint* intls[NDimensions];
     real* coords[NDimensions];
     BoundingBox box;
@@ -91,9 +93,11 @@ init_KDTree (KDTree* tree);
 void
 cleanup_KDTree (KDTree* tree);
 void
+init_KDTreeGrid (KDTreeGrid* grid, uint nelems);
+void
 cleanup_KDTreeGrid (KDTreeGrid* grid);
 void
-build_KDTree (KDTree* tree, KDTreeGrid* grid);
+build_KDTree (KDTree* tree, KDTreeGrid* grid, const Simplex* elems);
 
 #ifdef INCLUDE_SOURCE
 #include "kdtree.c"

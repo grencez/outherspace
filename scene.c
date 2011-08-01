@@ -567,6 +567,7 @@ condense_Scene (Scene* scene)
 
     max_n = scene->nverts;
     if (scene->nvnmls > max_n)  max_n = scene->nvnmls;
+    if (scene->nelems > max_n)  max_n = scene->nelems;
 
     jumps  = AllocT( uint, max_n );
     indices = AllocT( uint, max_n );
@@ -608,6 +609,36 @@ condense_Scene (Scene* scene)
                 *e = jumps[*e];
             }
         }
+    }
+
+    if (false && scene->nelems > 0)
+    {
+        Point* tmp_pts;
+        tmp_pts = AllocT( Point, scene->nelems );
+        UFor( i, scene->nelems )
+        {
+            uint dim;
+            UFor( dim, NDimensions )
+                tmp_pts[i].coords[dim] = scene->elems[i].pts[dim];
+        }
+        printf ("Before nelems:%u\n", scene->nelems);
+        scene->nelems = condense_Points (scene->nelems, tmp_pts,
+                                         jumps, indices, coords);
+        printf ("After nelems:%u\n", scene->nelems);
+        UFor( i, scene->nelems )
+        {
+            uint dim;
+            const SceneElement* src;
+            SceneElement* dst;
+
+            src = &scene->elems[jumps[i]];
+            dst = &scene->elems[i];
+
+            UFor( dim, NDimensions )
+                dst->pts[dim] = src->pts[dim];
+        }
+        ResizeT( SceneElement, scene->elems, scene->nelems );
+        free (tmp_pts);
     }
 
     if (max_n > 0)

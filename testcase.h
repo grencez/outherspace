@@ -9,6 +9,12 @@ setup_testcase_triangles (RaySpace* space,
                           real* view_angle,
                           const char* pathname);
 bool
+setup_testcase_simple (RaySpace* space,
+                       Point* view_origin, PointXfrm* view_basis,
+                       real* view_angle,
+                       const char* pathname,
+                       const char* file);
+bool
 setup_testcase_track (RaySpace* space,
                       Point* view_origin, PointXfrm* view_basis,
                       real* view_angle,

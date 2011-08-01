@@ -79,14 +79,12 @@ rotate_object (ObjectMotion* motion, uint xdim, uint ydim, real angle)
 move_objects (RaySpace* space, ObjectMotion* motions, real dt)
 {
     const uint nincs = 10;
-    ObjectRaySpace* objects;
     real inc;
     uint i, nobjects;
     BitString* collisions;
     Point* refldirs;
 
     nobjects = space->nobjects;
-    objects = space->objects;
 
     i = 1 + space->nobjects;
     i *= i;
@@ -317,7 +315,7 @@ apply_thrust (Point* veloc,
 {
     const real alpha = 3;  /* Arbitrary coefficient.*/
     real vthrust = 733;  /* Velocity of thrusters.*/
-    real accel, mag, magproj, magorth;
+    real accel, magproj, magorth;
     Point proj, orth, tmp;
     PointXfrm basis;
 
@@ -352,32 +350,30 @@ apply_thrust (Point* veloc,
     proj_Point (&proj, &motion->veloc, &orientation->pts[ForwardDim]);
     diff_Point (&orth, &motion->veloc, &proj);
 
-    mag = magnitude_Point (&proj);
-    magproj = mag;
+    magproj = magnitude_Point (&proj);
 
     if (0 > dot_Point (&orientation->pts[ForwardDim], &proj))
-        mag = - mag;
-
-    accel = alpha * (vthrust - mag);
+        accel = alpha * (vthrust + magproj);
+    else
+        accel = alpha * (vthrust - magproj);
 
     scale_Point (&tmp, &orientation->pts[ForwardDim], accel * dt);
     summ_Point (&proj, &proj, &tmp);
 
-    mag = magnitude_Point (&orth);
-    magorth = mag;
+    magorth = magnitude_Point (&orth);
 
     *drift = magorth;
 
 #if 1
-    if (mag == 0)
+    if (magorth == 0)
     {
         zero_Point (&orth);
     }
     else
     {
-        accel = - alpha * mag;
+        accel = - alpha * magorth;
 
-        scale_Point (&tmp, &orth, 1 / mag);
+        scale_Point (&tmp, &orth, 1 / magorth);
         scale_Point (&tmp, &tmp, accel * dt);
         summ_Point (&orth, &orth, &tmp);
     }

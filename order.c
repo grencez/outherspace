@@ -20,6 +20,13 @@ mid5_reals (const real a[5])
     return 0;
 }
 
+    void
+fill_minimal_unique (uint* a, uint n)
+{
+    uint i;
+    UFor( i, n )  a[i] = i;
+}
+
     bool
 minimal_unique (uint n, const uint* a)
 {

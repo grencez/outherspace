@@ -92,6 +92,37 @@ interpolate_by_file (Scene* dst,
     return good;
 }
 
+    bool
+setup_testcase_simple (RaySpace* space,
+                       Point* view_origin, PointXfrm* view_basis,
+                       real* view_angle,
+                       const char* pathname,
+                       const char* file)
+{
+    bool good;
+    PointXfrm basis;
+
+    init_RaySpace (space);
+    identity_PointXfrm (view_basis);
+    zero_Point (view_origin);
+
+    good = readin_wavefront (&space->main.scene, pathname, file);
+    if (!good)  return false;
+    condense_Scene (&space->main.scene);
+    init_filled_RaySpace (space);
+
+    *view_angle = 2 * M_PI / 3;
+    copy_Point (view_origin, &space->main.box.max);
+
+    diff_Point (&view_basis->pts[ForwardDim],
+                &space->main.box.min,
+                &space->main.box.max);
+    orthorotate_PointXfrm (&basis, view_basis, ForwardDim);
+    copy_PointXfrm (view_basis, &basis);
+
+    return good;
+}
+
 static
     bool
 read_racer (Scene* scene, uint idx, const char* pathname)
@@ -169,7 +200,6 @@ setup_racers (RaySpace* space, const char* pathname)
     }
     return good;
 }
-
 
     bool
 setup_testcase_track (RaySpace* space,

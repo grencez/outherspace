@@ -472,7 +472,7 @@ merge_BoundingBox (BoundingBox* dst,
                    const BoundingBox* b)
 {
     uint i;
-    UFor( i, NDimensions)
+    UFor( i, NDimensions )
     {
         if (a->min.coords[i] <= b->min.coords[i])
             dst->min.coords[i] = a->min.coords[i];
@@ -480,6 +480,40 @@ merge_BoundingBox (BoundingBox* dst,
             dst->min.coords[i] = b->min.coords[i];
 
         if (a->max.coords[i] >= b->max.coords[i])
+            dst->max.coords[i] = a->max.coords[i];
+        else
+            dst->max.coords[i] = b->max.coords[i];
+    }
+}
+
+    void
+clip_BoundingBox (BoundingBox* dst,
+                  const BoundingBox* a,
+                  const BoundingBox* b)
+{
+    uint i;
+    UFor( i, NDimensions )
+    {
+#if 1
+        assert (a->min.coords[i] <= b->max.coords[i]);
+#else
+        if (a->min.coords[i] > b->max.coords[i])
+            dst->min.coords[i] = b->max.coords[i];
+        else
+#endif
+        if (a->min.coords[i] >= b->min.coords[i])
+            dst->min.coords[i] = a->min.coords[i];
+        else
+            dst->min.coords[i] = b->min.coords[i];
+
+#if 1
+        assert (a->max.coords[i] >= b->min.coords[i]);
+#else
+        if (a->max.coords[i] < b->min.coords[i])
+            dst->min.coords[i] = b->min.coords[i];
+        else
+#endif
+        if (a->max.coords[i] <= b->max.coords[i])
             dst->max.coords[i] = a->max.coords[i];
         else
             dst->max.coords[i] = b->max.coords[i];

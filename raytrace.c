@@ -212,7 +212,7 @@ update_dynamic_RaySpace (RaySpace* space)
         copy_BoundingBox (&space->box, &grid.box);
             /* Since it's a regeneration, clean up the previous version.*/
         cleanup_KDTree (&space->object_tree);
-        build_KDTree (&space->object_tree, &grid);
+        build_KDTree (&space->object_tree, &grid, 0);
             /* output_KDTreeGrid (stderr, &grid); */
             /* output_KDTree (stderr, &space->object_tree); */
         cleanup_KDTreeGrid (&grid);
@@ -229,7 +229,12 @@ partition_ObjectRaySpace (ObjectRaySpace* space)
 {
     KDTreeGrid grid;
     init_Scene_KDTreeGrid (&grid, &space->scene, &space->box);
-    build_KDTree (&space->tree, &grid);
+    build_KDTree (&space->tree, &grid, space->elems);
+#if 0
+        /* build_KDTree (&space->tree, &grid, 0); */
+    printf ("nnodes:%u  nelemidcs:%u\n",
+            space->tree.nnodes, space->tree.nelemidcs);
+#endif
     cleanup_KDTreeGrid (&grid);
 }
 
@@ -251,15 +256,10 @@ init_Scene_KDTreeGrid (KDTreeGrid* grid, const Scene* scene,
     nelems = scene->nelems;
     assert (nelems > 0);
 
-    grid->nintls = 2 * nelems;
-    grid->intls[0] = AllocT( uint, NDimensions * grid->nintls );
-    grid->coords[0] = AllocT( real, NDimensions * grid->nintls );
-
+    init_KDTreeGrid( grid, nelems );
+    fill_minimal_unique (grid->elemidcs, grid->nelems);
     UFor( i, NDimensions )
-    {
-        grid->intls[i] = &grid->intls[0][i * grid->nintls];
-        grid->coords[i] = &grid->coords[0][i * grid->nintls];
-    }
+        fill_minimal_unique (grid->intls[i], 2*nelems);
 
     UFor( i, nelems )
     {
@@ -292,8 +292,6 @@ init_Scene_KDTreeGrid (KDTreeGrid* grid, const Scene* scene,
         ti = 2*i;
         UFor( dim, NDimensions )
         {
-            grid->intls[dim][ti] = ti;
-            grid->intls[dim][ti+1] = ti+1;
             grid->coords[dim][ti] = coords[dim][0];
             grid->coords[dim][ti+1] = coords[dim][1];
         }
@@ -332,21 +330,18 @@ init_Scene_KPTreeGrid (KPTreeGrid* grid, const Scene* scene,
 init_RaySpace_KDTreeGrid (KDTreeGrid* grid, const RaySpace* space)
 {
     uint i;
-    grid->nintls = 2 * (1 + space->nobjects);
-    grid->intls[0] = AllocT( uint, NDimensions * grid->nintls );
-    grid->coords[0] = AllocT( real, NDimensions * grid->nintls );
+
+    init_KDTreeGrid (grid, 1 + space->nobjects);
+    fill_minimal_unique (grid->elemidcs, grid->nelems);
 
     UFor( i, NDimensions )
     {
         uint ti;
         ti = 2 * space->nobjects;
 
-        grid->intls[i] = &grid->intls[0][i * grid->nintls];
-        grid->coords[i] = &grid->coords[0][i * grid->nintls];
+        fill_minimal_unique (grid->intls[i], 2*grid->nelems);
 
             /* Main case (special).*/
-        grid->intls[i][ti] = ti;
-        grid->intls[i][ti+1] = ti+1;
         grid->coords[i][ti] = space->main.box.min.coords[i];
         grid->coords[i][ti+1] = space->main.box.max.coords[i];
         grid->box.min.coords[i] = space->main.box.min.coords[i];
@@ -372,8 +367,6 @@ init_RaySpace_KDTreeGrid (KDTreeGrid* grid, const RaySpace* space)
             real lo, hi;
             lo = box.min.coords[dim];
             hi = box.max.coords[dim];
-            grid->intls[dim][ti] = ti;
-            grid->intls[dim][ti+1] = ti+1;
             grid->coords[dim][ti] = lo;
             grid->coords[dim][ti+1] = hi;
             if (lo < grid->box.min.coords[dim])
@@ -594,6 +587,60 @@ refraction_ray (Point* dst, const Point* dir, const Point* normal,
 }
 
 static
+    uint
+splitting_plane_count (const Point* origin, const Point* direct,
+                       real mag, const ObjectRaySpace* object)
+{
+    uint count = 0;
+    uint node_idx, parent, destin_nodeidx;
+    Point destin;
+    Point salo_entrance;
+    Point* restrict entrance;
+    const BoundingBox* box;
+
+    entrance = &salo_entrance;
+    box = &object->box;
+
+    Op_Point_2010( &destin ,+, origin ,mag*, direct );
+    if (inside_BoundingBox (box, &destin))
+        destin_nodeidx = find_KDTreeNode (&parent, &destin,
+                                          object->tree.nodes);
+    else
+        destin_nodeidx = Max_uint;
+    
+
+    if (inside_BoundingBox (box, origin))
+    {
+            /* Find the initial node.*/
+        node_idx = find_KDTreeNode (&parent, origin, object->tree.nodes);
+        box = &object->tree.nodes[node_idx].as.leaf.box;
+        assert (inside_BoundingBox (box, origin));
+    }
+    else
+    {
+        if (! hit_outer_BoundingBox (entrance, box, origin, direct))
+            return count;
+        count += 1;
+        node_idx = 0;
+    }
+
+    do
+    {
+        node_idx = descend_KDTreeNode (&parent, entrance, node_idx,
+                                       object->tree.nodes);
+
+        if (node_idx == destin_nodeidx)  return count;
+        count += 1;
+
+        node_idx = upnext_KDTreeNode (entrance, &parent, origin, direct,
+                                      node_idx, object->tree.nodes);
+    }
+    while (node_idx != parent);
+    count += 1;
+    return count;
+}
+
+static
     void
 fill_pixel (real* ret_colors,
             uint hitidx, real mag, uint objidx,
@@ -608,6 +655,8 @@ fill_pixel (real* ret_colors,
     const bool shade_by_element = false;
     const bool color_by_element = false;
     const bool compute_bary_coords = true;
+    const bool show_splitting_planes = false;
+    bool miss_effects = false;
     real colors[NColors];
     const BarySimplex* simplex;
     const ObjectRaySpace* object;
@@ -619,6 +668,9 @@ fill_pixel (real* ret_colors,
     real cos_normal;
     Point bpoint, normal;
     uint i;
+
+    if (show_splitting_planes)
+        miss_effects = true;
 
     if (objidx > space->nobjects)
     {
@@ -632,8 +684,42 @@ fill_pixel (real* ret_colors,
         {
             UFor( i, NColors )  ret_colors[i] = 0;
         }
+
+        if (!miss_effects)  return;
+        UFor( i, NColors )  colors[i] = ret_colors[i];
+    }
+    else
+    {
+        UFor( i, NColors )  colors[i] = 1;
+    }
+
+    if (show_splitting_planes)
+    {
+        const real frac = .1;
+        real red;
+        uint nplanes;
+
+        nplanes = splitting_plane_count (origin, dir, mag, &space->main);
+
+        red = 1;
+        UFor( i, nplanes )
+            red = (1 - frac) * red;
+
+        UFor( i, NColors )
+        {
+            if (i == 0)
+                colors[i] = clamp_real (1 - red * (1 - colors[i]), 0, 1);
+            else
+                colors[i] = clamp_real (red * colors[i], 0, 1);
+        }
+    }
+
+    if (objidx > space->nobjects)
+    {
+        UFor( i, NColors )  ret_colors[i] += colors[i];
         return;
     }
+
 
         /* Use 1 + the L1 (taxicab) norm to scale the offset of the origin of
          * subsequent rays (reflection, to-light, etc.) from the computed
@@ -661,8 +747,6 @@ fill_pixel (real* ret_colors,
     elem = &scene->elems[hitidx];
     if (elem->material != Max_uint)
         material = &scene->matls[elem->material];
-
-    UFor( i, NColors )  colors[i] = 1;
 
     if (image->color_distance_on && mag < image->view_light)
     {

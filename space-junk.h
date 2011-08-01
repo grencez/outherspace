@@ -76,14 +76,21 @@
     Op_Point_2010( dst, f, &tmp_sOp_Point_21010, h, b ); \
 } while (0)
 
-#define Op_Point_202100( dst, f, a, g, h, b, c ) \
+#define Op_Point_201200( dst, f1, a, f2, f3, b, c ) do \
+{ \
+    Point tmp_sOp_Point_201200; \
+    Op_Point_1200( &tmp_sOp_Point_201200, f2, f3, b, c ); \
+    Op_Point_200( dst, f1, a, &tmp_sOp_Point_201200 ); \
+} while (0)
+
+#define Op_Point_202100( dst, f, a, g, h, b, c ) do \
 { \
     Point tmp_sOp_Point_202100; \
     Op_Point_2100( &tmp_sOp_Point_202100, g, h, b, c ); \
     Op_Point_200( dst, f, a, &tmp_sOp_Point_202100 ); \
 } while (0)
 
-#define Op_Point_2021010( dst, f1, a, f2, f3, b, f4, c ) \
+#define Op_Point_2021010( dst, f1, a, f2, f3, b, f4, c ) do \
 { \
     Point tmp_sOp_Point_2021010; \
     Op_Point_10( &tmp_sOp_Point_2021010, f4, c ); \

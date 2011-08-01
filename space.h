@@ -73,6 +73,10 @@ void
 merge_BoundingBox (BoundingBox* dst,
                    const BoundingBox* a,
                    const BoundingBox* b);
+void
+clip_BoundingBox (BoundingBox* dst,
+                  const BoundingBox* a,
+                  const BoundingBox* b);
 
 #ifndef __OPENCL_VERSION__
 void output_Point (FILE* out, const Point* point);

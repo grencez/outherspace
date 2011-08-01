@@ -671,7 +671,7 @@ static gboolean grab_mouse_fn (GtkWidget* da,
         RayCastAPriori priori;
         uint hit_idx = Max_uint;
         real hit_mag = Max_real;
-        uint hit_object = Max_uint;
+        uint hit_objidx = Max_uint;
         Point origin, dir;
 
         setup_RayCastAPriori (&priori, &ray_image,
@@ -681,24 +681,30 @@ static gboolean grab_mouse_fn (GtkWidget* da,
         ray_from_RayCastAPriori (&origin, &dir,
                                  &priori, row, col, &ray_image);
 
-        cast_nopartition (&hit_idx, &hit_mag, &hit_object,
+        cast_nopartition (&hit_idx, &hit_mag, &hit_objidx,
                           space, &origin, &dir,
                           priori.inside_box,
                           Max_uint);
-        if (hit_object <= space->nobjects)
+        if (hit_objidx <= space->nobjects)
         {
             const ObjectRaySpace* object;
             Point isect;
+            uint nodeidx, parent_nodeidx;
             scale_Point (&isect, &dir, hit_mag);
             summ_Point (&isect, &origin, &isect);
-            fprintf (out, "Elem:%u  Intersect:", hit_idx);
-            output_Point (out, &isect);
-            fputc ('\n', out);
-            if (hit_object < space->nobjects)
-                object = &space->objects[hit_object];
+
+            nodeidx = find_KDTreeNode (&parent_nodeidx, &isect,
+                                       space->main.tree.nodes);
+
+            if (hit_objidx < space->nobjects)
+                object = &space->objects[hit_objidx];
             else
                 object = &space->main;
             output_SceneElement (out, &object->scene, hit_idx);
+            fputc ('\n', out);
+            fprintf (out, "Elem:%u  Obj:%u  Node:%u  Intersect:",
+                     hit_idx, hit_objidx, nodeidx);
+            output_Point (out, &isect);
             fputc ('\n', out);
         }
         else
@@ -1053,6 +1059,11 @@ int main (int argc, char* argv[])
 
     good =
 #if 0
+        setup_testcase_simple (&space, &view_origin,
+                               &view_basis, &view_angle,
+                               inpathname, "machine0.obj");
+#else
+#if 0
 #elif 0
         setup_testcase_triangles
 #elif 1
@@ -1072,6 +1083,7 @@ int main (int argc, char* argv[])
 #endif
         (&space, &view_origin, &view_basis, &view_angle,
          inpathname);
+#endif  /* Pre-rolled testcase.*/
 
     if (!good)
     {
