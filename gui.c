@@ -706,6 +706,8 @@ static gboolean grab_mouse_fn (GtkWidget* da,
                      hit_idx, hit_objidx, nodeidx);
             output_Point (out, &isect);
             fputc ('\n', out);
+            output_Point (out, &object->simplices[hit_idx].plane.normal);
+            fputc ('\n', out);
         }
         else
         {

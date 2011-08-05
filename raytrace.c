@@ -594,11 +594,9 @@ splitting_plane_count (const Point* origin, const Point* direct,
     uint count = 0;
     uint node_idx, parent, destin_nodeidx;
     Point destin;
-    Point salo_entrance;
-    Point* restrict entrance;
     const BoundingBox* box;
+    bool inside_box;
 
-    entrance = &salo_entrance;
     box = &object->box;
 
     Op_Point_2010( &destin ,+, origin ,mag*, direct );
@@ -608,35 +606,21 @@ splitting_plane_count (const Point* origin, const Point* direct,
     else
         destin_nodeidx = Max_uint;
     
+    inside_box = inside_BoundingBox (box, origin);
 
-    if (inside_BoundingBox (box, origin))
-    {
-            /* Find the initial node.*/
-        node_idx = find_KDTreeNode (&parent, origin, object->tree.nodes);
-        box = &object->tree.nodes[node_idx].as.leaf.box;
-        assert (inside_BoundingBox (box, origin));
-    }
-    else
-    {
-        if (! hit_outer_BoundingBox (entrance, box, origin, direct))
-            return count;
-        count += 1;
-        node_idx = 0;
-    }
+    node_idx = first_KDTreeNode (&parent, origin, direct,
+                                 object->tree.nodes,
+                                 box, inside_box);
 
-    do
-    {
-        node_idx = descend_KDTreeNode (&parent, entrance, node_idx,
-                                       object->tree.nodes);
-
-        if (node_idx == destin_nodeidx)  return count;
+    if (node_idx != Max_uint && inside_box)
         count += 1;
 
-        node_idx = upnext_KDTreeNode (entrance, &parent, origin, direct,
-                                      node_idx, object->tree.nodes);
+    while (node_idx != Max_uint && node_idx != destin_nodeidx)
+    {
+        count += 1;
+        node_idx = next_KDTreeNode (&parent, origin, direct,
+                                    node_idx, object->tree.nodes);
     }
-    while (node_idx != parent);
-    count += 1;
     return count;
 }
 
@@ -738,7 +722,7 @@ fill_pixel (real* ret_colors,
 
     object = ray_to_ObjectRaySpace (&rel_origin, &rel_dir,
                                     origin, dir, space, objidx);
-                                    
+
     simplex = &object->simplices[hitidx];
     hit_front = (0 >= dot_Point (&rel_dir, &simplex->plane.normal));
 
@@ -825,7 +809,8 @@ fill_pixel (real* ret_colors,
         colors[1] *= (real) ((y & 0x00FF00) >>  8) / (nincs-1);
         colors[2] *= (real) ((y & 0x0000FF) >>  0) / (nincs-1);
     }
-    else if (material && material->ambient_texture != Max_uint)
+    else if (compute_bary_coords &&
+             material && material->ambient_texture != Max_uint)
     {
             /* Texture mapping.*/
         const Texture* ambient_texture;
@@ -1078,13 +1063,9 @@ cast_ray (uint* restrict ret_hit, real* restrict ret_mag,
           __global const BoundingBox* restrict box,
           bool inside_box)
 {
-    Point salo_entrance;
     uint node_idx, parent = 0;
-    Point* restrict entrance;
     uint hit_idx;
     real hit_mag;
-
-    entrance = &salo_entrance;
 
     hit_idx = *ret_hit;
     hit_mag = *ret_mag;
@@ -1099,26 +1080,12 @@ cast_ray (uint* restrict ret_hit, real* restrict ret_mag,
         return;
     }
 
-    if (inside_box)
-    {
-            /* Find the initial node.*/
-        node_idx = find_KDTreeNode (&parent, origin, nodes);
-        box = &nodes[node_idx].as.leaf.box;
-        assert (inside_BoundingBox (box, origin));
-    }
-    else
-    {
-        if (! hit_outer_BoundingBox (entrance, box, origin, dir))
-            return;
-        node_idx = 0;
-    }
+    node_idx = first_KDTreeNode (&parent, origin, dir, nodes, box, inside_box);
 
-    do
+    while (node_idx != Max_uint)
     {
-        __global const KDTreeLeaf* restrict leaf;
         bool hit_in_leaf;
-
-        node_idx = descend_KDTreeNode (&parent, entrance, node_idx, nodes);
+        __global const KDTreeLeaf* restrict leaf;
 
         leaf = &nodes[node_idx].as.leaf;
         hit_in_leaf =
@@ -1127,10 +1094,8 @@ cast_ray (uint* restrict ret_hit, real* restrict ret_mag,
                                 simplices, tris, &leaf->box);
         if (hit_in_leaf)  break;
 
-        node_idx = upnext_KDTreeNode (entrance, &parent,
-                                      origin, dir, node_idx, nodes);
+        node_idx = next_KDTreeNode (&parent, origin, dir, node_idx, nodes);
     }
-    while (node_idx != parent);
 
     *ret_hit = hit_idx;
     *ret_mag = hit_mag;
@@ -1285,9 +1250,7 @@ cast_partitioned (uint* ret_hit,
 {
     const uint ntestedbits = 128;
     Declare_BitString( tested, 128 );
-    Point salo_entrance;
     uint node_idx, parent = 0;
-    Point* restrict entrance;
     const KDTreeNode* restrict nodes;
     const uint* restrict elemidcs;
     uint hit_idx;
@@ -1299,7 +1262,6 @@ cast_partitioned (uint* ret_hit,
     if (ignore_object <= space->nobjects)
         set1_BitString (tested, ignore_object);
 
-    entrance = &salo_entrance;
     nodes = space->object_tree.nodes;
     elemidcs = space->object_tree.elemidcs;
 
@@ -1307,27 +1269,13 @@ cast_partitioned (uint* ret_hit,
     hit_mag = *ret_mag;
     hit_object = *ret_object;
 
-    if (inside_box)
-    {
-        const BoundingBox* box;
-            /* Find the initial node.*/
-        node_idx = find_KDTreeNode (&parent, origin, nodes);
-        box = &nodes[node_idx].as.leaf.box;
-        assert (inside_BoundingBox (box, origin));
-    }
-    else
-    {
-        if (! hit_outer_BoundingBox (entrance, &space->box, origin, dir))
-            return;
-        node_idx = 0;
-    }
+    node_idx = first_KDTreeNode (&parent, origin, dir, nodes,
+                                 &space->box, inside_box);
 
-    do
+    while (node_idx != Max_uint)
     {
         __global const KDTreeLeaf* restrict leaf;
         bool hit_in_leaf;
-
-        node_idx = descend_KDTreeNode (&parent, entrance, node_idx, nodes);
 
         leaf = &nodes[node_idx].as.leaf;
         hit_in_leaf =
@@ -1337,11 +1285,8 @@ cast_partitioned (uint* ret_hit,
                                        &elemidcs[leaf->elemidcs],
                                        space, &leaf->box);
         if (hit_in_leaf)  break;
-
-        node_idx = upnext_KDTreeNode (entrance, &parent,
-                                      origin, dir, node_idx, nodes);
+        node_idx = next_KDTreeNode (&parent, origin, dir, node_idx, nodes);
     }
-    while (node_idx != parent);
 
     *ret_hit = hit_idx;
     *ret_mag = hit_mag;

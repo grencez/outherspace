@@ -575,6 +575,8 @@ condense_Scene (Scene* scene)
 
     if (scene->nverts > 0)
     {
+        uint prev_nverts;
+        prev_nverts = scene->nverts;
             /* printf ("Before nverts:%u\n", scene->nverts); */
         scene->nverts = condense_Points (scene->nverts, scene->verts,
                                          jumps, indices, coords);
@@ -587,6 +589,7 @@ condense_Scene (Scene* scene)
             {
                 uint* e;
                 e = &scene->elems[i].pts[dim];
+                assert (*e < prev_nverts);
                 *e = jumps[*e];
             }
         }
@@ -594,6 +597,8 @@ condense_Scene (Scene* scene)
 
     if (scene->nvnmls > 0)
     {
+        uint prev_nvnmls;
+        prev_nvnmls = scene->nvnmls;
             /* printf ("Before nvnmls:%u\n", scene->nvnmls); */
         scene->nvnmls = condense_Points (scene->nvnmls, scene->vnmls,
                                          jumps, indices, coords);
@@ -606,6 +611,7 @@ condense_Scene (Scene* scene)
             {
                 uint* e;
                 e = &scene->elems[i].vnmls[dim];
+                assert (*e < prev_nvnmls);
                 *e = jumps[*e];
             }
         }

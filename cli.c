@@ -40,6 +40,13 @@ int main (int argc, char** argv)
                                      &view_origin, &view_basis,
                                      &image.hifov,
                                      pathname);
+#elif 0
+    image.nrows = 1000;
+    image.ncols = 1000;
+    image.pixels = AllocT( byte, image.nrows * 3 * image.ncols );
+    good = setup_testcase_simple (&space, &view_origin,
+                                  &view_basis, &image.hifov,
+                                  pathname, "machine0.obj");
 #else
     image.nrows = 1000;
     image.ncols = 1000;

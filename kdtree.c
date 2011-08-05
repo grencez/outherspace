@@ -721,9 +721,10 @@ bool leaf_KDTreeNode (__global const KDTreeNode* node)
 }
 
 
-uint find_KDTreeNode (uint* ret_parent,
-                      const Point* origin,
-                      __global const KDTreeNode* nodes)
+    uint
+find_KDTreeNode (uint* ret_parent,
+                 const Point* origin,
+                 __global const KDTreeNode* nodes)
 {
     __global const KDTreeNode* node;
     uint node_idx = 0, parent = 0;
@@ -746,6 +747,7 @@ uint find_KDTreeNode (uint* ret_parent,
 }
 
 
+static
     uint
 upnext_KDTreeNode (Point* entrance,
                    uint* ret_parent,
@@ -808,6 +810,7 @@ upnext_KDTreeNode (Point* entrance,
 }
 
 
+static
     uint
 descend_KDTreeNode (uint* ret_parent,
                     const Point* entrance,
@@ -835,6 +838,60 @@ descend_KDTreeNode (uint* ret_parent,
         node = &nodes[node_idx];
     }
 
+    return node_idx;
+}
+
+
+    uint
+first_KDTreeNode (uint* ret_parent,
+                  const Point* restrict origin,
+                  const Point* restrict dir,
+                  __global const KDTreeNode* restrict nodes,
+                  const BoundingBox* restrict box,
+                  bool inside_box)
+{
+    uint node_idx = 0, parent = 0;
+
+    if (inside_box)
+    {
+            /* Find the initial node.*/
+        node_idx = find_KDTreeNode (&parent, origin, nodes);
+        box = &nodes[node_idx].as.leaf.box;
+        assert (inside_BoundingBox (box, origin));
+    }
+    else
+    {
+        Point entrance;
+        if (hit_outer_BoundingBox (&entrance, box, origin, dir))
+            node_idx = descend_KDTreeNode (&parent, &entrance, 0, nodes);
+        else
+            node_idx = parent = Max_uint;
+    }
+    *ret_parent = parent;
+    return node_idx;
+}
+
+
+    uint
+next_KDTreeNode (uint* ret_parent,
+                 const Point* origin,
+                 const Point* dir,
+                 uint node_idx,
+                 __global const KDTreeNode* nodes)
+{
+    uint parent;
+    Point entrance;
+    parent = *ret_parent;
+
+    node_idx = upnext_KDTreeNode (&entrance, &parent,
+                                  origin, dir, node_idx, nodes);
+
+    if (node_idx != parent)
+        node_idx = descend_KDTreeNode (&parent, &entrance, node_idx, nodes);
+    else
+        node_idx = parent = Max_uint;
+
+    *ret_parent = parent;
     return node_idx;
 }
 

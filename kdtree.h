@@ -61,22 +61,23 @@ struct kdtree_grid_struct
 
 bool leaf_KDTreeNode (__global const KDTreeNode* node);
 
-uint find_KDTreeNode (uint* ret_parent,
-                      const Point* origin,
-                      __global const KDTreeNode* nodes);
-
 uint
-upnext_KDTreeNode (Point* entrance,
-                   uint* ret_parent,
-                   const Point* origin,
-                   const Point* dir,
-                   uint node,
-                   __global const KDTreeNode* nodes);
+find_KDTreeNode (uint* ret_parent,
+                 const Point* origin,
+                 __global const KDTreeNode* nodes);
 uint
-descend_KDTreeNode (uint* ret_parent,
-                    const Point* entrance,
-                    uint node_idx,
-                    __global const KDTreeNode* nodes);
+first_KDTreeNode (uint* ret_parent,
+                  const Point* restrict origin,
+                  const Point* restrict dir,
+                  __global const KDTreeNode* restrict nodes,
+                  const BoundingBox* restrict box,
+                  bool inside_box);
+uint
+next_KDTreeNode (uint* ret_parent,
+                 const Point* origin,
+                 const Point* dir,
+                 uint node_idx,
+                 __global const KDTreeNode* nodes);
 
 #ifndef __OPENCL_VERSION__
 void

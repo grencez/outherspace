@@ -120,6 +120,7 @@ setup_testcase_simple (RaySpace* space,
     orthorotate_PointXfrm (&basis, view_basis, ForwardDim);
     copy_PointXfrm (view_basis, &basis);
 
+    setup_camera_light (space, view_origin);
     return good;
 }
 
@@ -229,6 +230,15 @@ setup_testcase_track (RaySpace* space,
     if (!good)  return false;
     condense_Scene (&space->main.scene);
 
+    if (false)
+    {
+        PointXfrm fix;
+        fixup_wavefront_Scene (&space->main.scene);
+        identity_PointXfrm (&fix);
+        scale_PointXfrm (&fix, &fix, 20);
+        xfrm_Scene (&space->main.scene, &fix);
+    }
+
     good = add_sky_texture (space, pathname, "gradient-sky.ppm");
     if (!good)  return false;
 
@@ -237,19 +247,13 @@ setup_testcase_track (RaySpace* space,
 
     init_filled_RaySpace (space);
 
-    *view_angle = 2 * M_PI / 3;
-    view_origin->coords[0] = (real) 988.474;
-    view_basis->pts[0].coords[0] = (real) 0.770512;
-    view_basis->pts[0].coords[1] = (real) -0.428396;
-    view_basis->pts[0].coords[2] = (real) -0.472005;
-    view_origin->coords[1] = (real) 82.3796;
-    view_basis->pts[1].coords[0] = (real) 0.0501207;
-    view_basis->pts[1].coords[1] = (real) -0.697475;
-    view_basis->pts[1].coords[2] = (real) 0.714854;
-    view_origin->coords[2] = (real) 183.883;
-    view_basis->pts[2].coords[0] = (real) -0.635452;
-    view_basis->pts[2].coords[1] = (real) -0.57446;
-    view_basis->pts[2].coords[2] = (real) -0.515942;
+    *view_angle = 2 * M_PI / 3,
+    view_origin->coords[0] = 108.474;
+    view_origin->coords[1] = 82.3796;
+    view_origin->coords[2] = 183.883;
+    trrotate_PointXfrm (view_basis, ForwardDim, RightDim, M_PI);
+    trrotate_PointXfrm (view_basis, UpDim, ForwardDim, M_PI/3);
+
 
     if (NDimensions == 4)
     {

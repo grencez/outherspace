@@ -2,6 +2,7 @@
 #CC = clang
 #CC = gcc
 #CC = llvm-gcc
+#CC = icc
 
 DFLAGS += -DNDimensions=3
 
@@ -21,6 +22,10 @@ CONFIG += openmp
 #CONFIG += macapp
 
 
+# For ICC:
+#   source $HOME/local/stow/icc-2011.5.220/bin/iccvars.sh intel64
+
+
 #LD_PRELOAD=$(pfx)/lib/valgrind/libmpiwrap-x86-linux.so \
 #	mpirun -np 3 valgrind ./cli 2>&1 | tee out
 
@@ -31,8 +36,13 @@ ifeq ($(CC),g++)
 	CONFIG += c++
 endif
 
-CFLAGS += -fwhole-program
-CFLAGS += -Wall -Wextra
+ifeq ($(CC),icc)
+	#CFLAGS += -Wremarks
+else
+	CFLAGS += -fwhole-program
+	CFLAGS += -Wall -Wextra
+endif
+
 DFLAGS += -DINCLUDE_SOURCE
 
 ifneq (,$(filter macapp,$(CONFIG)))
@@ -56,6 +66,7 @@ endif
 ## Go really fast.
 ifneq (,$(filter fast,$(CONFIG)))
 	CFLAGS += -O3
+	#CFLAGS += -Ofast
 	#CFLAGS += -Ofast
 	#CFLAGS += -march=native
 	#CFLAGS += -ffast-math
@@ -117,7 +128,11 @@ ifneq (,$(filter ansi,$(CONFIG)))
 endif
 ## Allow parallelism.
 ifneq (,$(filter openmp,$(CONFIG)))
-	CFLAGS += -fopenmp
+	ifeq ($(CC),icc)
+	  CFLAGS += -openmp
+	else
+	  CFLAGS += -fopenmp
+	endif
 endif
 
 
