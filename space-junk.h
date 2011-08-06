@@ -1,102 +1,44 @@
 
-#ifndef Op_Point_10
+#ifndef Op_Point_0
 
+#include "pack.h"
 
-#define Op_Point_0( dst, a )  do \
-{ \
-    uint i_sOp_Point_0; \
-    Point* dst_sOp_Point_0; \
-    const Point* a_sOp_Point_0; \
-    dst_sOp_Point_0 = dst; \
-    a_sOp_Point_0 = a; \
-    UFor( i_sOp_Point_0, NDimensions ) \
-    { \
-        dst_sOp_Point_0->coords[i_sOp_Point_0] \
-        = a_sOp_Point_0->coords[i_sOp_Point_0]; \
-    } \
-} while (0)
+#define Op_Point_0( dst, a ) \
+    Op_0( real, NDimensions, (dst)->coords, (a)->coords )
 
-#define Op_Point_10( dst, f, a )  do \
-{ \
-    uint i_sOp_Point_10; \
-    Point* dst_sOp_Point_10; \
-    const Point* a_sOp_Point_10; \
-    dst_sOp_Point_10 = dst; \
-    a_sOp_Point_10 = a; \
-    UFor( i_sOp_Point_10, NDimensions ) \
-    { \
-        dst_sOp_Point_10->coords[i_sOp_Point_10] \
-        = f a_sOp_Point_10->coords[i_sOp_Point_10]; \
-    } \
-} while (0)
+#define Op_Point_10( dst, f, a ) \
+    Op_10( real, NDimensions, (dst)->coords, f, (a)->coords )
 
-#define Op_Point_200( dst, f, a, b )  do \
-{ \
-    uint i_sOp_Point_200; \
-    Point* dst_sOp_Point_200; \
-    const Point* a_sOp_Point_200; \
-    const Point* b_sOp_Point_200; \
-    dst_sOp_Point_200 = dst; \
-    a_sOp_Point_200 = a; \
-    b_sOp_Point_200 = b; \
-    UFor( i_sOp_Point_200, NDimensions ) \
-    { \
-        dst_sOp_Point_200->coords[i_sOp_Point_200] \
-        = (a_sOp_Point_200->coords[i_sOp_Point_200] \
-           f \
-           b_sOp_Point_200->coords[i_sOp_Point_200]); \
-    } \
-} while (0)
+#define Op_Point_200( dst, f, a, b ) \
+    Op_200( real, NDimensions, (dst)->coords, f, (a)->coords, (b)->coords )
 
-#define Op_Point_1200( dst, f, g, a, b )  do \
-{ \
-    Point tmp_sOp_Point_1200; \
-    Op_Point_200( &tmp_sOp_Point_1200, g, a, b ); \
-    Op_Point_10( dst, f, &tmp_sOp_Point_1200 ); \
-} while (0)
+#define Op_Point_1200( dst, f, g, a, b ) \
+    Op_1200( real, NDimensions, (dst)->coords, \
+             f, g, (a)->coords, (b)->coords )
 
-#define Op_Point_2010( dst, f, a, g, b )  do \
-{ \
-    Point tmp_sOp_Point_2010; \
-    Op_Point_10( &tmp_sOp_Point_2010, g, b ); \
-    Op_Point_200( dst, f, a, &tmp_sOp_Point_2010 ); \
-} while (0)
+#define Op_Point_2010( dst, f, a, g, b ) \
+    Op_2010( real, NDimensions, (dst)->coords, \
+             f, (a)->coords, g, (b)->coords )
 
-#define Op_Point_2100( dst, f, g, a, b )  do \
-{ \
-    Point tmp_sOp_Point_2100; \
-    Op_Point_10( &tmp_sOp_Point_2100, g, a ); \
-    Op_Point_200( dst, f, &tmp_sOp_Point_2100, b ); \
-} while (0)
+#define Op_Point_2100( dst, f, g, a, b ) \
+    Op_2100( real, NDimensions, (dst)->coords, \
+             f, g, (a)->coords, (b)->coords )
 
-#define Op_Point_21010( dst, f, g, a, h, b )  do \
-{ \
-    Point tmp_sOp_Point_21010; \
-    Op_Point_10( &tmp_sOp_Point_21010, g, a ); \
-    Op_Point_2010( dst, f, &tmp_sOp_Point_21010, h, b ); \
-} while (0)
+#define Op_Point_21010( dst, f, g, a, h, b ) \
+    Op_21010( real, NDimensions, (dst)->coords, \
+              f, g, (a)->coords, h, (b)->coords )
 
-#define Op_Point_201200( dst, f1, a, f2, f3, b, c ) do \
-{ \
-    Point tmp_sOp_Point_201200; \
-    Op_Point_1200( &tmp_sOp_Point_201200, f2, f3, b, c ); \
-    Op_Point_200( dst, f1, a, &tmp_sOp_Point_201200 ); \
-} while (0)
+#define Op_Point_201200( dst, f1, a, f2, f3, b, c ) \
+    Op_201200( real, NDimensions, (dst)->coords, \
+               f1, (a)->coords, f2, f3, (b)->coords, (c)->coords )
 
-#define Op_Point_202100( dst, f, a, g, h, b, c ) do \
-{ \
-    Point tmp_sOp_Point_202100; \
-    Op_Point_2100( &tmp_sOp_Point_202100, g, h, b, c ); \
-    Op_Point_200( dst, f, a, &tmp_sOp_Point_202100 ); \
-} while (0)
+#define Op_Point_202100( dst, f, a, g, h, b, c ) \
+    Op_202100( real, NDimensions, (dst)->coords, \
+               f, (a)->coords, g, h, (b)->coords, (c)->coords )
 
-#define Op_Point_2021010( dst, f1, a, f2, f3, b, f4, c ) do \
-{ \
-    Point tmp_sOp_Point_2021010; \
-    Op_Point_10( &tmp_sOp_Point_2021010, f4, c ); \
-    Op_Point_202100( dst, f1, a, f2, f3, b, &tmp_sOp_Point_2021010 ); \
-} while (0)
-
+#define Op_Point_2021010( dst, f1, a, f2, f3, b, f4, c ) \
+    Op_2021010( real, NDimensions, (dst)->coords, f1, \
+                (a)->coords, f2, f3, (b)->coords, f4, (c)->coords )
 
 #endif
 
