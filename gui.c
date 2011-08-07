@@ -36,16 +36,12 @@ RunFromMyMac = true;
 RunFromMyMac = false;
 #endif
 
-static uint racer_idx = 0;
-static uint nracers = 0;
-static ObjectMotion racer_motions[NRacersMax];  /* Reset every frame.*/
-
 typedef struct motion_input_struct MotionInput;
+typedef struct pilot_struct Pilot;
+
 
 struct motion_input_struct
 {
-    real t0;
-    real t1;
     real vert;
     real horz;
     real drift;
@@ -57,21 +53,41 @@ struct motion_input_struct
     bool use_roll;
 };
 
-static real stride_magnitude = 10;
-static Point view_origin;
-static PointXfrm view_basis;
+struct pilot_struct
+{
+    uint racer_idx;
+    MotionInput motion_input;
+    Point view_origin;
+    PointXfrm view_basis;
+
+    uint image_start_row;
+    uint image_start_col;
+    RayImage ray_image;
+
+    real stride_magnitude;
+    real view_angle;
+    real view_width;
+
+        /* Not sure if these will be used evar.*/
+    uint mouse_coords[2];
+    uint mouse_diff[2];
+};
+
+    /* Global state changes.*/
+static uint nracers = 0;
+static uint npilots = 1;
+static uint kbd_pilot_idx = 0;
+static ObjectMotion racer_motions[NRacersMax];  /* Reset every frame.*/
+static Pilot pilots[NRacersMax];
 static uint view_nrows = 400;
 static uint view_ncols = 400;
-static uint mouse_coords[2];
-static uint mouse_diff[2];
-static RayImage ray_image;
-static real view_angle = 2 * M_PI / 3;
-static real view_width = 100;
 static bool needs_recast = true;
 static bool continue_running = true;
-static MotionInput motion_input;
+static real frame_t0 = 0;
+static real frame_t1 = 0;
 static real framerate_report_dt = 0;
 static uint framerate_report_count = 0;
+static GCond* pilots_initialized = 0;
 
 
 static
@@ -79,8 +95,6 @@ static
 init_MotionInput (MotionInput* mot)
 {
     uint i;
-    mot->t0 = 0;
-    mot->t1 = 0;
     mot->vert = 0;
     mot->horz = 0;
     mot->drift = 0;
@@ -88,6 +102,27 @@ init_MotionInput (MotionInput* mot)
     mot->boost = false;
     mot->inv_vert = true;
     mot->use_roll = false;
+}
+
+static
+    void
+init_Pilot (Pilot* p)
+{
+    p->racer_idx = 0;
+    init_MotionInput (&p->motion_input);
+    p->image_start_row = 0;
+    p->image_start_col = 0;
+    init_RayImage (&p->ray_image);
+    p->stride_magnitude = 10;
+    p->view_angle = 2 * M_PI / 3;
+    p->view_width = 100;
+}
+
+static
+    void
+cleanup_Pilot (Pilot* p)
+{
+    cleanup_RayImage (&p->ray_image);
 }
 
 static gboolean delete_event (GtkWidget* widget,
@@ -104,11 +139,42 @@ static gboolean delete_event (GtkWidget* widget,
 static void destroy_app (GtkWidget* widget,
                          gpointer data)
 {
+    uint i;
     (void) widget;
     (void) data;
-    cleanup_RayImage (&ray_image);
+    UFor( i, NRacersMax )
+        cleanup_Pilot (&pilots[i]);
     continue_running = false;
     gtk_main_quit ();
+}
+
+static
+    void
+resize_pilot_viewports (uint nrows, uint ncols)
+{
+    uint i, start_row = 0;
+    UFor( i, npilots )
+    {
+        Pilot* pilot;
+        RayImage* ray_image;
+        pilot = &pilots[i];
+        ray_image = &pilot->ray_image;
+
+        if (!ray_image->pixels) {
+            ray_image->pixels = AllocT( byte, 1 );
+                /* ray_image->hits = AllocT( uint, 1 ); */
+                /* ray_image->mags = AllocT( real, 1 ); */
+        }
+
+            /* Horizontal splits.*/
+        ray_image->nrows = (nrows - start_row) / (npilots - i);
+        ray_image->ncols = ncols;
+        resize_RayImage (ray_image);
+
+        pilot->image_start_row = start_row;
+        pilot->image_start_col = 0;
+        start_row += ray_image->nrows;
+    }
 }
 
 static
@@ -124,19 +190,31 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer data)
     tristate view_light_change = 0;
     tristate stride_mag_change = 0;
     tristate switch_racer = 0;
+    tristate switch_kbd_pilot = 0;
     bool reflect = false;
     bool rotate_dir_dim = false;
     bool change_cast_method = false;
     bool print_view_code = false;
     bool recast = true;
-    FILE* out;
+    FILE* out = stdout;
     bool shift_mod, ctrl_mod;
+    Pilot* pilot;
     MotionInput* input;
+    Point* view_origin;
+    PointXfrm* view_basis;
+    real stride_magnitude;
+    RayImage* ray_image;
+    uint racer_idx;
     ObjectMotion* racer_motion;
-    racer_motion = &racer_motions[racer_idx];
 
-    input = (MotionInput*) data;
-    out = stdout;
+    pilot = &((Pilot*) data)[kbd_pilot_idx];
+    input = &pilot->motion_input;
+    view_origin = &pilot->view_origin;
+    view_basis = &pilot->view_basis;
+    stride_magnitude = pilot->stride_magnitude;
+    ray_image = &pilot->ray_image;
+    racer_idx = pilot->racer_idx;
+    racer_motion = &racer_motions[racer_idx];
 
     shift_mod = event->state & GDK_SHIFT_MASK;
     ctrl_mod = event->state & GDK_CONTROL_MASK;
@@ -190,6 +268,10 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer data)
         case GDK_e:
             input->boost = true;
             break;
+        case GDK_f:
+            switch_kbd_pilot = 1;  break;
+        case GDK_F:
+            switch_kbd_pilot = -1;  break;
         case GDK_g:
             racer_motion->gravity = !racer_motion->gravity;
             break;
@@ -223,11 +305,11 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer data)
     {
         real diff = stride_magnitude;
         if (view_light_change > 0)
-            ray_image.view_light += diff;
-        else if (diff <= ray_image.view_light)
-            ray_image.view_light -= diff;;
+            ray_image->view_light += diff;
+        else if (diff <= ray_image->view_light)
+            ray_image->view_light -= diff;;
 
-        fprintf (out, "view_light:%f\n", ray_image.view_light);
+        fprintf (out, "view_light:%f\n", ray_image->view_light);
     }
     else if (stride != 0 && FollowRacer)
     {
@@ -236,29 +318,30 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer data)
     else if (stride != 0 && !FollowRacer)
     {
         Point diff;
-        scale_Point (&diff, &view_basis.pts[dim], stride_magnitude * stride);
-        summ_Point (&view_origin, &view_origin, &diff);
+        scale_Point (&diff, &view_basis->pts[dim], stride_magnitude * stride);
+        summ_Point (view_origin, view_origin, &diff);
 
         fputs ("pos:", out);
-        output_Point (out, &view_origin);
+        output_Point (out, view_origin);
         fputc ('\n', out);
     }
     else if (stride_mag_change != 0)
     {
         if (stride_mag_change > 0)  stride_magnitude *= 2;
         else                        stride_magnitude /= 2;
+        pilot->stride_magnitude = stride_magnitude;
         fprintf (out, "stride_magnitude: %f\n", stride_magnitude);
         recast = false;
     }
     else if (roll != 0)
     {
         PointXfrm tmp_basis;
-        copy_PointXfrm (&tmp_basis, &view_basis);
+        copy_PointXfrm (&tmp_basis, view_basis);
         rotate_PointXfrm (&tmp_basis, UpDim, RightDim, roll * M_PI / 8);
-        orthonormalize_PointXfrm (&view_basis, &tmp_basis);
+        orthonormalize_PointXfrm (view_basis, &tmp_basis);
 
         fputs ("basis:", out);
-        output_PointXfrm (out, &view_basis);
+        output_PointXfrm (out, view_basis);
         fputc ('\n', out);
     }
     else if (turn != 0)
@@ -276,39 +359,45 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer data)
         }
         else
         {
-            negate_Point (&view_basis.pts[negdim], &view_basis.pts[negdim]);
-            swaprows_PointXfrm (&view_basis, dim, ForwardDim);
+            negate_Point (&view_basis->pts[negdim], &view_basis->pts[negdim]);
+            swaprows_PointXfrm (view_basis, dim, ForwardDim);
             needs_recast = true;
 
             fputs ("basis:", out);
-            output_PointXfrm (out, &view_basis);
+            output_PointXfrm (out, view_basis);
             fputc ('\n', out);
         }
     }
     else if (view_angle_change != 0)
     {
-        if (ray_image.perspective)
+        if (ray_image->perspective)
         {
             const real epsilon = (real) (.00001);
             const real diff = M_PI / 18;
+            real view_angle;
+            view_angle = pilot->view_angle;
             if (view_angle_change > 0)  view_angle += diff;
             else                        view_angle -= diff;
             while (view_angle > M_PI - epsilon) view_angle -= diff;
             while (view_angle <        epsilon) view_angle += diff;
+            pilot->view_angle = view_angle;
             fprintf (out, "view_angle:%fpi\n", view_angle / M_PI);
         }
         else
         {
             const real diff = stride_magnitude;
+            real view_width;
+            view_width = pilot->view_width;
             if (view_angle_change > 0)  view_width += diff;
             else                        view_width -= diff;
+            pilot->view_width = view_width;
             fprintf (out, "view_width:%f\n", view_width);
         }
     }
     else if (resize != 0)
     {
         uint diff = 100;
-        assert (view_nrows == view_ncols);
+            /* assert (view_nrows == view_ncols); */
         if (resize > 0)
         {
             view_nrows += diff;
@@ -325,16 +414,14 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer data)
         }
         if (recast)
         {
-            ray_image.nrows = view_nrows;
-            ray_image.ncols = view_ncols;
-            resize_RayImage (&ray_image);
+            resize_pilot_viewports (view_nrows, view_ncols);
         }
-        gtk_window_resize (GTK_WINDOW(widget), view_nrows, view_ncols);
+        gtk_window_resize (GTK_WINDOW(widget), view_ncols, view_nrows);
     }
     else if (reflect)
     {
-        negate_Point (&view_basis.pts[NDimensions-1],
-                      &view_basis.pts[NDimensions-1]);
+        negate_Point (&view_basis->pts[NDimensions-1],
+                      &view_basis->pts[NDimensions-1]);
     }
     else if (rotate_dir_dim)
     {
@@ -343,7 +430,7 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer data)
         assert (NDimensions >= 3);
         n = NDimensions - 3;
         UFor( i, n )
-            swaprows_PointXfrm (&view_basis, 2+i, 3+i);
+            swaprows_PointXfrm (view_basis, 2+i, 3+i);
     }
     else if (FollowRacer && switch_racer != 0)
     {
@@ -351,12 +438,20 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer data)
             racer_idx = incmod_uint (racer_idx, 1, nracers);
         else
             racer_idx = decmod_uint (racer_idx, 1, nracers);
+        pilot->racer_idx = racer_idx;
         printf ("racer_idx:%u\n", racer_idx);
+    }
+    else if (switch_kbd_pilot != 0)
+    {
+        if (switch_kbd_pilot > 0)
+            kbd_pilot_idx = incmod_uint (kbd_pilot_idx, 1, npilots);
+        else
+            kbd_pilot_idx = decmod_uint (kbd_pilot_idx, 1, npilots);
     }
     else if (change_cast_method)
     {
-        ray_image.perspective = !ray_image.perspective;
-        if (ray_image.perspective)
+        ray_image->perspective = !ray_image->perspective;
+        if (ray_image->perspective)
             fputs ("method:perspective\n", out);
         else
             fputs ("method:parallel\n", out);
@@ -364,16 +459,16 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer data)
     else if (print_view_code)
     {
         uint i;
-        fprintf (out, "*view_angle = %g;\n", view_angle);
+        fprintf (out, "*view_angle = %g;\n", pilot->view_angle);
         UFor( i, NDimensions )
         {
             uint j;
             fprintf (out, "view_origin->coords[%u] = %g;\n",
-                     i, view_origin.coords[i]);
+                     i, view_origin->coords[i]);
             UFor( j, NDimensions )
             {
                 fprintf (out, "view_basis->pts[%u].coords[%u] = %g;\n",
-                         i, j, view_basis.pts[i].coords[j]);
+                         i, j, view_basis->pts[i].coords[j]);
             }
         }
     }
@@ -395,7 +490,7 @@ key_release_fn (GtkWidget* _widget, GdkEventKey* event, gpointer data)
     MotionInput* input;
     (void) _widget;
 
-    input = (MotionInput*) data;
+    input = &((Pilot*) data)[kbd_pilot_idx].motion_input;
 
     switch (event->keyval)
     {
@@ -420,33 +515,13 @@ key_release_fn (GtkWidget* _widget, GdkEventKey* event, gpointer data)
 
 static
     void
-set_rotate_view (real vert, real horz)
-{
-    Point dir;
-    PointXfrm tmp;
-    const uint dir_dim = ForwardDim;
-    copy_PointXfrm (&tmp, &view_basis);
-    zero_Point (&dir);
-    dir.coords[UpDim]    = vert * sin (view_angle / 2);
-    dir.coords[RightDim] = horz * sin (view_angle / 2);
-    dir.coords[dir_dim] = 1;
-    trxfrm_Point (&tmp.pts[dir_dim], &view_basis, &dir);
-    orthorotate_PointXfrm (&view_basis, &tmp, dir_dim);
-}
-
-
-static
-    void
-joystick_button_event (MotionInput* mot,
-                       uint devidx, uint btnidx, bool pressed)
+joystick_button_event (MotionInput* mot, uint btnidx, bool pressed)
 {
     tristate value;
 #if 0
     FILE* out = stderr;
     fprintf (out, "\rdevidx:%u  btnidx:%u  pressed:%u",
              devidx, btnidx, (uint) pressed);
-#else
-    (void) devidx;
 #endif
 
     value = pressed ? 1 : 0;
@@ -458,7 +533,7 @@ joystick_button_event (MotionInput* mot,
 
 static
     void
-joystick_axis_event (MotionInput* mot, uint devidx, uint axisidx, int value)
+joystick_axis_event (MotionInput* mot, uint axisidx, int value)
 {
     const int js_max =  32767;
     const int js_min = -32768;
@@ -468,8 +543,6 @@ joystick_axis_event (MotionInput* mot, uint devidx, uint axisidx, int value)
     FILE* out = stderr;
     fprintf (out, "\rdevidx:%u  axisidx:%u  value:%d",
              devidx, axisidx, value);
-#else
-    (void) devidx;
 #endif
 
     if (value < 0)  { if (value < -js_nil)  x = - (real) value / js_min; }
@@ -487,12 +560,9 @@ joystick_axis_event (MotionInput* mot, uint devidx, uint axisidx, int value)
     /* A call to this better be in a mutex!*/
 static
     void
-update_object_locations (RaySpace* space, MotionInput* input,
-                         uint idx, real dt)
+update_object_motion (ObjectMotion* motion, const MotionInput* input)
 {
     real x;
-    ObjectMotion* motion;
-    motion = &racer_motions[idx];
 
     x = input->vert;
     if (!input->inv_vert) x = - x;
@@ -507,22 +577,25 @@ update_object_locations (RaySpace* space, MotionInput* input,
 
     motion->thrust = input->stride[ForwardDim];
     motion->boost = input->boost;
-
-    move_objects (space, racer_motions, dt);
 }
 
 static
     void
-update_camera_location (const MotionInput* input, real dt)
+update_camera_location (Pilot* pilot, const MotionInput* input, real dt)
 {
     uint i;
     real x;
     PointXfrm tmp_basis;
+    Point* view_origin;
+    PointXfrm* view_basis;
+
+    view_origin = &pilot->view_origin;
+    view_basis = &pilot->view_basis;
 
     x = input->vert;
     if (!input->inv_vert) x = - x;
 
-    copy_PointXfrm (&tmp_basis, &view_basis);
+    copy_PointXfrm (&tmp_basis, view_basis);
         /* /x/ comes in as the vertical rotation.*/
     trrotate_PointXfrm (&tmp_basis, UpDim, ForwardDim, x * dt * (M_PI / 2));
 
@@ -532,21 +605,21 @@ update_camera_location (const MotionInput* input, real dt)
     else
         trrotate_PointXfrm (&tmp_basis, RightDim, ForwardDim, x);
 
-    orthonormalize_PointXfrm (&view_basis, &tmp_basis);
+    orthonormalize_PointXfrm (view_basis, &tmp_basis);
 
     UFor( i, NDimensions )
     {
         Point diff;
-        scale_Point (&diff, &view_basis.pts[i],
-                     stride_magnitude * dt * input->stride[i]);
-        summ_Point (&view_origin, &view_origin, &diff);
+        scale_Point (&diff, &view_basis->pts[i],
+                     pilot->stride_magnitude * dt * input->stride[i]);
+        summ_Point (view_origin, view_origin, &diff);
     }
 
     if (NDimensions == 4)
     {
         x = (1 + input->drift) / 2;
         x = clamp_real (x, 0, 1);
-        view_origin.coords[DriftDim] = x;
+        view_origin->coords[DriftDim] = x;
     }
 }
 
@@ -554,18 +627,22 @@ update_camera_location (const MotionInput* input, real dt)
     /* Global effects!*/
 static
     void
-update_view_params (const RaySpace* space, uint idx, const MotionInput* input)
+update_view_params (Pilot* pilot,
+                    const MotionInput* input,
+                    const RaySpace* space)
 {
     real view_zenith, view_azimuthcc;
     Point veloc;
     PointXfrm basis, rotation;
+    PointXfrm* view_basis;
     const ObjectRaySpace* object;
     const ObjectMotion* motion;
 
     if (!FollowRacer)  return;
 
-    object = &space->objects[idx];
-    motion = &racer_motions[idx];
+    object = &space->objects[pilot->racer_idx];
+    motion = &racer_motions[pilot->racer_idx];
+    view_basis = &pilot->view_basis;
 
     copy_PointXfrm (&basis, &object->orientation);
 
@@ -576,20 +653,20 @@ update_view_params (const RaySpace* space, uint idx, const MotionInput* input)
     Op_Point_2010( &basis.pts[ForwardDim]
                    ,+, &basis.pts[ForwardDim]
                    ,   .002*, &veloc );
-    orthorotate_PointXfrm (&view_basis, &basis, ForwardDim);
-    copy_PointXfrm (&basis, &view_basis);
+    orthorotate_PointXfrm (view_basis, &basis, ForwardDim);
+    copy_PointXfrm (&basis, view_basis);
 
     view_zenith    = (M_PI / 2) * (1 + input->view_zenith);
     view_azimuthcc =  M_PI      * (1 + input->view_azimuthcc);
 
     spherical3_PointXfrm (&rotation, view_zenith, view_azimuthcc - M_PI);
 
-    xfrm_PointXfrm (&view_basis, &rotation, &basis);
+    xfrm_PointXfrm (view_basis, &rotation, &basis);
 
-    Op_Point_2021010( &view_origin
+    Op_Point_2021010( &pilot->view_origin
                       ,+, &object->centroid
-                      ,   +, -130*, &view_basis.pts[ForwardDim]
-                      ,       50*,  &view_basis.pts[UpDim] );
+                      ,   +, -130*, &view_basis->pts[ForwardDim]
+                      ,       50*,  &view_basis->pts[UpDim] );
 }
 
 
@@ -612,40 +689,70 @@ static gboolean grab_mouse_fn (GtkWidget* da,
     FILE* out;
     bool do_rotate = false;
     bool do_raycast = false;
+    RayCastAPriori priori;
+    Point origin, dir;
+
     const RaySpace* space;
+    Pilot* pilot;
 
     space = (RaySpace*) state;
+    pilot = &pilots[kbd_pilot_idx];
 
     out = stdout;
 
     gdk_drawable_get_size (da->window, &width, &height);
 
-    if (event->x < 0 || view_ncols < event->x ||
-        event->y < 0 || view_nrows < event->y)
+    row = event->y;
+    col = event->x;
+    if (event->y < pilot->image_start_row ||
+        event->x < pilot->image_start_col)
     {
-        puts ("Stay in the box hoser!\n");
+        fputs ("Stay in the box hoser!\n", out);
         return FALSE;
     }
 
-    row = view_nrows - event->y - 1;
-    col = event->x;
+    row -= pilot->image_start_row;
+    col -= pilot->image_start_col;
+    if (pilot->ray_image.nrows <= row ||
+        pilot->ray_image.ncols <= col)
+    {
+        fputs ("Stay in the box hoser!\n", out);
+        return FALSE;
+    }
+
+        /* Row numbering becomes bottom-to-top.*/
+    row = pilot->ray_image.nrows - row - 1;
+
+
+    printf ("row:%u col:%u\n", row, col);
 
     if      (event->button == 1)  do_rotate = true;
     else if (event->button == 3)  do_raycast = true;
 
+    if (do_rotate || do_raycast)
+    {
+        setup_RayCastAPriori (&priori,
+                              &pilot->ray_image,
+                              &pilot->view_origin,
+                              &pilot->view_basis,
+                              &space->main.box);
+
+        ray_from_RayCastAPriori (&origin, &dir,
+                                 &priori, row, col,
+                                 &pilot->ray_image);
+    }
+
     if (do_rotate)
     {
-        real vert, horz;
-            /* Our X is vertical and Y is horizontal.*/
-        vert = (2 * (real) row - view_nrows) / view_nrows;
-        horz = (2 * (real) col - view_ncols) / view_ncols;
+        PointXfrm tmp_basis;
+        copy_Point (&pilot->view_origin, &origin);
 
-        fprintf (out, "vert:%f  horz:%f\n", vert, horz);
-
-        set_rotate_view (vert, horz);
+        copy_PointXfrm (&tmp_basis, &pilot->view_basis);
+        copy_Point (&tmp_basis.pts[ForwardDim], &dir);
+        orthorotate_PointXfrm (&pilot->view_basis, &tmp_basis, ForwardDim);
 
         fputs ("basis:", out);
-        output_PointXfrm (out, &view_basis);
+        output_PointXfrm (out, &pilot->view_basis);
         fputc ('\n', out);
         needs_recast = true;
 
@@ -661,25 +768,16 @@ static gboolean grab_mouse_fn (GtkWidget* da,
 
 #endif
 
-        mouse_coords[0] = event->x_root;
-        mouse_coords[1] = event->y_root;
-        mouse_diff[0] = 0;
-        mouse_diff[1] = 0;
+        pilot->mouse_coords[0] = event->x_root;
+        pilot->mouse_coords[1] = event->y_root;
+        pilot->mouse_diff[0] = 0;
+        pilot->mouse_diff[1] = 0;
     }
     else if (do_raycast)
     {
-        RayCastAPriori priori;
         uint hit_idx = Max_uint;
         real hit_mag = Max_real;
         uint hit_objidx = Max_uint;
-        Point origin, dir;
-
-        setup_RayCastAPriori (&priori, &ray_image,
-                              &view_origin, &view_basis,
-                              &space->main.box);
-
-        ray_from_RayCastAPriori (&origin, &dir,
-                                 &priori, row, col, &ray_image);
 
         cast_nopartition (&hit_idx, &hit_mag, &hit_objidx,
                           space, &origin, &dir,
@@ -690,8 +788,9 @@ static gboolean grab_mouse_fn (GtkWidget* da,
             const ObjectRaySpace* object;
             Point isect;
             uint nodeidx, parent_nodeidx;
-            scale_Point (&isect, &dir, hit_mag);
-            summ_Point (&isect, &origin, &isect);
+            Op_Point_2010( &isect
+                           ,+, &origin
+                           ,   hit_mag*, &dir );
 
             nodeidx = find_KDTreeNode (&parent_nodeidx, &isect,
                                        space->main.tree.nodes);
@@ -755,24 +854,23 @@ static
 render_RaySpace (byte* data, RaySpace* space,
                  uint nrows, uint ncols, uint stride)
 {
-    uint row;
-
+    uint pilot_idx;
     if (needs_recast)
     {
         FILE* out = stderr;
-        PointXfrm basis;
-        Point origin;
 
-        motion_input.t1 = (real) SDL_GetTicks () / 1000;
-        if (motion_input.t0 == 0)
+        needs_recast = false;
+
+        frame_t1 = (real) SDL_GetTicks () / 1000;
+        if (frame_t0 == 0)
         {
-            motion_input.t0 = motion_input.t1;
+            frame_t0 = frame_t1;
         }
         else
         {
             real dt;
-            dt = motion_input.t1 - motion_input.t0;
-            motion_input.t0 = motion_input.t1;
+            dt = frame_t1 - frame_t0;
+            frame_t0 = frame_t1;
 
             if (ShowFrameRate)
             {
@@ -788,62 +886,111 @@ render_RaySpace (byte* data, RaySpace* space,
                 }
             }
 
-            if (FollowRacer)
-                update_object_locations (space, &motion_input, racer_idx, dt);
-            else
-                update_camera_location (&motion_input, dt);
+            UFor( pilot_idx, npilots )
+            {
+                uint racer_idx;
+                Pilot* pilot;
+
+                pilot = &pilots[pilot_idx];
+                racer_idx = pilot->racer_idx;
+
+                if (FollowRacer)
+                    update_object_motion (&racer_motions[racer_idx],
+                                          &pilot->motion_input);
+                else
+                    update_camera_location (pilot, &pilot->motion_input, dt);
+            }
+            move_objects (space, racer_motions, dt);
         }
 
         if (FollowRacer && ShowSpeed)
+        {
+            uint racer_idx;
+            racer_idx = pilots[pilot_idx].racer_idx;
             fprintf (out, "SPEED:%f\n",
                      magnitude_Point (&racer_motions[racer_idx].veloc));
+        }
 
-        update_view_params (space, racer_idx, &motion_input);
-        copy_Point (&origin, &view_origin);
-        copy_PointXfrm (&basis, &view_basis);
-        needs_recast = false;
+#ifndef DistribCompute
+            /* TODO: There should probably be direct call to update
+             *       object positions on compute nodes.
+             */
+        update_dynamic_RaySpace (space);
+#endif
 
-        if (ray_image.perspective)  ray_image.hifov = view_angle;
-        else                        ray_image.hifov = view_width;
+        UFor( pilot_idx, npilots )
+        {
+            PointXfrm basis;
+            Point origin;
+            Pilot* pilot;
+            RayImage* ray_image;
+
+            pilot = &pilots[pilot_idx];
+            ray_image = &pilot->ray_image;
+
+
+            update_view_params (pilot, &pilot->motion_input, space);
+            copy_Point (&origin, &pilot->view_origin);
+            copy_PointXfrm (&basis, &pilot->view_basis);
+
+            if (ray_image->perspective)  ray_image->hifov = pilot->view_angle;
+            else                         ray_image->hifov = pilot->view_width;
 
 #ifdef DistribCompute
-        compute_rays_to_hits (&ray_image, space, &origin, &basis);
+            compute_rays_to_hits (ray_image, space, &origin, &basis);
 #else
-        if (LightAtCamera)
-        {
-            assert (space->nlights > 0);
-            copy_Point (&space->lights[0].location, &origin);
-            space->lights[0].intensity = .5;
-        }
-        update_dynamic_RaySpace (space);
-        if (ForceFauxFishEye)
-            rays_to_hits_fish (&ray_image, space,
-                               &origin, &basis, view_angle);
-        else
-            cast_RayImage (&ray_image, space, &origin, &basis);
+            if (LightAtCamera)
+            {
+                assert (space->nlights > 0);
+                copy_Point (&space->lights[0].location, &origin);
+                space->lights[0].intensity = .5;
+            }
+            if (ForceFauxFishEye)
+                rays_to_hits_fish (ray_image, space,
+                                   &origin, &basis, pilot->view_angle);
+            else
+                cast_RayImage (ray_image, space, &origin, &basis);
 #endif
+        }
     }
 
-    assert (ray_image.pixels);
-
-    UFor( row, view_nrows )
+    UFor( pilot_idx, npilots )
     {
-        uint col;
-        const byte* pixline;
-        guint32* outline;
-        if (view_nrows - row - 1 >= nrows)  continue;
+        uint ray_row, start_row, start_col;
+        Pilot* pilot;
+        RayImage* ray_image;
 
-        pixline = &ray_image.pixels[row * 3 * view_ncols];
-        outline = (guint32*) &data[stride * (view_nrows - row - 1)];
+        pilot = &pilots[pilot_idx];
+        ray_image = &pilot->ray_image;
 
-        UFor( col, view_ncols )
+        assert (ray_image->pixels);
+        if (ray_image->nrows == 0)  continue;
+        start_row = pilot->image_start_row + ray_image->nrows - 1;
+        start_col = pilot->image_start_col;
+
+        UFor( ray_row, ray_image->nrows )
         {
-            if (col >= ncols)  break;
-            outline[col] =
-                ((guint32) 0xFF             << 24) |
-                ((guint32) pixline[3*col+0] << 16) |
-                ((guint32) pixline[3*col+1] <<  8) |
-                ((guint32) pixline[3*col+2] <<  0);
+            uint image_row, ray_col;
+            const byte* pixline;
+            guint32* outline;
+
+            image_row = start_row - ray_row;
+            if (image_row >= nrows)  continue;
+
+            pixline = &ray_image->pixels[ray_row * 3 * view_ncols];
+            outline = (guint32*) &data[image_row * stride];
+
+            UFor( ray_col, ray_image->ncols )
+            {
+                uint image_col;
+                image_col = start_col + ray_col;
+                if (image_col >= ncols)  break;
+                outline[image_col] =
+                    ((guint32) 0xFF                   << 24) |
+                    ((guint32) pixline[3*image_col+0] << 16) |
+                    ((guint32) pixline[3*image_col+1] <<  8) |
+                    ((guint32) pixline[3*image_col+2] <<  0);
+            }
         }
     }
 }
@@ -911,9 +1058,9 @@ gui_main (int argc, char* argv[], RaySpace* space)
     g_signal_connect (window, "expose-event",
                       G_CALLBACK(render_expose), space);
     g_signal_connect (window, "key-press-event",
-                      G_CALLBACK(key_press_fn), &motion_input);
+                      G_CALLBACK(key_press_fn), pilots);
     g_signal_connect (window, "key-release-event",
-                      G_CALLBACK(key_release_fn), &motion_input);
+                      G_CALLBACK(key_release_fn), pilots);
     g_signal_connect (window, "button-press-event",
                       G_CALLBACK(grab_mouse_fn), space);
     g_timeout_add (1000 / 100, update_rendering, window);
@@ -944,9 +1091,10 @@ keepalive_sdl_event_fn (Uint32 interval,  void* param)
 sdl_main (gpointer data)
 {
     SDL_TimerID timer;
-    SDL_Joystick* joystick_handle; 
+    SDL_Joystick* joysticks[NRacersMax]; 
     SDL_Event event;
     Mix_Chunk* tune = 0;
+    uint i, njoysticks;
     int ret;
     int channel = -1;
     FILE* out = stderr;
@@ -955,10 +1103,18 @@ sdl_main (gpointer data)
     pathname = (char*) data;
 
     SDL_JoystickEventState (SDL_ENABLE);
-    joystick_handle = SDL_JoystickOpen (0);
-    fprintf (stderr, "Joystick has %d buttons!\n",
-             SDL_JoystickNumButtons (joystick_handle));
+    njoysticks = SDL_NumJoysticks ();
 
+    UFor( i, njoysticks )
+    {
+        joysticks[i] = SDL_JoystickOpen (i);
+        fprintf (stderr, "Joystick %u has %d buttons!\n",
+                 i, SDL_JoystickNumButtons (joysticks[i]));
+    }
+
+    if (njoysticks > 0)  npilots = njoysticks;
+    resize_pilot_viewports (view_nrows, view_ncols);
+    g_cond_signal (pilots_initialized);
 
     ret = Mix_OpenAudio(22050, AUDIO_S16SYS, 2, 1024);
     if (ret != 0)
@@ -995,19 +1151,25 @@ sdl_main (gpointer data)
         {
             case SDL_JOYAXISMOTION:
                 {
+                    MotionInput* input;
                     SDL_JoyAxisEvent* je;
                     je = &event.jaxis;
-                    joystick_axis_event (&motion_input,
-                                         je->which, je->axis, je->value);
+                    assert ((uint)je->which < npilots);
+                    input = &pilots[je->which].motion_input;
+
+                    joystick_axis_event (input, je->axis, je->value);
                 }
                 break;
             case SDL_JOYBUTTONUP:
             case SDL_JOYBUTTONDOWN:
                 {
+                    MotionInput* input;
                     SDL_JoyButtonEvent* je;
                     je = &event.jbutton;
-                    joystick_button_event (&motion_input,
-                                           je->which, je->button,
+                    assert ((uint)je->which < njoysticks);
+                    input = &pilots[je->which].motion_input;
+
+                    joystick_button_event (input, je->button,
                                            je->state == SDL_PRESSED);
                 }
                 break;
@@ -1027,7 +1189,8 @@ sdl_main (gpointer data)
         Mix_FreeChunk (tune);
     Mix_CloseAudio();
 
-    SDL_JoystickClose (joystick_handle);
+    UFor( i, njoysticks )
+        SDL_JoystickClose (joysticks[i]);
     SDL_Quit ();
     return 0;
 }
@@ -1037,8 +1200,12 @@ int main (int argc, char* argv[])
 {
     bool good = true;
     bool call_gui = true;
+    uint i;
     RaySpace space;
     char inpathname[1024];
+    Point view_origin;
+    PointXfrm view_basis;
+    real view_angle;
 
     sprintf (inpathname, "%s", "input");
 
@@ -1095,7 +1262,6 @@ int main (int argc, char* argv[])
 
     if (FollowRacer)
     {
-        uint i;
         assert (space.nobjects <= NRacersMax);
         nracers = space.nobjects;
         UFor( i, space.nobjects )
@@ -1109,20 +1275,31 @@ int main (int argc, char* argv[])
     if (call_gui)
     {
         GThread* sdl_thread;
+        GMutex* initializing_lock;
         int ret;
-        init_RayImage (&ray_image);
-        ray_image.nrows = view_nrows;
-        ray_image.ncols = view_ncols;
-            /* ray_image.hits = AllocT( uint, 1 ); */
-            /* ray_image.mags = AllocT( real, 1 ); */
-        ray_image.pixels = AllocT( byte, 1 );
-        resize_RayImage (&ray_image);
-        ray_image.view_light = 0;
-        ray_image.color_distance_on = true;
+
+        UFor( i, NRacersMax )
+        {
+            Pilot* pilot;
+            RayImage* ray_image;
+            pilot = &pilots[i];
+            init_Pilot (pilot);
+
+            pilot->racer_idx = i;
+
+            copy_Point (&pilot->view_origin, &view_origin); 
+            copy_PointXfrm (&pilot->view_basis, &view_basis); 
+            pilot->view_angle = view_angle;
+
+            ray_image = &pilot->ray_image;
+            ray_image->view_light = 0;
+            ray_image->color_distance_on = true;
+
+        }
 
         g_thread_init (0);
+        pilots_initialized = g_cond_new ();
 
-        init_MotionInput (&motion_input);
             /* Note: SDL_INIT_VIDEO is required for some silly reason!*/
         ret = SDL_Init (SDL_INIT_AUDIO |
                         SDL_INIT_EVENTTHREAD |
@@ -1132,6 +1309,13 @@ int main (int argc, char* argv[])
         assert (ret == 0);
 
         sdl_thread = g_thread_create (sdl_main, inpathname, true, 0);
+
+        initializing_lock = g_mutex_new ();
+        g_mutex_lock (initializing_lock);
+        g_cond_wait (pilots_initialized, initializing_lock);
+        g_mutex_unlock (initializing_lock);
+        g_mutex_free (initializing_lock);
+        g_cond_free (pilots_initialized);
 
         gui_main (argc, argv, &space);
 

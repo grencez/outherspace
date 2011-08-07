@@ -56,7 +56,7 @@ cast_to_light (const RaySpace* restrict space,
                const Point* restrict dir,
                real magtolight);
 static void
-setup_ray_pixel_deltas_orthographic (Point* dir_start,
+setup_ray_pixel_deltas_orthographic (Point* origin_start,
                                      Point* row_delta,
                                      Point* col_delta,
                                      uint nrows, uint ncols,
@@ -1565,7 +1565,7 @@ rays_to_hits_fixed_plane (uint* hits, real* mags,
 
 
     void
-setup_ray_pixel_deltas_orthographic (Point* dir_start,
+setup_ray_pixel_deltas_orthographic (Point* origin_start,
                                      Point* row_delta,
                                      Point* col_delta,
                                      uint nrows, uint ncols,
@@ -1574,24 +1574,32 @@ setup_ray_pixel_deltas_orthographic (Point* dir_start,
                                      real view_width)
 {
     const uint row_dim = UpDim, col_dim = RightDim;
+    uint max_n;
     Point diff;
     real tstart, tdelta;
+    real eff_width;
 
-    copy_Point (dir_start, origin);
+    copy_Point (origin_start, origin);
 
-    tdelta = view_width / nrows;
-    tstart = (- view_width + tdelta) / 2;
+    if (nrows >= ncols)  max_n = nrows;
+    else                 max_n = ncols;
+
+    tdelta = view_width / max_n;
+
+
+    eff_width = (view_width * nrows) / max_n;
+    tstart = (- eff_width + tdelta) / 2;
 
     scale_Point (row_delta, &view_basis->pts[row_dim], tdelta);
     scale_Point (&diff, &view_basis->pts[row_dim], tstart);
-    summ_Point (dir_start, dir_start, &diff);
+    summ_Point (origin_start, origin_start, &diff);
 
-    tdelta = view_width / ncols;
-    tstart = (- view_width + tdelta) / 2;
+    eff_width = (view_width * ncols) / max_n;
+    tstart = (- eff_width + tdelta) / 2;
 
     scale_Point (col_delta, &view_basis->pts[col_dim], tdelta);
     scale_Point (&diff, &view_basis->pts[col_dim], tstart);
-    summ_Point (dir_start, dir_start, &diff);
+    summ_Point (origin_start, origin_start, &diff);
 }
 
 
@@ -1657,8 +1665,16 @@ setup_ray_pixel_deltas_perspective (Point* dir_start,
     zero_Point (&rdelta);
     zero_Point (&cdelta);
 
-    dstart.coords[row_dim] = - halflen;
-    dstart.coords[col_dim] = - halflen;
+    if (nrows >= ncols)
+    {
+        dstart.coords[row_dim] = - halflen;
+        dstart.coords[col_dim] = - (halflen * ncols) / nrows;
+    }
+    else
+    {
+        dstart.coords[row_dim] = - (halflen * nrows) / ncols;
+        dstart.coords[col_dim] = - halflen;
+    }
     dstart.coords[dir_dim] = 1;
 
     rdelta.coords[row_dim] = -2 * dstart.coords[row_dim] / nrows;
