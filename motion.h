@@ -16,7 +16,7 @@ struct object_motion_struct
 {
     real mass;
     Point veloc;
-    tristate thrust;
+    real thrust;
     bool boost;
     real rots[N2DimRotations];
     bool collide;
@@ -27,6 +27,8 @@ struct object_motion_struct
     real hover_height;
     real escape_height;
     Point track_normal;
+    uint laps;
+    uint checkpoint_idx;
 };
 
 void
@@ -34,7 +36,8 @@ init_ObjectMotion (ObjectMotion* motion, const ObjectRaySpace* object);
 void
 rotate_object (ObjectMotion* motion, uint xdim, uint ydim, real angle);
 void
-move_objects (RaySpace* space, ObjectMotion* motions, real dt);
+move_objects (RaySpace* space, ObjectMotion* motions, real dt,
+              uint ncheckplanes, const Plane* checkplanes);
 
 #ifndef __OPENCL_VERSION__
 #ifdef INCLUDE_SOURCE

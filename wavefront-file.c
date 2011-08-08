@@ -154,15 +154,15 @@ readin_wavefront (Scene* scene, const char* pathname, const char* filename)
             good = false;
 
             line = &line[1];
-            line = parse_face_field (&elem.pts[0], &elem.txpts[0],
+            line = parse_face_field (&elem.verts[0], &elem.txpts[0],
                                      &elem.vnmls[0], line);
-            line = parse_face_field (&elem.pts[1], &elem.txpts[1],
+            line = parse_face_field (&elem.verts[1], &elem.txpts[1],
                                      &elem.vnmls[1], line);
 
             if (line) while (true)
             {
                 SceneElement* tri_elt;
-                line = parse_face_field (&elem.pts[2], &elem.txpts[2],
+                line = parse_face_field (&elem.verts[2], &elem.txpts[2],
                                          &elem.vnmls[2], line);
                 if (line)  good = true;
                 else       break;
@@ -171,7 +171,7 @@ readin_wavefront (Scene* scene, const char* pathname, const char* filename)
                 copy_SceneElement (tri_elt, &elem);
                 app_SList (&elemlist, tri_elt);
 
-                elem.pts[1] = elem.pts[2];
+                elem.verts[1] = elem.verts[2];
                 elem.txpts[1] = elem.txpts[2];
             }
             if (!good)
@@ -242,7 +242,7 @@ readin_wavefront (Scene* scene, const char* pathname, const char* filename)
             UFor( pi, nverts )
             {
                 uint vi;
-                vi = elem->pts[pi];
+                vi = elem->verts[pi];
                 if (vi >= scene->nverts)
                 {
                     fprintf (stderr, "Bad vertex:%u\n", vi);

@@ -45,7 +45,9 @@ struct motion_input_struct
     real vert;
     real horz;
     real drift;
-    tristate stride[NDimensions];
+    real stride[NDimensions];
+    real lthrust;
+    real rthrust;
     real view_azimuthcc;
     real view_zenith;
     bool boost;
@@ -68,12 +70,19 @@ struct pilot_struct
     real view_angle;
     real view_width;
 
+        /* Offsets from racer centroid when stationary.*/
+    real up_offset;
+    real forward_offset;
+
         /* Not sure if these will be used evar.*/
     uint mouse_coords[2];
     uint mouse_diff[2];
 };
 
     /* Global state changes.*/
+static uint ncheckplanes = 0;
+static Plane* checkplanes;
+static Point* checkpoints;
 static uint nracers = 0;
 static uint npilots = 1;
 static uint kbd_pilot_idx = 0;
@@ -99,6 +108,8 @@ init_MotionInput (MotionInput* mot)
     mot->horz = 0;
     mot->drift = 0;
     UFor( i, NDimensions )  mot->stride[i] = 0;
+    mot->lthrust = 0;
+    mot->rthrust = 0;
     mot->boost = false;
     mot->inv_vert = true;
     mot->use_roll = false;
@@ -116,6 +127,8 @@ init_Pilot (Pilot* p)
     p->stride_magnitude = 10;
     p->view_angle = 2 * M_PI / 3;
     p->view_width = 100;
+    p->up_offset = 30;
+    p->forward_offset = -130;
 }
 
 static
@@ -185,6 +198,7 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer data)
     tristate roll = 0;
     tristate stride = 0;
     tristate turn = 0;
+    tristate camera_offset = 0;
     tristate view_angle_change = 0;
     tristate resize = 0;
     tristate view_light_change = 0;
@@ -224,14 +238,24 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer data)
     switch (event->keyval)
     {
         case GDK_Up:
-            if (shift_mod) { dim = UpDim;  stride = 1; }
-            else if (FollowRacer) { dim = UpDim;  turn = 1; }
+            if (FollowRacer)
+            {
+                if (shift_mod) { dim = UpDim;  camera_offset = 1; }
+                else if (ctrl_mod) { dim = ForwardDim;  camera_offset = 1; }
+                else { dim = UpDim;  turn = 1; }
+            }
+            else if (shift_mod) { dim = UpDim;  stride = 1; }
             else if (ctrl_mod) { dim = UpDim;  turn = 1; }
             else { dim = ForwardDim;  stride = 1; }
             break;
         case GDK_Down:
-            if (shift_mod) { dim = UpDim;  stride = -1; }
-            else if (FollowRacer) { dim = UpDim;  turn = -1; }
+            if (FollowRacer)
+            {
+                if (shift_mod) { dim = UpDim;  camera_offset = -1; }
+                else if (ctrl_mod) { dim = ForwardDim;  camera_offset = -1; }
+                else { dim = UpDim;  turn = -1; }
+            }
+            else if (shift_mod) { dim = UpDim;  stride = -1; }
             else if (ctrl_mod) { dim = UpDim;  turn = -1; }
             else { dim = ForwardDim;  stride = -1; }
             break;
@@ -310,6 +334,13 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer data)
             ray_image->view_light -= diff;;
 
         fprintf (out, "view_light:%f\n", ray_image->view_light);
+    }
+    else if (camera_offset != 0)
+    {
+        if (dim == UpDim)
+            pilot->up_offset += stride_magnitude * (real) camera_offset;
+        if (dim == ForwardDim)
+            pilot->forward_offset += stride_magnitude * (real) camera_offset;
     }
     else if (stride != 0 && FollowRacer)
     {
@@ -541,8 +572,7 @@ joystick_axis_event (MotionInput* mot, uint axisidx, int value)
     real x = 0;
 #if 0
     FILE* out = stderr;
-    fprintf (out, "\rdevidx:%u  axisidx:%u  value:%d",
-             devidx, axisidx, value);
+    fprintf (out, "\raxisidx:%u  value:%d", axisidx, value);
 #endif
 
     if (value < 0)  { if (value < -js_nil)  x = - (real) value / js_min; }
@@ -550,9 +580,10 @@ joystick_axis_event (MotionInput* mot, uint axisidx, int value)
 
     if (axisidx == 0)  mot->horz = -x;
     if (axisidx == 1)  mot->vert = -x;
-    if (axisidx == 2)  mot->drift = x;
+    if (axisidx == 2)  mot->lthrust = clamp_real ((x+1)/2, 0, 1);
     if (axisidx == 3)  mot->view_azimuthcc = -x;
     if (axisidx == 4)  mot->view_zenith = -x;
+    if (axisidx == 5)  mot->rthrust = clamp_real ((x+1)/2, 0, 1);
 }
 
 
@@ -576,6 +607,8 @@ update_object_motion (ObjectMotion* motion, const MotionInput* input)
         rotate_object (motion, RightDim, ForwardDim, x);
 
     motion->thrust = input->stride[ForwardDim];
+    motion->thrust += input->lthrust;
+    motion->thrust += input->rthrust;
     motion->boost = input->boost;
 }
 
@@ -624,7 +657,6 @@ update_camera_location (Pilot* pilot, const MotionInput* input, real dt)
 }
 
 
-    /* Global effects!*/
 static
     void
 update_view_params (Pilot* pilot,
@@ -632,6 +664,7 @@ update_view_params (Pilot* pilot,
                     const RaySpace* space)
 {
     real view_zenith, view_azimuthcc;
+    real vert_off, fwd_off;
     Point veloc;
     PointXfrm basis, rotation;
     PointXfrm* view_basis;
@@ -663,10 +696,13 @@ update_view_params (Pilot* pilot,
 
     xfrm_PointXfrm (view_basis, &rotation, &basis);
 
+    vert_off = pilot->up_offset;
+    fwd_off = pilot->forward_offset;
+
     Op_Point_2021010( &pilot->view_origin
                       ,+, &object->centroid
-                      ,   +, -130*, &view_basis->pts[ForwardDim]
-                      ,       50*,  &view_basis->pts[UpDim] );
+                      ,   +, fwd_off*,  &view_basis->pts[ForwardDim]
+                      ,      vert_off*, &view_basis->pts[UpDim] );
 }
 
 
@@ -848,6 +884,69 @@ render_pattern (byte* data, void* state, int height, int width, int stride)
     }
 }
 
+static
+    void
+set_checkpoint_light (PointLightSource* light,
+                      ObjectRaySpace* object,
+                      const ObjectMotion* mot,
+                      const Point* view_origin)
+{
+    uint i;
+    real mag;
+    real scale;
+    Point direct, centroid, diff;
+    Simplex elem;
+    PointXfrm tmp, raw;
+    const Plane* checkplane;
+    const Point* checkpoint;
+    
+    checkplane = &checkplanes[mot->checkpoint_idx];
+    checkpoint = &checkpoints[mot->checkpoint_idx];
+
+    diff_Point (&direct, checkpoint, view_origin);
+    mag = magnitude_Point (&direct);
+    if (mag != 0)  scale_Point (&direct, &direct, 1/mag);
+
+    scale = mag/2;
+
+    Op_s( real, NColors, light->intensity , 0 );
+    light->intensity[1] = 1;
+    Op_Point_2010( &light->location
+                   ,-, checkpoint
+                   ,   scale*, &direct );
+
+
+    assert (object->scene.nverts == NDimensions);
+
+    identity_PointXfrm (&raw);
+    copy_Point (&tmp.pts[0], &checkplane->normal);
+    orthonormalize_PointXfrm (&raw, &tmp);
+
+    scale_PointXfrm (&raw, &raw, scale);
+
+    copy_Point (&elem.pts[0], checkpoint);
+    copy_Point (&centroid, checkpoint);
+
+    UFor( i, NDimensions-1)
+    {
+        summ_Point (&elem.pts[i+1], checkpoint, &raw.pts[i+1]);
+        summ_Point (&centroid, &centroid, &elem.pts[i+1]);
+
+        if (NDimensions == 4)
+            elem.pts[i].coords[DriftDim] =
+                view_origin->coords[DriftDim];
+    }
+    
+    scale_Point (&centroid, &centroid, 1 / (real) NDimensions);
+    diff_Point (&diff, checkpoint, &centroid);
+
+    UFor( i, NDimensions )
+        summ_Point (&elem.pts[i], &elem.pts[i], &diff);
+
+    UFor( i, NDimensions )
+        copy_Point (&object->scene.verts[i], &elem.pts[i]);
+    update_nopartition_ObjectRaySpace (object);
+}
 
 static
     void
@@ -900,7 +999,24 @@ render_RaySpace (byte* data, RaySpace* space,
                 else
                     update_camera_location (pilot, &pilot->motion_input, dt);
             }
-            move_objects (space, racer_motions, dt);
+            if (FollowRacer)
+            {
+                if (ncheckplanes > 0)
+                {
+                    assert (space->nobjects > 0 &&
+                            "Need backdrop for light!");
+                        /* TODO: This is essentially a hack to remove
+                         * the checkpoint light's backdrop object from
+                         * the ray space while doing collision tests.
+                         */
+                    space->nobjects -= 1;
+                }
+                assert (space->nobjects == nracers &&
+                        "All objects must be racers.");
+                move_objects (space, racer_motions, dt,
+                              ncheckplanes, checkplanes);
+                if (ncheckplanes > 0)  space->nobjects += 1;
+            }
         }
 
         if (FollowRacer && ShowSpeed)
@@ -910,13 +1026,6 @@ render_RaySpace (byte* data, RaySpace* space,
             fprintf (out, "SPEED:%f\n",
                      magnitude_Point (&racer_motions[racer_idx].veloc));
         }
-
-#ifndef DistribCompute
-            /* TODO: There should probably be direct call to update
-             *       object positions on compute nodes.
-             */
-        update_dynamic_RaySpace (space);
-#endif
 
         UFor( pilot_idx, npilots )
         {
@@ -943,8 +1052,16 @@ render_RaySpace (byte* data, RaySpace* space,
             {
                 assert (space->nlights > 0);
                 copy_Point (&space->lights[0].location, &origin);
-                space->lights[0].intensity = .5;
+                Op_s( real, NColors, space->lights[0].intensity , .5 );
             }
+            if (ncheckplanes > 0)
+            {
+                set_checkpoint_light (&space->lights[space->nlights-1],
+                                      &space->objects[space->nobjects-1],
+                                      &racer_motions[pilot->racer_idx],
+                                      &pilot->view_origin);
+            }
+            update_dynamic_RaySpace (space);
             if (ForceFauxFishEye)
                 rays_to_hits_fish (ray_image, space,
                                    &origin, &basis, pilot->view_angle);
@@ -1243,7 +1360,11 @@ int main (int argc, char* argv[])
         setup_testcase_smoothsphere
 #elif 0
         setup_testcase_4d_normals
-#elif 0
+#elif 1
+        true;
+        setup_checkplanes_4d_surface (&ncheckplanes, &checkplanes,
+                                      &checkpoints);
+        good =
         setup_testcase_4d_surface
 #elif 0
         setup_testcase_manual_interp
@@ -1258,14 +1379,6 @@ int main (int argc, char* argv[])
     {
         fputs ("Setup failed!\n", stderr);
         return 1;
-    }
-
-    if (FollowRacer)
-    {
-        assert (space.nobjects <= NRacersMax);
-        nracers = space.nobjects;
-        UFor( i, space.nobjects )
-            init_ObjectMotion (&racer_motions[i], &space.objects[i]);
     }
 
 #ifdef DistribCompute
@@ -1317,12 +1430,32 @@ int main (int argc, char* argv[])
         g_mutex_free (initializing_lock);
         g_cond_free (pilots_initialized);
 
+
+        if (FollowRacer)
+        {
+            assert (space.nobjects == 0 && "All objects must be racers.");
+            nracers = npilots;
+            assert (nracers <= NRacersMax);
+            add_racers (&space, nracers, inpathname);
+            UFor( i, nracers )
+                init_ObjectMotion (&racer_motions[i], &space.objects[i]);
+        }
+
+        if (ncheckplanes > 0)
+            add_1elem_Scene_RaySpace (&space);
+
         gui_main (argc, argv, &space);
 
         g_thread_join (sdl_thread);
 #ifdef DistribCompute
         stop_computeloop ();
 #endif
+    }
+
+    if (ncheckplanes > 0)
+    {
+        free (checkplanes);
+        free (checkpoints);
     }
 
 #ifdef DistribCompute

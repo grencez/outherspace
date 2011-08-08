@@ -70,7 +70,7 @@ output_SceneElement (FILE* out, const Scene* scene, uint ei)
     UFor( i, NDimensions )
     {
         uint vi;
-        vi = scene->elems[ei].pts[i];
+        vi = scene->elems[ei].verts[i];
         if (i == 0)  fputc ('[', out);
         else         fputc (' ', out);
         output_Point (out, &scene->verts[vi]);
@@ -92,10 +92,29 @@ simplex_Scene (Simplex* dst, const Scene* scene, uint idx)
     elem = &scene->elems[idx];
 
     UFor( i, NDimensions )
-        vert_Scene (&dst->pts[i], scene, elem->pts[i]);
+        vert_Scene (&dst->pts[i], scene, elem->verts[i]);
 }
 
+    void
+setup_1elem_Scene (Scene* scene)
+{
+    uint i;
+    init_Scene (scene);
 
+    scene->nelems = 1;
+    scene->nverts = NDimensions;
+    scene->elems = AllocT( SceneElement, scene->nelems );
+    scene->verts = AllocT( Point, scene->nverts );
+
+    init_SceneElement (&scene->elems[0]);
+
+    UFor( i, scene->nverts )
+    {
+        scene->elems[0].verts[i] = i;
+        zero_Point (&scene->verts[i]);
+        scene->verts[i].coords[i] = 1;
+    }
+}
 
     uint
 simplex_fill_count (uint k)
@@ -142,13 +161,15 @@ fill_between_simplices (SceneElement* elems,
         {
             if (j <= i)
             {
-                elem->pts[j] = a_vert_offset + a->pts[j];
-                elem->vnmls[j] = a_vnml_offset + a->vnmls[j];
+                elem->verts[j] = a_vert_offset + a->verts[j];
+                if (a_vnml_offset < Max_uint)
+                    elem->vnmls[j] = a_vnml_offset + a->vnmls[j];
             }
             if (j >= i)
             {
-                elem->pts[j+1] = b_vert_offset + b->pts[j];
-                elem->vnmls[j+1] = b_vnml_offset + b->vnmls[j];
+                elem->verts[j+1] = b_vert_offset + b->verts[j];
+                if (b_vnml_offset < Max_uint)
+                    elem->vnmls[j+1] = b_vnml_offset + b->vnmls[j];
             }
         }
     }
@@ -193,8 +214,8 @@ full_fill_between_simplices (SceneElement* dst_elems,
     assert (k == 3);
     if (NDimensions != 4 || k != 3)  return 0;
 
-    UFor( i, k )  vertidcs[0+i] = a_vert_offset + a->pts[i];
-    UFor( i, k )  vertidcs[k+i] = b_vert_offset + b->pts[i];
+    UFor( i, k )  vertidcs[0+i] = a_vert_offset + a->verts[i];
+    UFor( i, k )  vertidcs[k+i] = b_vert_offset + b->verts[i];
     UFor( i, k )
     {
         vnmlidcs[0+i] = a->vnmls[i];
@@ -222,7 +243,7 @@ full_fill_between_simplices (SceneElement* dst_elems,
             vi = elems[i][j];
             v = vertidcs[vi];
 
-            elem->pts[j] = v;
+            elem->verts[j] = v;
             elem->vnmls[j] = vnmlidcs[vi];
 
             copy_Point (&simplex.pts[j], &verts[v]);
@@ -285,8 +306,8 @@ interpolate_Scene (Scene* dst, uint k, uint nscenes, const Scene* scenes)
         {
                 /* All elements' vertex numbers are identical.*/
             UFor( pi, k )
-                assert (scenes[0].elems[ei].pts[pi] ==
-                        scenes[i+1].elems[ei].pts[pi]);
+                assert (scenes[0].elems[ei].verts[pi] ==
+                        scenes[i+1].elems[ei].verts[pi]);
 
                 /* Don't feel like interpolating materials.*/
             assert (scenes[0].elems[ei].material ==
@@ -588,7 +609,7 @@ condense_Scene (Scene* scene)
             UFor( dim, NDimensions )
             {
                 uint* e;
-                e = &scene->elems[i].pts[dim];
+                e = &scene->elems[i].verts[dim];
                 assert (*e < prev_nverts);
                 *e = jumps[*e];
             }
@@ -625,7 +646,7 @@ condense_Scene (Scene* scene)
         {
             uint dim;
             UFor( dim, NDimensions )
-                tmp_pts[i].coords[dim] = scene->elems[i].pts[dim];
+                tmp_pts[i].coords[dim] = scene->elems[i].verts[dim];
         }
         printf ("Before nelems:%u\n", scene->nelems);
         scene->nelems = condense_Points (scene->nelems, tmp_pts,
@@ -641,7 +662,7 @@ condense_Scene (Scene* scene)
             dst = &scene->elems[i];
 
             UFor( dim, NDimensions )
-                dst->pts[dim] = src->pts[dim];
+                dst->verts[dim] = src->verts[dim];
         }
         ResizeT( SceneElement, scene->elems, scene->nelems );
         free (tmp_pts);

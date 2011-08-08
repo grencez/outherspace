@@ -37,7 +37,7 @@ struct object_ray_space_struct
 struct point_light_source_struct
 {
     Point location;
-    real intensity;
+    real intensity[NColors];
     bool diffuse;
 };
 

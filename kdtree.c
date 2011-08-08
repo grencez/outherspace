@@ -678,6 +678,28 @@ static int uintcmp (const void* a, const void* b)
     return 0;
 }
 
+    /* Builds a tree of depth zero - everything in the root node.*/
+    void
+build_trivial_KDTree (KDTree* tree, uint nelems, const BoundingBox* box)
+{
+    KDTreeLeaf* leaf;
+
+    tree->nnodes = 1;
+    tree->nodes = AllocT( KDTreeNode, tree->nnodes );
+
+        /* Set the single leaf node to hold everything.*/
+    tree->nodes[0].split_dim = NDimensions;
+    leaf = &tree->nodes[0].as.leaf;
+    copy_BoundingBox (&leaf->box, box);
+    leaf->nelems = nelems;
+    leaf->elemidcs = 0;
+
+        /* Set element indices to be [0,..,n-1].*/
+    tree->nelemidcs = nelems;
+    tree->elemidcs = AllocT( uint, tree->nelemidcs );
+    fill_minimal_unique (tree->elemidcs, tree->nelemidcs);
+}
+
     void
 build_KDTree (KDTree* tree, KDTreeGrid* grid, const Simplex* elems)
 {

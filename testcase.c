@@ -178,13 +178,35 @@ read_racer (Scene* scene, uint idx, const char* pathname)
     return good;
 }
 
-static
+    void
+add_1elem_Scene_RaySpace (RaySpace* space)
+{
+    uint i;
+    ObjectRaySpace* object;
+
+    i = space->nobjects;
+    if (i == 0)  space->objects = 0;
+    space->nobjects += 1;
+    ResizeT( ObjectRaySpace, space->objects, space->nobjects );
+
+    object = &space->objects[i];
+    init_ObjectRaySpace (object);
+    setup_1elem_Scene (&object->scene);
+    init_filled_ObjectRaySpace (object);
+}
+
     bool
-setup_racers (RaySpace* space, const char* pathname)
+add_racers (RaySpace* space, uint nracers, const char* pathname)
 {
     uint i;
     bool good = true;
-    UFor( i, space->nobjects )
+
+    i = space->nobjects;
+    if (i == 0)  space->objects = 0;
+    space->nobjects += nracers;
+    ResizeT( ObjectRaySpace, space->objects, space->nobjects );
+
+    for (; i < space->nobjects; ++i)
     {
         ObjectRaySpace* object;
         object = &space->objects[i];
@@ -198,6 +220,7 @@ setup_racers (RaySpace* space, const char* pathname)
 
         good = read_racer (&object->scene, 0, pathname);
         if (!good)  return false;
+        init_filled_ObjectRaySpace (object);
     }
     return good;
 }
@@ -214,7 +237,6 @@ setup_testcase_track (RaySpace* space,
     identity_PointXfrm (view_basis);
     zero_Point (view_origin);
 
-    space->nobjects = 2;
     space->objects = AllocT( ObjectRaySpace, space->nobjects );
 
     if (NDimensions == 3)
@@ -242,9 +264,6 @@ setup_testcase_track (RaySpace* space,
     good = add_sky_texture (space, pathname, "gradient-sky.ppm");
     if (!good)  return false;
 
-    good = setup_racers (space, pathname);
-    if (!good)  return false;
-
     init_filled_RaySpace (space);
 
     *view_angle = 2 * M_PI / 3,
@@ -263,15 +282,15 @@ setup_testcase_track (RaySpace* space,
 
 #if 1
     setup_camera_light (space, view_origin);
-    space->lights[0].intensity = .5;
+    Op_s( real, NColors, space->lights[0].intensity , .5 );
         /* space->lights[0].intensity = 1e6; */
 #else
     space->nlights = 2;
     space->lights = AllocT( PointLightSource, space->nlights );
     copy_Point (&space->lights[0].location, view_origin);
     copy_Point (&space->lights[1].location, &space->main.box.max);
-    space->lights[0].intensity = .5;
-    space->lights[1].intensity = .1;
+    Op_s( real, NColors, space->lights[0].intensity , .5 );
+    Op_s( real, NColors, space->lights[1].intensity , .1 );
 #endif
     return good;
 }
@@ -319,7 +338,7 @@ setup_testcase_bouncethru (RaySpace* space,
     space->lights[0].location.coords[0] = -61.2664;
     space->lights[0].location.coords[1] = 51.928;
     space->lights[0].location.coords[2] = -84.2657;
-    space->lights[0].intensity = .5;
+    Op_s( real, NColors, space->lights[0].intensity , .5 );
 
     return good;
 }
@@ -385,7 +404,7 @@ setup_testcase_smoothsphere (RaySpace* space,
     space->lights[0].location.coords[0] = -61.2664;
     space->lights[0].location.coords[1] = 51.928;
     space->lights[0].location.coords[2] = -84.2657;
-    space->lights[0].intensity = 1;
+    Op_s( real, NColors, space->lights[0].intensity , 1 );
 
     return good;
 }
@@ -469,7 +488,7 @@ setup_testcase_4d_normals (RaySpace* space,
         uint j;
         init_SceneElement (&scene->elems[i]);
         UFor( j, NDimensions )
-            scene->elems[i].pts[j] = vertidcs[i][j];
+            scene->elems[i].verts[j] = vertidcs[i][j];
     }
 
     scene->nverts = 8;
@@ -585,8 +604,8 @@ setup_testcase_manual_interp (RaySpace* space,
 
         UFor( j, ndims )
         {
-            elem->pts[j] = elems[i][j];
-            copy_Point (&simplex.pts[j], &scene->verts[elem->pts[j]]);
+            elem->verts[j] = elems[i][j];
+            copy_Point (&simplex.pts[j], &scene->verts[elem->verts[j]]);
         }
 
         if (degenerate_Simplex (&simplex))
@@ -676,6 +695,54 @@ setup_testcase_sphere (RaySpace* space,
     return good;
 }
 
+    void
+setup_checkplanes_4d_surface (uint* ret_nplanes, Plane** ret_planes,
+                              Point** ret_points)
+{
+    uint i;
+    const uint nplanes = 7;
+    real offset_points[7][3] =
+    {    { -77.9152, -3784.31, 362.3 }
+        ,{ 239.16, -389.33, -2695.52 }
+        ,{ 190.418, 3502.14, -3374.04 }
+        ,{ 430.915, 3893.13, -726.384 }
+        ,{ -95.5732, -3398.58, 3788.98 }
+        ,{ 162.919, 3793.6, 3101.59 }
+        ,{ 10.2566, 3914.34, 3280.88 }
+    };
+    real normals[7][3] =
+    {    {  -0.177766, 0.490335, 0.853212 }
+        ,{  -0.180094, 0.90385, 0.3881 }
+        ,{ 0.00527882, -0.968351, 0.249537 }
+        ,{  0.0208925, -0.178936, -0.983639 }
+        ,{  -0.280181, 0.889428, -0.361133 }
+        ,{ -0.0498265, 0.992046, 0.115591 }
+        ,{  -0.142098, -0.00440444, 0.989843 }
+    };
+    Plane* planes;
+    Point* points;
+
+    planes = AllocT( Plane, nplanes );
+    points = AllocT( Point, nplanes );
+
+    UFor( i, nplanes )
+    {
+        Point normal, point;
+        zero_Point (&normal);
+        zero_Point (&point);
+
+        Op_0( real, 3, normal.coords , normals[i] );
+        Op_0( real, 3, point.coords , offset_points[i] );
+
+        copy_Point (&points[i], &point);
+        init_Plane (&planes[i], &normal, &point);
+    }
+
+    *ret_nplanes = nplanes;;
+    *ret_planes = planes;
+    *ret_points = points;
+}
+
     bool
 setup_testcase_4d_surface (RaySpace* space,
                            Point* view_origin,
@@ -690,7 +757,6 @@ setup_testcase_4d_surface (RaySpace* space,
     identity_PointXfrm (view_basis);
     zero_Point (view_origin);
 
-    space->nobjects = 1;
     space->objects = AllocT( ObjectRaySpace, space->nobjects );
 
     zero_Point (&new_centroid);
@@ -713,9 +779,6 @@ setup_testcase_4d_surface (RaySpace* space,
     recenter_Scene (&space->main.scene, &new_centroid);
 
     good = add_sky_texture (space, pathname, "iras.ppm");
-    if (!good)  return false;
-
-    good = setup_racers (space, pathname);
     if (!good)  return false;
 
     init_filled_RaySpace (space);
@@ -746,7 +809,7 @@ setup_testcase_4d_surface (RaySpace* space,
         zero_Point (&p);
         p.coords[0] = 5000;
         setup_camera_light (space, &p);
-        space->lights[0].intensity = .8;
+        Op_s( real, NColors, space->lights[0].intensity , .5 );
         space->lights[0].diffuse = true;
     }
     else
@@ -760,7 +823,9 @@ setup_testcase_4d_surface (RaySpace* space,
         box.max.coords[UpDim] += 2000;
 
         init_PointLightSource (&light);
-        light.intensity /= exp2_uint (NDimensions-1);
+        Op_20s( real, NColors, light.intensity
+                ,/, light.intensity
+                ,   exp2_uint (NDimensions-1) );
         light.diffuse = true;
 
         setup_box_lights (space, &light, &box);
@@ -829,7 +894,7 @@ random_Scene (Scene* scene, uint nelems, const BoundingBox* box)
         offset = i * NDimensions;
         init_SceneElement (&scene->elems[i]);
         UFor( pi, NDimensions )
-            scene->elems[i].pts[pi] = pi + offset;
+            scene->elems[i].verts[pi] = pi + offset;
     }
 }
 
@@ -838,7 +903,7 @@ random_Scene (Scene* scene, uint nelems, const BoundingBox* box)
 setup_camera_light (RaySpace* space, const Point* origin)
 {
     assert (space->nlights == 0);
-    space->nlights = 1;
+    space->nlights = 2;
     space->lights = AllocT( PointLightSource, space->nlights );
     init_PointLightSource (&space->lights[0]);
     copy_Point (&space->lights[0].location, origin);

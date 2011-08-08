@@ -110,7 +110,7 @@ init_ObjectRaySpace (ObjectRaySpace* space)
 init_PointLightSource (PointLightSource* light)
 {
     zero_Point (&light->location);
-    light->intensity = 1;
+    Op_s( real, NColors, light->intensity , 1 );
     light->diffuse = false;
 }
 
@@ -118,7 +118,7 @@ init_PointLightSource (PointLightSource* light)
 copy_PointLightSource (PointLightSource* dst, const PointLightSource* src)
 {
     copy_Point (&dst->location, &src->location);
-    dst->intensity = src->intensity;
+    Op_0( real, NColors, dst->intensity , src->intensity );
     dst->diffuse = src->diffuse;
 }
 
@@ -131,17 +131,14 @@ init_filled_RaySpace (RaySpace* space)
         init_filled_ObjectRaySpace (&space->objects[i]);
 }
 
+static
     void
-init_filled_ObjectRaySpace (ObjectRaySpace* space)
+update_internal_transformed_ObjectRaySpace (ObjectRaySpace* space)
 {
     uint ei;
     const Scene* scene;
     scene = &space->scene;
-
     init_BoundingBox (&space->box, scene->nverts, scene->verts);
-
-    space->nelems = scene->nelems;
-    space->elems = AllocT( Simplex, space->nelems );
 
     UFor( ei, space->nelems )
     {
@@ -155,13 +152,12 @@ init_filled_ObjectRaySpace (ObjectRaySpace* space)
         UFor( pi, NDimensions )
         {
             uint vi;
-            vi = elem->pts[pi];
+            vi = elem->verts[pi];
             assert (vi < scene->nverts);
             copy_Point (&tri->pts[pi], &scene->verts[vi]);
         }
     }
 
-    space->simplices = AllocT( BarySimplex, space->nelems );
     UFor( ei, space->nelems )
     {
         Simplex raw;
@@ -171,9 +167,38 @@ init_filled_ObjectRaySpace (ObjectRaySpace* space)
         if (!good)  printf ("ei:%u\n", ei);
         assert (good);
     }
+}
 
-    partition_ObjectRaySpace (space);
-    partition_verts_ObjectRaySpace (space);
+    void
+init_nopartition_ObjectRaySpace (ObjectRaySpace* object)
+{
+    object->nelems = object->scene.nelems;
+    object->elems = AllocT( Simplex, object->nelems );
+    object->simplices = AllocT( BarySimplex, object->nelems );
+
+    update_internal_transformed_ObjectRaySpace (object);
+
+    build_trivial_KDTree (&object->tree, object->nelems, &object->box);
+}
+
+    void
+update_nopartition_ObjectRaySpace (ObjectRaySpace* object)
+{
+    update_internal_transformed_ObjectRaySpace (object);
+    copy_BoundingBox (&object->tree.nodes[0].as.leaf.box, &object->box);
+}
+
+    void
+init_filled_ObjectRaySpace (ObjectRaySpace* object)
+{
+    object->nelems = object->scene.nelems;
+    object->elems = AllocT( Simplex, object->nelems );
+    object->simplices = AllocT( BarySimplex, object->nelems );
+
+    update_internal_transformed_ObjectRaySpace (object);
+
+    partition_ObjectRaySpace (object);
+    partition_verts_ObjectRaySpace (object);
 }
 
     void
@@ -278,7 +303,7 @@ init_Scene_KDTreeGrid (KDTreeGrid* grid, const Scene* scene,
         UFor( pi, NDimensions )
         {
             const Point* p;
-            p = &scene->verts[elem->pts[pi]];
+            p = &scene->verts[elem->verts[pi]];
             UFor( dim, NDimensions )
             {
                 assert (inside_BoundingBox (box, p));
@@ -518,7 +543,7 @@ map_isect_height (Point* ret_isect,
         Plane plane;
         assert (elem->vnmls[i] != Max_uint);
         copy_Point (&plane.normal, &vnmls[elem->vnmls[i]]);
-        plane.offset = - dot_Point (&plane.normal, &verts[elem->pts[i]]);
+        plane.offset = - dot_Point (&plane.normal, &verts[elem->verts[i]]);
         proj_Plane (&tmp, isect, &plane);
         Op_Point_2010( &tmp_isect
                        ,+, &tmp_isect
@@ -844,7 +869,10 @@ fill_pixel (real* ret_colors,
         bool transparent = false;
         bool reflective = false;
         Point isect, refldir;
-        real dscale = 0, sscale = 0;
+        real dscale[NColors], sscale[NColors];
+
+        UFor( i, NColors )
+            dscale[i] = sscale[i] = 0;
 
         scale_Point (&refldir, &normal, 2 * cos_normal);
         summ_Point (&refldir, dir, &refldir);
@@ -886,12 +914,12 @@ fill_pixel (real* ret_colors,
                 if (cast_to_light (space, &tmp_origin, &tolight,
                                    offset_magtolight))
                 {
-                    real intensity;
-                    intensity = light->intensity;
-                        /* intensity *= 1 / (magtolight * magtolight); */
+                        /* real dist_factor *= 1 / (magtolight * magtolight); */
 
                         /* Add diffuse portion.*/
-                    dscale += tscale * intensity;
+                    Op_2010( real, NColors, dscale
+                             ,+, dscale
+                             ,   tscale*, light->intensity );
 
                         /* Specular */
                     if (!light->diffuse && material)
@@ -901,7 +929,7 @@ fill_pixel (real* ret_colors,
                         if (dot > 0)
                         {
                             tscale = pow (dot, material->shininess);
-                            sscale += tscale;
+                            Op_10( real, NColors, sscale ,tscale+, sscale );
                         }
                     }
                 }
@@ -932,7 +960,7 @@ fill_pixel (real* ret_colors,
                 if (specular > 0)  reflective = true;
             }
 
-            tscale = ambient + diffuse * dscale + specular * sscale;
+            tscale = ambient + diffuse * dscale[i] + specular * sscale[i];
             if (material && material->opacity < 1)
             {
                 transparent = true;

@@ -63,6 +63,8 @@ init_ObjectMotion (ObjectMotion* motion, const ObjectRaySpace* object)
     motion->escape_height = 5 * motion->hover_height;
     zero_Point (&motion->track_normal);
     motion->track_normal.coords[0] = 1;
+    motion->laps = 0;
+    motion->checkpoint_idx = 0;
 }
 
     void
@@ -76,15 +78,21 @@ rotate_object (ObjectMotion* motion, uint xdim, uint ydim, real angle)
 }
 
     void
-move_objects (RaySpace* space, ObjectMotion* motions, real dt)
+move_objects (RaySpace* space, ObjectMotion* motions, real dt,
+              uint ncheckplanes, const Plane* checkplanes)
 {
     const uint nincs = 10;
     real inc;
     uint i, nobjects;
+    Point* prev_centroids;
     BitString* collisions;
     Point* refldirs;
 
     nobjects = space->nobjects;
+    prev_centroids = AllocT( Point, nobjects );
+
+    UFor( i, nobjects )
+        copy_Point (&prev_centroids[i], &space->objects[i].centroid);
 
     i = 1 + space->nobjects;
     i *= i;
@@ -105,10 +113,39 @@ move_objects (RaySpace* space, ObjectMotion* motions, real dt)
 
     UFor( i, nobjects )
     {
-        zero_rotations (&motions[i]);
-        motions[i].thrust = 0;
+        ObjectMotion* mot;
+        mot = &motions[i];
+
+        zero_rotations (mot);
+        mot->thrust = 0;
+
+        if (ncheckplanes > 0)
+        {
+            uint idx;
+            const Point* prev_centroid;
+            const Point* centroid;
+            prev_centroid = &prev_centroids[i];
+            centroid = &space->objects[i].centroid;
+            idx = mot->checkpoint_idx;
+
+                /* See which checkplanes are passed.*/
+            while ((0 > distance_Plane (&checkplanes[idx], prev_centroid)) ==
+                   (0 < distance_Plane (&checkplanes[idx], centroid)))
+            {
+                FILE* out = stderr;
+                fprintf (out, "Racer:%u passed checkplane:%u.\n", i, idx);
+                idx = incmod_uint (idx, 1, ncheckplanes);
+                if (idx == 0)
+                {
+                    mot->laps += 1;
+                    fprintf (out, "Racer:%u gets lap::%u.\n", i, mot->laps);
+                }
+            }
+            mot->checkpoint_idx = idx;
+        }
     }
 
+    free (prev_centroids);
     free_BitString (collisions);
     free (refldirs);
 }
@@ -319,7 +356,7 @@ apply_thrust (Point* veloc,
     Point proj, orth, tmp;
     PointXfrm basis;
 
-    if (motion->boost)  vthrust = 2000;
+    if (motion->boost)  vthrust *= 2;
 
     vthrust *= motion->thrust;
 

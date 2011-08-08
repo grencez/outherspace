@@ -9,7 +9,7 @@
 
 struct scene_element_struct
 {
-    uint pts[NDimensions];
+    uint verts[NDimensions];
     uint vnmls[NDimensions];
     uint txpts[NDimensions];
     uint material;
@@ -50,6 +50,8 @@ output_SceneElement (FILE* out, const Scene* scene, uint ei);
 void vert_Scene (Point* dst, const Scene* scene, uint idx);
 void
 simplex_Scene (Simplex* dst, const Scene* scene, uint idx);
+void
+setup_1elem_Scene (Scene* scene);
 void
 interpolate_Scene (Scene* dst, uint k, uint nscenes, const Scene* scenes);
 void
