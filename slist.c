@@ -46,6 +46,15 @@ void unroll_SList (void* dst, SList* src, size_t size)
     }
 }
 
+    void
+app_uint_SList (SList* l, uint x)
+{
+    uint* p;
+    p = AllocT( uint, 1 );
+    *p = x;
+    app_SList (l, p);
+}
+
 void app_SList (SList* l, void* data)
 {
     SListNode* node;
@@ -70,6 +79,32 @@ void app_SList (SList* l, void* data)
     assert (l->head);
     assert (l->tail);
     assert (!l->tail->cdr);
+}
+
+    void
+cat_SList (SList* dst, SList* src)
+{
+    if (!dst->tail)
+    {
+        assert (!dst->head);
+        dst->nmembs = src->nmembs;
+        dst->head = src->head;
+        dst->tail = src->tail;
+    }
+    else if (src->tail)
+    {
+        assert (src->head);
+        dst->nmembs += src->nmembs;
+        dst->tail->cdr = src->head;
+        dst->tail = src->tail;
+    }
+    else
+    {
+        assert (src->nmembs == 0);
+        assert (!src->head);
+    }
+
+    init_SList (src);
 }
 
     void*

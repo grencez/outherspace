@@ -1,7 +1,7 @@
 
 #ifndef PNM_IMAGE_H_
 #define PNM_IMAGE_H_
-#include "raytrace.h"
+#include "util.h"
 
 void output_PBM_image (const char* filename, uint nrows, uint ncols,
                        const uint* hits, uint nelems);

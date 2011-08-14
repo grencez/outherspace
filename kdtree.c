@@ -10,6 +10,10 @@
 #define MaxKDTreeDepth 50
     /* #define MaxKDTreeDepth 0 */
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
     void
 output_KDTreeGrid (FILE* out, const KDTreeGrid* grid)
 {
@@ -411,6 +415,8 @@ kdtree_cost_fn (uint split_dim, real split_pos,
 {
     const real cost_it = 1;  /* Cost of intersection test.*/
     const real cost_tr = 2;  /* Cost of traversal.*/
+    const real empty_bonus = .8;  /* Bonus for empty node!*/
+    real cost;
     BoundingBox lo_box, hi_box;
     real area;
 
@@ -419,11 +425,16 @@ kdtree_cost_fn (uint split_dim, real split_pos,
     area = surface_area_BoundingBox (box);
     if (area < Epsilon_real)  return Max_real;
 
-    return (cost_tr
+    cost = (cost_tr
             + cost_it
             * (nlo * surface_area_BoundingBox (&lo_box) +
                nhi * surface_area_BoundingBox (&hi_box))
             / area);
+
+    if (nlo == 0 || nhi == 0)
+        cost *= empty_bonus;
+
+    return cost;
 }
 
 static
@@ -551,10 +562,9 @@ determine_split (KDTreeGrid* logrid, KDTreeGrid* higrid, KDTreeGrid* grid,
 
 static
     void
-build_KDTreeNode (uint node_idx, uint parent,
-                  KDTreeGrid* grid,
-                  uint depth,
+build_KDTreeNode (KDTreeGrid* grid,
                   SList* nodelist, SList* elemidxlist,
+                  uint depth,
                   const Simplex* elems)
 {
     KDTreeGrid logrid, higrid;
@@ -579,7 +589,6 @@ build_KDTreeNode (uint node_idx, uint parent,
         copy_BoundingBox (&leaf->box, &grid->box);
 
         leaf->nelems = grid->nelems;
-        leaf->elemidcs = elemidxlist->nmembs;
 
         if (0 != leaf->nelems)
         {
@@ -592,13 +601,11 @@ build_KDTreeNode (uint node_idx, uint parent,
                 app_SList (elemidxlist, idx_ptr);
             }
         }
-        assert (leaf->elemidcs + leaf->nelems == elemidxlist->nmembs);
     }
     else
     {
         KDTreeInner* inner;
         inner = &node->as.inner;
-        inner->parent = parent;
         inner->split_pos = logrid.box.max.coords[node->split_dim];
 
 #if 0
@@ -621,16 +628,101 @@ build_KDTreeNode (uint node_idx, uint parent,
 #endif
 
 
-        inner->children[0] = nodelist->nmembs;
-        build_KDTreeNode (inner->children[0], node_idx,
-                          &logrid, 1+depth, nodelist, elemidxlist, elems);
-        inner->children[1] = nodelist->nmembs;
-        build_KDTreeNode (inner->children[1], node_idx,
-                          &higrid, 1+depth, nodelist, elemidxlist, elems);
+            /* Perform tree split.*/
+        {
+            SList tmp_nodelist, tmp_elemidxlist;
+#ifdef _OPENMP
+#pragma omp parallel sections
+#endif
+            {
 
-        cleanup_KDTreeGrid (&logrid);
-        cleanup_KDTreeGrid (&higrid);
+#ifdef _OPENMP
+#pragma omp section
+#endif
+                {
+                    build_KDTreeNode (&logrid,
+                                      nodelist, elemidxlist,
+                                      1+depth, elems);
+                    cleanup_KDTreeGrid (&logrid);
+                }
+
+#ifdef _OPENMP
+#pragma omp section
+#endif
+                {
+                    init_SList (&tmp_nodelist);
+                    init_SList (&tmp_elemidxlist);
+                    build_KDTreeNode (&higrid,
+                                      &tmp_nodelist, &tmp_elemidxlist,
+                                      1+depth, elems);
+                    cleanup_KDTreeGrid (&higrid);
+                }
+            }
+
+            cat_SList (nodelist, &tmp_nodelist);
+            cat_SList (elemidxlist, &tmp_elemidxlist);
+        }
     }
+}
+
+static
+    void
+fixup_node_indices (KDTree* tree)
+{
+    bool ascending = false;
+    uint node_idx = 0, parent_idx = 0;
+    uint node_count = 0, elemidx_count = 0;
+    KDTreeNode* nodes;
+
+    nodes = tree->nodes;
+    do
+    {
+        if (ascending)
+        {
+            KDTreeInner* inner;
+            inner = &nodes[parent_idx].as.inner;
+            if (inner->children[1] == Max_uint)
+            {
+                inner->children[1] = node_count;
+                node_idx = node_count;
+                ascending = false;
+            }
+            else
+            {
+                node_idx = parent_idx;
+                parent_idx = inner->parent;
+            }
+        }
+        else if (leaf_KDTreeNode (&nodes[node_idx]))
+        {
+            KDTreeLeaf* leaf;
+            leaf = &nodes[node_idx].as.leaf;
+
+            leaf->elemidcs = elemidx_count;
+            elemidx_count += leaf->nelems;
+
+            assert (node_idx == node_count);
+            node_count += 1;
+            ascending = true;
+        }
+        else
+        {
+            KDTreeInner* inner;
+            inner = &nodes[node_idx].as.inner;
+
+            inner->parent = parent_idx;
+            parent_idx = node_idx;
+
+            assert (node_idx == node_count);
+            node_count += 1;
+            node_idx = node_count;
+            inner->children[0] = node_idx;
+            inner->children[1] = Max_uint;
+        }
+    }
+    while (node_idx != parent_idx);
+    assert (node_count == tree->nnodes);
+    assert (elemidx_count == tree->nelemidcs);
 }
 
 static
@@ -704,13 +796,17 @@ build_trivial_KDTree (KDTree* tree, uint nelems, const BoundingBox* box)
 build_KDTree (KDTree* tree, KDTreeGrid* grid, const Simplex* elems)
 {
     uint i;
+    real t0;
     SList nodelist, elemidxlist;
+
+    t0 = monotime ();
 
     UFor( i, NDimensions )
         sort_indexed_reals (grid->intls[i], 0, 2*grid->nelems, grid->coords[i]);
+
     init_SList (&nodelist);
     init_SList (&elemidxlist);
-    build_KDTreeNode (0, 0, grid, 0, &nodelist, &elemidxlist, elems);
+    build_KDTreeNode (grid, &nodelist, &elemidxlist, 0, elems);
 
     tree->nnodes = nodelist.nmembs;
     tree->nelemidcs = elemidxlist.nmembs;
@@ -720,6 +816,8 @@ build_KDTree (KDTree* tree, KDTreeGrid* grid, const Simplex* elems)
 
     unroll_SList (tree->nodes, &nodelist, sizeof (KDTreeNode));
     unroll_SList (tree->elemidcs, &elemidxlist, sizeof (uint));
+
+    fixup_node_indices (tree);
 
     UFor( i, tree->nnodes )
     {
@@ -732,6 +830,7 @@ build_KDTree (KDTree* tree, KDTreeGrid* grid, const Simplex* elems)
         }
     }
 
+    if (false)  printf ("kdtree build:%f\n", monotime () - t0);
     assert (complete_KDTree (tree, grid->nelems));
 }
 #endif  /* #ifndef __OPENCL_VERSION__ */
@@ -768,25 +867,32 @@ find_KDTreeNode (uint* ret_parent,
     return node_idx;
 }
 
-
 static
     uint
 upnext_KDTreeNode (Point* entrance,
                    uint* ret_parent,
                    const Point* origin,
-                   const Point* dir,
+                   const Point* direct,
+                   const Point* invdirect,
                    uint node_idx,
                    __global const KDTreeNode* nodes)
 {
-    __global const BoundingBox* box;
     uint child_idx;
+    uint split_dim;
+    uint to_idx;
 
     {
         __global const KDTreeNode* node;
+        __global const BoundingBox* box;
         node = &nodes[node_idx];
         assert (leaf_KDTreeNode (node));
         box = &node->as.leaf.box;
+        hit_inner_BoundingBox (entrance, &split_dim, box, origin, direct, invdirect);
     }
+
+        /* Subtlety: Inclusive case opposite when descending tree.*/
+    if (direct->coords[split_dim] < 0)  to_idx = 0;
+    else                                to_idx = 1;
 
     child_idx = node_idx;
     assert (ret_parent);
@@ -795,42 +901,31 @@ upnext_KDTreeNode (Point* entrance,
         /* Terminating condition:
          * Backtracked from root node => no possible next leaf.
          */
-    while (node_idx != child_idx)
+    while (child_idx != 0)
     {
         __global const KDTreeNode* node;
         __global const KDTreeInner* inner;
-        tristate facing;
-        uint ni;
 
         node = &nodes[node_idx];
 
         assert (! leaf_KDTreeNode (node));
         inner = &node->as.inner;
 
-        facing = signum_real (dir->coords[node->split_dim]);
-
-            /* Subtlety: Inclusive case opposite when descending tree.*/
-        ni = (facing < 0) ? 0 : 1;
-
-            /* Ray pointing to previously visited node => keep backtracking.*/
-        if (inner->children[ni] != child_idx)
+            /* If not expected split dim or ray is pointing to
+             * previously visited node, then keep backtracking.
+             */
+        if (split_dim == node->split_dim &&
+            inner->children[to_idx] != child_idx)
         {
-            if (hit_inner_BoundingPlane (entrance,
-                                         node->split_dim, inner->split_pos,
-                                         box, origin, dir))
-            {
-                child_idx = inner->children[ni];
-                break;
-            }
+            *ret_parent = node_idx;
+            return inner->children[to_idx];
         }
 
         child_idx = node_idx;
         node_idx = inner->parent;
     }
-    *ret_parent = node_idx;
-    return child_idx;
+    return Max_uint;
 }
-
 
 static
     uint
@@ -839,14 +934,16 @@ descend_KDTreeNode (uint* ret_parent,
                     uint node_idx,
                     __global const KDTreeNode* nodes)
 {
+    uint parent;
     __global const KDTreeNode* restrict node;
     node = &nodes[node_idx];
 
+    parent = *ret_parent;
     while (! leaf_KDTreeNode (node))
     {
         __global const KDTreeInner* restrict inner;
         inner = &node->as.inner;
-        *ret_parent = node_idx;
+        parent = node_idx;
 
             /* Subtlety: Inclusive case here must be opposite of
              * inclusive case in upnext_KDTreeNode to avoid infinite
@@ -860,6 +957,7 @@ descend_KDTreeNode (uint* ret_parent,
         node = &nodes[node_idx];
     }
 
+    *ret_parent = parent;
     return node_idx;
 }
 
@@ -898,6 +996,7 @@ first_KDTreeNode (uint* ret_parent,
 next_KDTreeNode (uint* ret_parent,
                  const Point* origin,
                  const Point* dir,
+                 const Point* invdir,
                  uint node_idx,
                  __global const KDTreeNode* nodes)
 {
@@ -906,12 +1005,11 @@ next_KDTreeNode (uint* ret_parent,
     parent = *ret_parent;
 
     node_idx = upnext_KDTreeNode (&entrance, &parent,
-                                  origin, dir, node_idx, nodes);
+                                  origin, dir, invdir,
+                                  node_idx, nodes);
 
-    if (node_idx != parent)
-        node_idx = descend_KDTreeNode (&parent, &entrance, node_idx, nodes);
-    else
-        node_idx = parent = Max_uint;
+    if (node_idx == Max_uint)  return Max_uint;
+    node_idx = descend_KDTreeNode (&parent, &entrance, node_idx, nodes);
 
     *ret_parent = parent;
     return node_idx;

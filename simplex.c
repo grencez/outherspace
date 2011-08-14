@@ -527,6 +527,7 @@ hit_BarySimplex (real* restrict ret_dist,
                  const Point* restrict dir,
                  const BarySimplex* restrict elem)
 {
+#if 0
     uint i;
     real dist, dot, bcoord_sum;
     BaryPoint bpoint;
@@ -549,51 +550,103 @@ hit_BarySimplex (real* restrict ret_dist,
     {
         return false;
     }
-    
-#define NewMethod
 
-#ifdef NewMethod
-    Op_Point_21010( &isect
-                    ,+, dist*, dir
-                    ,   dot*, origin );
-#else
+# if 0
     dist *= 1 / dot;
     Op_Point_2010 ( &isect ,+, origin ,dist*, dir );
-#endif
     
     bcoord_sum = 0;
     UFor( i, NDimensions-1 )
     {
-#ifdef NewMethod
+        bpoint.coords[i] = distance_Plane (&elem->barys[i], &isect);
+        if (bpoint.coords[i] < 0)  return false;
+        bcoord_sum += bpoint.coords[i];
+        if (bcoord_sum > 1)  return false;
+    }
+    *ret_dist = dist;
+# else
+
+    
+    Op_Point_21010( &isect
+                    ,+, dist*, dir
+                    ,   dot*, origin );
+    
+    bcoord_sum = 0;
+    UFor( i, NDimensions-1 )
+    {
         bpoint.coords[i] =
             dot_Point (&elem->barys[i].normal, &isect)
             + elem->barys[i].offset * dot;
-#else
-        bpoint.coords[i] = distance_Plane (&elem->barys[i], &isect);
-#endif
         if (bpoint.coords[i] < 0)  return false;
         bcoord_sum += bpoint.coords[i];
-#ifdef NewMethod
         if (bcoord_sum > dot)  return false;
-#else
-        if (bcoord_sum > 1)  return false;
-#endif
     }
 
-#ifdef NewMethod
     dot = 1 / dot;
-#if 0
-    UFor( i, NDimensions-1 )
-        ret_bpoint->coords[i] = bpoint.coords[i] * dot;
-#endif
     *ret_dist = dist * dot;
-#else
-#if 0
-    UFor( i, NDimensions-1 )
-        ret_bpoint->coords[i] = bpoint.coords[i];
-#endif
-    *ret_dist = dist;
-#endif
+# endif
+
     return true;
+#else
+    uint i;
+    real dist, dot, bcoord_sum = 0;
+    BaryPoint bpoint;
+    Point isect;
+
+    dist = distance_Plane (&elem->plane, origin);
+    dot = - dot_Point (&elem->plane.normal, dir);
+    if (dot > 0)
+    {
+        if (dist < 0)  return false;
+
+        Op_Point_21010( &isect
+                        ,+, dist*, dir
+                        ,   dot*, origin );
+
+        UFor( i, NDimensions-1 )
+        {
+            bpoint.coords[i] =
+                dot_Point (&elem->barys[i].normal, &isect)
+                + elem->barys[i].offset * dot;
+            if (bpoint.coords[i] < 0)  return false;
+        }
+
+        UFor( i, NDimensions-1 )
+            bcoord_sum += bpoint.coords[i];
+
+        if (bcoord_sum > dot)  return false;
+    }
+    else if (dot < 0)
+    {
+        if (dist > 0)  return false;
+
+        Op_Point_21010( &isect
+                        ,+, dist*, dir
+                        ,   dot*, origin );
+
+        UFor( i, NDimensions-1 )
+        {
+            bpoint.coords[i] =
+                dot_Point (&elem->barys[i].normal, &isect)
+                + elem->barys[i].offset * dot;
+            if (bpoint.coords[i] > 0)  return false;
+        }
+
+        UFor( i, NDimensions-1 )
+            bcoord_sum += bpoint.coords[i];
+
+        if (bcoord_sum < dot)  return false;
+    }
+    else
+    {
+        return false;
+    }
+
+        /* I see no time penalty for this division.*/
+        /* *ret_dist = dist / dot; */
+    dot = 1 / dot;
+    *ret_dist = dist * dot;
+    return true;
+#endif
 }
 

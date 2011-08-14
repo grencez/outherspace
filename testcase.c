@@ -252,7 +252,14 @@ setup_testcase_track (RaySpace* space,
     if (!good)  return false;
     condense_Scene (&space->main.scene);
 
-    if (false)
+    if (true)
+    {
+        PointXfrm fix;
+        identity_PointXfrm (&fix);
+        scale_PointXfrm (&fix, &fix, 3);
+        xfrm_Scene (&space->main.scene, &fix);
+    }
+    else if (false)
     {
         PointXfrm fix;
         fixup_wavefront_Scene (&space->main.scene);
@@ -800,7 +807,11 @@ setup_testcase_4d_surface (RaySpace* space,
     view_basis->pts[2].coords[2] = -0.191601;
 #elif 1
     *view_angle = 2 * M_PI / 3;
-    view_origin->coords[UpDim] = 500;
+    view_origin->coords[UpDim] = 200;
+    view_origin->coords[RightDim] = 3000;
+    view_origin->coords[ForwardDim] = -4000;
+    view_origin->coords[3] = 700;
+    rotate_PointXfrm (view_basis, ForwardDim, UpDim, M_PI/5);
 #endif
 
     if (true)
@@ -906,7 +917,10 @@ setup_camera_light (RaySpace* space, const Point* origin)
     space->nlights = 2;
     space->lights = AllocT( PointLightSource, space->nlights );
     init_PointLightSource (&space->lights[0]);
+    init_PointLightSource (&space->lights[1]);
     copy_Point (&space->lights[0].location, origin);
+    copy_Point (&space->lights[1].location, origin);
+    Op_s( real, NColors,space->lights[1].intensity , 0 );
 }
 
     void

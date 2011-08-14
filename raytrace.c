@@ -19,6 +19,25 @@ static const bool BarycentricRayTrace = false;
 static const bool BarycentricRayTrace = true;
 #endif
 
+#define RayPacketDimSz PackSz_real
+#define RayPacketSz (RayPacketDimSz*RayPacketDimSz)
+
+struct ray_packet_struct
+{
+    Point origins[RayPacketSz];
+    Point directs[RayPacketSz];
+};
+typedef struct ray_packet_struct RayPacket;
+
+struct ray_hit_packet_struct
+{
+    uint inds[RayPacketSz];
+    uint objs[RayPacketSz];
+    real mags[RayPacketSz];
+};
+typedef struct ray_hit_packet_struct RayHitPacket;
+
+
 #ifdef TrivialMpiRayTrace
 #include <mpi.h>
 static void
@@ -619,6 +638,7 @@ splitting_plane_count (const Point* origin, const Point* direct,
     uint count = 0;
     uint node_idx, parent, destin_nodeidx;
     Point destin;
+    Point invdirect;
     const BoundingBox* box;
     bool inside_box;
 
@@ -633,6 +653,7 @@ splitting_plane_count (const Point* origin, const Point* direct,
     
     inside_box = inside_BoundingBox (box, origin);
 
+    invmul_Point (&invdirect, direct);
     node_idx = first_KDTreeNode (&parent, origin, direct,
                                  object->tree.nodes,
                                  box, inside_box);
@@ -643,7 +664,7 @@ splitting_plane_count (const Point* origin, const Point* direct,
     while (node_idx != Max_uint && node_idx != destin_nodeidx)
     {
         count += 1;
-        node_idx = next_KDTreeNode (&parent, origin, direct,
+        node_idx = next_KDTreeNode (&parent, origin, direct, &invdirect,
                                     node_idx, object->tree.nodes);
     }
     return count;
@@ -1082,7 +1103,7 @@ static
     void
 cast_ray (uint* restrict ret_hit, real* restrict ret_mag,
           const Point* restrict origin,
-          const Point* restrict dir,
+          const Point* restrict direct,
           const uint nelems,
           __global const uint* restrict elemidcs,
           __global const KDTreeNode* restrict nodes,
@@ -1091,6 +1112,7 @@ cast_ray (uint* restrict ret_hit, real* restrict ret_mag,
           __global const BoundingBox* restrict box,
           bool inside_box)
 {
+    Point invdirect;
     uint node_idx, parent = 0;
     uint hit_idx;
     real hit_mag;
@@ -1098,9 +1120,10 @@ cast_ray (uint* restrict ret_hit, real* restrict ret_mag,
     hit_idx = *ret_hit;
     hit_mag = *ret_mag;
 
+
     if (!KDTreeRayTrace)
     {
-        test_intersections (&hit_idx, &hit_mag, origin, dir,
+        test_intersections (&hit_idx, &hit_mag, origin, direct,
                             nelems, elemidcs,
                             simplices, tris, box);
         *ret_hit = hit_idx;
@@ -1108,7 +1131,9 @@ cast_ray (uint* restrict ret_hit, real* restrict ret_mag,
         return;
     }
 
-    node_idx = first_KDTreeNode (&parent, origin, dir, nodes, box, inside_box);
+    invmul_Point (&invdirect, direct);
+    node_idx = first_KDTreeNode (&parent, origin, direct,
+                                 nodes, box, inside_box);
 
     while (node_idx != Max_uint)
     {
@@ -1117,12 +1142,13 @@ cast_ray (uint* restrict ret_hit, real* restrict ret_mag,
 
         leaf = &nodes[node_idx].as.leaf;
         hit_in_leaf =
-            test_intersections (&hit_idx, &hit_mag, origin, dir,
+            test_intersections (&hit_idx, &hit_mag, origin, direct,
                                 leaf->nelems, &elemidcs[leaf->elemidcs],
                                 simplices, tris, &leaf->box);
         if (hit_in_leaf)  break;
 
-        node_idx = next_KDTreeNode (&parent, origin, dir, node_idx, nodes);
+        node_idx = next_KDTreeNode (&parent, origin, direct, &invdirect,
+                                    node_idx, nodes);
     }
 
     *ret_hit = hit_idx;
@@ -1281,6 +1307,7 @@ cast_partitioned (uint* ret_hit,
     uint node_idx, parent = 0;
     const KDTreeNode* restrict nodes;
     const uint* restrict elemidcs;
+    Point invdirect;
     uint hit_idx;
     real hit_mag;
     uint hit_object;
@@ -1293,10 +1320,11 @@ cast_partitioned (uint* ret_hit,
     nodes = space->object_tree.nodes;
     elemidcs = space->object_tree.elemidcs;
 
-    hit_idx = *ret_hit;;
+    hit_idx = *ret_hit;
     hit_mag = *ret_mag;
     hit_object = *ret_object;
 
+    invmul_Point (&invdirect, dir);
     node_idx = first_KDTreeNode (&parent, origin, dir, nodes,
                                  &space->box, inside_box);
 
@@ -1313,7 +1341,8 @@ cast_partitioned (uint* ret_hit,
                                        &elemidcs[leaf->elemidcs],
                                        space, &leaf->box);
         if (hit_in_leaf)  break;
-        node_idx = next_KDTreeNode (&parent, origin, dir, node_idx, nodes);
+        node_idx = next_KDTreeNode (&parent, origin, dir, &invdirect,
+                                    node_idx, nodes);
     }
 
     *ret_hit = hit_idx;
@@ -1825,7 +1854,6 @@ computer_triv_sync_mpi_RayImage (const RayImage* image,
 }
 #endif
 
-
     void
 setup_RayCastAPriori (RayCastAPriori* dst,
                       const RayImage* image,
@@ -1886,6 +1914,120 @@ ray_from_RayCastAPriori (Point* origin, Point* dir,
     }
 }
 
+static
+    void
+RayCastAPriori_to_RayPacket (RayPacket* pkt,
+                             const RayCastAPriori* known,
+                             uint row_off, uint col_off,
+                             const RayImage* image)
+{
+    uint i;
+    Point row_directs[RayPacketDimSz];
+    Point col_directs[RayPacketDimSz];
+    Point directs[RayPacketSz];
+
+    UFor( i, RayPacketDimSz )
+    {
+        scale_Point (&row_directs[i], &known->row_delta, i+row_off);
+        scale_Point (&col_directs[i], &known->col_delta, i+col_off);
+    }
+
+    UFor( i, RayPacketDimSz )
+    {
+        uint j;
+        UFor( j, RayPacketDimSz )
+            Op_Point_20200( &directs[j+i*RayPacketDimSz]
+                            ,+, &known->dir_start
+                            ,   +, &row_directs[i]
+                            ,      &col_directs[j] );
+    }
+
+    UFor( i, RayPacketSz )
+    {
+        if (image->perspective)
+        {
+            copy_Point (&pkt->origins[i], &known->origin);
+            normalize_Point (&pkt->directs[i], &directs[i]);
+        }
+        else
+        {
+            copy_Point (&pkt->origins[i], &directs[i]);
+            copy_Point (&pkt->directs[i], &known->origin);
+        }
+    }
+}
+
+static
+    void
+cast_packet_RayImage (RayImage* image, uint row_off, uint col_off,
+                      const RaySpace* space,
+                      const RayCastAPriori* known)
+{
+    uint i;
+    bool inside_box[RayPacketSz];
+    RayPacket pkt;
+    RayHitPacket hit;
+
+    RayCastAPriori_to_RayPacket (&pkt, known, row_off, col_off, image);
+
+    UFor( i, RayPacketSz )
+    {
+        hit.inds[i] = Max_uint;
+        hit.objs[i] = Max_uint;
+        hit.mags[i] = Max_real;
+        if (image->perspective)
+            inside_box[i] = known->inside_box;
+        else
+            inside_box[i] = inside_BoundingBox (&space->box, &pkt.origins[i]);
+    }
+
+    if (space->partition)
+        UFor( i, RayPacketSz )
+            cast_partitioned (&hit.inds[i], &hit.mags[i], &hit.objs[i],
+                              space, &pkt.origins[i], &pkt.directs[i],
+                              inside_box[i], Max_uint);
+    else
+        UFor( i, RayPacketSz )
+            cast_nopartition (&hit.inds[i], &hit.mags[i], &hit.objs[i],
+                              space, &pkt.origins[i], &pkt.directs[i],
+                              inside_box[i], Max_uint);
+
+    UFor( i, RayPacketDimSz )
+    {
+        uint row;
+        uint j;
+
+        row = i + row_off;
+        UFor( j, RayPacketDimSz )
+        {
+            uint img_idx;
+            uint pai;
+            img_idx = j + col_off + row * image->ncols;
+            pai = j+i*RayPacketDimSz;
+
+            if (image->hits)  image->hits[img_idx] = hit.inds[pai];
+            if (image->mags)  image->mags[img_idx] = hit.mags[pai];
+            if (image->pixels)
+            {
+                real colors[NColors];
+                uint color_idx;
+
+                UFor( color_idx, NColors )  colors[color_idx] = 0;
+                fill_pixel (colors,
+                            hit.inds[pai], hit.mags[pai], hit.objs[pai],
+                            image,
+                            &pkt.origins[pai],
+                            &pkt.directs[pai],
+                            space, 0);
+                UFor( color_idx, NColors )
+                {
+                    image->pixels[3*img_idx + color_idx] = (byte)
+                        clamp_real (255.5 * colors[color_idx], 0, 255.5);
+                }
+            }
+        }
+    }
+}
 
     void
 cast_partial_RayImage (RayImage* restrict image,
@@ -1907,12 +2049,20 @@ cast_partial_RayImage (RayImage* restrict image,
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic)
 #endif
-    for (i = myrank; i < row_nul; i += nprocs)
+    for (i = myrank; i < row_nul; i += RayPacketDimSz * nprocs)
     {
-        if (image->perspective)
-            cast_row_perspective (image, row_off + i, space, known);
-        else
-            cast_row_orthographic (image, row_off + i, space, known);
+#if 1
+        uint col_off;
+        for (col_off = 0; col_off < image->ncols; col_off += RayPacketDimSz)
+            cast_packet_RayImage (image, row_off + i, col_off, space, known);
+#else
+        uint j;
+        UFor( j, RayPacketDimSz )
+            if (image->perspective)
+                cast_row_perspective (image, row_off + i + j, space, known);
+            else
+                cast_row_orthographic (image, row_off + i + j, space, known);
+#endif
     }
 
 #ifdef TrivialMpiRayTrace

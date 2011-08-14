@@ -1,7 +1,7 @@
 
 #ifndef Op_Point_0
 
-#include "pack.h"
+#include "op.h"
 
 #define Op_Point_0( dst, a ) \
     Op_0( real, NDimensions, (dst)->coords, (a)->coords )
@@ -19,6 +19,10 @@
 #define Op_Point_2010( dst, f, a, g, b ) \
     Op_2010( real, NDimensions, (dst)->coords, \
              f, (a)->coords, g, (b)->coords )
+
+#define Op_Point_20200( dst, f, u, g, v, w ) \
+    Op_20200( real, NDimensions, (dst)->coords, \
+             f, (u)->coords, g, (v)->coords, (w)->coords )
 
 #define Op_Point_2100( dst, f, g, a, b ) \
     Op_2100( real, NDimensions, (dst)->coords, \

@@ -57,6 +57,17 @@ void scale_Point (Point* dst, const Point* a, real k)
     Op_Point_10( dst ,k*, a );
 }
 
+    void
+invmul_Point (Point* dst, const Point* src)
+{
+    uint i;
+    UFor( i, NDimensions )
+    {
+        if (src->coords[i] == 0)  dst->coords[i] = 0;
+        else                      dst->coords[i] = 1 / src->coords[i];
+    }
+}
+
 void zero_Point (Point* a)
 {
     uint i;
@@ -173,10 +184,12 @@ tristate facing_BoundingPlane (uint dim, real plane,
 }
 
     /* Assume ray is coming from inside BoundingBox.*/
-bool hit_inner_BoundingPlane (Point* entrance,
-                              uint dim, real plane,
-                              __global const BoundingBox* box,
-                              const Point* origin, const Point* dir)
+    bool
+hit_inner_BoundingPlane (Point* entrance,
+                         uint dim, real plane,
+                         __global const BoundingBox* box,
+                         const Point* origin,
+                         const Point* dir)
 {
     uint i;
     bool didhit = true;
@@ -240,6 +253,55 @@ bool hit_inner_BoundingPlane (Point* entrance,
         entrance->coords[i] = x;
     }
     return didhit;
+}
+
+    void
+hit_inner_BoundingBox (Point* isect,
+                       uint* ret_dim,
+                       const BoundingBox* box,
+                       const Point* origin,
+                       const Point* direct,
+                       const Point* invdirect)
+{
+    uint dim, hit_dim;
+    real planes[NDimensions];
+    real mags[NDimensions];
+    UFor( dim, NDimensions )
+    {
+        real x;
+        x = invdirect->coords[dim];
+        if (x < 0)
+        {
+            planes[dim] = box->min.coords[dim];
+            mags[dim] = (planes[dim] - origin->coords[dim]) * x;
+        }
+        else if (x > 0)
+        {
+            planes[dim] = box->max.coords[dim];
+            mags[dim] = (planes[dim] - origin->coords[dim]) * x;
+        }
+        else
+        {
+            planes[dim] = box->max.coords[dim];
+            if (origin->coords[dim] == planes[dim])
+                mags[dim] = 0;
+            else
+                mags[dim] = Max_real;
+        }
+    }
+
+    hit_dim = NDimensions-1;
+
+    UFor( dim, NDimensions-1 )
+        if (mags[dim] < mags[hit_dim])
+            hit_dim = dim;
+
+    Op_Point_2010( isect
+                   ,+, origin
+                   ,   mags[hit_dim]*, direct );
+
+    isect->coords[hit_dim] = planes[hit_dim];
+    *ret_dim = hit_dim;
 }
 
     /* Assume ray is coming from outside BoundingBox.*/

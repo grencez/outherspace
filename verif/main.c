@@ -4,6 +4,7 @@
 #include "kptree.h"
 #include "order.h"
 #include "util.h"
+#include "slist.h"
 #include "xfrm.h"
 
 #include <assert.h>
@@ -244,6 +245,67 @@ testfn_select ()
     }
 }
 
+static
+    void
+testfn_SList ()
+{
+    const uint counts[]  = { 19,  1, 0, 13,  5 };
+    const uint factors[] = { 3,   5, 7, 11, 17 };
+    SList a, b;
+    uint i, n;
+    uint* membs;
+
+    init_SList (&a);  init_SList (&b);
+
+    n = 0;
+    UFor( i, 5 )
+    {
+        uint j;
+
+        UFor( j, counts[i] )
+        {
+            if (even_uint (i))  app_uint_SList (&b, factors[i] * j);
+            else                app_uint_SList (&a, factors[i] * j);
+        }
+
+        cat_SList (&a, &b);
+
+        assert (a.nmembs == n + counts[i]);
+        assert (b.nmembs == 0);
+
+        if (counts[i] > 0)
+        {
+            j = *(uint*) aref_SList (&a, n);
+            assert (j == 0);
+        }
+        if (counts[i] > 1)
+        {
+            j = *(uint*) aref_SList (&a, n + counts[i] - 1);
+            assert (j == factors[i] * (counts[i] - 1));
+        }
+        n += counts[i];
+    }
+
+    membs = AllocT( uint, n );
+    unroll_SList (membs, &a, sizeof(uint));
+
+    UFor( i, n )
+    {
+        uint x, j, k;
+        x = membs[i];
+        j = i;
+        k = 0;
+        while (j >= counts[k])
+        {
+            j -= counts[k];
+            k += 1;
+            assert (k < 5);
+        }
+        assert (x == j * factors[k]);
+    }
+    free (membs);
+}
+
 int main ()
 {
     testfn_BitString ();
@@ -252,6 +314,7 @@ int main ()
     testfn_partition ();
     testfn_PointXfrm ();
     testfn_select ();
+    testfn_SList ();
     return 0;
 }
 

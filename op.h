@@ -81,6 +81,13 @@
     Op_200( T, N, dst, f, u, tmp_sOp_2010 ); \
 } while (0)
 
+#define Op_20200( T, N, dst, f, u, g, v, w )  do \
+{ \
+    T tmp_sOp_20200[N]; \
+    Op_200( T, N, tmp_sOp_20200, g, v, w ); \
+    Op_200( T, N, dst, f, u, tmp_sOp_20200 ); \
+} while (0)
+
 #define Op_2100( T, N, dst, f, g, u, v )  do \
 { \
     T tmp_sOp_2100[N]; \

@@ -11,7 +11,9 @@
 #include <mpi.h>
 #endif
 
-#ifdef _OPENMP
+#if defined(__INTEL_COMPILER)
+#include <time.h>
+#elif defined(_OPENMP)
 #include <omp.h>
 #else
 #include <time.h>
@@ -130,6 +132,11 @@ real monotime ()
     {
         return (real) (MPI_Wtime () - t0);
     }
+#elif defined(__INTEL_COMPILER)
+        /* TODO: ICC's omp_get_wtime() doesn't work for some reason.
+         * This gives the wrong result with OpenMP on.
+         */
+    return ((real) clock ()) / CLOCKS_PER_SEC;
 #elif defined(_OPENMP)
     return (real) omp_get_wtime ();
 #else

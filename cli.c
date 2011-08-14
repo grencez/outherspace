@@ -48,14 +48,14 @@ int main (int argc, char** argv)
                                   &view_basis, &image.hifov,
                                   pathname, "machine0.obj");
 #else
-    image.nrows = 1000;
-    image.ncols = 1000;
+    image.nrows = 1500;
+    image.ncols = 1500;
     image.pixels = AllocT( byte, image.nrows * 3 * image.ncols );
     good =
 #if 0
 #elif 0
         setup_testcase_track
-#elif 0
+#elif 1
         setup_testcase_4d_surface
 #elif 1
         setup_testcase_sphere

@@ -66,6 +66,7 @@ typedef double real;
 #define Min_real (-DBL_MAX)
 #define Small_real DBL_MIN
 #define Epsilon_real DBL_EPSILON
+#define PackSz_real 2
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -81,6 +82,7 @@ typedef float real;
 #define Min_real (-FLT_MAX)
 #define Small_real FLT_MIN
 #define Epsilon_real FLT_EPSILON
+#define PackSz_real 4
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846f
@@ -91,6 +93,8 @@ typedef float real;
 #endif
 
 #endif
+
+#define NColors 3
 
 #define Max_uint UINT_MAX
 

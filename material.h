@@ -3,8 +3,6 @@
 #define MATERIAL_H_
 #include "util.h"
 
-#define NColors 3
-
 struct texture_struct
 {
     uint nrows;

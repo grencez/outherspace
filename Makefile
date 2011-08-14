@@ -66,7 +66,7 @@ endif
 ## Go really fast.
 ifneq (,$(filter fast,$(CONFIG)))
 	CFLAGS += -O3
-	#CFLAGS += -Ofast
+	#CFLAGS += -ftree-vectorizer-verbose=2
 	#CFLAGS += -Ofast
 	#CFLAGS += -march=native
 	#CFLAGS += -ffast-math
@@ -155,7 +155,10 @@ CSources = bitstring.c \
 
 LFLAGS += -lm
 
-all: cli gui verify
+default: cli gui verify
+	# Done!
+
+all: imgdiff cli gui verify
 	# Done!
 
 # Note: OpenCL code does not function at this time, don't bother.
@@ -184,6 +187,9 @@ gui: gui.c compute.c motion.c $(CSources)
 verify: verif/main.c $(CSources)
 	$(CC) $(CFLAGS) $(DFLAGS) -I . $< -o $@ $(LFLAGS)
 
+imgdiff: imgdiff.c pnm-image.c
+	$(CC) $(CFLAGS) $(DFLAGS) -I . $< -o $@ $(LFLAGS)
+
 .PHONY: test
 test: cli
 	#valgrind --track-origins=yes ./$<
@@ -191,5 +197,5 @@ test: cli
 
 .PHONY: clean
 clean:
-	rm -f hello cli gui verify
+	rm -f hello cli gui verify imgdiff
 

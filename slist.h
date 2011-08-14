@@ -27,7 +27,9 @@ void init_SList (SList* l);
 void cleanup_SList (SList* l);
 void unroll_SList (void* dst, SList* src, size_t size);
 
+void app_uint_SList (SList* l, uint x);
 void app_SList (SList* l, void* data);
+void cat_SList (SList* dst, SList* src);
 
 void*
 aref_SList (SList* l, uint i);

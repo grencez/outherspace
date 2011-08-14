@@ -29,6 +29,8 @@ void diff_Point (Point* dst, const Point* a, const Point* b);
 real dot_Point (const Point* a, const Point* b);
 void summ_Point (Point* dst, const Point* a, const Point* b);
 void scale_Point (Point* dst, const Point* a, real k);
+void
+invmul_Point (Point* dst, const Point* src);
 void zero_Point (Point* a);
 bool
 equal_Point (const Point* a, const Point* b);
@@ -50,10 +52,19 @@ reflect_Point (Point* refl, const Point* p,
                const Point* normal, real dot);
 tristate facing_BoundingPlane (uint dim, real plane,
                                const Point* origin, const Point* dir);
-bool hit_inner_BoundingPlane (Point* entrance,
-                              uint dim, real plane,
-                              __global const BoundingBox* box,
-                              const Point* origin, const Point* dir);
+bool
+hit_inner_BoundingPlane (Point* entrance,
+                         uint dim, real plane,
+                         __global const BoundingBox* box,
+                         const Point* origin,
+                         const Point* dir);
+void
+hit_inner_BoundingBox (Point* isect,
+                       uint* ret_dim,
+                       const BoundingBox* box,
+                       const Point* origin,
+                       const Point* direct,
+                       const Point* invdirect);
 bool hit_outer_BoundingBox (Point* entrance,
                             __global const BoundingBox* box,
                             const Point* origin, const Point* dir);
