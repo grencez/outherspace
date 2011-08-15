@@ -37,6 +37,7 @@ RunFromMyMac = false;
 #endif
 
 typedef struct motion_input_struct MotionInput;
+typedef struct race_craft_struct RaceCraft;
 typedef struct pilot_struct Pilot;
 
 
@@ -46,19 +47,25 @@ struct motion_input_struct
     real horz;
     real drift;
     real stride[NDimensions];
-    real lthrust;
-    real rthrust;
+    real thrust[2];
     real view_azimuthcc;
     real view_zenith;
     bool boost;
     bool inv_vert;
     bool use_roll;
+    bool firing[2];
+};
+
+struct race_craft_struct
+{
+    real health;
+    uint pilot_idx;
 };
 
 struct pilot_struct
 {
-    uint racer_idx;
-    MotionInput motion_input;
+    uint craft_idx;
+    MotionInput input;
     Point view_origin;
     PointXfrm view_basis;
 
@@ -87,6 +94,7 @@ static uint nracers = 0;
 static uint npilots = 1;
 static uint kbd_pilot_idx = 0;
 static ObjectMotion racer_motions[NRacersMax];  /* Reset every frame.*/
+static RaceCraft crafts[NRacersMax];
 static Pilot pilots[NRacersMax];
 static uint view_nrows = 400;
 static uint view_ncols = 400;
@@ -97,6 +105,9 @@ static real frame_t1 = 0;
 static real framerate_report_dt = 0;
 static uint framerate_report_count = 0;
 static GCond* pilots_initialized = 0;
+    /* Object indices.*/
+static uint laser_objidcs[NRacersMax][2];
+static uint checkplane_objidx;
 
 
 static
@@ -108,19 +119,26 @@ init_MotionInput (MotionInput* mot)
     mot->horz = 0;
     mot->drift = 0;
     UFor( i, NDimensions )  mot->stride[i] = 0;
-    mot->lthrust = 0;
-    mot->rthrust = 0;
+    UFor( i, 2 )  mot->thrust[i] = 0;
     mot->boost = false;
     mot->inv_vert = true;
     mot->use_roll = false;
+    UFor( i, 2 )  mot->firing[i] = false;
+}
+
+static
+    void
+init_RaceCraft (RaceCraft* craft)
+{
+    craft->health = 1;
 }
 
 static
     void
 init_Pilot (Pilot* p)
 {
-    p->racer_idx = 0;
-    init_MotionInput (&p->motion_input);
+    p->craft_idx = 0;
+    init_MotionInput (&p->input);
     p->image_start_row = 0;
     p->image_start_col = 0;
     init_RayImage (&p->ray_image);
@@ -218,17 +236,17 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer data)
     PointXfrm* view_basis;
     real stride_magnitude;
     RayImage* ray_image;
-    uint racer_idx;
+    uint craft_idx;
     ObjectMotion* racer_motion;
 
     pilot = &((Pilot*) data)[kbd_pilot_idx];
-    input = &pilot->motion_input;
+    input = &pilot->input;
     view_origin = &pilot->view_origin;
     view_basis = &pilot->view_basis;
     stride_magnitude = pilot->stride_magnitude;
     ray_image = &pilot->ray_image;
-    racer_idx = pilot->racer_idx;
-    racer_motion = &racer_motions[racer_idx];
+    craft_idx = pilot->craft_idx;
+    racer_motion = &racer_motions[craft_idx];
 
     shift_mod = event->state & GDK_SHIFT_MASK;
     ctrl_mod = event->state & GDK_CONTROL_MASK;
@@ -466,11 +484,11 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer data)
     else if (FollowRacer && switch_racer != 0)
     {
         if (switch_racer > 0)
-            racer_idx = incmod_uint (racer_idx, 1, nracers);
+            craft_idx = incmod_uint (craft_idx, 1, nracers);
         else
-            racer_idx = decmod_uint (racer_idx, 1, nracers);
-        pilot->racer_idx = racer_idx;
-        printf ("racer_idx:%u\n", racer_idx);
+            craft_idx = decmod_uint (craft_idx, 1, nracers);
+        pilot->craft_idx = craft_idx;
+        printf ("craft_idx:%u\n", craft_idx);
     }
     else if (switch_kbd_pilot != 0)
     {
@@ -521,7 +539,7 @@ key_release_fn (GtkWidget* _widget, GdkEventKey* event, gpointer data)
     MotionInput* input;
     (void) _widget;
 
-    input = &((Pilot*) data)[kbd_pilot_idx].motion_input;
+    input = &((Pilot*) data)[kbd_pilot_idx].input;
 
     switch (event->keyval)
     {
@@ -560,6 +578,8 @@ joystick_button_event (MotionInput* mot, uint btnidx, bool pressed)
     if (btnidx == 0)  mot->boost = pressed;
     if (btnidx == 2)  mot->stride[ForwardDim] =  value;
     if (btnidx == 3)  mot->stride[ForwardDim] = -value;
+    if (btnidx == 4)  mot->firing[0] = pressed;
+    if (btnidx == 5)  mot->firing[1] = pressed;
 }
 
 static
@@ -580,10 +600,10 @@ joystick_axis_event (MotionInput* mot, uint axisidx, int value)
 
     if (axisidx == 0)  mot->horz = -x;
     if (axisidx == 1)  mot->vert = -x;
-    if (axisidx == 2)  mot->lthrust = clamp_real ((x+1)/2, 0, 1);
+    if (axisidx == 2)  mot->thrust[0] = clamp_real ((x+1)/2, 0, 1);
     if (axisidx == 3)  mot->view_azimuthcc = -x;
     if (axisidx == 4)  mot->view_zenith = -x;
-    if (axisidx == 5)  mot->rthrust = clamp_real ((x+1)/2, 0, 1);
+    if (axisidx == 5)  mot->thrust[1] = clamp_real ((x+1)/2, 0, 1);
 }
 
 
@@ -606,9 +626,16 @@ update_object_motion (ObjectMotion* motion, const MotionInput* input)
     else
         rotate_object (motion, RightDim, ForwardDim, x);
 
-    motion->thrust = input->stride[ForwardDim];
-    motion->thrust += input->lthrust;
-    motion->thrust += input->rthrust;
+    if (input->stride[ForwardDim] != 0)
+    {
+        motion->thrust[0] = input->stride[ForwardDim];
+        motion->thrust[1] = input->stride[ForwardDim];
+    }
+    else
+    {
+        motion->thrust[0] = input->thrust[0];
+        motion->thrust[1] = input->thrust[1];
+    }
     motion->boost = input->boost;
 }
 
@@ -665,6 +692,7 @@ update_view_params (Pilot* pilot,
 {
     real view_zenith, view_azimuthcc;
     real vert_off, fwd_off;
+    real dot;
     Point veloc;
     PointXfrm basis, rotation;
     PointXfrm* view_basis;
@@ -673,8 +701,8 @@ update_view_params (Pilot* pilot,
 
     if (!FollowRacer)  return;
 
-    object = &space->objects[pilot->racer_idx];
-    motion = &racer_motions[pilot->racer_idx];
+    object = &space->objects[pilot->craft_idx];
+    motion = &racer_motions[pilot->craft_idx];
     view_basis = &pilot->view_basis;
 
     copy_PointXfrm (&basis, &object->orientation);
@@ -682,6 +710,13 @@ update_view_params (Pilot* pilot,
     copy_Point (&veloc, &motion->veloc);
     if (NDimensions == 4)
         veloc.coords[DriftDim] = 0;
+
+    dot = dot_Point (&basis.pts[ForwardDim], &veloc);
+    if (dot < 0)
+    {
+        negate_Point (&veloc, &veloc);
+        reflect_Point (&veloc, &veloc, &basis.pts[ForwardDim], -dot);
+    }
 
     Op_Point_2010( &basis.pts[ForwardDim]
                    ,+, &basis.pts[ForwardDim]
@@ -950,6 +985,146 @@ set_checkpoint_light (PointLightSource* light,
 
 static
     void
+relative_laser_origin (Point* origin, uint side,
+                       const ObjectRaySpace* object)
+{
+    centroid_BoundingBox (origin, &object->box);
+    origin->coords[ForwardDim] = object->box.max.coords[ForwardDim];
+    if (side == 0)
+        origin->coords[RightDim] = object->box.min.coords[RightDim];
+    else
+        origin->coords[RightDim] = object->box.max.coords[RightDim];
+}
+
+static
+    void
+setup_laser_scenes (RaySpace* space)
+{
+    uint i;
+    fprintf (stderr, "setting up %u lasers\n", nracers*2);
+    UFor( i, nracers )
+    {
+        uint side;
+        UFor( side, 2 )
+        {
+            uint j;
+            ObjectRaySpace* object;
+            Point origin, destin;
+            Material* mat;
+            Point* verts;
+
+            laser_objidcs[i][side] = space->nobjects;
+            add_1elem_Scene_RaySpace (space);
+            object = &space->objects[laser_objidcs[i][side]];
+
+            mat = AllocT( Material, 1 );
+            init_Material (mat);
+            UFor( j, NColors )
+            {
+                mat->ambient[j] = 0;
+                mat->diffuse[j] = 0;
+                mat->specular[j] = 0;
+            }
+            mat->ambient[0] = .7;
+            object->scene.nmatls = 1;
+            object->scene.matls = mat;
+            object->scene.elems[0].material = 0;
+
+            relative_laser_origin (&origin, side, &space->objects[i]);
+            copy_Point (&destin, &origin);
+            destin.coords[ForwardDim] += 5000;
+
+            verts = object->scene.verts;
+            UFor( j, NDimensions )
+            {
+                copy_Point (&verts[j], &destin);
+                if (j == ForwardDim)
+                    verts[j].coords[j] = origin.coords[j];
+                else if (j == RightDim && side == 0)
+                    verts[j].coords[j] += 10;
+                else if (j == RightDim && side == 1)
+                    verts[j].coords[j] -= 10;
+                else
+                    verts[j].coords[j] += 10;
+            }
+
+            update_nopartition_ObjectRaySpace (object);
+            object->visible = false;
+        }
+    }
+}
+
+static
+    void
+update_health (const RaySpace* space, real dt)
+{
+    FILE* out = stderr;
+    uint i;
+
+    UFor( i, npilots )
+    {
+        const Pilot* pilot;
+        const ObjectRaySpace* object;
+        ObjectRaySpace* laser_objects[2];
+        uint j;
+        Point direct;
+
+        pilot = &pilots[i];
+        object = &space->objects[pilot->craft_idx];
+        copy_Point (&direct, &object->orientation.pts[ForwardDim]);
+
+        UFor( j, 2 )
+        {
+            uint objidx;
+            objidx = laser_objidcs[pilot->craft_idx][j];
+            laser_objects[j] = &space->objects[objidx];
+        }
+
+        UFor( j, 2 )
+        {
+            bool inside_box;
+            uint hit_idx = Max_uint;
+            real hit_mag = Max_real;
+            uint hit_objidx = Max_uint;
+            Point origin;
+
+            laser_objects[j]->visible = pilot->input.firing[j];
+            if (!laser_objects[j]->visible)  continue;
+
+            copy_PointXfrm (&laser_objects[j]->orientation,
+                            &object->orientation);
+            copy_Point (&laser_objects[j]->centroid,
+                        &object->centroid);
+
+            relative_laser_origin (&origin, j, object);
+            point_from_basis (&origin, &object->orientation,
+                              &origin, &object->centroid);
+
+
+            inside_box = inside_BoundingBox (&space->main.box, &origin);
+            cast_nopartition (&hit_idx, &hit_mag, &hit_objidx,
+                              space, &origin, &direct,
+                              inside_box, pilot->craft_idx);
+            if (hit_objidx < nracers)
+            {
+                RaceCraft* craft;
+                craft = &crafts[hit_objidx];
+                craft->health -= dt * (1 - pilot->input.thrust[j]);
+                fprintf (out, "%u zaps %u, health at %f!!!\n",
+                         pilot->craft_idx, hit_objidx, craft->health);
+
+                if (craft->health <= 0)
+                {
+                    fprintf (out, "%u is DEAAAAAAAAAAAAAD\n", hit_objidx);
+                    craft->health = 1;
+                }
+            }
+        }
+    }
+}
+
+static
+    void
 render_RaySpace (byte* data, RaySpace* space,
                  uint nrows, uint ncols, uint stride)
 {
@@ -987,44 +1162,39 @@ render_RaySpace (byte* data, RaySpace* space,
 
             UFor( pilot_idx, npilots )
             {
-                uint racer_idx;
+                uint craft_idx;
                 Pilot* pilot;
 
                 pilot = &pilots[pilot_idx];
-                racer_idx = pilot->racer_idx;
+                craft_idx = pilot->craft_idx;
 
                 if (FollowRacer)
-                    update_object_motion (&racer_motions[racer_idx],
-                                          &pilot->motion_input);
+                    update_object_motion (&racer_motions[craft_idx],
+                                          &pilot->input);
                 else
-                    update_camera_location (pilot, &pilot->motion_input, dt);
+                    update_camera_location (pilot, &pilot->input, dt);
             }
             if (FollowRacer)
             {
-                if (ncheckplanes > 0)
-                {
-                    assert (space->nobjects > 0 &&
-                            "Need backdrop for light!");
-                        /* TODO: This is essentially a hack to remove
-                         * the checkpoint light's backdrop object from
-                         * the ray space while doing collision tests.
-                         */
-                    space->nobjects -= 1;
-                }
-                assert (space->nobjects == nracers &&
-                        "All objects must be racers.");
+                uint nobjects = space->nobjects;
+                    /* TODO: This is essentially a hack to remove
+                     * non-racecraft objects from the the ray space
+                     * while doing collision tests.
+                     */
+                space->nobjects = nracers;
                 move_objects (space, racer_motions, dt,
                               ncheckplanes, checkplanes);
-                if (ncheckplanes > 0)  space->nobjects += 1;
+                update_health (space, dt);
+                space->nobjects = nobjects;
             }
         }
 
         if (FollowRacer && ShowSpeed)
         {
-            uint racer_idx;
-            racer_idx = pilots[pilot_idx].racer_idx;
+            uint craft_idx;
+            craft_idx = pilots[kbd_pilot_idx].craft_idx;
             fprintf (out, "SPEED:%f\n",
-                     magnitude_Point (&racer_motions[racer_idx].veloc));
+                     magnitude_Point (&racer_motions[craft_idx].veloc));
         }
 
         UFor( pilot_idx, npilots )
@@ -1038,7 +1208,7 @@ render_RaySpace (byte* data, RaySpace* space,
             ray_image = &pilot->ray_image;
 
 
-            update_view_params (pilot, &pilot->motion_input, space);
+            update_view_params (pilot, &pilot->input, space);
             copy_Point (&origin, &pilot->view_origin);
             copy_PointXfrm (&basis, &pilot->view_basis);
 
@@ -1057,8 +1227,8 @@ render_RaySpace (byte* data, RaySpace* space,
             if (ncheckplanes > 0)
             {
                 set_checkpoint_light (&space->lights[space->nlights-1],
-                                      &space->objects[space->nobjects-1],
-                                      &racer_motions[pilot->racer_idx],
+                                      &space->objects[checkplane_objidx],
+                                      &racer_motions[pilot->craft_idx],
                                       &pilot->view_origin);
             }
             update_dynamic_RaySpace (space);
@@ -1272,7 +1442,7 @@ sdl_main (gpointer data)
                     SDL_JoyAxisEvent* je;
                     je = &event.jaxis;
                     assert ((uint)je->which < npilots);
-                    input = &pilots[je->which].motion_input;
+                    input = &pilots[je->which].input;
 
                     joystick_axis_event (input, je->axis, je->value);
                 }
@@ -1284,7 +1454,7 @@ sdl_main (gpointer data)
                     SDL_JoyButtonEvent* je;
                     je = &event.jbutton;
                     assert ((uint)je->which < njoysticks);
-                    input = &pilots[je->which].motion_input;
+                    input = &pilots[je->which].input;
 
                     joystick_button_event (input, je->button,
                                            je->state == SDL_PRESSED);
@@ -1397,8 +1567,9 @@ int main (int argc, char* argv[])
             RayImage* ray_image;
             pilot = &pilots[i];
             init_Pilot (pilot);
+            init_RaceCraft (&crafts[i]);
 
-            pilot->racer_idx = i;
+            pilot->craft_idx = i;
 
             copy_Point (&pilot->view_origin, &view_origin); 
             copy_PointXfrm (&pilot->view_basis, &view_basis); 
@@ -1442,7 +1613,12 @@ int main (int argc, char* argv[])
         }
 
         if (ncheckplanes > 0)
+        {
+            checkplane_objidx = space.nobjects;
             add_1elem_Scene_RaySpace (&space);
+        }
+
+        setup_laser_scenes (&space);
 
         gui_main (argc, argv, &space);
 

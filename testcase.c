@@ -288,7 +288,12 @@ setup_testcase_track (RaySpace* space,
     }
 
 #if 1
-    setup_camera_light (space, view_origin);
+    {
+        Point loc;
+        centroid_BoundingBox (&loc, &space->main.box);
+        loc.coords[UpDim] += 5000;
+        setup_camera_light (space, &loc);
+    }
     Op_s( real, NColors, space->lights[0].intensity , .5 );
         /* space->lights[0].intensity = 1e6; */
 #else
@@ -810,7 +815,8 @@ setup_testcase_4d_surface (RaySpace* space,
     view_origin->coords[UpDim] = 200;
     view_origin->coords[RightDim] = 3000;
     view_origin->coords[ForwardDim] = -4000;
-    view_origin->coords[3] = 700;
+    if (NDimensions == 4)
+        view_origin->coords[3] = 700;
     rotate_PointXfrm (view_basis, ForwardDim, UpDim, M_PI/5);
 #endif
 

@@ -42,7 +42,7 @@ init_ObjectMotion (ObjectMotion* motion, const ObjectRaySpace* object)
     uint i;
     motion->mass = 1;
     zero_Point (&motion->veloc);
-    motion->thrust = 0;
+    UFor( i, 2 )  motion->thrust[i] = 0;
     motion->boost = false;
     UFor( i, N2DimRotations )
         motion->rots[i] = 0;
@@ -59,7 +59,7 @@ init_ObjectMotion (ObjectMotion* motion, const ObjectRaySpace* object)
         if (motion->hover_height < x)
             motion->hover_height = x;
     }
-    motion->hover_height *= .7;
+    motion->hover_height *= .4;
     motion->escape_height = 5 * motion->hover_height;
     zero_Point (&motion->track_normal);
     motion->track_normal.coords[0] = 1;
@@ -117,7 +117,8 @@ move_objects (RaySpace* space, ObjectMotion* motions, real dt,
         mot = &motions[i];
 
         zero_rotations (mot);
-        mot->thrust = 0;
+        mot->thrust[0] = 0;
+        mot->thrust[1] = 0;
 
         if (ncheckplanes > 0)
         {
@@ -331,7 +332,7 @@ apply_gravity (ObjectMotion* motion, const RaySpace* space,
         Op_Point_2010( &motion->veloc
                        ,+, &motion->veloc
                        ,   accel*dt*, &motion->track_normal );
-        orth_Point (&dv, &dv, &motion->track_normal);
+        orth_unit_Point (&dv, &dv, &motion->track_normal);
     }
 
     if (NDimensions == 4)
@@ -352,17 +353,19 @@ apply_thrust (Point* veloc,
 {
     const real alpha = 3;  /* Arbitrary coefficient.*/
     real vthrust = 733;  /* Velocity of thrusters.*/
-    real accel, magproj, magorth;
-    Point proj, orth, tmp;
+    real accel;
+    real forward_mag, up_mag, drift_mag;
+    Point forward_veloc, up_veloc, drift_veloc;
+    Point tmp;
     PointXfrm basis;
 
     if (motion->boost)  vthrust *= 2;
 
-    vthrust *= motion->thrust;
+    vthrust *= motion->thrust[0] + motion->thrust[1];
 
+    copy_PointXfrm (&basis, orientation);
     if (motion->stabilize && !motion->flying)
     {
-        copy_PointXfrm (&basis, orientation);
         if (true)
         {
             real dot;
@@ -375,58 +378,84 @@ apply_thrust (Point* veloc,
         }
         else
         {
-            proj_Point (&basis.pts[0], &basis.pts[0],
-                        &motion->track_normal);
+            proj_unit_Point (&basis.pts[0], &basis.pts[0],
+                             &motion->track_normal);
         }
-        remove_4d_rotation (&basis);
-        orthorotate_PointXfrm (orientation, &basis, 0);
     }
+    else
+    {
+        real roll;
+        roll = motion->thrust[1] - motion->thrust[0];
+        rotate_PointXfrm (&basis, RightDim, UpDim, roll * dt * (M_PI / 2));
+    }
+    remove_4d_rotation (&basis);
+    orthorotate_PointXfrm (orientation, &basis, 0);
 
     copy_Point (veloc, &motion->veloc);
 
-    proj_Point (&proj, &motion->veloc, &orientation->pts[ForwardDim]);
-    diff_Point (&orth, &motion->veloc, &proj);
+        /* Forward component.*/
+    forward_mag = dot_Point (veloc, &orientation->pts[ForwardDim]);
+    scale_Point (&forward_veloc, &orientation->pts[ForwardDim], forward_mag);
 
-    magproj = magnitude_Point (&proj);
-
-    if (0 > dot_Point (&orientation->pts[ForwardDim], &proj))
-        accel = alpha * (vthrust + magproj);
+    diff_Point (&drift_veloc, veloc, &forward_veloc);
+        /* Up component.*/
+    if (motion->stabilize && !motion->flying)
+    {
+        up_mag = dot_Point (&drift_veloc, &motion->track_normal);
+        scale_Point (&up_veloc, &motion->track_normal, up_mag);
+    }
     else
-        accel = alpha * (vthrust - magproj);
+    {
+        up_mag = dot_Point (&drift_veloc, &orientation->pts[UpDim]);
+        scale_Point (&up_veloc, &orientation->pts[UpDim], up_mag);
+    }
+        /* Drift component.*/
+    diff_Point (&drift_veloc, &drift_veloc, &up_veloc);
+    drift_mag = magnitude_Point (&drift_veloc);
 
+    *drift = drift_mag;
+
+
+    accel = alpha * (vthrust - forward_mag);
     scale_Point (&tmp, &orientation->pts[ForwardDim], accel * dt);
-    summ_Point (&proj, &proj, &tmp);
+    summ_Point (&forward_veloc, &forward_veloc, &tmp);
 
-    magorth = magnitude_Point (&orth);
-
-    *drift = magorth;
-
-#if 1
-    if (magorth == 0)
+    if (up_mag != 0)
     {
-        zero_Point (&orth);
+        accel = - alpha;
+        scale_Point (&tmp, &up_veloc, accel * dt);
+        summ_Point (&up_veloc, &up_veloc, &tmp);
     }
-    else
+
+    if (drift_mag != 0)
     {
-        accel = - alpha * magorth;
+        const real grip_min = .5;
+        real grip = 5;
 
-        scale_Point (&tmp, &orth, 1 / magorth);
-        scale_Point (&tmp, &tmp, accel * dt);
-        summ_Point (&orth, &orth, &tmp);
+        grip -= grip_min;
+        if (0 < dot_Point (&drift_veloc, &orientation->pts[RightDim]))
+            grip *= motion->thrust[0];
+        else
+            grip *= motion->thrust[1];
+
+        if (grip < 0)  grip = grip_min - grip;
+        else           grip = grip_min + grip;
+
+        accel = -grip;
+        scale_Point (&tmp, &drift_veloc, accel * dt);
+        summ_Point (&drift_veloc, &drift_veloc, &tmp);
     }
-#else
-        /* HACK to make racer stop fast!*/
-        /* Half the speed every second.*/
-    scale_Point (&orth, &orth, pow (0.5, dt));
-#endif
 
-    summ_Point (veloc, &proj, &orth);
+    Op_Point_20200( veloc
+                    ,+, &forward_veloc
+                    ,   +, &up_veloc
+                    ,      &drift_veloc );
 
     if (motion->stabilize && !motion->flying)
     {
         Op_Point_2100( &orientation->pts[0]
-                       ,-, (500+magorth)*, &motion->track_normal
-                       ,   &orth );
+                       ,-, (500+drift_mag)*, &motion->track_normal
+                       ,   &drift_veloc );
         remove_4d_rotation (orientation);
         orthorotate_PointXfrm (&basis, orientation, 0);
     }

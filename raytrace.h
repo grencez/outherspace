@@ -32,6 +32,7 @@ struct object_ray_space_struct
     BoundingBox box;
     KDTree tree;
     KPTree verttree;
+    bool visible;
 };
 
 struct point_light_source_struct

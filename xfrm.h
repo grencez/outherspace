@@ -69,6 +69,11 @@ ray_to_basis (Point* ret_origin, Point* ret_dir,
               const Point* dir,
               const Point* old_centroid);
 void
+point_from_basis (Point* ret_origin,
+                const PointXfrm* basis,
+                const Point* origin,
+                const Point* new_centroid);
+void
 ray_from_basis (Point* ret_origin, Point* ret_dir,
                 const PointXfrm* basis,
                 const Point* origin,

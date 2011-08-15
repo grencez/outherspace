@@ -163,6 +163,20 @@ orth_Point (Point* dst, const Point* a, const Point* b)
     diff_Point (dst, a, &tmp);
 }
 
+    void
+proj_unit_Point (Point* dst, const Point* a, const Point* b)
+{
+    scale_Point (dst, b, dot_Point (a, b));
+}
+
+    void
+orth_unit_Point (Point* dst, const Point* a, const Point* b)
+{
+    Point tmp;
+    proj_unit_Point (&tmp, a, b);
+    diff_Point (dst, a, &tmp);
+}
+
     /* /dot/ is the dot product of /p/ and /normal/ */
     void
 reflect_Point (Point* refl, const Point* p,
@@ -467,6 +481,20 @@ void adjust_BoundingBox (BoundingBox* box, const Point* point)
             box->min.coords[i] = point->coords[i];
         else if (point->coords[i] > box->max.coords[i])
             box->max.coords[i] = point->coords[i];
+    }
+}
+
+    void
+include_BoundingBox (BoundingBox* dst,
+                     const BoundingBox* a, const BoundingBox* b)
+{
+    uint i;
+    UFor( i, NDimensions )
+    {
+        dst->min.coords[i] = ((a->min.coords[i] <= b->min.coords[i])
+                              ? a->min.coords[i] : b->min.coords[i]);
+        dst->max.coords[i] = ((a->max.coords[i] >= b->max.coords[i])
+                              ? a->max.coords[i] : b->max.coords[i]);
     }
 }
 

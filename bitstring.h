@@ -26,6 +26,8 @@ bool
 set1_BitString (BitString* bs, uint i);
 bool
 set0_BitString (BitString* bs, uint i);
+bool
+all_BitString (uint n, const BitString* bs);
 
 #ifdef INCLUDE_SOURCE
 #include "bitstring.c"

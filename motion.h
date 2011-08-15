@@ -16,7 +16,7 @@ struct object_motion_struct
 {
     real mass;
     Point veloc;
-    real thrust;
+    real thrust[2];
     bool boost;
     real rots[N2DimRotations];
     bool collide;

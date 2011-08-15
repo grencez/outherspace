@@ -48,6 +48,10 @@ void normalize_Point (Point* dst, const Point* a);
 void proj_Point (Point* dst, const Point* a, const Point* b);
 void orth_Point (Point* dst, const Point* a, const Point* b);
 void
+proj_unit_Point (Point* dst, const Point* a, const Point* b);
+void
+orth_unit_Point (Point* dst, const Point* a, const Point* b);
+void
 reflect_Point (Point* refl, const Point* p,
                const Point* normal, real dot);
 tristate facing_BoundingPlane (uint dim, real plane,
@@ -73,6 +77,9 @@ bool hit_BoundingBox (Point* entrance,
                       const Point* origin, const Point* dir);
 void init_BoundingBox (BoundingBox* box, uint npoints, const Point* points);
 void adjust_BoundingBox (BoundingBox* box, const Point* point);
+void
+include_BoundingBox (BoundingBox* dst,
+                     const BoundingBox* a, const BoundingBox* b);
 void
 centroid_BoundingBox (Point* dst, const BoundingBox* box);
 bool inside_BoundingBox (__global const BoundingBox* box, const Point* point);

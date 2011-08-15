@@ -123,6 +123,8 @@ init_ObjectRaySpace (ObjectRaySpace* space)
     space->nelems = 0;
     init_KDTree (&space->tree);
     init_KPTree (&space->verttree);
+
+    space->visible = true;
 }
 
     void
@@ -374,38 +376,41 @@ init_Scene_KPTreeGrid (KPTreeGrid* grid, const Scene* scene,
 init_RaySpace_KDTreeGrid (KDTreeGrid* grid, const RaySpace* space)
 {
     uint i;
+    uint nvisible = 0;
 
     init_KDTreeGrid (grid, 1 + space->nobjects);
-    fill_minimal_unique (grid->elemidcs, grid->nelems);
 
     UFor( i, NDimensions )
     {
-        uint ti;
-        ti = 2 * space->nobjects;
-
         fill_minimal_unique (grid->intls[i], 2*grid->nelems);
-
-            /* Main case (special).*/
-        grid->coords[i][ti] = space->main.box.min.coords[i];
-        grid->coords[i][ti+1] = space->main.box.max.coords[i];
-        grid->box.min.coords[i] = space->main.box.min.coords[i];
-        grid->box.max.coords[i] = space->main.box.max.coords[i];
+        grid->box.max.coords[i] = Min_real;
+        grid->box.min.coords[i] = Max_real;
     }
 
-    UFor( i, space->nobjects )
+    UFor( i, space->nobjects+1 )
     {
         uint dim, ti;
         const ObjectRaySpace* object;
         BoundingBox box;
 
-        ti = 2 * i;
-        object = &space->objects[i];
-        
-        trxfrm_BoundingBox (&box,
-                            &object->orientation,
-                            &object->box,
-                            &object->centroid);
+        if (i < space->nobjects)  object = &space->objects[i];
+        else                      object = &space->main;
 
+        if (!object->visible)  continue;
+
+        ti = 2 * nvisible;
+        
+        if (i < space->nobjects)
+            trxfrm_BoundingBox (&box,
+                                &object->orientation,
+                                &object->box,
+                                &object->centroid);
+        else
+            copy_BoundingBox (&box, &object->box);
+
+        include_BoundingBox (&grid->box, &grid->box, &box);
+
+        grid->elemidcs[nvisible] = i;
         UFor( dim, NDimensions )
         {
             real lo, hi;
@@ -413,12 +418,10 @@ init_RaySpace_KDTreeGrid (KDTreeGrid* grid, const RaySpace* space)
             hi = box.max.coords[dim];
             grid->coords[dim][ti] = lo;
             grid->coords[dim][ti+1] = hi;
-            if (lo < grid->box.min.coords[dim])
-                grid->box.min.coords[dim] = lo;
-            if (hi > grid->box.max.coords[dim])
-                grid->box.max.coords[dim] = hi;
         }
+        nvisible += 1;
     }
+    shrink_KDTreeGrid (grid, nvisible);
 }
 
 
@@ -1189,8 +1192,9 @@ cast_nopartition (uint* ret_hit,
     hit_mag = *ret_mag;
     hit_object = *ret_object;
 
-    cast1_ObjectRaySpace (&hit_idx, &hit_mag, origin, dir,
-                          &space->main, inside_box);
+    if (space->main.visible)
+        cast1_ObjectRaySpace (&hit_idx, &hit_mag, origin, dir,
+                              &space->main, inside_box);
 
     if (hit_idx < space->main.nelems)
         hit_object = space->nobjects;
@@ -1205,7 +1209,7 @@ cast_nopartition (uint* ret_hit,
         uint tmp_hit;
         real tmp_mag;
 
-        if (i == ignore_object)  continue;
+        if (i == ignore_object || !space->objects[i].visible)  continue;
 
         object = ray_to_ObjectRaySpace (&rel_origin, &rel_dir,
                                         origin, dir, space, i);
@@ -2051,18 +2055,23 @@ cast_partial_RayImage (RayImage* restrict image,
 #endif
     for (i = myrank; i < row_nul; i += RayPacketDimSz * nprocs)
     {
-#if 1
-        uint col_off;
-        for (col_off = 0; col_off < image->ncols; col_off += RayPacketDimSz)
-            cast_packet_RayImage (image, row_off + i, col_off, space, known);
-#else
         uint j;
-        UFor( j, RayPacketDimSz )
-            if (image->perspective)
-                cast_row_perspective (image, row_off + i + j, space, known);
-            else
-                cast_row_orthographic (image, row_off + i + j, space, known);
-#endif
+        if (i + RayPacketDimSz <= row_nul)
+        {
+            uint j;
+            for (j = 0; j < image->ncols; j += RayPacketDimSz)
+                cast_packet_RayImage (image, row_off + i, j, space, known);
+        }
+        else
+        {
+            uint n;
+            n = row_nul - i;
+            UFor( j, n )
+                if (image->perspective)
+                    cast_row_perspective (image, row_off + i + j, space, known);
+                else
+                    cast_row_orthographic (image, row_off + i + j, space, known);
+        }
     }
 
 #ifdef TrivialMpiRayTrace

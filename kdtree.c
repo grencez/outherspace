@@ -190,6 +190,13 @@ cleanup_KDTreeGrid (KDTreeGrid* grid)
     }
 }
 
+    void
+shrink_KDTreeGrid (KDTreeGrid* grid, uint nelems)
+{
+    assert (nelems <= grid->nelems);
+    grid->nelems = nelems;
+}
+
 static
     void
 splitclip_Simplex_BoundingBox (BoundingBox* restrict lobox,
@@ -594,12 +601,7 @@ build_KDTreeNode (KDTreeGrid* grid,
         {
             uint i;
             UFor( i, grid->nelems )
-            {
-                uint* idx_ptr;
-                idx_ptr = AllocT( uint, 1 );
-                *idx_ptr = grid->elemidcs[i];
-                app_SList (elemidxlist, idx_ptr);
-            }
+                app_uint_SList (elemidxlist, grid->elemidcs[i]);
         }
     }
     else
@@ -727,14 +729,21 @@ fixup_node_indices (KDTree* tree)
 
 static
     bool
-complete_KDTree (const KDTree* tree, uint nelems)
+complete_KDTree (const KDTree* tree, const KDTreeGrid* grid)
 {
     uint i;
-    bool* contains;
+    BitString* contains;
     bool pred = true;
-    contains = AllocT( bool, nelems );
+    uint elemidx_capac = 0;
 
-    UFor( i, nelems )  contains[i] = false;
+    UFor( i, grid->nelems )
+        if (grid->elemidcs[i] >= elemidx_capac)
+            elemidx_capac = grid->elemidcs[i] + 1;
+
+    contains = alloc_BitString (elemidx_capac, true);
+    UFor( i, grid->nelems )
+        set0_BitString (contains, grid->elemidcs[i]);
+
     UFor( i, tree->nnodes )
     {
         if (leaf_KDTreeNode (&tree->nodes[i]))
@@ -747,19 +756,15 @@ complete_KDTree (const KDTree* tree, uint nelems)
             {
                 uint idx;
                 idx = tree->elemidcs[leaf->elemidcs + j];
-                assert (idx < nelems);
-                contains[idx] = true;
+                assert (idx < elemidx_capac);
+                set1_BitString (contains, idx);
             }
         }
     }
 
-    UFor( i, nelems )
-    {
-        if (!contains[i])
-            pred = false;
-    }
+    pred = all_BitString (elemidx_capac, contains);
 
-    if (contains)  free (contains);
+    if (elemidx_capac > 0)  free_BitString (contains);
     return pred;
 }
 
@@ -831,7 +836,7 @@ build_KDTree (KDTree* tree, KDTreeGrid* grid, const Simplex* elems)
     }
 
     if (false)  printf ("kdtree build:%f\n", monotime () - t0);
-    assert (complete_KDTree (tree, grid->nelems));
+    assert (complete_KDTree (tree, grid));
 }
 #endif  /* #ifndef __OPENCL_VERSION__ */
 

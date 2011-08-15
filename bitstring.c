@@ -92,3 +92,23 @@ set0_BitString (BitString* bs, uint i)
     }
 }
 
+    bool
+all_BitString (uint n, const BitString* bs)
+{
+    const uint nblockbits = sizeof (bitstring_t) * NBitsInByte;
+    const bitstring_t all_true = ~ (bitstring_t) 0;
+    uint p, q;
+    uint i;
+
+    p = n / nblockbits;
+    q = n % nblockbits;
+
+    UFor( i, p )
+        if (bs[i] != all_true)  return false;
+
+    UFor( i, q )
+        if (!test_BitString (bs, n - 1 - i))  return false;
+
+    return true;
+}
+
