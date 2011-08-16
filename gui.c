@@ -11,7 +11,10 @@
 #include <gtk/gtk.h>
 #include <gdk/gdkkeysyms.h>
 #include <SDL.h>
+
+#ifdef PlaySound
 #include <SDL_mixer.h>
+#endif
 
     /* SDL on OS X does some weirdo bootstrapping by redefining /main/.*/
 #ifdef main
@@ -980,7 +983,7 @@ set_checkpoint_light (PointLightSource* light,
 
     UFor( i, NDimensions )
         copy_Point (&object->scene.verts[i], &elem.pts[i]);
-    update_nopartition_ObjectRaySpace (object);
+    update_trivial_ObjectRaySpace (object);
 }
 
 static
@@ -1048,7 +1051,7 @@ setup_laser_scenes (RaySpace* space)
                     verts[j].coords[j] += 10;
             }
 
-            update_nopartition_ObjectRaySpace (object);
+            update_trivial_ObjectRaySpace (object);
             object->visible = false;
         }
     }
@@ -1380,11 +1383,13 @@ sdl_main (gpointer data)
     SDL_TimerID timer;
     SDL_Joystick* joysticks[NRacersMax]; 
     SDL_Event event;
-    Mix_Chunk* tune = 0;
     uint i, njoysticks;
+#ifdef PlaySound
+    Mix_Chunk* tune = 0;
     int ret;
     int channel = -1;
     FILE* out = stderr;
+#endif
     const char* pathname;
 
     pathname = (char*) data;
@@ -1403,6 +1408,7 @@ sdl_main (gpointer data)
     resize_pilot_viewports (view_nrows, view_ncols);
     g_cond_signal (pilots_initialized);
 
+#ifdef PlaySound
     ret = Mix_OpenAudio(22050, AUDIO_S16SYS, 2, 1024);
     if (ret != 0)
     {
@@ -1424,6 +1430,7 @@ sdl_main (gpointer data)
 
         free (buf);
     }
+#endif
 
         /* Add a timer to assure the event loop has
          * an event to process when we should exit.
@@ -1470,11 +1477,13 @@ sdl_main (gpointer data)
 
     SDL_RemoveTimer (timer);
 
+#ifdef PlaySound
     if (channel >= 0)
         Mix_HaltChannel (channel);
     if (tune)
         Mix_FreeChunk (tune);
     Mix_CloseAudio();
+#endif
 
     UFor( i, njoysticks )
         SDL_JoystickClose (joysticks[i]);
@@ -1585,7 +1594,10 @@ int main (int argc, char* argv[])
         pilots_initialized = g_cond_new ();
 
             /* Note: SDL_INIT_VIDEO is required for some silly reason!*/
-        ret = SDL_Init (SDL_INIT_AUDIO |
+        ret = SDL_Init (
+#ifdef PlaySound
+                        SDL_INIT_AUDIO |
+#endif
                         SDL_INIT_EVENTTHREAD |
                         SDL_INIT_JOYSTICK |
                         SDL_INIT_TIMER |

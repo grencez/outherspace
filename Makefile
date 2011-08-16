@@ -6,6 +6,7 @@
 
 DFLAGS += -DNDimensions=3
 
+CONFIG += sound
 #CONFIG += c++
 CONFIG += ansi
 #CONFIG += c99
@@ -45,6 +46,10 @@ endif
 
 DFLAGS += -DINCLUDE_SOURCE
 
+ifneq (,$(filter sound,$(CONFIG)))
+	DFLAGS += -DPlaySound
+endif
+
 ifneq (,$(filter macapp,$(CONFIG)))
 	# Everything on this OS X setup is 32 bit.
 	CFLAGS += -m32
@@ -52,10 +57,16 @@ ifneq (,$(filter macapp,$(CONFIG)))
 	GuiCFlags += -I$(HOME)/gtk/inst/include \
 				 -I/Library/Frameworks/SDL.framework/Headers \
 				 -I/Library/Frameworks/SDL_mixer.framework/Headers
-	GuiLFlags += -framework SDL -framework SDL_mixer
+	GuiLFlags += -framework SDL
+	ifneq (,$(filter sound,$(CONFIG)))
+		GuiLFlags += -framework SDL_mixer
+	endif
 else
 	GuiCFlags += $(shell pkg-config --cflags sdl)
-	GuiLFlags += $(shell pkg-config --libs sdl) -lSDL_mixer
+	GuiLFlags += $(shell pkg-config --libs sdl)
+	ifneq (,$(filter sound,$(CONFIG)))
+		GuiLFlags += -lSDL_mixer
+	endif
 endif
 
 ## Serious debugging is about to happen.

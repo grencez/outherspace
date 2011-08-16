@@ -775,7 +775,7 @@ static int uintcmp (const void* a, const void* b)
     return 0;
 }
 
-    /* Builds a tree of depth zero - everything in the root node.*/
+    /* Build a tree of depth zero - everything in the root node.*/
     void
 build_trivial_KDTree (KDTree* tree, uint nelems, const BoundingBox* box)
 {

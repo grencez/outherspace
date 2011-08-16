@@ -154,6 +154,10 @@ init_filled_RaySpace (RaySpace* space);
 void
 init_filled_ObjectRaySpace (ObjectRaySpace* object);
 void
+init_trivial_ObjectRaySpace (ObjectRaySpace* object);
+void
+update_trivial_ObjectRaySpace (ObjectRaySpace* object);
+void
 update_dynamic_RaySpace (RaySpace* space);
 void
 init_Scene_KDTreeGrid (KDTreeGrid* grid, const Scene* scene,

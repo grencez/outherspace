@@ -192,7 +192,7 @@ add_1elem_Scene_RaySpace (RaySpace* space)
     object = &space->objects[i];
     init_ObjectRaySpace (object);
     setup_1elem_Scene (&object->scene);
-    init_filled_ObjectRaySpace (object);
+    init_trivial_ObjectRaySpace (object);
 }
 
     bool

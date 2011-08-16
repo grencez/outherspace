@@ -101,6 +101,8 @@ cleanup_KDTreeGrid (KDTreeGrid* grid);
 void
 shrink_KDTreeGrid (KDTreeGrid* grid, uint nelems);
 void
+build_trivial_KDTree (KDTree* tree, uint nelems, const BoundingBox* box);
+void
 build_KDTree (KDTree* tree, KDTreeGrid* grid, const Simplex* elems);
 
 #ifdef INCLUDE_SOURCE

@@ -191,7 +191,20 @@ update_internal_transformed_ObjectRaySpace (ObjectRaySpace* space)
 }
 
     void
-init_nopartition_ObjectRaySpace (ObjectRaySpace* object)
+init_filled_ObjectRaySpace (ObjectRaySpace* object)
+{
+    object->nelems = object->scene.nelems;
+    object->elems = AllocT( Simplex, object->nelems );
+    object->simplices = AllocT( BarySimplex, object->nelems );
+
+    update_internal_transformed_ObjectRaySpace (object);
+
+    partition_ObjectRaySpace (object);
+    partition_verts_ObjectRaySpace (object);
+}
+
+    void
+init_trivial_ObjectRaySpace (ObjectRaySpace* object)
 {
     object->nelems = object->scene.nelems;
     object->elems = AllocT( Simplex, object->nelems );
@@ -203,23 +216,10 @@ init_nopartition_ObjectRaySpace (ObjectRaySpace* object)
 }
 
     void
-update_nopartition_ObjectRaySpace (ObjectRaySpace* object)
+update_trivial_ObjectRaySpace (ObjectRaySpace* object)
 {
     update_internal_transformed_ObjectRaySpace (object);
     copy_BoundingBox (&object->tree.nodes[0].as.leaf.box, &object->box);
-}
-
-    void
-init_filled_ObjectRaySpace (ObjectRaySpace* object)
-{
-    object->nelems = object->scene.nelems;
-    object->elems = AllocT( Simplex, object->nelems );
-    object->simplices = AllocT( BarySimplex, object->nelems );
-
-    update_internal_transformed_ObjectRaySpace (object);
-
-    partition_ObjectRaySpace (object);
-    partition_verts_ObjectRaySpace (object);
 }
 
     void
