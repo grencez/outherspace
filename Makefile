@@ -52,7 +52,7 @@ ifneq (,$(filter image,$(CONFIG)))
 	GuiDFlags += -DSupportImage
 endif
 ifneq (,$(filter sound,$(CONFIG)))
-	GuiDFlags += -DPlaySound
+	GuiDFlags += -DSupportSound
 endif
 
 ifneq (,$(filter macapp,$(CONFIG)))
