@@ -151,6 +151,10 @@ char* strto_real (real* ret, const char* in);
 const char* strskip_ws (const char* line);
 void strstrip_eol (char* line);
 uint readin_whitesep (char* buf, FILE* in, uint capacity, uint len);
+char*
+cat_strings (uint n, const char* const* a);
+char*
+cat_filepath (const char* pathname, const char* filename);
 FILE*
 fopen_path (const char* pathname, const char* filename, const char* mode);
 real monotime ();

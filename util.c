@@ -105,15 +105,47 @@ uint readin_whitesep (char* buf, FILE* in, uint capacity, uint len)
     return len;
 }
 
+    /* Concatenate strings.*/
+    char*
+cat_strings (uint n, const char* const* a)
+{
+    uint i, len;
+    char* s;
+
+    len = 0;
+    UFor( i, n )  len += strlen (a[i]);
+
+    s = AllocT( char, len+1 );
+
+    len = 0;
+    UFor( i, n )
+    {
+        uint count;
+        count = strlen (a[i]);
+        array_cpy (s, a[i], len, count, sizeof(char));
+        len += count;
+    }
+    s[len] = '\0';
+    return s;
+}
+
+    /* Create a full filepath from a pathname and filename.*/
+    char*
+cat_filepath (const char* pathname, const char* filename)
+{
+    const char* parts[3];
+    parts[0] = pathname;
+    parts[1] = "/";
+    parts[2] = filename;
+    return cat_strings (3, parts);
+}
+
     FILE*
 fopen_path (const char* pathname, const char* filename, const char* mode)
 {
-    uint len;
     char* path;
     FILE* f;
-    len = strlen (pathname) + 1 + strlen (filename);
-    path = AllocT( char, len+1 );
-    sprintf (path, "%s/%s", pathname, filename);
+    path = cat_filepath (pathname, filename);
     f = fopen (path, mode);
     free (path);
     return f;

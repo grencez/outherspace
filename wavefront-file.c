@@ -425,13 +425,13 @@ parse_texture (SList* texlist, SList* texnamelist,
 
     if (i == Max_uint)
     {
+        bool good;
         Texture* texture;
         texture = AllocT( Texture, 1 );
 
-        texture->pixels = readin_PPM_image (&texture->nrows, &texture->ncols,
-                                            pathname, filename);
+        good = readin_Texture (texture, pathname, filename);
 
-        if (texture->pixels)
+        if (good)
         {
             char* s;
             i = texlist->nmembs;

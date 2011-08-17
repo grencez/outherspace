@@ -8,6 +8,7 @@
 #include "xfrm.h"
 
 #include <assert.h>
+#include <math.h>
 
 static
     void

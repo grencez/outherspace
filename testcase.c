@@ -1,7 +1,10 @@
 
 #include "testcase.h"
 
+#include "pnm-image.h"
 #include "wavefront-file.h"
+
+#include <assert.h>
 
 static void
 random_Point (Point* p, const BoundingBox* box);
@@ -978,6 +981,7 @@ add_sky_texture (RaySpace* space,
                  const char* pathname,
                  const char* filename)
 {
+    bool good;
     uint i;
     Scene* scene;
     scene = &space->main.scene;
@@ -985,12 +989,8 @@ add_sky_texture (RaySpace* space,
     if (i == 0)  scene->txtrs = 0;  /* Assure this is NULL.*/
     scene->ntxtrs = i+1;
     ResizeT( Texture, scene->txtrs, i+1 );
-    scene->txtrs[i].pixels =
-        readin_PPM_image (&scene->txtrs[i].nrows,
-                          &scene->txtrs[i].ncols,
-                          pathname, filename);
-    if (!scene->txtrs[i].pixels)  return false;
-    space->skytxtr = i;
-    return true;
+    good = readin_Texture (&scene->txtrs[i], pathname, filename);
+    if (good)  space->skytxtr = i;
+    return good;
 }
 

@@ -6,7 +6,9 @@
 
 DFLAGS += -DNDimensions=3
 
+CONFIG += image
 CONFIG += sound
+
 #CONFIG += c++
 CONFIG += ansi
 #CONFIG += c99
@@ -46,8 +48,11 @@ endif
 
 DFLAGS += -DINCLUDE_SOURCE
 
+ifneq (,$(filter image,$(CONFIG)))
+	GuiDFlags += -DSupportImage
+endif
 ifneq (,$(filter sound,$(CONFIG)))
-	DFLAGS += -DPlaySound
+	GuiDFlags += -DPlaySound
 endif
 
 ifneq (,$(filter macapp,$(CONFIG)))
@@ -58,12 +63,18 @@ ifneq (,$(filter macapp,$(CONFIG)))
 				 -I/Library/Frameworks/SDL.framework/Headers \
 				 -I/Library/Frameworks/SDL_mixer.framework/Headers
 	GuiLFlags += -framework SDL
+	ifneq (,$(filter image,$(CONFIG)))
+		GuiLFlags += -framework SDL_image
+	endif
 	ifneq (,$(filter sound,$(CONFIG)))
 		GuiLFlags += -framework SDL_mixer
 	endif
 else
 	GuiCFlags += $(shell pkg-config --cflags sdl)
 	GuiLFlags += $(shell pkg-config --libs sdl)
+	ifneq (,$(filter image,$(CONFIG)))
+		GuiLFlags += -lSDL_image
+	endif
 	ifneq (,$(filter sound,$(CONFIG)))
 		GuiLFlags += -lSDL_mixer
 	endif
@@ -186,17 +197,22 @@ test-hello: hello
 cli: cli.c compute.c $(CSources)
 	$(CC) $(CFLAGS) $(DFLAGS) $< -o $@ $(LFLAGS)
 
+GuiCFlags += $(CFLAGS)
+GuiDFlags += $(DFLAGS)
 gui: gui.c compute.c motion.c $(CSources)
-	$(CC) $(CFLAGS) $(DFLAGS) \
-		$(GuiCFlags) \
+	$(CC) $(GuiCFlags) $(GuiDFlags) \
 	   	`pkg-config --cflags gtk+-2.0` \
 		$< -o $@ \
 		`pkg-config --libs gtk+-2.0` \
 		`pkg-config --libs gthread-2.0` \
 		$(GuiLFlags) $(LFLAGS)
 
+
+VerifyCFlags := $(filter-out -fwhole-program,$(CFLAGS))
+VerifyDFlags := $(filter-out -DINCLUDE_SOURCE,$(DFLAGS))
+
 verify: verif/main.c $(CSources)
-	$(CC) $(CFLAGS) $(DFLAGS) -I . $< -o $@ $(LFLAGS)
+	$(CC) $(VerifyCFlags) $(VerifyDFlags) -I . $^ -o $@ $(LFLAGS)
 
 imgdiff: imgdiff.c pnm-image.c
 	$(CC) $(CFLAGS) $(DFLAGS) -I . $< -o $@ $(LFLAGS)

@@ -1,6 +1,8 @@
 
 #include "pnm-image.h"
 
+#include <string.h>
+
 
 void output_PBM_image (const char* filename, uint nrows, uint ncols,
                        const uint* hits, uint nelems)

@@ -1,7 +1,12 @@
 
 #include "material.h"
 
-#include "simplex.h"
+#include "pnm-image.h"
+
+#include <math.h>
+#ifdef SupportImage
+#include <SDL_image.h>
+#endif
 
 void init_Material (Material* mat)
 {
@@ -108,5 +113,55 @@ map_sky_Texture (real* colors, const Texture* texture, const Point* p)
     pixels = &texture->pixels[NColors * (col + row * texture->ncols)];
     UFor( i, NColors )
         colors[i] = (real) pixels[i] / 255;
+}
+
+    bool
+readin_Texture (Texture* texture, const char* pathname, const char* filename)
+{
+#ifdef SupportImage
+    SDL_PixelFormat* fmt;
+    SDL_Surface* surface;
+    char* path;
+    uint nrows, ncols;
+    uint row;
+
+    path = cat_filepath (pathname, filename);
+    surface = IMG_Load (path);
+    free (path);
+    if (!surface)  return false;
+    fmt = surface->format;
+
+    texture->nrows = nrows = surface->h;
+    texture->ncols = ncols = surface->w;
+    texture->pixels = AllocT( byte, 3 * nrows * ncols );
+
+    UFor( row, nrows )
+    {
+        uint surf_row, col;
+        Uint8* scanline;
+
+        surf_row = nrows - 1 - row;
+        scanline = &((Uint8*) surface->pixels)[surf_row * surface->pitch];
+
+        UFor( col, ncols )
+        {
+            uint idx;
+            Uint8 r, g, b;
+            Uint32 pixel;
+            pixel = *(Uint32*)&scanline[col*fmt->BytesPerPixel];
+            SDL_GetRGB (pixel, fmt, &r, &g, &b);
+            idx = 3 * (row * ncols + col);
+            texture->pixels[idx+0] = r;
+            texture->pixels[idx+1] = g;
+            texture->pixels[idx+2] = b;
+        }
+    }
+    SDL_FreeSurface (surface);
+    return true;
+#else
+    texture->pixels = readin_PPM_image (&texture->nrows, &texture->ncols,
+                                        pathname, filename);
+    return (texture->pixels != 0);
+#endif
 }
 

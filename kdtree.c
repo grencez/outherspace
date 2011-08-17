@@ -1,6 +1,8 @@
 
 #ifndef __OPENCL_VERSION__
 #include "kdtree.h"
+
+#include "bitstring.h"
 #include "order.h"
 #include "slist.h"
 

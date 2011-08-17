@@ -1,6 +1,11 @@
 
 #include "scene.h"
 
+#include "order.h"
+
+#include <assert.h>
+#include <string.h>
+
 static uint
 fill_between_simplices (SceneElement* elems,
                         uint k,

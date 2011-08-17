@@ -3,6 +3,8 @@
 #define MATERIAL_H_
 #include "util.h"
 
+#include "simplex.h"
+
 struct texture_struct
 {
     uint nrows;
@@ -31,6 +33,9 @@ void
 map_Texture (real* colors, const Texture* texture, const BaryPoint* p);
 void
 map_sky_Texture (real* colors, const Texture* texture, const Point* p);
+
+bool
+readin_Texture (Texture* texture, const char* pathname, const char* filename);
 
 #ifdef INCLUDE_SOURCE
 #include "material.c"

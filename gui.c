@@ -11,8 +11,10 @@
 #include <gtk/gtk.h>
 #include <gdk/gdkkeysyms.h>
 #include <SDL.h>
-
-#ifdef PlaySound
+#ifdef SupportImage
+#include <SDL_image.h>
+#endif
+#ifdef SupportSound
 #include <SDL_mixer.h>
 #endif
 
@@ -1384,7 +1386,7 @@ sdl_main (gpointer data)
     SDL_Joystick* joysticks[NRacersMax]; 
     SDL_Event event;
     uint i, njoysticks;
-#ifdef PlaySound
+#ifdef SupportSound
     Mix_Chunk* tune = 0;
     int ret;
     int channel = -1;
@@ -1408,7 +1410,7 @@ sdl_main (gpointer data)
     resize_pilot_viewports (view_nrows, view_ncols);
     g_cond_signal (pilots_initialized);
 
-#ifdef PlaySound
+#ifdef SupportSound
     ret = Mix_OpenAudio(22050, AUDIO_S16SYS, 2, 1024);
     if (ret != 0)
     {
@@ -1477,7 +1479,7 @@ sdl_main (gpointer data)
 
     SDL_RemoveTimer (timer);
 
-#ifdef PlaySound
+#ifdef SupportSound
     if (channel >= 0)
         Mix_HaltChannel (channel);
     if (tune)
@@ -1497,6 +1499,7 @@ int main (int argc, char* argv[])
     bool good = true;
     bool call_gui = true;
     uint i;
+    int ret;
     RaySpace space;
     char inpathname[1024];
     Point view_origin;
@@ -1520,6 +1523,11 @@ int main (int argc, char* argv[])
 
 #ifdef DistribCompute
     init_compute (&argc, &argv);
+#endif
+
+#ifdef SupportImage
+        ret = IMG_Init (IMG_INIT_PNG);
+        assert (ret == IMG_INIT_PNG);
 #endif
 
     good =
@@ -1568,7 +1576,6 @@ int main (int argc, char* argv[])
     {
         GThread* sdl_thread;
         GMutex* initializing_lock;
-        int ret;
 
         UFor( i, NRacersMax )
         {
@@ -1595,7 +1602,7 @@ int main (int argc, char* argv[])
 
             /* Note: SDL_INIT_VIDEO is required for some silly reason!*/
         ret = SDL_Init (
-#ifdef PlaySound
+#ifdef SupportSound
                         SDL_INIT_AUDIO |
 #endif
                         SDL_INIT_EVENTTHREAD |
@@ -1639,6 +1646,10 @@ int main (int argc, char* argv[])
         stop_computeloop ();
 #endif
     }
+
+#ifdef SupportImage
+    IMG_Quit ();
+#endif
 
     if (ncheckplanes > 0)
     {

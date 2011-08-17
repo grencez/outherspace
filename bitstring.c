@@ -1,6 +1,8 @@
 
 #include "bitstring.h"
 
+#include <string.h>
+
     BitString*
 alloc_BitString (uint n, bool val)
 {
