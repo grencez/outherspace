@@ -139,7 +139,7 @@ move_objects (RaySpace* space, ObjectMotion* motions, real dt,
                 if (idx == 0)
                 {
                     mot->laps += 1;
-                    fprintf (out, "Racer:%u gets lap::%u.\n", i, mot->laps);
+                    fprintf (out, "Racer:%u gets lap:%u.\n", i, mot->laps);
                 }
             }
             mot->checkpoint_idx = idx;

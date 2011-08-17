@@ -1503,7 +1503,7 @@ int main (int argc, char* argv[])
     PointXfrm view_basis;
     real view_angle;
 
-    sprintf (inpathname, "%s", "input");
+    sprintf (inpathname, "%s", "data");
 
     if (RunFromMyMac)
     {
