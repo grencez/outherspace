@@ -793,7 +793,7 @@ setup_testcase_4d_surface (RaySpace* space,
     fixup_wavefront_Scene (&space->main.scene);
     recenter_Scene (&space->main.scene, &new_centroid);
 
-    good = add_sky_texture (space, pathname, "iras.ppm");
+    good = add_sky_texture (space, pathname, "iras.png");
     if (!good)  return false;
 
     init_filled_RaySpace (space);

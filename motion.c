@@ -202,10 +202,10 @@ move_object (RaySpace* space, ObjectMotion* motions,
     apply_thrust (&veloc, &new_orientation, &drift, motion, dt);
         /* orthorotate_PointXfrm (&new_orientation, &basis, 0); */
 
-    /* TODO: This applies the rotation early!
-     * If this choice is kept, some simplification can
-     * happen down in detect_collision().
-     */
+        /* TODO: This applies the rotation early!
+         * If this choice is kept, some simplification can
+         * happen down in detect_collision().
+         */
     identity_PointXfrm (&rotation);
     copy_PointXfrm (&object->orientation, &new_orientation);
     mark_colliding (collisions, refldirs, motions, objidx, space);
@@ -352,7 +352,7 @@ apply_thrust (Point* veloc,
               real dt)
 {
     const real alpha = 3;  /* Arbitrary coefficient.*/
-    real vthrust = 733;  /* Velocity of thrusters.*/
+    real vthrust = 2 * 733;  /* Velocity of thrusters.*/
     real accel;
     real forward_mag, up_mag, drift_mag;
     Point forward_veloc, up_veloc, drift_veloc;
@@ -361,7 +361,8 @@ apply_thrust (Point* veloc,
 
     if (motion->boost)  vthrust *= 2;
 
-    vthrust *= motion->thrust[0] + motion->thrust[1];
+    if (motion->thrust[0] > motion->thrust[1])  vthrust *= motion->thrust[0];
+    else                                        vthrust *= motion->thrust[1];
 
     copy_PointXfrm (&basis, orientation);
     if (motion->stabilize && !motion->flying)
