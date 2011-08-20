@@ -26,10 +26,16 @@ RunFromMyMac = false;
 
 static bool needs_recast = true;
 static bool continue_running = true;
-static SDL_cond* redraw_cond;
-static bool redraw_happening = true;
 static uint resize_nrows = 0;
 static uint resize_ncols = 0;
+
+struct redraw_loop_param_struct
+{
+    RaySpace* space;
+    const char* pathname;
+    SDL_sem* sig;
+};
+typedef struct redraw_loop_param_struct RedrawLoopParam;
 
 
 static
@@ -556,24 +562,18 @@ static
     int
 redraw_loop_fn (void* data)
 {
+    RedrawLoopParam* param;
     SDL_Surface* screen = 0;
-    SDL_mutex* cond_lock;
     RaySpace* space;
-    space = (RaySpace*) data;
-    cond_lock = SDL_CreateMutex ();
 
-    SDL_WM_SetCaption ("OuTHER SPACE", 0);
+    param = (RedrawLoopParam*) data;
+    space = param->space;
+
     resize_nrows = view_nrows;
     resize_ncols = view_ncols;
 
     while (continue_running)
     {
-        SDL_mutexP (cond_lock);
-        redraw_happening = false;
-        SDL_CondWait (redraw_cond, cond_lock);
-        redraw_happening = true;
-        SDL_mutexV (cond_lock);
-
         if (resize_nrows > 0)
         {
             view_nrows = resize_nrows;
@@ -591,9 +591,10 @@ redraw_loop_fn (void* data)
             update_pilot_images (space, (real) SDL_GetTicks () / 1000);
         }
         sdl_redraw (screen);
+
+        SDL_SemWait (param->sig);
     }
 
-    SDL_DestroyMutex (cond_lock);
     return 0;
 }
 
@@ -616,7 +617,9 @@ static
     void
 sdl_main (RaySpace* space, const char* pathname)
 {
+    RedrawLoopParam redraw_param;
     SDL_Thread* redraw_thread;
+    SDL_Surface* icon = 0;
     SDL_TimerID timer;
     SDL_Joystick* joysticks[NRacersMax]; 
     SDL_Event event;
@@ -627,6 +630,14 @@ sdl_main (RaySpace* space, const char* pathname)
     int channel = -1;
     FILE* out = stderr;
 #endif
+
+    {
+        char* iconpath;
+        iconpath = cat_filepath (pathname, "icon.bmp");
+        icon = SDL_LoadBMP (iconpath);
+        free (iconpath);
+    }
+
         /* Note: SDL_INIT_VIDEO is required for some silly reason!*/
     ret = SDL_Init (SDL_INIT_VIDEO |
 #ifdef SupportSound
@@ -636,6 +647,7 @@ sdl_main (RaySpace* space, const char* pathname)
                     SDL_INIT_JOYSTICK |
                     SDL_INIT_TIMER);
     assert (ret == 0);
+
 
     SDL_JoystickEventState (SDL_ENABLE);
     njoysticks = SDL_NumJoysticks ();
@@ -674,8 +686,13 @@ sdl_main (RaySpace* space, const char* pathname)
     }
 #endif
 
-    redraw_cond = SDL_CreateCond ();
-    redraw_thread = SDL_CreateThread (redraw_loop_fn, space);
+    SDL_WM_SetCaption ("OuTHER SPACE", 0);
+    if (icon)  SDL_WM_SetIcon (icon, 0);
+
+    redraw_param.space = space;
+    redraw_param.pathname = pathname;
+    redraw_param.sig = SDL_CreateSemaphore (1);
+    redraw_thread = SDL_CreateThread (redraw_loop_fn, &redraw_param);
 
         /* Add a timer to assure the event loop has
          * an event to process when we should exit.
@@ -723,12 +740,12 @@ sdl_main (RaySpace* space, const char* pathname)
                                            je->state == SDL_PRESSED);
                 }
                 break;
-            case SDL_USEREVENT:
-                if (!redraw_happening)
-                    SDL_CondSignal (redraw_cond);
-                break;
             case SDL_QUIT:
                 continue_running = false;
+                    /* Fall thru.*/
+            case SDL_USEREVENT:
+                if (SDL_SemValue (redraw_param.sig) < 1)
+                    SDL_SemPost (redraw_param.sig);
                 break;
             default:
                 break;
@@ -748,11 +765,13 @@ sdl_main (RaySpace* space, const char* pathname)
 #endif
 
     SDL_WaitThread (redraw_thread, 0);
-    SDL_DestroyCond (redraw_cond);
+    SDL_DestroySemaphore (redraw_param.sig);
 
     UFor( i, njoysticks )
         SDL_JoystickClose (joysticks[i]);
     SDL_Quit ();
+
+    if (icon)  SDL_FreeSurface (icon);
 }
 
 
@@ -884,6 +903,9 @@ int main (int argc, char* argv[])
 #ifdef DistribCompute
     cleanup_compute ();
 #endif
+
+    cleanup_RaySpace (space);
+
     return 0;
 }
 
