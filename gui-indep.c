@@ -432,160 +432,199 @@ render_pattern (byte* data, uint nrows, uint ncols, uint stride)
 }
 
     void
-render_RaySpace (RaySpace* space, byte* data,
-                 uint nrows, uint ncols, uint stride,
-                 real frame_t1)
+render_RayImage (byte* data, uint nrows, uint ncols, uint stride,
+                 const RayImage* ray_image,
+                 uint image_start_row,
+                 uint image_start_col)
+{
+    uint ray_row, start_row, start_col;
+
+    assert (ray_image->pixels);
+    if (ray_image->nrows == 0)  return;
+    start_row = image_start_row + ray_image->nrows - 1;
+    start_col = image_start_col;
+
+    UFor( ray_row, ray_image->nrows )
+    {
+        uint image_row, ray_col;
+        const byte* pixline;
+        uint32* outline;
+
+        image_row = start_row - ray_row;
+        if (image_row >= nrows)  continue;
+
+        pixline = &ray_image->pixels[ray_row * 3 * view_ncols];
+        outline = (uint32*) &data[image_row * stride];
+
+        UFor( ray_col, ray_image->ncols )
+        {
+            uint image_col;
+            image_col = start_col + ray_col;
+            if (image_col >= ncols)  break;
+            outline[image_col] =
+                ((uint32) 0xFF                   << 24) |
+                ((uint32) pixline[3*image_col+0] << 16) |
+                ((uint32) pixline[3*image_col+1] <<  8) |
+                ((uint32) pixline[3*image_col+2] <<  0);
+        }
+    }
+}
+
+    void
+render_pilot_images (byte* data, uint nrows, uint ncols, uint stride)
 {
     uint pilot_idx;
-    if (needs_recast)
+    UFor( pilot_idx, npilots )
     {
-        FILE* out = stderr;
+        Pilot* pilot;
+        pilot = &pilots[pilot_idx];
 
-        needs_recast = false;
+        render_RayImage (data, nrows, ncols, stride,
+                         &pilot->ray_image,
+                         pilot->image_start_row,
+                         pilot->image_start_col);
+    }
+}
 
-        if (frame_t0 == 0)
+    void
+update_pilot_images (RaySpace* space, real frame_t1)
+{
+    uint pilot_idx;
+    FILE* out = stderr;
+
+    if (frame_t0 == 0)
+    {
+        frame_t0 = frame_t1;
+    }
+    else
+    {
+        real dt;
+        dt = frame_t1 - frame_t0;
+        frame_t0 = frame_t1;
+
+        if (ShowFrameRate)
         {
-            frame_t0 = frame_t1;
-        }
-        else
-        {
-            real dt;
-            dt = frame_t1 - frame_t0;
-            frame_t0 = frame_t1;
-
-            if (ShowFrameRate)
+            framerate_report_dt += dt;
+            framerate_report_count += 1;
+            if (framerate_report_dt >= 1)
             {
-                framerate_report_dt += dt;
-                framerate_report_count += 1;
-                if (framerate_report_dt >= 1)
-                {
-                    real fps;
-                    fps = framerate_report_count / framerate_report_dt;
-                    fprintf (out, "FPS:%f\n", fps);
-                    framerate_report_dt = 0;
-                    framerate_report_count = 0;
-                }
+                real fps;
+                fps = framerate_report_count / framerate_report_dt;
+                fprintf (out, "FPS:%f\n", fps);
+                framerate_report_dt = 0;
+                framerate_report_count = 0;
             }
-
-            UFor( pilot_idx, npilots )
-            {
-                uint craft_idx;
-                Pilot* pilot;
-
-                pilot = &pilots[pilot_idx];
-                craft_idx = pilot->craft_idx;
-
-                if (FollowRacer)
-                    update_object_motion (&racer_motions[craft_idx],
-                                          &pilot->input);
-                else
-                    update_camera_location (pilot, &pilot->input, dt);
-            }
-            if (FollowRacer)
-            {
-                uint nobjects = space->nobjects;
-                    /* TODO: This is essentially a hack to remove
-                     * non-racecraft objects from the the ray space
-                     * while doing collision tests.
-                     */
-                space->nobjects = nracers;
-                move_objects (space, racer_motions, dt,
-                              ncheckplanes, checkplanes);
-                update_health (space, dt);
-                space->nobjects = nobjects;
-            }
-        }
-
-        if (FollowRacer && ShowSpeed)
-        {
-            uint craft_idx;
-            craft_idx = pilots[kbd_pilot_idx].craft_idx;
-            fprintf (out, "SPEED:%f\n",
-                     magnitude_Point (&racer_motions[craft_idx].veloc));
         }
 
         UFor( pilot_idx, npilots )
         {
-            PointXfrm basis;
-            Point origin;
+            uint craft_idx;
             Pilot* pilot;
-            RayImage* ray_image;
 
             pilot = &pilots[pilot_idx];
-            ray_image = &pilot->ray_image;
+            craft_idx = pilot->craft_idx;
 
-
-            update_view_params (pilot, &pilot->input, space);
-            copy_Point (&origin, &pilot->view_origin);
-            copy_PointXfrm (&basis, &pilot->view_basis);
-
-            if (ray_image->perspective)  ray_image->hifov = pilot->view_angle;
-            else                         ray_image->hifov = pilot->view_width;
-
-#ifdef DistribCompute
-            compute_rays_to_hits (ray_image, space, &origin, &basis);
-#else
-            if (LightAtCamera)
-            {
-                assert (space->nlights > 0);
-                copy_Point (&space->lights[0].location, &origin);
-                Op_s( real, NColors, space->lights[0].intensity , .5 );
-            }
-            if (ncheckplanes > 0)
-            {
-                set_checkpoint_light (&space->lights[space->nlights-1],
-                                      &space->objects[checkplane_objidx],
-                                      &racer_motions[pilot->craft_idx],
-                                      &pilot->view_origin);
-            }
-            update_dynamic_RaySpace (space);
-            if (ForceFauxFishEye)
-                rays_to_hits_fish (ray_image, space,
-                                   &origin, &basis, pilot->view_angle);
+            if (FollowRacer)
+                update_object_motion (&racer_motions[craft_idx],
+                                      &pilot->input);
             else
-                cast_RayImage (ray_image, space, &origin, &basis);
-#endif
+                update_camera_location (pilot, &pilot->input, dt);
         }
+        if (FollowRacer)
+        {
+            uint nobjects = space->nobjects;
+                /* TODO: This is essentially a hack to remove
+                 * non-racecraft objects from the the ray space
+                 * while doing collision tests.
+                 */
+            space->nobjects = nracers;
+            move_objects (space, racer_motions, dt,
+                          ncheckplanes, checkplanes);
+            update_health (space, dt);
+            space->nobjects = nobjects;
+        }
+    }
+
+    if (FollowRacer && ShowSpeed)
+    {
+        uint craft_idx;
+        craft_idx = pilots[kbd_pilot_idx].craft_idx;
+        fprintf (out, "SPEED:%f\n",
+                 magnitude_Point (&racer_motions[craft_idx].veloc));
     }
 
     UFor( pilot_idx, npilots )
     {
-        uint ray_row, start_row, start_col;
+        PointXfrm basis;
+        Point origin;
         Pilot* pilot;
         RayImage* ray_image;
 
         pilot = &pilots[pilot_idx];
         ray_image = &pilot->ray_image;
 
-        assert (ray_image->pixels);
-        if (ray_image->nrows == 0)  continue;
-        start_row = pilot->image_start_row + ray_image->nrows - 1;
-        start_col = pilot->image_start_col;
 
-        UFor( ray_row, ray_image->nrows )
+        update_view_params (pilot, &pilot->input, space);
+        copy_Point (&origin, &pilot->view_origin);
+        copy_PointXfrm (&basis, &pilot->view_basis);
+
+        if (ray_image->perspective)  ray_image->hifov = pilot->view_angle;
+        else                         ray_image->hifov = pilot->view_width;
+
+#ifdef DistribCompute
+        compute_rays_to_hits (ray_image, space, &origin, &basis);
+#else
+        if (LightAtCamera)
         {
-            uint image_row, ray_col;
-            const byte* pixline;
-            uint32* outline;
-
-            image_row = start_row - ray_row;
-            if (image_row >= nrows)  continue;
-
-            pixline = &ray_image->pixels[ray_row * 3 * view_ncols];
-            outline = (uint32*) &data[image_row * stride];
-
-            UFor( ray_col, ray_image->ncols )
-            {
-                uint image_col;
-                image_col = start_col + ray_col;
-                if (image_col >= ncols)  break;
-                outline[image_col] =
-                    ((uint32) 0xFF                   << 24) |
-                    ((uint32) pixline[3*image_col+0] << 16) |
-                    ((uint32) pixline[3*image_col+1] <<  8) |
-                    ((uint32) pixline[3*image_col+2] <<  0);
-            }
+            assert (space->nlights > 0);
+            copy_Point (&space->lights[0].location, &origin);
+            Op_s( real, NColors, space->lights[0].intensity , .5 );
         }
+        if (ncheckplanes > 0)
+        {
+            set_checkpoint_light (&space->lights[space->nlights-1],
+                                  &space->objects[checkplane_objidx],
+                                  &racer_motions[pilot->craft_idx],
+                                  &pilot->view_origin);
+        }
+        update_dynamic_RaySpace (space);
+        if (ForceFauxFishEye)
+            rays_to_hits_fish (ray_image, space,
+                               &origin, &basis, pilot->view_angle);
+        else
+            cast_RayImage (ray_image, space, &origin, &basis);
+#endif
     }
+}
+
+    void
+init_ui_data (RaySpace* space, const char* inpathname)
+{
+    uint i;
+    if (FollowRacer)
+    {
+        assert (space->nobjects == 0 && "All objects must be racers.");
+        nracers = npilots;
+        assert (nracers <= NRacersMax);
+        add_racers (space, nracers, inpathname);
+        UFor( i, nracers )
+            init_ObjectMotion (&racer_motions[i], &space->objects[i]);
+    }
+
+    if (ncheckplanes > 0)
+    {
+        checkplane_objidx = space->nobjects;
+        add_1elem_Scene_RaySpace (space);
+    }
+
+    setup_laser_scenes (space);
+}
+
+    void
+cleanup_ui_data ()
+{
+    uint i;
+    UFor( i, NRacersMax )
+        cleanup_Pilot (&pilots[i]);
 }
 

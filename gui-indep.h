@@ -1,6 +1,10 @@
 
     /* Include the .c file!*/
 
+#ifdef DistribCompute
+#include "compute.h"
+#endif
+
 #include "motion.h"
 #include "pnm-image.h"
 #include "testcase.h"
@@ -79,8 +83,6 @@ static RaceCraft crafts[NRacersMax];
 static Pilot pilots[NRacersMax];
 static uint view_nrows = 400;
 static uint view_ncols = 400;
-static bool needs_recast = true;
-static bool continue_running = true;
 static real frame_t0 = 0;
 static real framerate_report_dt = 0;
 static uint framerate_report_count = 0;
@@ -122,7 +124,16 @@ update_health (const RaySpace* space, real dt);
 static void
 render_pattern (byte* data, uint nrows, uint ncols, uint stride);
 static void
-render_RaySpace (RaySpace* space, byte* data,
-                 uint nrows, uint ncols, uint stride,
-                 real frame_t1);
+render_RayImage (byte* data, uint nrows, uint ncols, uint stride,
+                 const RayImage* ray_image,
+                 uint image_start_row,
+                 uint image_start_col);
+static void
+render_pilot_images (byte* data, uint nrows, uint ncols, uint stride);
+static void
+update_pilot_images (RaySpace* space, real frame_t1);
+static void
+init_ui_data (RaySpace* space, const char* inpathname);
+static void
+cleanup_ui_data ();
 

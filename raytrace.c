@@ -1887,6 +1887,7 @@ setup_RayCastAPriori (RayCastAPriori* dst,
                                              image->nrows, image->ncols,
                                              origin, view_basis,
                                              image->hifov);
+        dst->inside_box = false;
     }
 }
 

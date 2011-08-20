@@ -59,14 +59,14 @@ ifneq (,$(filter macapp,$(CONFIG)))
 	# Everything on this OS X setup is 32 bit.
 	CFLAGS += -m32
 	DFLAGS += -DRunFromMyMac
-	GuiCFlags += -I$(HOME)/gtk/inst/include \
-				 -I/Library/Frameworks/SDL.framework/Headers \
-				 -I/Library/Frameworks/SDL_mixer.framework/Headers
+	GuiCFlags += -I/Library/Frameworks/SDL.framework/Headers
 	GuiLFlags += -framework SDL
 	ifneq (,$(filter image,$(CONFIG)))
+		GuiCFlags += -I/Library/Frameworks/SDL_image.framework/Headers
 		GuiLFlags += -framework SDL_image
 	endif
 	ifneq (,$(filter sound,$(CONFIG)))
+		GuiCFlags += -I/Library/Frameworks/SDL_mixer.framework/Headers
 		GuiLFlags += -framework SDL_mixer
 	endif
 else
@@ -199,13 +199,9 @@ cli: cli.c compute.c $(CSources)
 
 GuiCFlags += $(CFLAGS)
 GuiDFlags += $(DFLAGS)
+GuiLFlags += $(LFLAGS)
 gui: gui.c gui-indep.c compute.c motion.c $(CSources)
-	$(CC) $(GuiCFlags) $(GuiDFlags) \
-	   	`pkg-config --cflags gtk+-2.0` \
-		$< -o $@ \
-		`pkg-config --libs gtk+-2.0` \
-		`pkg-config --libs gthread-2.0` \
-		$(GuiLFlags) $(LFLAGS)
+	$(CC) $(GuiCFlags) $(GuiDFlags) $< -o $@ $(GuiLFlags)
 
 
 VerifyCFlags := $(filter-out -fwhole-program,$(CFLAGS))

@@ -1,16 +1,8 @@
 
-#ifdef DistribCompute
-#include "compute.h"
-#endif
-
     /* Note: important stuff in this file!*/
 #include "gui-indep.c"
 
-#include <gtk/gtk.h>
-#include <gdk/gdkkeysyms.h>
-
 #include <SDL.h>
-#include <SDL_thread.h>
 #ifdef SupportImage
 #include <SDL_image.h>
 #endif
@@ -32,35 +24,17 @@ RunFromMyMac = true;
 RunFromMyMac = false;
 #endif
 
+static bool needs_recast = true;
+static bool continue_running = true;
+static SDL_cond* redraw_cond;
+static bool redraw_happening = true;
+static uint resize_nrows = 0;
+static uint resize_ncols = 0;
 
-static SDL_cond* pilots_initialized = 0;
-
-static gboolean delete_event (GtkWidget* widget,
-                              GdkEvent* event,
-                              gpointer data)
-{
-    (void) widget;
-    (void) event;
-    (void) data;
-    return FALSE;
-}
-
-    /* Another callback */
-static void destroy_app (GtkWidget* widget,
-                         gpointer data)
-{
-    uint i;
-    (void) widget;
-    (void) data;
-    UFor( i, NRacersMax )
-        cleanup_Pilot (&pilots[i]);
-    continue_running = false;
-    gtk_main_quit ();
-}
 
 static
-    gboolean
-key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer data)
+    void
+key_press_fn (Pilot* pilot, const SDL_keysym* event)
 {
     uint dim = NDimensions;
     tristate roll = 0;
@@ -80,7 +54,6 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer data)
     bool recast = true;
     FILE* out = stdout;
     bool shift_mod, ctrl_mod;
-    Pilot* pilot;
     MotionInput* input;
     Point* view_origin;
     PointXfrm* view_basis;
@@ -89,7 +62,6 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer data)
     uint craft_idx;
     ObjectMotion* racer_motion;
 
-    pilot = &((Pilot*) data)[kbd_pilot_idx];
     input = &pilot->input;
     view_origin = &pilot->view_origin;
     view_basis = &pilot->view_basis;
@@ -98,14 +70,12 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer data)
     craft_idx = pilot->craft_idx;
     racer_motion = &racer_motions[craft_idx];
 
-    shift_mod = event->state & GDK_SHIFT_MASK;
-    ctrl_mod = event->state & GDK_CONTROL_MASK;
+    shift_mod = 0 != (event->mod & KMOD_SHIFT);
+    ctrl_mod = 0 != (event->mod & KMOD_CTRL);
 
-        /* /usr/include/gtk-2.0/gdk/gdkkeysyms.h */
-        /* printf ("%x\n", event->keyval); */
-    switch (event->keyval)
+    switch (event->sym)
     {
-        case GDK_Up:
+        case SDLK_UP:
             if (FollowRacer)
             {
                 if (shift_mod) { dim = UpDim;  camera_offset = 1; }
@@ -116,7 +86,7 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer data)
             else if (ctrl_mod) { dim = UpDim;  turn = 1; }
             else { dim = ForwardDim;  stride = 1; }
             break;
-        case GDK_Down:
+        case SDLK_DOWN:
             if (FollowRacer)
             {
                 if (shift_mod) { dim = UpDim;  camera_offset = -1; }
@@ -127,68 +97,70 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer data)
             else if (ctrl_mod) { dim = UpDim;  turn = -1; }
             else { dim = ForwardDim;  stride = -1; }
             break;
-        case GDK_Right:
+        case SDLK_RIGHT:
             if (shift_mod) { dim = RightDim;  stride = 1; }
             else if (ctrl_mod) { roll = -1; }
             else if (FollowRacer) { dim = RightDim;  turn = 1; }
             else { roll = -1; }
             break;
-        case GDK_Left:
+        case SDLK_LEFT:
             if (shift_mod) { dim = RightDim;  stride = -1; }
             else if (ctrl_mod) { roll = 1; }
             else if (FollowRacer) { dim = RightDim;  turn = -1; }
             else { roll = 1; }
             break;
-        case GDK_Tab:
-            switch_racer =  1; break;
-        case GDK_ISO_Left_Tab:
-            switch_racer = -1; break;
-        case GDK_Escape:
-            gdk_pointer_ungrab (event->time);  break;
-        case GDK_a:
+        case SDLK_TAB:
+            if (shift_mod)  switch_racer = -1;
+            else            switch_racer =  1;
+            break;
+        case SDLK_a:
             dim = ForwardDim; stride = 1; break;
-        case GDK_c:
+        case SDLK_c:
             racer_motion->collide = !racer_motion->collide;
             break;
-        case GDK_D:
-            if (NDimensions == 4) { dim = DriftDim; stride = 1; }
+        case SDLK_d:
+            if (shift_mod)
+            {
+                if (NDimensions == 4) { dim = DriftDim; stride = 1; }
+            }
+            else
+            {
+                if (ctrl_mod) { rotate_dir_dim = true; }
+                else if (NDimensions == 4) { dim = DriftDim; stride = -1; }
+            }
             break;
-        case GDK_d:
-            if (ctrl_mod) { rotate_dir_dim = true; }
-            else if (NDimensions == 4) { dim = DriftDim; stride = -1; }
-            break;
-        case GDK_e:
+        case SDLK_e:
             input->boost = true;
             break;
-        case GDK_f:
-            switch_kbd_pilot = 1;  break;
-        case GDK_F:
-            switch_kbd_pilot = -1;  break;
-        case GDK_g:
+        case SDLK_f:
+            if (shift_mod)  switch_kbd_pilot = -1;
+            else            switch_kbd_pilot =  1;
+            break;
+        case SDLK_g:
             racer_motion->gravity = !racer_motion->gravity;
             break;
-        case GDK_L:
-            view_light_change = 1;  break;
-        case GDK_l:
-            view_light_change = -1;  break;
-        case GDK_P:
-            print_view_code = true;  break;
-        case GDK_r:
+        case SDLK_l:
+            if (shift_mod)  view_light_change =  1;
+            else            view_light_change = -1;
+            break;
+        case SDLK_p:
+            if (shift_mod)  print_view_code = true;
+            break;
+        case SDLK_r:
             reflect = true;  break;
-        case GDK_S:
-            stride_mag_change = 1; break;
-        case GDK_s:
-            stride_mag_change = -1; break;
-        case GDK_V:
-            view_angle_change = 1;  break;
-        case GDK_v:
+        case SDLK_s:
+            if (shift_mod)  stride_mag_change =  1;
+            else            stride_mag_change = -1;
+            break;
+        case SDLK_v:
             if (ctrl_mod)  change_cast_method = true;
+            else if (shift_mod)  view_angle_change = 1;
             else  view_angle_change = -1;
             break;
-        case GDK_Z:
-            resize = 1;  break;
-        case GDK_z:
-            resize = -1;  break;
+        case SDLK_z:
+            if (shift_mod)  resize =  1;
+            else            resize = -1;
+            break;
         default:
             break;
     }
@@ -297,25 +269,25 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer data)
     {
         uint diff = 100;
             /* assert (view_nrows == view_ncols); */
+        if (resize_nrows == 0)
+        {
+            resize_nrows = view_nrows;
+            resize_ncols = view_ncols;
+        }
         if (resize > 0)
         {
-            view_nrows += diff;
-            view_ncols += diff;
+            resize_nrows += diff;
+            resize_ncols += diff;
         }
-        else if (view_nrows > diff)
+        else if (resize_nrows > diff)
         {
-            view_nrows -= diff;
-            view_ncols -= diff;
+            resize_nrows -= diff;
+            resize_ncols -= diff;
         }
         else
         {
             recast = false;
         }
-        if (recast)
-        {
-            resize_pilot_viewports (view_nrows, view_ncols);
-        }
-        gtk_window_resize (GTK_WINDOW(widget), view_ncols, view_nrows);
     }
     else if (reflect)
     {
@@ -378,37 +350,31 @@ key_press_fn (GtkWidget* widget, GdkEventKey* event, gpointer data)
 
 
     if (recast)  needs_recast = true;
-
-    return TRUE;
 }
 
 static
-    gboolean
-key_release_fn (GtkWidget* _widget, GdkEventKey* event, gpointer data)
+    void
+key_release_fn (MotionInput* input, const SDL_keysym* event)
 {
-    MotionInput* input;
-    (void) _widget;
-
-    input = &((Pilot*) data)[kbd_pilot_idx].input;
-
-    switch (event->keyval)
+    switch (event->sym)
     {
-        case GDK_Up:
-        case GDK_Down:
+        case SDLK_UP:
+        case SDLK_DOWN:
             input->vert = 0;
             break;
-        case GDK_Right:
-        case GDK_Left:
+        case SDLK_RIGHT:
+        case SDLK_LEFT:
             input->horz = 0;
             break;
-        case GDK_a:
+        case SDLK_a:
             input->stride[ForwardDim] = 0;
             break;
-        case GDK_e:
+        case SDLK_e:
             input->boost = false;
             break;
+        default:
+            break;
     }
-    return TRUE;
 }
 
 
@@ -457,37 +423,19 @@ joystick_axis_event (MotionInput* mot, uint axisidx, int value)
 }
 
 
-#if 0
-static gboolean move_mouse_fn (GtkWidget* widget,
-                               GdkEventButton* event,
-                               Gdk)
+static
+    void
+grab_mouse_fn (const SDL_MouseButtonEvent* event, const RaySpace* space)
 {
-    return TRUE;
-}
-#endif
-
-static gboolean grab_mouse_fn (GtkWidget* da,
-                               GdkEventButton* event,
-                               gpointer state)
-{
-        /* GdkCursor* cursor; */
-    int width, height;
     uint row, col;
-    FILE* out;
+    FILE* out = stdout;
     bool do_rotate = false;
     bool do_raycast = false;
     RayCastAPriori priori;
     Point origin, dir;
-
-    const RaySpace* space;
     Pilot* pilot;
 
-    space = (RaySpace*) state;
     pilot = &pilots[kbd_pilot_idx];
-
-    out = stdout;
-
-    gdk_drawable_get_size (da->window, &width, &height);
 
     row = event->y;
     col = event->x;
@@ -495,7 +443,6 @@ static gboolean grab_mouse_fn (GtkWidget* da,
         event->x < pilot->image_start_col)
     {
         fputs ("Stay in the box hoser!\n", out);
-        return FALSE;
     }
 
     row -= pilot->image_start_row;
@@ -504,7 +451,6 @@ static gboolean grab_mouse_fn (GtkWidget* da,
         pilot->ray_image.ncols <= col)
     {
         fputs ("Stay in the box hoser!\n", out);
-        return FALSE;
     }
 
         /* Row numbering becomes bottom-to-top.*/
@@ -543,20 +489,8 @@ static gboolean grab_mouse_fn (GtkWidget* da,
         fputc ('\n', out);
         needs_recast = true;
 
-#if 0
-        cursor = gdk_cursor_new (GDK_GUMBY);
-        gdk_pointer_grab (da->window,
-                          FALSE,
-                          0,
-                          da->window,
-                          cursor,
-                          event->time);
-        gdk_cursor_unref (cursor);
-
-#endif
-
-        pilot->mouse_coords[0] = event->x_root;
-        pilot->mouse_coords[1] = event->y_root;
+        pilot->mouse_coords[0] = event->x;
+        pilot->mouse_coords[1] = event->y;
         pilot->mouse_diff[0] = 0;
         pilot->mouse_diff[1] = 0;
     }
@@ -600,112 +534,70 @@ static gboolean grab_mouse_fn (GtkWidget* da,
             fputs ("No hit!\n", out);
         }
     }
-
-    return FALSE;
-}
-
-static
-    gboolean
-render_expose (GtkWidget* da,
-               GdkEventExpose* event,
-               gpointer state)
-{
-    cairo_surface_t* surface;
-    cairo_t* cr;
-    byte* data;
-    int width, height, stride;
-
-    (void) event;
-
-    gdk_drawable_get_size (da->window, &width, &height);
-
-    surface = cairo_image_surface_create (CAIRO_FORMAT_ARGB32, width, height);
-
-    stride = cairo_image_surface_get_stride (surface);
-    data = cairo_image_surface_get_data (surface);
-
-    if (RenderDrawsPattern)
-        render_pattern (data, (uint) height, (uint)  width, (uint) stride);
-    else
-        render_RaySpace ((RaySpace*) state,
-                         data, (uint) height, (uint) width, (uint) stride,
-                         (real) SDL_GetTicks () / 1000);
-
-    cairo_surface_mark_dirty (surface);
-    cr = gdk_cairo_create (da->window);
-    cairo_set_source_surface (cr, surface, 0, 0);
-    cairo_paint (cr);
-
-    cairo_surface_destroy (surface);
-    cairo_destroy (cr);
-    return TRUE;
-}
-
-static
-    gboolean
-update_rendering (gpointer widget)
-{
-    if (needs_recast)
-        gtk_widget_queue_draw ((GtkWidget*)widget);
-    return TRUE;
 }
 
 static
     void
-gui_main (int argc, char* argv[], RaySpace* space)
+sdl_redraw (SDL_Surface* screen)
 {
-    GtkWidget *window;
-    gtk_init (&argc, &argv);
-
-    window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
-    gtk_widget_add_events (window, GDK_BUTTON_PRESS_MASK);
-
-    g_signal_connect (window, "delete-event",
-                      G_CALLBACK(delete_event), NULL);
-    g_signal_connect (window, "destroy",
-                      G_CALLBACK(destroy_app), NULL);
-    g_signal_connect (window, "expose-event",
-                      G_CALLBACK(render_expose), space);
-    g_signal_connect (window, "key-press-event",
-                      G_CALLBACK(key_press_fn), pilots);
-    g_signal_connect (window, "key-release-event",
-                      G_CALLBACK(key_release_fn), pilots);
-    g_signal_connect (window, "button-press-event",
-                      G_CALLBACK(grab_mouse_fn), space);
-    g_timeout_add (1000 / 100, update_rendering, window);
-
-
-    gtk_window_set_position (GTK_WINDOW(window), GTK_WIN_POS_CENTER);
-    gtk_window_set_title (GTK_WINDOW(window), "OuTHER SPACE");
-    gtk_window_set_default_size (GTK_WINDOW(window), view_ncols, view_nrows); 
-
-    gtk_widget_show_all (window);
-    gtk_main ();
-}
-
-    void
-redraw_loop (RaySpace* space)
-{
-    SDL_Surface* screen;
-    screen = SDL_SetVideoMode (view_ncols, view_nrows, 32, SDL_HWSURFACE);
-
-    while (true)
-    {
-        if (SDL_MUSTLOCK (screen) && SDL_LockSurface (screen) < 0)  break;
-
+    if (SDL_MUSTLOCK (screen) && SDL_LockSurface (screen) < 0)  return;
 
     if (RenderDrawsPattern)
         render_pattern (screen->pixels, screen->h, screen->w, screen->pitch);
     else
-        render_RaySpace (space, (byte*)screen->pixels,
-                         screen->h, screen->w, screen->pitch,
-                         (real) SDL_GetTicks () / 1000);
+        render_pilot_images ((byte*)screen->pixels,
+                             screen->h, screen->w, screen->pitch);
 
-        if (SDL_MUSTLOCK (screen))  SDL_UnlockSurface (screen);
-        SDL_Flip (screen);
-    }
+    if (SDL_MUSTLOCK (screen))  SDL_UnlockSurface (screen);
+    SDL_Flip (screen);
 }
 
+static
+    int
+redraw_loop_fn (void* data)
+{
+    SDL_Surface* screen = 0;
+    SDL_mutex* cond_lock;
+    RaySpace* space;
+    space = (RaySpace*) data;
+    cond_lock = SDL_CreateMutex ();
+
+    SDL_WM_SetCaption ("OuTHER SPACE", 0);
+    resize_nrows = view_nrows;
+    resize_ncols = view_ncols;
+
+    while (continue_running)
+    {
+        SDL_mutexP (cond_lock);
+        redraw_happening = false;
+        SDL_CondWait (redraw_cond, cond_lock);
+        redraw_happening = true;
+        SDL_mutexV (cond_lock);
+
+        if (resize_nrows > 0)
+        {
+            view_nrows = resize_nrows;
+            view_ncols = resize_ncols;
+            resize_nrows = resize_ncols = 0;
+
+            resize_pilot_viewports (view_nrows, view_ncols);
+            screen = SDL_SetVideoMode (view_ncols, view_nrows, 32,
+                                       SDL_DOUBLEBUF|SDL_HWSURFACE);
+        }
+
+        if (!RenderDrawsPattern && needs_recast)
+        {
+            needs_recast = false;
+            update_pilot_images (space, (real) SDL_GetTicks () / 1000);
+        }
+        sdl_redraw (screen);
+    }
+
+    SDL_DestroyMutex (cond_lock);
+    return 0;
+}
+
+static
     uint32
 keepalive_sdl_event_fn (uint32 interval, void* param)
 {
@@ -719,22 +611,31 @@ keepalive_sdl_event_fn (uint32 interval, void* param)
     return interval;
 }
 
-    int
-sdl_main (void* data)
+
+static
+    void
+sdl_main (RaySpace* space, const char* pathname)
 {
+    SDL_Thread* redraw_thread;
     SDL_TimerID timer;
     SDL_Joystick* joysticks[NRacersMax]; 
     SDL_Event event;
     uint i, njoysticks;
+    int ret;
 #ifdef SupportSound
     Mix_Chunk* tune = 0;
-    int ret;
     int channel = -1;
     FILE* out = stderr;
 #endif
-    const char* pathname;
-
-    pathname = (char*) data;
+        /* Note: SDL_INIT_VIDEO is required for some silly reason!*/
+    ret = SDL_Init (SDL_INIT_VIDEO |
+#ifdef SupportSound
+                    SDL_INIT_AUDIO |
+#endif
+                    SDL_INIT_EVENTTHREAD |
+                    SDL_INIT_JOYSTICK |
+                    SDL_INIT_TIMER);
+    assert (ret == 0);
 
     SDL_JoystickEventState (SDL_ENABLE);
     njoysticks = SDL_NumJoysticks ();
@@ -747,8 +648,7 @@ sdl_main (void* data)
     }
 
     if (njoysticks > 0)  npilots = njoysticks;
-    resize_pilot_viewports (view_nrows, view_ncols);
-    SDL_CondSignal (pilots_initialized);
+    init_ui_data (space, pathname);
 
 #ifdef SupportSound
     ret = Mix_OpenAudio(22050, AUDIO_S16SYS, 2, 1024);
@@ -774,17 +674,31 @@ sdl_main (void* data)
     }
 #endif
 
+    redraw_cond = SDL_CreateCond ();
+    redraw_thread = SDL_CreateThread (redraw_loop_fn, space);
+
         /* Add a timer to assure the event loop has
          * an event to process when we should exit.
          * Also, so updates can occur.
          */
-    timer = SDL_AddTimer (40, keepalive_sdl_event_fn, 0);
+    timer = SDL_AddTimer (10, keepalive_sdl_event_fn, 0);
     assert (timer);
 
     while (continue_running && SDL_WaitEvent (&event))
     {
         switch (event.type)
         {
+            case SDL_KEYDOWN:
+                key_press_fn (&pilots[kbd_pilot_idx],
+                              &event.key.keysym);
+                break;
+            case SDL_KEYUP:
+                key_release_fn (&pilots[kbd_pilot_idx].input,
+                                &event.key.keysym);
+                break;
+            case SDL_MOUSEBUTTONDOWN:
+                grab_mouse_fn (&event.button, space);
+                break;
             case SDL_JOYAXISMOTION:
                 {
                     MotionInput* input;
@@ -810,6 +724,12 @@ sdl_main (void* data)
                 }
                 break;
             case SDL_USEREVENT:
+                if (!redraw_happening)
+                    SDL_CondSignal (redraw_cond);
+                break;
+            case SDL_QUIT:
+                continue_running = false;
+                break;
             default:
                 break;
 
@@ -827,26 +747,35 @@ sdl_main (void* data)
     Mix_CloseAudio();
 #endif
 
+    SDL_WaitThread (redraw_thread, 0);
+    SDL_DestroyCond (redraw_cond);
+
     UFor( i, njoysticks )
         SDL_JoystickClose (joysticks[i]);
-    return 0;
+    SDL_Quit ();
 }
 
 
 int main (int argc, char* argv[])
 {
+    FILE* out = stderr;
     bool good = true;
     bool call_gui = true;
     uint i;
+#ifdef SupportImage
     int ret;
-    RaySpace space;
+#endif
+    RaySpace ray_space;
     char inpathname[1024];
     Point view_origin;
     PointXfrm view_basis;
     real view_angle;
+    RaySpace* space;
+
+    if (argc > 1)
+        fputs ("No options for this program, ignoring.\n", out);
 
     sprintf (inpathname, "%s", "data");
-
     if (RunFromMyMac)
     {
         char pathname[1024];
@@ -859,19 +788,20 @@ int main (int argc, char* argv[])
         sprintf (inpathname, "%s/../Resources/share/outherspace", pathname);
     }
 
+    space = &ray_space;
 
 #ifdef DistribCompute
     init_compute (&argc, &argv);
 #endif
 
 #ifdef SupportImage
-        ret = IMG_Init (IMG_INIT_PNG);
-        assert (ret == IMG_INIT_PNG);
+    ret = IMG_Init (IMG_INIT_PNG);
+    assert (ret == IMG_INIT_PNG);
 #endif
 
     good =
 #if 0
-        setup_testcase_simple (&space, &view_origin,
+        setup_testcase_simple (space, &view_origin,
                                &view_basis, &view_angle,
                                inpathname, "machine0.obj");
 #else
@@ -897,25 +827,22 @@ int main (int argc, char* argv[])
 #elif 1
         setup_testcase_sphere
 #endif
-        (&space, &view_origin, &view_basis, &view_angle,
+        (space, &view_origin, &view_basis, &view_angle,
          inpathname);
 #endif  /* Pre-rolled testcase.*/
 
     if (!good)
     {
-        fputs ("Setup failed!\n", stderr);
+        fputs ("Setup failed!\n", out);
         return 1;
     }
 
 #ifdef DistribCompute
-    call_gui = !rays_to_hits_computeloop (&space);
+    call_gui = !rays_to_hits_computeloop (space);
 #endif
 
     if (call_gui)
     {
-        SDL_Thread* sdl_thread;
-        SDL_mutex* initializing_lock;
-
         UFor( i, NRacersMax )
         {
             Pilot* pilot;
@@ -936,51 +863,9 @@ int main (int argc, char* argv[])
 
         }
 
-        pilots_initialized = SDL_CreateCond ();
+        sdl_main (space, inpathname);
 
-            /* Note: SDL_INIT_VIDEO is required for some silly reason!*/
-        ret = SDL_Init (SDL_INIT_VIDEO |
-#ifdef SupportSound
-                        SDL_INIT_AUDIO |
-#endif
-                        SDL_INIT_EVENTTHREAD |
-                        SDL_INIT_JOYSTICK |
-                        SDL_INIT_TIMER);
-                        
-        assert (ret == 0);
-
-        sdl_thread = SDL_CreateThread (sdl_main, inpathname);
-
-        initializing_lock = SDL_CreateMutex ();
-        SDL_mutexP (initializing_lock);
-        SDL_CondWait (pilots_initialized, initializing_lock);
-        SDL_mutexV (initializing_lock);
-        SDL_DestroyMutex (initializing_lock);
-        SDL_DestroyCond (pilots_initialized);
-
-
-        if (FollowRacer)
-        {
-            assert (space.nobjects == 0 && "All objects must be racers.");
-            nracers = npilots;
-            assert (nracers <= NRacersMax);
-            add_racers (&space, nracers, inpathname);
-            UFor( i, nracers )
-                init_ObjectMotion (&racer_motions[i], &space.objects[i]);
-        }
-
-        if (ncheckplanes > 0)
-        {
-            checkplane_objidx = space.nobjects;
-            add_1elem_Scene_RaySpace (&space);
-        }
-
-        setup_laser_scenes (&space);
-
-        gui_main (argc, argv, &space);
-
-        SDL_WaitThread (sdl_thread, 0);
-        SDL_Quit ();
+        cleanup_ui_data ();
 #ifdef DistribCompute
         stop_computeloop ();
 #endif
