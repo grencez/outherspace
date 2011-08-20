@@ -34,6 +34,10 @@
 typedef unsigned int uint;
 typedef unsigned char byte;
 
+#ifndef uint32
+#define uint32 uint
+#endif
+
 #define NBitsInByte 8
 
 #ifndef COMPILER_HAS_BOOL

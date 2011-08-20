@@ -199,7 +199,7 @@ cli: cli.c compute.c $(CSources)
 
 GuiCFlags += $(CFLAGS)
 GuiDFlags += $(DFLAGS)
-gui: gui.c compute.c motion.c $(CSources)
+gui: gui.c gui-indep.c compute.c motion.c $(CSources)
 	$(CC) $(GuiCFlags) $(GuiDFlags) \
 	   	`pkg-config --cflags gtk+-2.0` \
 		$< -o $@ \
