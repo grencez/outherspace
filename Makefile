@@ -55,12 +55,18 @@ ifneq (,$(filter sound,$(CONFIG)))
 	GuiDFlags += -DSupportSound
 endif
 
+GuiMainCSources = gui.c 
 ifneq (,$(filter macapp,$(CONFIG)))
 	# Everything on this OS X setup is 32 bit.
 	CFLAGS += -m32
 	DFLAGS += -DRunFromMyMac
 	GuiCFlags += -I/Library/Frameworks/SDL.framework/Headers
 	GuiLFlags += -framework SDL
+	GuiLFlags += -framework foundation
+	GuiLFlags += -framework cocoa
+	# Need a wrapper around the main function.
+	GuiMainCSources += SDLMain.m
+	CFLAGS := $(filter-out -fwhole-program,$(CFLAGS))
 	ifneq (,$(filter image,$(CONFIG)))
 		GuiCFlags += -I/Library/Frameworks/SDL_image.framework/Headers
 		GuiLFlags += -framework SDL_image
@@ -200,8 +206,8 @@ cli: cli.c compute.c $(CSources)
 GuiCFlags += $(CFLAGS)
 GuiDFlags += $(DFLAGS)
 GuiLFlags += $(LFLAGS)
-gui: gui.c gui-indep.c compute.c motion.c $(CSources)
-	$(CC) $(GuiCFlags) $(GuiDFlags) $< -o $@ $(GuiLFlags)
+gui: $(GuiMainCSources) gui-indep.c compute.c motion.c $(CSources)
+	$(CC) $(GuiCFlags) $(GuiDFlags) $(GuiMainCSources) -o $@ $(GuiLFlags)
 
 
 VerifyCFlags := $(filter-out -fwhole-program,$(CFLAGS))

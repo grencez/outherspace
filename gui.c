@@ -15,15 +15,6 @@
 #undef main
 #endif
 
-
-static const bool
-#ifdef RunFromMyMac
-#undef RunFromMyMac
-RunFromMyMac = true;
-#else
-RunFromMyMac = false;
-#endif
-
 static bool needs_recast = true;
 static bool continue_running = true;
 static uint resize_nrows = 0;
@@ -34,6 +25,7 @@ struct redraw_loop_param_struct
     RaySpace* space;
     const char* pathname;
     SDL_sem* sig;
+    SDL_sem* oktoquit_sig;
 };
 typedef struct redraw_loop_param_struct RedrawLoopParam;
 
@@ -569,9 +561,6 @@ redraw_loop_fn (void* data)
     param = (RedrawLoopParam*) data;
     space = param->space;
 
-    resize_nrows = view_nrows;
-    resize_ncols = view_ncols;
-
     while (continue_running)
     {
         if (resize_nrows > 0)
@@ -595,6 +584,7 @@ redraw_loop_fn (void* data)
         SDL_SemWait (param->sig);
     }
 
+    SDL_SemPost (param->oktoquit_sig);
     return 0;
 }
 
@@ -612,17 +602,13 @@ keepalive_sdl_event_fn (uint32 interval, void* param)
     return interval;
 }
 
-
 static
-    void
-sdl_main (RaySpace* space, const char* pathname)
+    int
+event_loop_fn (void* data)
 {
-    RedrawLoopParam redraw_param;
-    SDL_Thread* redraw_thread;
-    SDL_Surface* icon = 0;
+    SDL_Event event;
     SDL_TimerID timer;
     SDL_Joystick* joysticks[NRacersMax]; 
-    SDL_Event event;
     uint i, njoysticks;
     int ret;
 #ifdef SupportSound
@@ -630,13 +616,11 @@ sdl_main (RaySpace* space, const char* pathname)
     int channel = -1;
     FILE* out = stderr;
 #endif
+    RedrawLoopParam* param;
+    RaySpace* space;
 
-    {
-        char* iconpath;
-        iconpath = cat_filepath (pathname, "icon.bmp");
-        icon = SDL_LoadBMP (iconpath);
-        free (iconpath);
-    }
+    param = (RedrawLoopParam*) data;
+    space = param->space;
 
         /* Note: SDL_INIT_VIDEO is required for some silly reason!*/
     ret = SDL_Init (SDL_INIT_VIDEO |
@@ -647,7 +631,6 @@ sdl_main (RaySpace* space, const char* pathname)
                     SDL_INIT_JOYSTICK |
                     SDL_INIT_TIMER);
     assert (ret == 0);
-
 
     SDL_JoystickEventState (SDL_ENABLE);
     njoysticks = SDL_NumJoysticks ();
@@ -660,7 +643,11 @@ sdl_main (RaySpace* space, const char* pathname)
     }
 
     if (njoysticks > 0)  npilots = njoysticks;
-    init_ui_data (space, pathname);
+    init_ui_data (space, param->pathname);
+
+        /* Allow the main thread to start drawing.*/
+    assert (SDL_SemValue (param->sig) == 0);
+    SDL_SemPost (param->sig);
 
 #ifdef SupportSound
     ret = Mix_OpenAudio(22050, AUDIO_S16SYS, 2, 1024);
@@ -673,8 +660,7 @@ sdl_main (RaySpace* space, const char* pathname)
         const char fname[] = "music0.ogg";
         char* buf;
 
-        buf = AllocT( char, strlen (pathname) + 1 + strlen (fname) + 1 );
-        sprintf (buf, "%s/%s", pathname, fname);
+        buf = cat_filepath (param->pathname, fname);
         tune = Mix_LoadWAV (buf);
 
         if (!tune)
@@ -685,14 +671,6 @@ sdl_main (RaySpace* space, const char* pathname)
         free (buf);
     }
 #endif
-
-    SDL_WM_SetCaption ("OuTHER SPACE", 0);
-    if (icon)  SDL_WM_SetIcon (icon, 0);
-
-    redraw_param.space = space;
-    redraw_param.pathname = pathname;
-    redraw_param.sig = SDL_CreateSemaphore (1);
-    redraw_thread = SDL_CreateThread (redraw_loop_fn, &redraw_param);
 
         /* Add a timer to assure the event loop has
          * an event to process when we should exit.
@@ -744,8 +722,8 @@ sdl_main (RaySpace* space, const char* pathname)
                 continue_running = false;
                     /* Fall thru.*/
             case SDL_USEREVENT:
-                if (SDL_SemValue (redraw_param.sig) < 1)
-                    SDL_SemPost (redraw_param.sig);
+                if (SDL_SemValue (param->sig) < 1)
+                    SDL_SemPost (param->sig);
                 break;
             default:
                 break;
@@ -764,18 +742,61 @@ sdl_main (RaySpace* space, const char* pathname)
     Mix_CloseAudio();
 #endif
 
-    SDL_WaitThread (redraw_thread, 0);
-    SDL_DestroySemaphore (redraw_param.sig);
-
     UFor( i, njoysticks )
         SDL_JoystickClose (joysticks[i]);
+
+    SDL_SemWait (param->oktoquit_sig);
     SDL_Quit ();
+    return 0;
+}
+
+static
+    void
+sdl_main (RaySpace* space, const char* pathname)
+{
+    RedrawLoopParam redraw_param;
+    SDL_Thread* event_thread;
+    SDL_Surface* icon = 0;
+
+    {
+        char* iconpath;
+        iconpath = cat_filepath (pathname, "icon.bmp");
+        icon = SDL_LoadBMP (iconpath);
+        free (iconpath);
+    }
+
+    resize_nrows = view_nrows;
+    resize_ncols = view_ncols;
+
+    redraw_param.space = space;
+    redraw_param.pathname = pathname;
+    redraw_param.sig = SDL_CreateSemaphore (0);
+    redraw_param.oktoquit_sig = SDL_CreateSemaphore (0);
+    event_thread = SDL_CreateThread (event_loop_fn, &redraw_param);
+
+        /* Wait for thread to initialize SDL, then set up some stuff.*/
+    SDL_SemWait (redraw_param.sig);
+    SDL_WM_SetCaption ("OuTHER SPACE", 0);
+    if (icon)  SDL_WM_SetIcon (icon, 0);
+
+        /* Start main render loop, the event thread tells it when to die.*/
+    redraw_loop_fn (&redraw_param);
+    SDL_WaitThread (event_thread, 0);
+    SDL_DestroySemaphore (redraw_param.sig);
+    SDL_DestroySemaphore (redraw_param.oktoquit_sig);
 
     if (icon)  SDL_FreeSurface (icon);
 }
 
 
+#ifdef RunFromMyMac
+#undef RunFromMyMac
+static const bool RunFromMyMac = true;
+extern int wrapped_main_fn (int argc, char* argv[])
+#else
+static const bool RunFromMyMac = false;
 int main (int argc, char* argv[])
+#endif
 {
     FILE* out = stderr;
     bool good = true;
