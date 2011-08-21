@@ -16,16 +16,15 @@
 #endif
 
 static bool needs_recast = true;
-static bool continue_running = true;
 static uint resize_nrows = 0;
 static uint resize_ncols = 0;
 
 struct redraw_loop_param_struct
 {
     RaySpace* space;
-    const char* pathname;
     SDL_sem* sig;
-    SDL_sem* oktoquit_sig;
+    bool continue_running;
+    bool resize;
 };
 typedef struct redraw_loop_param_struct RedrawLoopParam;
 
@@ -538,13 +537,19 @@ static
     void
 sdl_redraw (SDL_Surface* screen)
 {
+#ifdef RunFromMyMac
+    const bool argb_order = false;
+#else
+    const bool argb_order = true;
+#endif
     if (SDL_MUSTLOCK (screen) && SDL_LockSurface (screen) < 0)  return;
 
     if (RenderDrawsPattern)
-        render_pattern (screen->pixels, screen->h, screen->w, screen->pitch);
+        render_pattern (screen->pixels, screen->h, screen->w, screen->pitch,
+                        argb_order);
     else
         render_pilot_images ((byte*)screen->pixels,
-                             screen->h, screen->w, screen->pitch);
+                             screen->h, screen->w, screen->pitch, argb_order);
 
     if (SDL_MUSTLOCK (screen))  SDL_UnlockSurface (screen);
     SDL_Flip (screen);
@@ -552,62 +557,54 @@ sdl_redraw (SDL_Surface* screen)
 
 static
     int
-redraw_loop_fn (void* data)
+render_loop_fn (void* data)
 {
+    SDL_Event draw_event;
     RedrawLoopParam* param;
-    SDL_Surface* screen = 0;
     RaySpace* space;
 
     param = (RedrawLoopParam*) data;
     space = param->space;
 
-    while (continue_running)
+    draw_event.type = SDL_USEREVENT;
+    draw_event.user.code = 2;
+    draw_event.user.data1 = 0;
+    draw_event.user.data2 = 0;
+
+    while (param->continue_running)
     {
-        if (resize_nrows > 0)
+        param->resize = (resize_nrows > 0);
+        if (param->resize)
         {
             view_nrows = resize_nrows;
             view_ncols = resize_ncols;
             resize_nrows = resize_ncols = 0;
-
             resize_pilot_viewports (view_nrows, view_ncols);
-            screen = SDL_SetVideoMode (view_ncols, view_nrows, 32,
-                                       SDL_DOUBLEBUF|SDL_HWSURFACE);
+            param->resize = true;
         }
-
         if (!RenderDrawsPattern && needs_recast)
         {
             needs_recast = false;
             update_pilot_images (space, (real) SDL_GetTicks () / 1000);
         }
-        sdl_redraw (screen);
 
+        SDL_PushEvent (&draw_event);
         SDL_SemWait (param->sig);
     }
 
-    SDL_SemPost (param->oktoquit_sig);
     return 0;
 }
 
 static
-    uint32
-keepalive_sdl_event_fn (uint32 interval, void* param)
+    void
+sdl_main (RaySpace* space, const char* pathname)
 {
+    RedrawLoopParam redraw_loop_param;
     SDL_Event event;
-    (void) param;
-    event.type = SDL_USEREVENT;
-    event.user.code = 2;
-    event.user.data1 = 0;
-    event.user.data2 = 0;
-    SDL_PushEvent (&event);
-    return interval;
-}
-
-static
-    int
-event_loop_fn (void* data)
-{
-    SDL_Event event;
-    SDL_TimerID timer;
+        /* SDL_TimerID timer; */
+    SDL_Thread* render_thread;
+    SDL_Surface* icon = 0;
+    SDL_Surface* screen = 0;
     SDL_Joystick* joysticks[NRacersMax]; 
     uint i, njoysticks;
     int ret;
@@ -617,17 +614,22 @@ event_loop_fn (void* data)
     FILE* out = stderr;
 #endif
     RedrawLoopParam* param;
-    RaySpace* space;
 
-    param = (RedrawLoopParam*) data;
-    space = param->space;
+    param = &redraw_loop_param;
+
+    {
+        char* iconpath;
+        iconpath = cat_filepath (pathname, "icon.bmp");
+        icon = SDL_LoadBMP (iconpath);
+        free (iconpath);
+    }
 
         /* Note: SDL_INIT_VIDEO is required for some silly reason!*/
     ret = SDL_Init (SDL_INIT_VIDEO |
 #ifdef SupportSound
                     SDL_INIT_AUDIO |
 #endif
-                    SDL_INIT_EVENTTHREAD |
+                            /* SDL_INIT_EVENTTHREAD DOES NOT WORK!*/
                     SDL_INIT_JOYSTICK |
                     SDL_INIT_TIMER);
     assert (ret == 0);
@@ -643,11 +645,16 @@ event_loop_fn (void* data)
     }
 
     if (njoysticks > 0)  npilots = njoysticks;
-    init_ui_data (space, param->pathname);
+    init_ui_data (space, pathname);
+        /* Assure pilot views will be initialized (trigger a resize).*/
+    resize_nrows = view_nrows;
+    resize_ncols = view_ncols;
 
-        /* Allow the main thread to start drawing.*/
-    assert (SDL_SemValue (param->sig) == 0);
-    SDL_SemPost (param->sig);
+        /* Allow the render thread to begin.*/
+    param->space = space;
+    param->sig = SDL_CreateSemaphore (0);
+    param->continue_running = true;
+    render_thread = SDL_CreateThread (render_loop_fn, param);
 
 #ifdef SupportSound
     ret = Mix_OpenAudio(22050, AUDIO_S16SYS, 2, 1024);
@@ -660,7 +667,7 @@ event_loop_fn (void* data)
         const char fname[] = "music0.ogg";
         char* buf;
 
-        buf = cat_filepath (param->pathname, fname);
+        buf = cat_filepath (pathname, fname);
         tune = Mix_LoadWAV (buf);
 
         if (!tune)
@@ -672,14 +679,17 @@ event_loop_fn (void* data)
     }
 #endif
 
+    SDL_WM_SetCaption ("OuTHER SPACE", 0);
+    if (icon)  SDL_WM_SetIcon (icon, 0);
+
         /* Add a timer to assure the event loop has
          * an event to process when we should exit.
          * Also, so updates can occur.
          */
-    timer = SDL_AddTimer (10, keepalive_sdl_event_fn, 0);
-    assert (timer);
+        /* timer = SDL_AddTimer (10, keepalive_sdl_event_fn, 0); */
+        /* assert (timer); */
 
-    while (continue_running && SDL_WaitEvent (&event))
+    while (param->continue_running && SDL_WaitEvent (&event))
     {
         switch (event.type)
         {
@@ -718,21 +728,26 @@ event_loop_fn (void* data)
                                            je->state == SDL_PRESSED);
                 }
                 break;
-            case SDL_QUIT:
-                continue_running = false;
-                    /* Fall thru.*/
             case SDL_USEREVENT:
-                if (SDL_SemValue (param->sig) < 1)
-                    SDL_SemPost (param->sig);
+                if (param->resize) {
+                    screen = SDL_SetVideoMode (view_ncols, view_nrows, 32,
+                                               SDL_DOUBLEBUF|SDL_HWSURFACE);
+                }
+                sdl_redraw (screen);
+                needs_recast = true;
+                SDL_SemPost (param->sig);
+                break;
+            case SDL_QUIT:
+                param->continue_running = false;
+                SDL_SemPost (param->sig);
                 break;
             default:
                 break;
 
         }
-        needs_recast = true;
     }
 
-    SDL_RemoveTimer (timer);
+        /* SDL_RemoveTimer (timer); */
 
 #ifdef SupportSound
     if (channel >= 0)
@@ -745,46 +760,10 @@ event_loop_fn (void* data)
     UFor( i, njoysticks )
         SDL_JoystickClose (joysticks[i]);
 
-    SDL_SemWait (param->oktoquit_sig);
+    SDL_WaitThread (render_thread, 0);
+    SDL_DestroySemaphore (param->sig);
+
     SDL_Quit ();
-    return 0;
-}
-
-static
-    void
-sdl_main (RaySpace* space, const char* pathname)
-{
-    RedrawLoopParam redraw_param;
-    SDL_Thread* event_thread;
-    SDL_Surface* icon = 0;
-
-    {
-        char* iconpath;
-        iconpath = cat_filepath (pathname, "icon.bmp");
-        icon = SDL_LoadBMP (iconpath);
-        free (iconpath);
-    }
-
-    resize_nrows = view_nrows;
-    resize_ncols = view_ncols;
-
-    redraw_param.space = space;
-    redraw_param.pathname = pathname;
-    redraw_param.sig = SDL_CreateSemaphore (0);
-    redraw_param.oktoquit_sig = SDL_CreateSemaphore (0);
-    event_thread = SDL_CreateThread (event_loop_fn, &redraw_param);
-
-        /* Wait for thread to initialize SDL, then set up some stuff.*/
-    SDL_SemWait (redraw_param.sig);
-    SDL_WM_SetCaption ("OuTHER SPACE", 0);
-    if (icon)  SDL_WM_SetIcon (icon, 0);
-
-        /* Start main render loop, the event thread tells it when to die.*/
-    redraw_loop_fn (&redraw_param);
-    SDL_WaitThread (event_thread, 0);
-    SDL_DestroySemaphore (redraw_param.sig);
-    SDL_DestroySemaphore (redraw_param.oktoquit_sig);
-
     if (icon)  SDL_FreeSurface (icon);
 }
 

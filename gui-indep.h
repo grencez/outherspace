@@ -122,14 +122,17 @@ setup_laser_scenes (RaySpace* space);
 static void
 update_health (const RaySpace* space, real dt);
 static void
-render_pattern (byte* data, uint nrows, uint ncols, uint stride);
+render_pattern (byte* data, uint nrows, uint ncols, uint stride,
+                bool argb_order);
 static void
 render_RayImage (byte* data, uint nrows, uint ncols, uint stride,
                  const RayImage* ray_image,
                  uint image_start_row,
-                 uint image_start_col);
+                 uint image_start_col,
+                 bool argb_order);
 static void
-render_pilot_images (byte* data, uint nrows, uint ncols, uint stride);
+render_pilot_images (byte* data, uint nrows, uint ncols, uint stride,
+                     bool argb_order);
 static void
 update_pilot_images (RaySpace* space, real frame_t1);
 static void

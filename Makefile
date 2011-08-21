@@ -62,10 +62,9 @@ ifneq (,$(filter macapp,$(CONFIG)))
 	DFLAGS += -DRunFromMyMac
 	GuiCFlags += -I/Library/Frameworks/SDL.framework/Headers
 	GuiLFlags += -framework SDL
-	GuiLFlags += -framework foundation
 	GuiLFlags += -framework cocoa
 	# Need a wrapper around the main function.
-	GuiMainCSources += SDLMain.m
+	GuiMainCSources += sdl-main-osx.m
 	CFLAGS := $(filter-out -fwhole-program,$(CFLAGS))
 	ifneq (,$(filter image,$(CONFIG)))
 		GuiCFlags += -I/Library/Frameworks/SDL_image.framework/Headers

@@ -400,10 +400,24 @@ update_health (const RaySpace* space, real dt)
     }
 }
 
+static
     void
-render_pattern (byte* data, uint nrows, uint ncols, uint stride)
+set_argb_shifts (byte* shifts, bool argb_order)
+{
+    if (argb_order)
+    { shifts[0] = 24;  shifts[1] = 16;  shifts[2] =  8;  shifts[3] =  0; }
+    else
+    { shifts[0] =  0;  shifts[1] =  8;  shifts[2] = 16;  shifts[3] = 24; }
+}
+
+    void
+render_pattern (byte* data, uint nrows, uint ncols, uint stride,
+                bool argb_order)
 {
     uint row;
+    byte shifts[4];
+
+    set_argb_shifts (shifts, argb_order);
 
     UFor( row, nrows )
     {
@@ -418,10 +432,10 @@ render_pattern (byte* data, uint nrows, uint ncols, uint stride)
             g = (byte) (( col | ~row) / 2);
             b = (byte) ((~col | ~row) / 2);
 
-            v = 0xFF;
-            v = (v << 8) | r;
-            v = (v << 8) | g;
-            v = (v << 8) | b;
+            v = ((uint32) 0xFF << shifts[0]) |
+                ((uint32) r    << shifts[1]) |
+                ((uint32) g    << shifts[2]) |
+                ((uint32) b    << shifts[3]);
 
                 /* v  = (uint32)(0x7FFFFF*(1+sin(~(x^y) % ~(x|y)))); */
                 /* v |= 0xFF000000; */
@@ -435,9 +449,13 @@ render_pattern (byte* data, uint nrows, uint ncols, uint stride)
 render_RayImage (byte* data, uint nrows, uint ncols, uint stride,
                  const RayImage* ray_image,
                  uint image_start_row,
-                 uint image_start_col)
+                 uint image_start_col,
+                 bool argb_order)
 {
     uint ray_row, start_row, start_col;
+    byte shifts[4];
+
+    set_argb_shifts (shifts, argb_order);
 
     assert (ray_image->pixels);
     if (ray_image->nrows == 0)  return;
@@ -462,16 +480,17 @@ render_RayImage (byte* data, uint nrows, uint ncols, uint stride,
             image_col = start_col + ray_col;
             if (image_col >= ncols)  break;
             outline[image_col] =
-                ((uint32) 0xFF                   << 24) |
-                ((uint32) pixline[3*image_col+0] << 16) |
-                ((uint32) pixline[3*image_col+1] <<  8) |
-                ((uint32) pixline[3*image_col+2] <<  0);
+                ((uint32) 0xFF                   << shifts[0]) |
+                ((uint32) pixline[3*image_col+0] << shifts[1]) |
+                ((uint32) pixline[3*image_col+1] << shifts[2]) |
+                ((uint32) pixline[3*image_col+2] << shifts[3]);
         }
     }
 }
 
     void
-render_pilot_images (byte* data, uint nrows, uint ncols, uint stride)
+render_pilot_images (byte* data, uint nrows, uint ncols, uint stride,
+                     bool argb_order)
 {
     uint pilot_idx;
     UFor( pilot_idx, npilots )
@@ -482,7 +501,8 @@ render_pilot_images (byte* data, uint nrows, uint ncols, uint stride)
         render_RayImage (data, nrows, ncols, stride,
                          &pilot->ray_image,
                          pilot->image_start_row,
-                         pilot->image_start_col);
+                         pilot->image_start_col,
+                         argb_order);
     }
 }
 
