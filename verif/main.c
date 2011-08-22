@@ -10,6 +10,8 @@
 #include <assert.h>
 #include <math.h>
 
+void testfn_pack ();
+
 static
     void
 testfn_BitString ()
@@ -316,6 +318,7 @@ int main ()
     testfn_PointXfrm ();
     testfn_select ();
     testfn_SList ();
+    testfn_pack ();
     return 0;
 }
 

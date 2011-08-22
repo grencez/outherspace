@@ -21,7 +21,7 @@ static const bool BarycentricRayTrace = false;
 static const bool BarycentricRayTrace = true;
 #endif
 
-#define RayPacketDimSz PackSz_real
+#define RayPacketDimSz realPackSz
 #define RayPacketSz (RayPacketDimSz*RayPacketDimSz)
 
 struct ray_packet_struct

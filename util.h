@@ -70,7 +70,7 @@ typedef double real;
 #define Min_real (-DBL_MAX)
 #define Small_real DBL_MIN
 #define Epsilon_real DBL_EPSILON
-#define PackSz_real 2
+#define realPackSz 2
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -86,7 +86,7 @@ typedef float real;
 #define Min_real (-FLT_MAX)
 #define Small_real FLT_MIN
 #define Epsilon_real FLT_EPSILON
-#define PackSz_real 4
+#define realPackSz 4
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846f
@@ -126,6 +126,8 @@ tristate compare_real (real a, real b);
 real match_real (real a, real b);
 real
 clamp_real (real x, real lo, real hi);
+real
+abs_real (real x);
 real
 atan2_real (real y, real x);
 real absolute_error (real expect, real result);

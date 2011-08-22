@@ -298,6 +298,12 @@ clamp_real (real x, real lo, real hi)
 }
 
     real
+abs_real (real x)
+{
+    return (x >= 0) ? x : -x;
+}
+
+    real
 atan2_real (real y, real x)
 {
     real a = 0;

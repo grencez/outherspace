@@ -210,9 +210,12 @@ gui: $(GuiMainCSources) gui-indep.c compute.c motion.c $(CSources)
 
 
 VerifyCFlags := $(filter-out -fwhole-program,$(CFLAGS))
+# Testing SSE intrinsics!
+VerifyCFlags += -msse -msse2
 VerifyDFlags := $(filter-out -DINCLUDE_SOURCE,$(DFLAGS))
+VerifyCSources = verif/main.c verif/pack.c pack.c
 
-verify: verif/main.c $(CSources)
+verify: $(VerifyCSources) $(CSources)
 	$(CC) $(VerifyCFlags) $(VerifyDFlags) -I . $^ -o $@ $(LFLAGS)
 
 imgdiff: imgdiff.c pnm-image.c
