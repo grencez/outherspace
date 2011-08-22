@@ -15,6 +15,17 @@
 #undef main
 #endif
 
+#ifdef RunFromMyMac
+#undef RunFromMyMac
+static const bool RunFromMyMac = true;
+static const bool SeparateRenderThread = false;
+extern int wrapped_main_fn (int argc, char* argv[]);
+#else
+static const bool RunFromMyMac = false;
+static const bool SeparateRenderThread = true;
+#define wrapped_main_fn main
+#endif
+
 static bool needs_recast = true;
 static uint resize_nrows = 0;
 static uint resize_ncols = 0;
@@ -537,11 +548,7 @@ static
     void
 sdl_redraw (SDL_Surface* screen)
 {
-#ifdef RunFromMyMac
-    const bool argb_order = false;
-#else
-    const bool argb_order = true;
-#endif
+    const bool argb_order = !RunFromMyMac;
     if (SDL_MUSTLOCK (screen) && SDL_LockSurface (screen) < 0)  return;
 
     if (RenderDrawsPattern)
@@ -580,7 +587,6 @@ render_loop_fn (void* data)
             view_ncols = resize_ncols;
             resize_nrows = resize_ncols = 0;
             resize_pilot_viewports (view_nrows, view_ncols);
-            param->resize = true;
         }
         if (!RenderDrawsPattern && needs_recast)
         {
@@ -589,7 +595,10 @@ render_loop_fn (void* data)
         }
 
         SDL_PushEvent (&draw_event);
-        SDL_SemWait (param->sig);
+        if (SeparateRenderThread)
+            SDL_SemWait (param->sig);
+        else
+            break;
     }
 
     return 0;
@@ -602,7 +611,7 @@ sdl_main (RaySpace* space, const char* pathname)
     RedrawLoopParam redraw_loop_param;
     SDL_Event event;
         /* SDL_TimerID timer; */
-    SDL_Thread* render_thread;
+    SDL_Thread* render_thread = 0;
     SDL_Surface* icon = 0;
     SDL_Surface* screen = 0;
     SDL_Joystick* joysticks[NRacersMax]; 
@@ -652,9 +661,16 @@ sdl_main (RaySpace* space, const char* pathname)
 
         /* Allow the render thread to begin.*/
     param->space = space;
-    param->sig = SDL_CreateSemaphore (0);
     param->continue_running = true;
-    render_thread = SDL_CreateThread (render_loop_fn, param);
+    if (SeparateRenderThread)
+    {
+        param->sig = SDL_CreateSemaphore (0);
+        render_thread = SDL_CreateThread (render_loop_fn, param);
+    }
+    else
+    {
+        render_loop_fn (param);
+    }
 
 #ifdef SupportSound
     ret = Mix_OpenAudio(22050, AUDIO_S16SYS, 2, 1024);
@@ -691,7 +707,10 @@ sdl_main (RaySpace* space, const char* pathname)
 
     while (param->continue_running && SDL_WaitEvent (&event))
     {
-        switch (event.type)
+            /* Loop here when single threaded so all events can be processed
+             * before committing to a render.
+             */
+        do  switch (event.type)
         {
             case SDL_KEYDOWN:
                 key_press_fn (&pilots[kbd_pilot_idx],
@@ -735,16 +754,22 @@ sdl_main (RaySpace* space, const char* pathname)
                 }
                 sdl_redraw (screen);
                 needs_recast = true;
-                SDL_SemPost (param->sig);
+                    /* When there is a separate render thread,
+                     * it is timely to signal a render at this point.
+                     */
+                if (SeparateRenderThread)  SDL_SemPost (param->sig);
                 break;
             case SDL_QUIT:
                 param->continue_running = false;
-                SDL_SemPost (param->sig);
+                if (SeparateRenderThread)  SDL_SemPost (param->sig);
                 break;
             default:
                 break;
 
-        }
+        } while (!SeparateRenderThread && SDL_PollEvent (&event));
+
+        if (!SeparateRenderThread && needs_recast)
+            render_loop_fn (param);
     }
 
         /* SDL_RemoveTimer (timer); */
@@ -760,22 +785,17 @@ sdl_main (RaySpace* space, const char* pathname)
     UFor( i, njoysticks )
         SDL_JoystickClose (joysticks[i]);
 
-    SDL_WaitThread (render_thread, 0);
-    SDL_DestroySemaphore (param->sig);
+    if (SeparateRenderThread)
+    {
+        SDL_WaitThread (render_thread, 0);
+        SDL_DestroySemaphore (param->sig);
+    }
 
     SDL_Quit ();
     if (icon)  SDL_FreeSurface (icon);
 }
 
-
-#ifdef RunFromMyMac
-#undef RunFromMyMac
-static const bool RunFromMyMac = true;
-extern int wrapped_main_fn (int argc, char* argv[])
-#else
-static const bool RunFromMyMac = false;
-int main (int argc, char* argv[])
-#endif
+int wrapped_main_fn (int argc, char* argv[])
 {
     FILE* out = stderr;
     bool good = true;
