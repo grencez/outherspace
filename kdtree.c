@@ -849,31 +849,6 @@ bool leaf_KDTreeNode (__global const KDTreeNode* node)
 }
 
 
-    uint
-find_KDTreeNode (uint* ret_parent,
-                 const Point* origin,
-                 __global const KDTreeNode* nodes)
-{
-    __global const KDTreeNode* node;
-    uint node_idx = 0, parent = 0;
-    assert (nodes);
-    node = &nodes[0];
-    while (! leaf_KDTreeNode (node))
-    {
-        __global const KDTreeInner* inner;
-        inner = &node->as.inner;
-        parent = node_idx;
-        if (origin->coords[node->split_dim] < inner->split_pos)
-            node_idx = inner->children[0];
-        else
-            node_idx = inner->children[1];
-        node = &nodes[node_idx];
-    }
-    *ret_parent = parent;
-    assert (leaf_KDTreeNode (node));
-    return node_idx;
-}
-
 static
     uint
 upnext_KDTreeNode (Point* entrance,
@@ -966,6 +941,14 @@ descend_KDTreeNode (uint* ret_parent,
 
     *ret_parent = parent;
     return node_idx;
+}
+
+    uint
+find_KDTreeNode (uint* ret_parent,
+                 const Point* origin,
+                 __global const KDTreeNode* nodes)
+{
+    return descend_KDTreeNode (ret_parent, origin, 0, nodes);
 }
 
 
