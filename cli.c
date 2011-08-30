@@ -11,7 +11,7 @@
 
 int main (int argc, char** argv)
 {
-    const char pathname[] = "input";
+    const char pathname[] = "data";
     bool good = true;
     FILE* out;
     RaySpace space;

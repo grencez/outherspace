@@ -62,7 +62,7 @@ hit_inner_BoundingPlane (Point* entrance,
                          __global const BoundingBox* box,
                          const Point* origin,
                          const Point* dir);
-void
+real
 hit_inner_BoundingBox (Point* isect,
                        uint* ret_dim,
                        const BoundingBox* box,

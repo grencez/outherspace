@@ -77,6 +77,7 @@ next_KDTreeNode (uint* ret_parent,
                  const Point* origin,
                  const Point* dir,
                  const Point* invdir,
+                 real hit_mag,
                  uint node_idx,
                  __global const KDTreeNode* nodes);
 

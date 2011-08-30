@@ -24,6 +24,9 @@ CONFIG += openmp
 #CONFIG += noassert
 #CONFIG += macapp
 
+# Use only for testing, slower in the general case.
+#CONFIG += sse
+
 
 # For ICC:
 #   source $HOME/local/stow/icc-2011.5.220/bin/iccvars.sh intel64
@@ -179,6 +182,11 @@ CSources = bitstring.c \
 		   wavefront-file.c \
 		   xfrm.c
 
+ifneq (,$(filter sse,$(CONFIG)))
+	CFLAGS += -msse -msse2
+	DFLAGS += -DPackOpsAvail
+	CSources += pack.c
+endif
 
 LFLAGS += -lm
 
@@ -210,10 +218,8 @@ gui: $(GuiMainCSources) gui-indep.c compute.c motion.c $(CSources)
 
 
 VerifyCFlags := $(filter-out -fwhole-program,$(CFLAGS))
-# Testing SSE intrinsics!
-VerifyCFlags += -msse -msse2
 VerifyDFlags := $(filter-out -DINCLUDE_SOURCE,$(DFLAGS))
-VerifyCSources = verif/main.c verif/pack.c pack.c
+VerifyCSources = verif/main.c verif/pack.c
 
 verify: $(VerifyCSources) $(CSources)
 	$(CC) $(VerifyCFlags) $(VerifyDFlags) -I . $^ -o $@ $(LFLAGS)

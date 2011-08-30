@@ -22,7 +22,7 @@ void output_PBM_image (const char* filename, uint nrows, uint ncols,
         hitline = &hits[(nrows - row - 1) * ncols];
         UFor( col, ncols )
         {
-            if (nelems != hitline[col])
+            if (hitline[col] < nelems)
                 fputs (" 1", out);
             else
                 fputs (" 0", out);
@@ -36,7 +36,8 @@ void output_PBM_image (const char* filename, uint nrows, uint ncols,
 void output_PGM_image (const char* filename, uint nrows, uint ncols,
                        const uint* hits, uint nelems)
 {
-    uint row;
+    const bool debug = false;
+    uint img_row;
     FILE* out;
 
     out = fopen (filename, "wb");
@@ -50,15 +51,25 @@ void output_PGM_image (const char* filename, uint nrows, uint ncols,
     fprintf (out, "%u %u\n", ncols, nrows);
     fprintf (out, "%u\n", nelems);
 
-    UFor( row, nrows )
+    if (debug)
+        fprintf (out, "# nelems:%u  maxval:%u  (elem_idx = val - 1)\n",
+                 nelems, nelems+1);
+
+    UFor( img_row, nrows )
     {
-        uint col;
+        uint row, col;
         const uint* hitline;
 
-        hitline = &hits[(nrows - row - 1) * ncols];
+        row = nrows - img_row - 1;
+        hitline = &hits[row * ncols];
+        if (debug)  fprintf (out, "# row:%u\n", row);
+
         UFor( col, ncols )
         {
-            fprintf (out, " %u", nelems - hitline[col]);
+            uint v;
+            v = (hitline[col] < nelems) ? hitline[col] : nelems;
+            v += 1;
+            fprintf (out, " %u", v);
         }
         fputc ('\n', out);
     }

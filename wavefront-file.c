@@ -52,6 +52,74 @@ fixup_wavefront_Scene (Scene* scene)
 }
 
     bool
+output_wavefront (const Scene* scene,
+                  const char* pathname,
+                  const char* filename)
+{
+    uint i;
+    FILE* out;
+
+    out = fopen_path (pathname, filename, "wb");
+    if (!out)  return false;
+
+    UFor( i, scene->nverts )
+        fprintf (out, "v %f %f %f\n",
+                 scene->verts[i].coords[0],
+                 scene->verts[i].coords[1],
+                 scene->verts[i].coords[2]);
+    UFor( i, scene->ntxpts )
+        fprintf (out, "vt %f %f %f\n",
+                 scene->txpts[i].coords[0],
+                 scene->txpts[i].coords[1],
+                 scene->txpts[i].coords[2]);
+    UFor( i, scene->nvnmls )
+        fprintf (out, "vn %f %f %f\n",
+                 scene->vnmls[i].coords[0],
+                 scene->vnmls[i].coords[1],
+                 scene->vnmls[i].coords[2]);
+    UFor( i, scene->nelems )
+    {
+        char buf[1024];
+        const SceneElement* elem;
+        uint j, off = 0;
+
+        elem = &scene->elems[i];
+
+        buf[off++] = 'f';
+        buf[off++] = ' ';
+
+        UFor( j, 3 )
+        {
+            uint a, b, c;
+            a = 1+elem->verts[j];
+            b = 1+elem->txpts[j];
+            c = 1+elem->vnmls[j];
+            assert (a < Max_uint);
+            if (b < Max_uint)
+            {
+                if (c < Max_uint)
+                    off += sprintf (&buf[off], "%u/%u/%u", a, b, c);
+                else
+                    off += sprintf (&buf[off], "%u/%u/", a, b);
+            }
+            else if (c < Max_uint)
+            {
+                off += sprintf (&buf[off], "%u//%u", a, c);
+            }
+            else
+            {
+                off += sprintf (&buf[off], "%u", a);
+            }
+        }
+        buf[off++] = '\n';
+        off = fwrite (buf, sizeof(char), off, out);
+        assert (off > 0);
+    }
+    fclose (out);
+    return true;
+}
+
+    bool
 readin_wavefront (Scene* scene, const char* pathname, const char* filename)
 {
     const uint ndims = 3;

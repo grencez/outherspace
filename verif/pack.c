@@ -1,4 +1,16 @@
 
+#ifndef PackOpsAvail
+
+#include <stdio.h>
+
+void testfn_pack ()
+{
+    FILE* out = stderr;
+    fputs ("testfn_pack() skipped, no pack operations available.\n", out);
+}
+
+#else  /*V PackOpsAvail V*/
+
 #include "pack.h"
 
 #include <assert.h>
@@ -30,15 +42,15 @@ testfn_realPack ()
     UFor( i, realPackSz )
         assert (u.v[i] == v[i] - 7);
 
-    u.x = mult_realPack (x, fill_realPack (5));
+    u.x = prod_realPack (x, fill_realPack (5));
     UFor( i, realPackSz )
         assert (u.v[i] == v[i] * 5);
 
-    u.x = divi_realPack (x, fill_realPack (2));
+    u.x = quot_realPack (x, fill_realPack (2));
     UFor( i, realPackSz )
         assert (u.v[i] == v[i] / 2);
 
-    u.x = abs_realPack (mult_realPack (x, fill_realPack (-3)));
+    u.x = abs_realPack (prod_realPack (x, fill_realPack (-3)));
     UFor( i, realPackSz )
         assert (u.v[i] == abs_real (v[i] * -3));
 
@@ -52,4 +64,6 @@ testfn_pack ()
 {
     testfn_realPack ();
 }
+
+#endif
 

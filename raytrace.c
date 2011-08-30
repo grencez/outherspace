@@ -21,24 +21,6 @@ static const bool BarycentricRayTrace = false;
 static const bool BarycentricRayTrace = true;
 #endif
 
-#define RayPacketDimSz realPackSz
-#define RayPacketSz (RayPacketDimSz*RayPacketDimSz)
-
-struct ray_packet_struct
-{
-    Point origins[RayPacketSz];
-    Point directs[RayPacketSz];
-};
-typedef struct ray_packet_struct RayPacket;
-
-struct ray_hit_packet_struct
-{
-    uint inds[RayPacketSz];
-    uint objs[RayPacketSz];
-    real mags[RayPacketSz];
-};
-typedef struct ray_hit_packet_struct RayHitPacket;
-
 
 #ifdef TrivialMpiRayTrace
 #include <mpi.h>
@@ -670,6 +652,7 @@ splitting_plane_count (const Point* origin, const Point* direct,
     {
         count += 1;
         node_idx = next_KDTreeNode (&parent, origin, direct, &invdirect,
+                                    Max_real,
                                     node_idx, object->tree.nodes);
     }
     return count;
@@ -1153,6 +1136,7 @@ cast_ray (uint* restrict ret_hit, real* restrict ret_mag,
         if (hit_in_leaf)  break;
 
         node_idx = next_KDTreeNode (&parent, origin, direct, &invdirect,
+                                    Max_real,
                                     node_idx, nodes);
     }
 
@@ -1348,6 +1332,7 @@ cast_partitioned (uint* ret_hit,
                                        space, &leaf->box);
         if (hit_in_leaf)  break;
         node_idx = next_KDTreeNode (&parent, origin, dir, &invdirect,
+                                    Max_real,
                                     node_idx, nodes);
     }
 
@@ -1921,120 +1906,9 @@ ray_from_RayCastAPriori (Point* origin, Point* dir,
     }
 }
 
-static
-    void
-RayCastAPriori_to_RayPacket (RayPacket* pkt,
-                             const RayCastAPriori* known,
-                             uint row_off, uint col_off,
-                             const RayImage* image)
-{
-    uint i;
-    Point row_directs[RayPacketDimSz];
-    Point col_directs[RayPacketDimSz];
-    Point directs[RayPacketSz];
-
-    UFor( i, RayPacketDimSz )
-    {
-        scale_Point (&row_directs[i], &known->row_delta, i+row_off);
-        scale_Point (&col_directs[i], &known->col_delta, i+col_off);
-    }
-
-    UFor( i, RayPacketDimSz )
-    {
-        uint j;
-        UFor( j, RayPacketDimSz )
-            Op_Point_20200( &directs[j+i*RayPacketDimSz]
-                            ,+, &known->dir_start
-                            ,   +, &row_directs[i]
-                            ,      &col_directs[j] );
-    }
-
-    UFor( i, RayPacketSz )
-    {
-        if (image->perspective)
-        {
-            copy_Point (&pkt->origins[i], &known->origin);
-            normalize_Point (&pkt->directs[i], &directs[i]);
-        }
-        else
-        {
-            copy_Point (&pkt->origins[i], &directs[i]);
-            copy_Point (&pkt->directs[i], &known->origin);
-        }
-    }
-}
-
-static
-    void
-cast_packet_RayImage (RayImage* image, uint row_off, uint col_off,
-                      const RaySpace* space,
-                      const RayCastAPriori* known)
-{
-    uint i;
-    bool inside_box[RayPacketSz];
-    RayPacket pkt;
-    RayHitPacket hit;
-
-    RayCastAPriori_to_RayPacket (&pkt, known, row_off, col_off, image);
-
-    UFor( i, RayPacketSz )
-    {
-        hit.inds[i] = Max_uint;
-        hit.objs[i] = Max_uint;
-        hit.mags[i] = Max_real;
-        if (image->perspective)
-            inside_box[i] = known->inside_box;
-        else
-            inside_box[i] = inside_BoundingBox (&space->box, &pkt.origins[i]);
-    }
-
-    if (space->partition)
-        UFor( i, RayPacketSz )
-            cast_partitioned (&hit.inds[i], &hit.mags[i], &hit.objs[i],
-                              space, &pkt.origins[i], &pkt.directs[i],
-                              inside_box[i], Max_uint);
-    else
-        UFor( i, RayPacketSz )
-            cast_nopartition (&hit.inds[i], &hit.mags[i], &hit.objs[i],
-                              space, &pkt.origins[i], &pkt.directs[i],
-                              inside_box[i], Max_uint);
-
-    UFor( i, RayPacketDimSz )
-    {
-        uint row;
-        uint j;
-
-        row = i + row_off;
-        UFor( j, RayPacketDimSz )
-        {
-            uint img_idx;
-            uint pai;
-            img_idx = j + col_off + row * image->ncols;
-            pai = j+i*RayPacketDimSz;
-
-            if (image->hits)  image->hits[img_idx] = hit.inds[pai];
-            if (image->mags)  image->mags[img_idx] = hit.mags[pai];
-            if (image->pixels)
-            {
-                real colors[NColors];
-                uint color_idx;
-
-                UFor( color_idx, NColors )  colors[color_idx] = 0;
-                fill_pixel (colors,
-                            hit.inds[pai], hit.mags[pai], hit.objs[pai],
-                            image,
-                            &pkt.origins[pai],
-                            &pkt.directs[pai],
-                            space, 0);
-                UFor( color_idx, NColors )
-                {
-                    image->pixels[3*img_idx + color_idx] = (byte)
-                        clamp_real (255.5 * colors[color_idx], 0, 255.5);
-                }
-            }
-        }
-    }
-}
+#ifdef PackOpsAvail
+#include "raytrace-pack.c"
+#endif
 
     void
 cast_partial_RayImage (RayImage* restrict image,
@@ -2043,7 +1917,7 @@ cast_partial_RayImage (RayImage* restrict image,
                        const RaySpace* restrict space,
                        const RayCastAPriori* restrict known)
 {
-    uint i, nprocs, myrank;
+    uint i, inc, nprocs, myrank;
 
 #ifdef TrivialMpiRayTrace
     MPI_Comm_size (MPI_COMM_WORLD, (int*) &nprocs);
@@ -2053,15 +1927,21 @@ cast_partial_RayImage (RayImage* restrict image,
     nprocs = 1;
 #endif
 
+#ifdef PackOpsAvail
+    inc = RayPacketDimSz * nprocs;
+#else
+    inc = nprocs;
+#endif
+
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic)
 #endif
-    for (i = myrank; i < row_nul; i += RayPacketDimSz * nprocs)
+    for (i = myrank; i < row_nul; i += inc)
     {
+#ifdef PackOpsAvail
         uint j;
-        if (i + RayPacketDimSz <= row_nul)
+        if (RayPacketDimSz <= row_nul)
         {
-            uint j;
             for (j = 0; j < image->ncols; j += RayPacketDimSz)
                 cast_packet_RayImage (image, row_off + i, j, space, known);
         }
@@ -2075,6 +1955,12 @@ cast_partial_RayImage (RayImage* restrict image,
                 else
                     cast_row_orthographic (image, row_off + i + j, space, known);
         }
+#else
+        if (image->perspective)
+            cast_row_perspective (image, row_off + i, space, known);
+        else
+            cast_row_orthographic (image, row_off + i, space, known);
+#endif
     }
 
 #ifdef TrivialMpiRayTrace

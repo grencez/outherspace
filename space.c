@@ -269,7 +269,7 @@ hit_inner_BoundingPlane (Point* entrance,
     return didhit;
 }
 
-    void
+    real
 hit_inner_BoundingBox (Point* isect,
                        uint* ret_dim,
                        const BoundingBox* box,
@@ -316,6 +316,7 @@ hit_inner_BoundingBox (Point* isect,
 
     isect->coords[hit_dim] = planes[hit_dim];
     *ret_dim = hit_dim;
+    return mags[hit_dim];
 }
 
     /* Assume ray is coming from outside BoundingBox.*/
