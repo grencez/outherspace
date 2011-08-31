@@ -1012,7 +1012,7 @@ fill_pixel (real* ret_colors,
 
 
 static
-    bool
+    void
 test_intersections (uint* ret_hit,
                     real* ret_mag,
                     const Point* restrict origin,
@@ -1020,8 +1020,7 @@ test_intersections (uint* ret_hit,
                     uint nelemidcs,
                     __global const uint* restrict elemidcs,
                     __global const BarySimplex* restrict simplices,
-                    __global const Simplex* restrict tris,
-                    const BoundingBox* restrict box)
+                    __global const Simplex* restrict tris)
 {
     uint i, hit_idx;
     real hit_mag;
@@ -1066,24 +1065,6 @@ test_intersections (uint* ret_hit,
 
     *ret_hit = hit_idx;
     *ret_mag = hit_mag;
-
-    if (hit_mag != Max_real)
-    {
-        Point isect;
-        Op_Point_2010( &isect
-                       ,+, origin
-                       ,   hit_mag*, dir );
-        return inside_BoundingBox (box, &isect);
-#if 0
-        output_BoundingBox (stderr, box);
-        fputs ("\n", stderr);
-        output_Point (stderr, origin);
-        fputs (" => ", stderr);
-        output_Point (stderr, &isect);
-        fputs ("\n", stderr);
-#endif
-    }
-    return false;
 }
 
 
@@ -1113,7 +1094,7 @@ cast_ray (uint* restrict ret_hit, real* restrict ret_mag,
     {
         test_intersections (&hit_idx, &hit_mag, origin, direct,
                             nelems, elemidcs,
-                            simplices, tris, box);
+                            simplices, tris);
         *ret_hit = hit_idx;
         *ret_mag = hit_mag;
         return;
@@ -1125,18 +1106,15 @@ cast_ray (uint* restrict ret_hit, real* restrict ret_mag,
 
     while (node_idx != Max_uint)
     {
-        bool hit_in_leaf;
         __global const KDTreeLeaf* restrict leaf;
 
         leaf = &nodes[node_idx].as.leaf;
-        hit_in_leaf =
-            test_intersections (&hit_idx, &hit_mag, origin, direct,
-                                leaf->nelems, &elemidcs[leaf->elemidcs],
-                                simplices, tris, &leaf->box);
-        if (hit_in_leaf)  break;
+        test_intersections (&hit_idx, &hit_mag, origin, direct,
+                            leaf->nelems, &elemidcs[leaf->elemidcs],
+                            simplices, tris);
 
         node_idx = next_KDTreeNode (&parent, origin, direct, &invdirect,
-                                    Max_real,
+                                    hit_mag,
                                     node_idx, nodes);
     }
 
@@ -1224,7 +1202,7 @@ cast_nopartition (uint* ret_hit,
 
 
 static
-    bool
+    void
 test_object_intersections (uint* ret_hit,
                            real* ret_mag,
                            uint* ret_object,
@@ -1233,8 +1211,7 @@ test_object_intersections (uint* ret_hit,
                            const Point* dir,
                            uint nobjectidcs,
                            const uint* objectidcs,
-                           const RaySpace* space,
-                           const BoundingBox* box)
+                           const RaySpace* space)
 {
     uint i;
     UFor( i, nobjectidcs )
@@ -1268,16 +1245,6 @@ test_object_intersections (uint* ret_hit,
             *ret_object = objidx;
         }
     }
-
-    if (*ret_mag != Max_real)
-    {
-        Point isect;
-        Op_Point_2010( &isect
-                       ,+, origin
-                       ,   (*ret_mag)*, dir );
-        return inside_BoundingBox (box, &isect);
-    }
-    return false;
 }
 
 
@@ -1321,18 +1288,15 @@ cast_partitioned (uint* ret_hit,
     while (node_idx != Max_uint)
     {
         __global const KDTreeLeaf* restrict leaf;
-        bool hit_in_leaf;
 
         leaf = &nodes[node_idx].as.leaf;
-        hit_in_leaf =
-            test_object_intersections (&hit_idx, &hit_mag, &hit_object,
-                                       tested,
-                                       origin, dir, leaf->nelems,
-                                       &elemidcs[leaf->elemidcs],
-                                       space, &leaf->box);
-        if (hit_in_leaf)  break;
+        test_object_intersections (&hit_idx, &hit_mag, &hit_object,
+                                   tested,
+                                   origin, dir, leaf->nelems,
+                                   &elemidcs[leaf->elemidcs],
+                                   space);
         node_idx = next_KDTreeNode (&parent, origin, dir, &invdirect,
-                                    Max_real,
+                                    hit_mag,
                                     node_idx, nodes);
     }
 
