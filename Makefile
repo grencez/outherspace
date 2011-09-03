@@ -4,6 +4,10 @@
 #CC = llvm-gcc
 #CC = icc
 
+# Use CONFIG += c++ with these.
+#CXX = clang++
+#CXX = g++
+
 DFLAGS += -DNDimensions=3
 
 CONFIG += image
@@ -37,10 +41,6 @@ CONFIG += openmp
 
 #valgrind --num-callers=50 --db-attach=yes --db-command='cgdb -- %f %p'
 
-
-ifeq ($(CC),g++)
-	CONFIG += c++
-endif
 
 ifeq ($(CC),icc)
 	#CFLAGS += -Wremarks

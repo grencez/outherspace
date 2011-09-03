@@ -68,10 +68,9 @@ output_wavefront (const Scene* scene,
                  scene->verts[i].coords[1],
                  scene->verts[i].coords[2]);
     UFor( i, scene->ntxpts )
-        fprintf (out, "vt %f %f %f\n",
+        fprintf (out, "vt %f %f\n",
                  scene->txpts[i].coords[0],
-                 scene->txpts[i].coords[1],
-                 scene->txpts[i].coords[2]);
+                 scene->txpts[i].coords[1]);
     UFor( i, scene->nvnmls )
         fprintf (out, "vn %f %f %f\n",
                  scene->vnmls[i].coords[0],

@@ -552,8 +552,8 @@ sdl_redraw (SDL_Surface* screen)
     if (SDL_MUSTLOCK (screen) && SDL_LockSurface (screen) < 0)  return;
 
     if (RenderDrawsPattern)
-        render_pattern (screen->pixels, screen->h, screen->w, screen->pitch,
-                        argb_order);
+        render_pattern ((byte*)screen->pixels,
+                        screen->h, screen->w, screen->pitch, argb_order);
     else
         render_pilot_images ((byte*)screen->pixels,
                              screen->h, screen->w, screen->pitch, argb_order);
