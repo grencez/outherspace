@@ -27,6 +27,7 @@ CONFIG += openmp
 #CONFIG += benchmark  # +noassert
 #CONFIG += noassert
 #CONFIG += macapp
+#CONFIG += sunstudio
 
 # Use only for testing, slower in the general case.
 #CONFIG += sse
@@ -44,6 +45,10 @@ CONFIG += openmp
 
 ifeq ($(CC),icc)
 	#CFLAGS += -Wremarks
+else ifneq (,$(filter sunstudio,$(CONFIG)))
+	# Nothing!
+	# But do note that, if using OpenMP,
+	# the OMP_NUM_THREADS environment variable must be set!
 else
 	CFLAGS += -fwhole-program
 	CFLAGS += -Wall -Wextra
@@ -95,7 +100,11 @@ ifneq (,$(filter ultradebug,$(CONFIG)))
 endif
 ## Go really fast.
 ifneq (,$(filter fast,$(CONFIG)))
-	CFLAGS += -O3
+	ifneq (,$(filter sunstudio,$(CONFIG)))
+		CFLAGS += -xO3
+	else
+		CFLAGS += -O3
+	endif
 	#CFLAGS += -ftree-vectorizer-verbose=2
 	#CFLAGS += -Ofast
 	#CFLAGS += -march=native
@@ -154,14 +163,26 @@ ifneq (,$(filter c99,$(CONFIG)))
 endif
 ## Stick to the ANSI standard.
 ifneq (,$(filter ansi,$(CONFIG)))
-	CFLAGS += -ansi -pedantic
+	ifneq (,$(filter sunstudio,$(CONFIG)))
+		CC = c89
+		# SDL has a couple // comments, hope this is fixed someday.
+		GuiCFlags += -xCC
+		# SDL uses incompatible __inline__ qualifier.
+		GuiDFlags += -D__inline__=""
+	else
+		CFLAGS += -ansi -pedantic
+	endif
 endif
 ## Allow parallelism.
 ifneq (,$(filter openmp,$(CONFIG)))
 	ifeq ($(CC),icc)
-	  CFLAGS += -openmp
+		CFLAGS += -openmp
+	else ifneq (,$(filter sunstudio,$(CONFIG)))
+		# Important! Set the OMP_NUM_THREADS
+		# environment variable to see parallelism!
+		CFLAGS += -xopenmp
 	else
-	  CFLAGS += -fopenmp
+		CFLAGS += -fopenmp
 	endif
 endif
 
