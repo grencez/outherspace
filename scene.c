@@ -16,7 +16,20 @@ fill_between_simplices (SceneElement* elems,
                         uint a_vnml_offset,
                         uint b_vnml_offset);
 static uint
-full_fill_between_simplices (SceneElement* dst_elems,
+midfill_between_simplices (SceneElement* dst_elems,
+                           uint* nverts,
+                           Point* verts,
+                           uint* nvnmls,
+                           Point* vnmls,
+                           uint k,
+                           const SceneElement* a,
+                           const SceneElement* b,
+                           uint a_vert_offset,
+                           uint b_vert_offset,
+                           uint a_vnml_offset,
+                           uint b_vnml_offset);
+static uint
+brutefill_between_simplices (SceneElement* dst_elems,
                              uint k,
                              const SceneElement* a,
                              const SceneElement* b,
@@ -181,9 +194,146 @@ fill_between_simplices (SceneElement* elems,
     return k;
 }
 
+    /* This method of filling simplices of dimension /k-1/
+     * only accepts triangles. 14 tetrahedra the space between,
+     * utilizing 4 new vertices.
+     *
+     * 1 new vertex is created between the two triangles.
+     * The two triangles form 2 tetrahedra using this new vertex.
+     *
+     * Draw 3 planes between the unconnected tetrahedra edges such that
+     * we are left with 3 pyramids. For each pyramid, create a new vertex
+     * on its 4-sided face, and partition out 4 tetrahedra using the new
+     * vertex. For this section, we see that 3 vertices and 12 tetrahedra
+     * are formed.
+     */
+    uint
+midfill_between_simplices (SceneElement* dst_elems,
+                           uint* nverts,
+                           Point* verts,
+                           uint* nvnmls,
+                           Point* vnmls,
+                           uint k,
+                           const SceneElement* a,
+                           const SceneElement* b,
+                           uint a_vert_offset,
+                           uint b_vert_offset,
+                           uint a_vnml_offset,
+                           uint b_vnml_offset)
+{
+    bool use_vnmls = true;
+    uint i;
+    Point* new_verts;  Point* new_vnmls;
+    const uint nelems = 14;
+    const uint elems[][4] =
+    {
+        { 0,            6, 5, 4            },
+        { 0,                       7, 8, 9 },
+        { 0, 1,         4, 5               },
+        { 0,    2,         5, 6            },
+        { 0,       3,   6,    4            },
+        { 0, 1,                    8, 7    },
+        { 0,    2,                    9, 8 },
+        { 0,       3,              7,    9 },
+        { 0, 1,         7,         4       },
+        { 0,    2,         8,         5    },
+        { 0,       3,         9,         6 },
+        { 0, 1,            5,         8    },
+        { 0,    2,            6,         9 },
+        { 0,       3,   4,         7       }
+    };
+    uint vertidcs[10], vnmlidcs[10];
+
+    assert (NDimensions == 4);
+    assert (k == 3);
+    if (NDimensions != 4 || k != 3)  return 0;
+
+    UFor( i, 4 )  vertidcs[    i] = *nverts + i;
+    UFor( i, k )  vertidcs[4+  i] = a_vert_offset + a->verts[i];
+    UFor( i, k )  vertidcs[4+k+i] = b_vert_offset + b->verts[i];
+
+    UFor( i, 4 )  vnmlidcs[    i] = *nvnmls + i;
+    UFor( i, k )
+    {
+        vnmlidcs[4+  i] = a->vnmls[i];
+        vnmlidcs[4+k+i] = b->vnmls[i];
+        if (vnmlidcs[4+  i] < Max_uint)  vnmlidcs[4+  i] += a_vnml_offset;
+        else  use_vnmls = false;
+        if (vnmlidcs[4+k+i] < Max_uint)  vnmlidcs[4+k+i] += b_vnml_offset;
+        else  use_vnmls = false;
+    }
+
+    new_verts = &verts[*nverts];
+    new_vnmls = &vnmls[*nvnmls];
+    *nverts += 4;
+    if (use_vnmls)  *nvnmls += 4;
+
+    UFor( i, 4 )
+    {
+        zero_Point (&new_verts[i]);
+        zero_Point (&new_vnmls[i]);
+    }
+
+        /* k == 3 */
+    UFor( i, k )
+    {
+        Point vertsum, vnmlsum;
+        summ_Point (&vertsum,
+                    &verts[a_vert_offset + a->verts[i]],
+                    &verts[b_vert_offset + b->verts[i]]);
+        if (use_vnmls)
+            summ_Point(&vnmlsum,
+                       &vnmls[a_vnml_offset + a->vnmls[i]],
+                       &vnmls[b_vnml_offset + b->vnmls[i]]);
+        else
+            zero_Point (&vnmlsum);
+
+        summ_Point (&new_verts[0], &new_verts[0], &vertsum);
+        summ_Point (&new_vnmls[0], &new_vnmls[0], &vnmlsum);
+
+        summ_Point (&new_verts[i+1], &new_verts[i+1], &vertsum);
+        summ_Point (&new_vnmls[i+1], &new_vnmls[i+1], &vnmlsum);
+        if (i == 0)
+        {
+            summ_Point (&new_verts[k], &new_verts[k], &vertsum);
+            summ_Point (&new_vnmls[k], &new_vnmls[k], &vnmlsum);
+        }
+        else
+        {
+            summ_Point (&new_verts[i], &new_verts[i], &vertsum);
+            summ_Point (&new_vnmls[i], &new_vnmls[i], &vnmlsum);
+        }
+    }
+
+    scale_Point (&new_verts[0], &new_verts[0], .5 / k);
+    UFor( i, k )
+        scale_Point (&new_verts[i+1], &new_verts[i+1], .25);
+    if (use_vnmls)
+        UFor( i, 4 )
+            normalize_Point (&new_vnmls[i], &new_vnmls[i]);
+    
+    UFor( i, nelems )
+    {
+        uint j;
+        SceneElement* elem;
+        elem = &dst_elems[i];
+        init_SceneElement (elem);
+        elem->material = a->material;
+        UFor( j, k+1 )
+        {
+            elem->verts[j] = vertidcs[elems[i][j]];
+            if (use_vnmls)
+                elem->vnmls[j] = vnmlidcs[elems[i][j]];
+            else
+                elem->vnmls[j] = Max_uint;
+        }
+    }
+
+    return nelems;
+}
 
     uint
-full_fill_between_simplices (SceneElement* dst_elems,
+brutefill_between_simplices (SceneElement* dst_elems,
                              uint k,
                              const SceneElement* a,
                              const SceneElement* b,
@@ -281,6 +431,8 @@ interpolate_Scene (Scene* dst, uint k, uint nscenes, const Scene* scenes)
     uint i;
     uint nelems, nverts, nvnmls, nmatls;
     uint ecount = 0;  /* Element count.*/
+    uint vcount = 0;  /* Vertex count.*/
+    uint vnmlcount = 0;  /* Vertex normal count.*/
 
     assert (nscenes > 0);
     nelems = scenes[0].nelems;
@@ -338,9 +490,13 @@ interpolate_Scene (Scene* dst, uint k, uint nscenes, const Scene* scenes)
     init_Scene (dst);
     dst->nelems = (nscenes-1) * nelems * simplex_fill_count (k);
     dst->elems = AllocT( SceneElement, dst->nelems );
-    dst->nverts = nscenes * nverts;
+
+    vcount = nscenes * nverts;
+    dst->nverts = vcount + dst->nelems;
     dst->verts = AllocT( Point, dst->nverts );
-    dst->nvnmls = nscenes * nvnmls;
+
+    vnmlcount = nscenes * nvnmls;
+    dst->nvnmls = vnmlcount + dst->nelems;
     dst->vnmls = AllocT( Point, dst->nvnmls );
     dst->nmatls = nmatls;
     dst->matls = AllocT( Material, dst->nmatls );
@@ -371,17 +527,25 @@ interpolate_Scene (Scene* dst, uint k, uint nscenes, const Scene* scenes)
 
         UFor( ei, nelems )
         {
-            const bool use_full_fill = true;
             uint x;
             SceneElement* dst_elems;
             dst_elems = &dst->elems[ecount];
-            if (use_full_fill)
-                x = full_fill_between_simplices (dst_elems,
+            if (false)
+                x = brutefill_between_simplices (dst_elems,
                                                  k,
                                                  &a->elems[ei], &b->elems[ei],
                                                  a_vert_offset, b_vert_offset,
                                                  a_vnml_offset, b_vnml_offset,
                                                  dst->verts);
+            else if (true)
+                    /* This method looks best.*/
+                x = midfill_between_simplices (dst_elems,
+                                               &vcount, dst->verts,
+                                               &vnmlcount, dst->vnmls,
+                                               k,
+                                               &a->elems[ei], &b->elems[ei],
+                                               a_vert_offset, b_vert_offset,
+                                               a_vnml_offset, b_vnml_offset);
             else
                 x = fill_between_simplices (dst_elems, k,
                                             &a->elems[ei], &b->elems[ei],
@@ -393,6 +557,10 @@ interpolate_Scene (Scene* dst, uint k, uint nscenes, const Scene* scenes)
 
     dst->nelems = ecount;
     ResizeT( SceneElement, dst->elems, dst->nelems );
+    dst->nverts = vcount;
+    ResizeT( Point, dst->verts, dst->nverts );
+    dst->nvnmls = vnmlcount;
+    ResizeT( Point, dst->vnmls, dst->nvnmls );
 }
 
     void

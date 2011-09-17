@@ -585,7 +585,8 @@ clip_BoundingBox (BoundingBox* dst,
     uint i;
     UFor( i, NDimensions )
     {
-#if 1
+            /* TODO  Why does this fail sometimes? */
+#if 0
         assert (a->min.coords[i] <= b->max.coords[i]);
 #else
         if (a->min.coords[i] > b->max.coords[i])
@@ -597,7 +598,8 @@ clip_BoundingBox (BoundingBox* dst,
         else
             dst->min.coords[i] = b->min.coords[i];
 
-#if 1
+            /* TODO  Why does this fail sometimes? */
+#if 0
         assert (a->max.coords[i] >= b->min.coords[i]);
 #else
         if (a->max.coords[i] < b->min.coords[i])

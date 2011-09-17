@@ -422,6 +422,10 @@ trxfrm_BoundingBox (BoundingBox* dst,
 
     Op_Point_1200( &diff ,.5*, -, &box->max , &box->min );
 
+        /* Fill rows in /bbox/ matrix with components of /diff/,
+         * flipping signs of the components based on the signs
+         * of the basis matrix's corresponding columns.
+         */
     UFor( i, NDimensions )
     {
         uint j;
@@ -449,7 +453,9 @@ trxfrm_BoundingBox (BoundingBox* dst,
         dst->max.coords[i] = + a + b;
 
         UFor( j, NDimensions )
-            assert (a >= robox.pts[j].coords[i]);
+                /* assert (a >= robox.pts[j].coords[i]); */
+            assert (relative_error (a, robox.pts[j].coords[i], 1)
+                    <= 2*Epsilon_real);
     }
 }
 

@@ -137,7 +137,7 @@ update_camera_location (Pilot* pilot, const MotionInput* input, real dt)
         summ_Point (view_origin, view_origin, &diff);
     }
 
-    if (NDimensions == 4)
+    if (NDimensions == 4 && FollowRacer)
     {
         x = (1 + input->drift) / 2;
         x = clamp_real (x, 0, 1);
