@@ -5,15 +5,17 @@
 
 #include "simplex.h"
 
-struct texture_struct
+typedef struct Texture Texture;
+typedef struct Material Material;
+
+struct Texture
 {
     uint nrows;
     uint ncols;
     byte* pixels;
 };
-typedef struct texture_struct Texture;
 
-struct material_struct
+struct Material
 {
     real ambient[NColors]; /* Ka */
     real diffuse[NColors]; /* Kd */
@@ -26,7 +28,6 @@ struct material_struct
     uint ambient_texture;
     uint diffuse_texture;
 };
-typedef struct material_struct Material;
     
 void init_Material (Material* mat);
 void

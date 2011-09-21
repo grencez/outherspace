@@ -7,26 +7,24 @@
 #include "space.h"
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
-struct kp_tree_node_struct;
-struct kp_tree_struct;
-typedef struct kp_tree_node_struct KPTreeNode;
-typedef struct kp_tree_struct KPTree;
-typedef struct kptree_grid_struct KPTreeGrid;
+typedef struct KPTreeNode KPTreeNode;
+typedef struct KPTree KPTree;
+typedef struct KPTreeGrid KPTreeGrid;
 
-struct kp_tree_node_struct
+struct KPTreeNode
 {
     uint dim;
     uint idx;
     Point loc;
 };
 
-struct kp_tree_struct
+struct KPTree
 {
     uint nnodes;
     KPTreeNode* nodes;
 };
 
-struct kptree_grid_struct
+struct KPTreeGrid
 {
     uint npts;
     uint* indices;

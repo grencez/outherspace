@@ -5,14 +5,13 @@
 #include "raytrace.h"
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
-struct object_motion_struct;
-typedef struct object_motion_struct ObjectMotion;
+typedef struct ObjectMotion ObjectMotion;
 
 #define DriftDim 3
 
 #define N2DimRotations (NDimensions * (NDimensions - 1) / 2)
 
-struct object_motion_struct
+struct ObjectMotion
 {
     real mass;
     Point veloc;

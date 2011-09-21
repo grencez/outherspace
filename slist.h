@@ -4,19 +4,16 @@
 
 #include "util.h"
 
-struct slist_node_struct;
-struct slist_struct;
+typedef struct SListNode SListNode;
+typedef struct SList SList;
 
-typedef struct slist_node_struct SListNode;
-typedef struct slist_struct SList;
-
-struct slist_node_struct
+struct SListNode
 {
     void* car;
     SListNode* cdr;
 };
 
-struct slist_struct
+struct SList
 {
     uint nmembs;
     SListNode* head;

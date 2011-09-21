@@ -5,31 +5,32 @@
 #include "xfrm.h"
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
-struct simplex_struct
+typedef struct Simplex Simplex;
+typedef struct Plane Plane;
+typedef struct BaryPoint BaryPoint;
+typedef struct BarySimplex BarySimplex;
+
+struct Simplex
 {
     Point pts[NDimensions];
 };
-typedef struct simplex_struct Simplex;
 
-struct plane_struct
+struct Plane
 {
     real offset;
     Point normal;
 };
-typedef struct plane_struct Plane;
 
-struct bary_point_struct
+struct BaryPoint
 {
     real coords[NDimensions-1];
 };
-typedef struct bary_point_struct BaryPoint;
 
-struct bary_simplex_struct
+struct BarySimplex
 {
     Plane plane;
     Plane barys[NDimensions-1];
 };
-typedef struct bary_simplex_struct BarySimplex;
 
 
 bool

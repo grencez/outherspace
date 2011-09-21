@@ -10,18 +10,13 @@
 #include "xfrm.h"
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
-struct ray_space_struct;
-struct object_ray_space_struct;
-struct point_light_source_struct;
-struct ray_image_struct;
-struct ray_cast_a_priori_struct;
-typedef struct ray_space_struct RaySpace;
-typedef struct object_ray_space_struct ObjectRaySpace;
-typedef struct point_light_source_struct PointLightSource;
-typedef struct ray_image_struct RayImage;
-typedef struct ray_cast_a_priori_struct RayCastAPriori;
+typedef struct RaySpace RaySpace;
+typedef struct ObjectRaySpace ObjectRaySpace;
+typedef struct PointLightSource PointLightSource;
+typedef struct RayImage RayImage;
+typedef struct RayCastAPriori RayCastAPriori;
 
-struct object_ray_space_struct
+struct ObjectRaySpace
 {
     Point centroid;
     PointXfrm orientation;
@@ -35,14 +30,14 @@ struct object_ray_space_struct
     bool visible;
 };
 
-struct point_light_source_struct
+struct PointLightSource
 {
     Point location;
     real intensity[NColors];
     bool diffuse;
 };
 
-struct ray_space_struct
+struct RaySpace
 {
     ObjectRaySpace main;
     uint nobjects;
@@ -56,7 +51,7 @@ struct ray_space_struct
     BoundingBox box;
 };
 
-struct ray_image_struct
+struct RayImage
 {
     uint* hits;
     real* mags;
@@ -72,7 +67,7 @@ struct ray_image_struct
     uint nbounces_max;
 };
 
-struct ray_cast_a_priori_struct
+struct RayCastAPriori
 {
     Point origin;
     Point dir_start;

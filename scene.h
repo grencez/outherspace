@@ -7,16 +7,18 @@
 #include "material.h"
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
-struct scene_element_struct
+typedef struct SceneElement SceneElement;
+typedef struct Scene Scene;
+
+struct SceneElement
 {
     uint verts[NDimensions];
     uint vnmls[NDimensions];
     uint txpts[NDimensions];
     uint material;
 };
-typedef struct scene_element_struct SceneElement;
 
-struct scene_struct
+struct Scene
 {
     uint nelems;
     uint nverts;
@@ -31,7 +33,6 @@ struct scene_struct
     Material* matls; /* Materials.*/
     Texture* txtrs; /* Textures.*/
 };
-typedef struct scene_struct Scene;
 
 void
 xlate_Scene (Scene* scene, const Point* displacement);

@@ -10,11 +10,12 @@
 #define RightDim 1
 #define ForwardDim 2
 
-struct point_xfrm_struct
+typedef struct PointXfrm PointXfrm;
+
+struct PointXfrm
 {
     Point pts[NDimensions];
 };
-typedef struct point_xfrm_struct PointXfrm;
 
 void zero_PointXfrm (PointXfrm* xfrm);
 void copy_PointXfrm (PointXfrm* dst, const PointXfrm* src);

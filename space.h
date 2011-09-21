@@ -12,18 +12,19 @@
 #define NDimensions 3
 #endif
 
-struct point_struct
+typedef struct Point Point;
+typedef struct BoundingBox BoundingBox;
+
+struct Point
 {
     real coords[NDimensions];
 };
-typedef struct point_struct Point;
 
-struct bounding_box_struct
+struct BoundingBox
 {
     Point min;
     Point max;
 };
-typedef struct bounding_box_struct BoundingBox;
 
 void diff_Point (Point* dst, const Point* a, const Point* b);
 real dot_Point (const Point* a, const Point* b);

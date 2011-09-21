@@ -21,12 +21,12 @@ static const bool ShowFrameRate = false;
 static const bool LightAtCamera = false;
 static const bool ShowSpeed = false;
 
-typedef struct motion_input_struct MotionInput;
-typedef struct race_craft_struct RaceCraft;
-typedef struct pilot_struct Pilot;
+typedef struct MotionInput MotionInput;
+typedef struct RaceCraft RaceCraft;
+typedef struct Pilot Pilot;
 
 
-struct motion_input_struct
+struct MotionInput
 {
     real vert;
     real horz;
@@ -41,13 +41,13 @@ struct motion_input_struct
     bool firing[2];
 };
 
-struct race_craft_struct
+struct RaceCraft
 {
     real health;
     uint pilot_idx;
 };
 
-struct pilot_struct
+struct Pilot
 {
     uint craft_idx;
     MotionInput input;

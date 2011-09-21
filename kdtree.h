@@ -7,40 +7,35 @@
 #include "space.h"
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
-struct kd_tree_leaf_struct;
-struct kd_tree_inner_struct;
-struct kd_tree_node_struct;
-struct kd_tree_struct;
-struct kdtree_grid_struct;
-typedef struct kd_tree_leaf_struct  KDTreeLeaf;
-typedef struct kd_tree_inner_struct KDTreeInner;
-typedef struct kd_tree_node_struct  KDTreeNode;
-typedef struct kd_tree_struct KDTree;
-typedef struct kdtree_grid_struct KDTreeGrid;
+typedef struct KDTreeLeaf  KDTreeLeaf;
+typedef struct KDTreeInner KDTreeInner;
+typedef struct KDTreeNode  KDTreeNode;
+typedef struct KDTree KDTree;
+typedef struct KDTreeGrid KDTreeGrid;
 
-struct kd_tree_leaf_struct
+struct KDTreeLeaf
 {
     uint nelems;
     BoundingBox box;
     uint elemidcs;
 };
-struct kd_tree_inner_struct
+struct KDTreeInner
 {
     real split_pos;
     uint parent;
     uint children[2];
 };
-struct kd_tree_node_struct
+struct KDTreeNode
 {
     uint split_dim;
-    union kd_tree_node_struct_union
+    union KDTreeNode_union
     {
         KDTreeLeaf leaf;
         KDTreeInner inner;
     } as;
 };
 
-struct kd_tree_struct
+struct KDTree
 {
     uint nnodes;
     uint nelemidcs;
@@ -48,7 +43,7 @@ struct kd_tree_struct
     uint* elemidcs;
 };
 
-struct kdtree_grid_struct
+struct KDTreeGrid
 {
     uint nelems;
     uint* elemidcs;
