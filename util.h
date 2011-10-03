@@ -34,6 +34,8 @@
 typedef unsigned int uint;
 typedef unsigned char byte;
 
+typedef unsigned long srand_t;
+
 #ifndef uint32
 #define uint32 uint
 #endif
@@ -136,6 +138,12 @@ real
 approx_eql (real expect, real result, real large, real mul);
 tristate signum_real (real a);
 tristate mul_signum (tristate a, tristate b);
+real
+random_real (srand_t* seed);
+uint
+random_uint (srand_t* seed, uint n);
+bool
+random_bool (srand_t* seed);
 
 #ifdef NDEBUG
 #define AssertApprox( expect, result, large, mul )

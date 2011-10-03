@@ -73,6 +73,10 @@ void rotation_PointXfrm (PointXfrm* xfrm, uint xdim, uint ydim, real angle)
     xfrm->pts[ydim].coords[ydim] =   tcos;
 }
 
+    /** Rotate /xdim/ in the direction of /ydim/ by /angle/.
+     ** This is the same as pre-multiplying by a matrix representing
+     ** an /angle/ rotation about the (/xdim/,/ydim/)-plane.
+     **/
     void
 rotate_PointXfrm (PointXfrm* xfrm, uint xdim, uint ydim, real angle)
 {
