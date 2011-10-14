@@ -259,7 +259,12 @@ partition_ObjectRaySpace (ObjectRaySpace* space)
 {
     KDTreeGrid grid;
     init_Scene_KDTreeGrid (&grid, &space->scene, &space->box);
+#if 1
     build_KDTree (&space->tree, &grid, space->elems);
+#else
+        /* Can use this code for development, less time spent building tree.*/
+    build_KDTree (&space->tree, &grid, 0);
+#endif
 #if 0
         /* build_KDTree (&space->tree, &grid, 0); */
     printf ("nnodes:%u  nelemidcs:%u\n",

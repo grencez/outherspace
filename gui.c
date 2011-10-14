@@ -10,6 +10,10 @@
 #include <SDL_mixer.h>
 #endif
 
+#ifdef SupportHaptic
+#include <SDL_haptic.h>
+#endif
+
     /* SDL on OS X does some weirdo bootstrapping by redefining /main/.*/
 #ifdef main
 #undef main
@@ -55,6 +59,7 @@ key_press_fn (Pilot* pilot, const SDL_keysym* event)
     tristate stride_mag_change = 0;
     tristate switch_racer = 0;
     tristate switch_kbd_pilot = 0;
+    tristate nperpixel_change = 0;  /* Magnify.*/
     bool reflect = false;
     bool rotate_dir_dim = false;
     bool change_cast_method = false;
@@ -151,6 +156,9 @@ key_press_fn (Pilot* pilot, const SDL_keysym* event)
             if (shift_mod)  view_light_change =  1;
             else            view_light_change = -1;
             break;
+        case SDLK_m:
+            if (shift_mod)  nperpixel_change =  1;
+            else            nperpixel_change = -1;
         case SDLK_p:
             if (shift_mod)  print_view_code = true;
             break;
@@ -295,6 +303,18 @@ key_press_fn (Pilot* pilot, const SDL_keysym* event)
         else
         {
             recast = false;
+        }
+    }
+    else if (nperpixel_change != 0)
+    {
+        if (nperpixel_change > 0)  nperpixel += 1;
+        else if (nperpixel > 1)    nperpixel -= 1;
+        else                       recast = false;
+
+        if (recast && resize_nrows == 0)
+        {
+            resize_nrows = view_nrows;
+            resize_ncols = view_ncols;
         }
     }
     else if (reflect)
@@ -447,8 +467,8 @@ grab_mouse_fn (const SDL_MouseButtonEvent* event, const RaySpace* space)
 
     row = event->y;
     col = event->x;
-    if (event->y < pilot->image_start_row ||
-        event->x < pilot->image_start_col)
+    if (event->y < (int)pilot->image_start_row ||
+        event->x < (int)pilot->image_start_col)
     {
         fputs ("Stay in the box hoser!\n", out);
     }
@@ -615,6 +635,12 @@ sdl_main (RaySpace* space, const char* pathname)
     SDL_Surface* icon = 0;
     SDL_Surface* screen = 0;
     SDL_Joystick* joysticks[NRacersMax]; 
+#ifdef SupportHaptic
+    SDL_Haptic* haptics[NRacersMax];
+    SDL_HapticEffect haptic_effect;
+    int haptic_id;
+#endif
+
     uint i, njoysticks;
     int ret;
 #ifdef SupportSound
@@ -633,12 +659,17 @@ sdl_main (RaySpace* space, const char* pathname)
         free (iconpath);
     }
 
-        /* Note: SDL_INIT_VIDEO is required for some silly reason!*/
+        /* Note: SDL_INIT_VIDEO is required for some silly reason!
+         * (This note written when GTK was used for display.)
+         */
     ret = SDL_Init (SDL_INIT_VIDEO |
 #ifdef SupportSound
                     SDL_INIT_AUDIO |
 #endif
                             /* SDL_INIT_EVENTTHREAD DOES NOT WORK!*/
+#ifdef SupportHaptic
+                    SDL_INIT_HAPTIC |
+#endif
                     SDL_INIT_JOYSTICK |
                     SDL_INIT_TIMER);
     assert (ret == 0);
@@ -651,6 +682,12 @@ sdl_main (RaySpace* space, const char* pathname)
         joysticks[i] = SDL_JoystickOpen (i);
         fprintf (stderr, "Joystick %u has %d buttons!\n",
                  i, SDL_JoystickNumButtons (joysticks[i]));
+
+#ifdef SupportHaptic
+        haptics[i] = (SDL_JoystickIsHaptic (joysticks[i]))
+            ? SDL_HapticOpenFromJoystick (joysticks[i])
+            : 0;
+#endif
     }
 
     if (njoysticks > 0)  npilots = njoysticks;
@@ -671,6 +708,26 @@ sdl_main (RaySpace* space, const char* pathname)
     {
         render_loop_fn (param);
     }
+
+#ifdef SupportHaptic
+    memset (&haptic_effect, 0, sizeof (SDL_HapticEffect));
+        /* supported = SDL_HapticQuery (haptics[0]); */
+        /* fprintf (stderr, "supported:%x\n", supported); */
+        /* if (supported & SDL_HAPTIC_SQUARE) */
+    haptic_effect.type = SDL_HAPTIC_SQUARE;
+        /* haptic_effect.periodic.period = 500; */
+    haptic_effect.periodic.period = 800;
+    haptic_effect.periodic.magnitude = 0x1000;
+    haptic_effect.periodic.length = SDL_HAPTIC_INFINITY;
+        /* haptic_effect.periodic.attack_length = 1000; */
+        /* haptic_effect.periodic.fade_length = 1000; */
+
+    haptic_id = SDL_HapticNewEffect (haptics[0], &haptic_effect);
+    if (haptic_id < 0)
+        fprintf (stderr, "Unable to upload haptic effect: %s.\n", SDL_GetError());
+    else SDL_HapticRunEffect (haptics[0], haptic_id, 1);
+#endif
+
 
 #ifdef SupportSound
     ret = Mix_OpenAudio(22050, AUDIO_S16SYS, 2, 1024);
@@ -748,10 +805,30 @@ sdl_main (RaySpace* space, const char* pathname)
                 }
                 break;
             case SDL_USEREVENT:
-                if (param->resize) {
-                    screen = SDL_SetVideoMode (view_ncols, view_nrows, 32,
+                if (param->resize || resize_nrows != 0) {
+                    screen = SDL_SetVideoMode (nperpixel * view_ncols,
+                                               nperpixel * view_nrows,
+                                               32,
                                                SDL_DOUBLEBUF|SDL_HWSURFACE);
                 }
+
+
+                UFor( i, njoysticks )
+                {
+                    const ObjectMotion* motion;
+                    real mag;
+                    motion = &racer_motions[pilots[i].craft_idx];
+                    mag = magnitude_Point (&motion->veloc);
+
+#ifdef SupportHaptic
+                        /* haptic_effect.periodic.period = (uint) (2000 / (1+mag)); */
+                    haptic_effect.periodic.magnitude = (uint) (0x8000 * (mag / 4000));
+                        /* printf ("period: %u\n", haptic_effect.periodic.period); */
+                    SDL_HapticUpdateEffect (haptics[i], haptic_id, &haptic_effect);
+                        /* SDL_HapticRunEffect (haptics[i], haptic_id, 1); */
+#endif
+                }
+
                 sdl_redraw (screen);
                 needs_recast = true;
                     /* When there is a separate render thread,
@@ -783,7 +860,16 @@ sdl_main (RaySpace* space, const char* pathname)
 #endif
 
     UFor( i, njoysticks )
+    {
+#ifdef SupportHaptic
+        if (haptics[i])
+        {
+            SDL_HapticStopEffect (haptics[i], haptic_id);
+            SDL_HapticClose (haptics[i]);
+        }
+#endif
         SDL_JoystickClose (joysticks[i]);
+    }
 
     if (SeparateRenderThread)
     {

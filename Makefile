@@ -27,6 +27,7 @@ CONFIG += openmp
 #CONFIG += benchmark  # +noassert
 #CONFIG += noassert
 #CONFIG += macapp
+#CONFIG += local_sdl
 #CONFIG += sunstudio
 
 # Use only for testing, slower in the general case.
@@ -83,9 +84,18 @@ ifneq (,$(filter macapp,$(CONFIG)))
 		GuiLFlags += -framework SDL_mixer
 	endif
 else
-	GuiCFlags += $(shell pkg-config --cflags sdl)
-	GuiLFlags += $(shell pkg-config --libs sdl)
+	ifneq (,$(filter local_sdl,$(CONFIG)))
+		GuiDFlags += -DSupportHaptic
+		GuiCFlags += $(shell sdl-config --prefix=$(HOME)/local --cflags)
+		GuiLFlags += $(shell sdl-config --prefix=$(HOME)/local --libs)
+	else
+		GuiCFlags += $(shell pkg-config --cflags sdl)
+		GuiLFlags += $(shell pkg-config --libs sdl)
+	endif
 	ifneq (,$(filter image,$(CONFIG)))
+		ifneq (,$(filter local_sdl,$(CONFIG)))
+			GuiLFlags += -L$(HOME)/local/lib
+		endif
 		GuiLFlags += -lSDL_image
 	endif
 	ifneq (,$(filter sound,$(CONFIG)))

@@ -67,6 +67,10 @@ init_ObjectMotion (ObjectMotion* motion, const ObjectRaySpace* object)
     motion->checkpoint_idx = 0;
 }
 
+    /** Rotate the (/xdim/,/ydim/)-plane by /angle/ counterclockwise,
+     * or more intuitively, the positive /xdim/-axis moves toward the
+     * positive /ydim/-axis for the first quarter-rotation.
+     **/
     void
 rotate_object (ObjectMotion* motion, uint xdim, uint ydim, real angle)
 {

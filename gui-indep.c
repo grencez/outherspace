@@ -71,8 +71,10 @@ resize_pilot_viewports (uint nrows, uint ncols)
     }
 }
 
-    /* Global effects!*/
-    /* A call to this better be in a mutex!*/
+    /** Global effects!
+     * A call to this better be in a mutex!
+     * Not every function like this is labeled!
+     **/
     void
 update_object_motion (ObjectMotion* motion, const MotionInput* input)
 {
@@ -459,10 +461,10 @@ render_RayImage (byte* data, uint nrows, uint ncols, uint stride,
 
     assert (ray_image->pixels);
     if (ray_image->nrows == 0)  return;
-    start_row = image_start_row + ray_image->nrows - 1;
+    start_row = image_start_row + nperpixel * ray_image->nrows - 1;
     start_col = image_start_col;
 
-    UFor( ray_row, ray_image->nrows )
+    UFor( ray_row, nperpixel * ray_image->nrows )
     {
         uint image_row, ray_col;
         const byte* pixline;
@@ -470,20 +472,19 @@ render_RayImage (byte* data, uint nrows, uint ncols, uint stride,
 
         image_row = start_row - ray_row;
         if (image_row >= nrows)  continue;
-
-        pixline = &ray_image->pixels[ray_row * 3 * view_ncols];
+        pixline = &ray_image->pixels[(ray_row / nperpixel) * 3 * view_ncols];
         outline = (uint32*) &data[image_row * stride];
 
-        UFor( ray_col, ray_image->ncols )
+        UFor( ray_col, nperpixel * ray_image->ncols )
         {
             uint image_col;
             image_col = start_col + ray_col;
             if (image_col >= ncols)  break;
             outline[image_col] =
-                ((uint32) 0xFF                   << shifts[0]) |
-                ((uint32) pixline[3*image_col+0] << shifts[1]) |
-                ((uint32) pixline[3*image_col+1] << shifts[2]) |
-                ((uint32) pixline[3*image_col+2] << shifts[3]);
+                ((uint32) 0xFF                               << shifts[0]) |
+                ((uint32) pixline[3*(image_col/nperpixel)+0] << shifts[1]) |
+                ((uint32) pixline[3*(image_col/nperpixel)+1] << shifts[2]) |
+                ((uint32) pixline[3*(image_col/nperpixel)+2] << shifts[3]);
         }
     }
 }
