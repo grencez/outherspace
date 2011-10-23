@@ -588,11 +588,13 @@ hit_BarySimplex (real* restrict ret_dist,
 
     return true;
 #else
+    const real fuzz = -16 * Epsilon_real;
     uint i;
-    real dist, dot, bcoord_sum = 0;
+    real dist, dot, bcoord_sum;
     BaryPoint bpoint;
     Point isect;
 
+    bcoord_sum = fuzz;
     dist = distance_Plane (&elem->plane, origin);
     dot = - dot_Point (&elem->plane.normal, dir);
     if (dot > 0)
@@ -608,7 +610,7 @@ hit_BarySimplex (real* restrict ret_dist,
             bpoint.coords[i] =
                 dot_Point (&elem->barys[i].normal, &isect)
                 + elem->barys[i].offset * dot;
-            if (bpoint.coords[i] < 0)  return false;
+            if (bpoint.coords[i] < fuzz)  return false;
         }
 
         UFor( i, NDimensions-1 )
@@ -629,7 +631,7 @@ hit_BarySimplex (real* restrict ret_dist,
             bpoint.coords[i] =
                 dot_Point (&elem->barys[i].normal, &isect)
                 + elem->barys[i].offset * dot;
-            if (bpoint.coords[i] > 0)  return false;
+            if (bpoint.coords[i] > - fuzz)  return false;
         }
 
         UFor( i, NDimensions-1 )

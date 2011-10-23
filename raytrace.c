@@ -1736,7 +1736,7 @@ cast_row_perspective (RayImage* image, uint row,
 #if 0
         if (! (row == 10 && col == 10))
         {
-            hitline[col] = space->nelems;
+            hitline[col] = Max_uint;
             continue;
         }
 #endif
@@ -1750,7 +1750,16 @@ cast_row_perspective (RayImage* image, uint row,
                      space, image,
                      origin, &dir, known->inside_box);
 
-            /* if (row == 333 && col == 322)  puts (elem ? "hit" : "miss"); */
+#if 0
+        {
+            static bool missed = false;
+            if (!missed && hitline[col] == Max_uint)
+            {
+                printf ("row:%u  col:%u\n", row, col);
+                missed = true;
+            }
+        }
+#endif
     }
 }
 
