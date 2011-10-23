@@ -923,7 +923,7 @@ fill_pixel (real* ret_colors,
                 Point tmp_origin;
 
                 offset_magtolight = magtolight - offset;
-                Op_Point_2010( &tmp_origin ,+, &isect ,offset*, &tolight );
+                Op_Point_2010( &tmp_origin ,-, &isect ,offset*, dir );
 
                 if (cast_to_light (space, &tmp_origin, &tolight,
                                    offset_magtolight))
@@ -1006,7 +1006,7 @@ fill_pixel (real* ret_colors,
             UFor( i, NColors )
                 factors[i] = (material->opacity * material->specular[i]);
 
-            Op_Point_2010( &tmp_origin ,+, &isect ,offset*, &refldir );
+            Op_Point_2010( &tmp_origin ,-, &isect ,offset*, dir );
             cast_colors (colors, space, image, &tmp_origin, &refldir,
                          factors, nbounces);
         }
