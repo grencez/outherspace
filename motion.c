@@ -325,17 +325,32 @@ apply_gravity (ObjectMotion* motion, const RaySpace* space,
 
     if (!motion->flying)
     {
-        real h;
-        h = hit_mag - motion->hover_height;
+        real x0, v0;
+        real v1, x1;
+        real v2, x2;
+        x0 = hit_mag + object->box.min.coords[UpDim];
+        v0 = dot_Point (&motion->track_normal, &motion->veloc);
 
-        if (h < 0)  h /= motion->hover_height;
-        else        h /= (motion->escape_height - motion->hover_height);
+        if (x0 <= motion->hover_height)
+            v1 = v0 + motion->hover_height - x0;
+        else
+            v1 = v0 + ((x0 - motion->hover_height)
+                       / (motion->escape_height - motion->hover_height));
 
-        accel *= h;
+            /* Note: this dt is optional?*/
+        x1 = x0 + dt * v1;
+
+        if (x1 <= motion->hover_height)
+            x2 = motion->hover_height * exp (x1 / motion->hover_height);
+        else
+            x2 = motion->hover_height;
+
+        v2 = x2 - x0;
 
         Op_Point_2010( &motion->veloc
                        ,+, &motion->veloc
-                       ,   accel*dt*, &motion->track_normal );
+                       ,   (v2-v0)*, &motion->track_normal );
+
         orth_unit_Point (&dv, &dv, &motion->track_normal);
     }
 
