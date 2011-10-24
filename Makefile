@@ -27,6 +27,7 @@ CONFIG += openmp
 #CONFIG += benchmark  # +noassert
 #CONFIG += noassert
 #CONFIG += macapp
+#CONFIG += haptic
 #CONFIG += local_sdl
 #CONFIG += sunstudio
 
@@ -85,7 +86,6 @@ ifneq (,$(filter macapp,$(CONFIG)))
 	endif
 else
 	ifneq (,$(filter local_sdl,$(CONFIG)))
-		GuiDFlags += -DSupportHaptic
 		GuiCFlags += $(shell sdl-config --prefix=$(HOME)/local --cflags)
 		GuiLFlags += $(shell sdl-config --prefix=$(HOME)/local --libs)
 	else
@@ -101,6 +101,9 @@ else
 	ifneq (,$(filter sound,$(CONFIG)))
 		GuiLFlags += -lSDL_mixer
 	endif
+endif
+ifneq (,$(filter haptic,$(CONFIG)))
+	GuiDFlags += -DSupportHaptic
 endif
 
 ## Serious debugging is about to happen.

@@ -591,7 +591,7 @@ xfrm_Scene (Scene* scene, const PointXfrm* xfrm)
         Point tmp;
         p = &scene->vnmls[i];
         xfrm_Point (&tmp, xfrm, p);
-        copy_Point (p, &tmp);
+        normalize_Point (p, &tmp);
     }
 }
 
