@@ -311,8 +311,8 @@ key_press_fn (Pilot* pilot, const SDL_keysym* event)
     }
     else if (nperpixel_change != 0)
     {
-        if (nperpixel_change > 0)  nperpixel += 1;
-        else if (nperpixel > 1)    nperpixel -= 1;
+        if (nperpixel_change > 0)  npixelzoom += 1;
+        else if (npixelzoom > 1)   npixelzoom -= 1;
         else                       recast = false;
 
         if (recast && resize_nrows == 0)
@@ -476,8 +476,8 @@ grab_mouse_fn (const SDL_MouseButtonEvent* event, const RaySpace* space)
 
     pilot = &pilots[kbd_pilot_idx];
 
-    row = event->y / nperpixel;
-    col = event->x / nperpixel;
+    row = event->y / npixelzoom;
+    col = event->x / npixelzoom;
     if (event->y < (int)pilot->image_start_row ||
         event->x < (int)pilot->image_start_col)
     {
@@ -816,13 +816,13 @@ sdl_main (RaySpace* space, const char* pathname)
                 }
                 break;
             case SDL_VIDEORESIZE:
-                resize_nrows = event.resize.h / nperpixel;
-                resize_ncols = event.resize.w / nperpixel;
+                resize_nrows = event.resize.h / npixelzoom;
+                resize_ncols = event.resize.w / npixelzoom;
                 break;
             case SDL_USEREVENT:
                 if (param->resize) {
-                    screen = SDL_SetVideoMode (nperpixel * view_ncols,
-                                               nperpixel * view_nrows,
+                    screen = SDL_SetVideoMode (npixelzoom * view_ncols,
+                                               npixelzoom * view_nrows,
                                                32,
                                                SDL_RESIZABLE|
                                                SDL_DOUBLEBUF|SDL_HWSURFACE);

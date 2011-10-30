@@ -83,7 +83,7 @@ static RaceCraft crafts[NRacersMax];
 static Pilot pilots[NRacersMax];
 static uint view_nrows = 200;
 static uint view_ncols = 200;
-static uint nperpixel = 2;
+static uint npixelzoom = 2;
 static real frame_t0 = 0;
 static real framerate_report_dt = 0;
 static uint framerate_report_count = 0;
