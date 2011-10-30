@@ -46,6 +46,14 @@ static void
 init_RaySpace_KDTreeGrid (KDTreeGrid* grid, const RaySpace* space);
 
 static void
+fill_pixel (real* ret_colors,
+            uint hitidx, real mag, uint objidx,
+            const RayImage* image,
+            const Point* origin,
+            const Point* dir,
+            const RaySpace* space,
+            uint nbounces);
+static void
 cast_colors (real* ret_colors,
              const RaySpace* restrict space,
              const RayImage* restrict image,
@@ -82,6 +90,13 @@ static void
 cast_row_perspective (RayImage* image, uint row,
                       const RaySpace* restrict space,
                       const RayCastAPriori* restrict known);
+
+    /* Include all packet tracing stuff here.
+     * Keep dependence on this minimal.
+     */
+#ifdef PackOpsAvail
+#include "raytrace-pack.c"
+#endif
 
 
     void
@@ -421,6 +436,7 @@ void init_RayImage (RayImage* image)
     image->mags = 0;
     image->pixels = 0;
     image->nrows = 0;
+    image->stride = 0;
     image->ncols = 0;
     image->hifov = 2 * M_PI / 3;
     image->perspective = true;
@@ -434,12 +450,44 @@ void init_RayImage (RayImage* image)
 
 void resize_RayImage (RayImage* image)
 {
+#ifdef PackOpsAvail
+    const uint align = RayPacketDimSz;
+#else
+    const uint align = 4;
+#endif
     uint npixels;
     if (image->nrows == 0 || image->ncols == 0)  return;
-    npixels = image->nrows * image->ncols;
+    image->stride = align * ceil_uint (image->ncols, align);
+    npixels = image->nrows * image->stride;
     if (image->hits)  ResizeT( uint, image->hits, npixels );
     if (image->mags)  ResizeT( real, image->mags, npixels );
     if (image->pixels)  ResizeT( byte, image->pixels, 3 * npixels );
+}
+
+    /** Remove the stride from a RayImage to make
+     * /image->cols == image->stride/.
+     **/
+void unstride_RayImage (RayImage* image)
+{
+    uint row;
+    if (image->ncols == image->stride)  return;
+    UFor( row, image->nrows )
+    {
+        uint dst_idx, src_idx;
+        dst_idx = row * image->ncols;
+        src_idx = row * image->stride;
+
+        if (image->hits)
+            memmove (&image->hits[dst_idx], &image->hits[src_idx],
+                     image->ncols * sizeof (uint));
+        if (image->mags)
+            memmove (&image->mags[dst_idx], &image->mags[src_idx],
+                     image->ncols * sizeof (real));
+        if (image->pixels)
+            memmove (&image->pixels[3 * dst_idx], &image->pixels[3 * src_idx],
+                     image->ncols * 3 * sizeof (byte));
+    }
+    image->stride = image->ncols;
 }
 
 void downsample_RayImage (RayImage* image, uint inv)
@@ -492,7 +540,7 @@ void downsample_RayImage (RayImage* image, uint inv)
 
         if ((row + 1) % inv == 0)
         {
-            memcpy (&image->pixels[(row/inv) * 3 * o_ncols],
+            memcpy (&image->pixels[(row/inv) * 3 * image->stride],
                     o_pixline,
                     3 * o_ncols * sizeof(byte));
 
@@ -663,7 +711,6 @@ splitting_plane_count (const Point* origin, const Point* direct,
     return count;
 }
 
-static
     void
 fill_pixel (real* ret_colors,
             uint hitidx, real mag, uint objidx,
@@ -1463,9 +1510,9 @@ rays_to_hits_fish (RayImage* image,
         real* magline = 0;
         byte* pixline = 0;
 
-        if (image->hits)  hitline = &image->hits[row * ncols];
-        if (image->mags)  magline = &image->mags[row * ncols];
-        if (image->pixels)  pixline = &image->pixels[row * 3 * ncols];
+        if (image->hits)  hitline = &image->hits[row * image->stride];
+        if (image->mags)  magline = &image->mags[row * image->stride];
+        if (image->pixels)  pixline = &image->pixels[row * 3 * image->stride];
 
         row_angle = row_start + row_delta * row;
 
@@ -1507,7 +1554,7 @@ rays_to_hits_fish (RayImage* image,
 
     void
 rays_to_hits_fixed_plane (uint* hits, real* mags,
-                          uint nrows, uint ncols,
+                          uint nrows, uint ncols, uint stride,
                           const RaySpace* space, real zpos)
 {
     uint row;
@@ -1550,8 +1597,8 @@ rays_to_hits_fixed_plane (uint* hits, real* mags,
         uint* hitline;
         real* magline;
 
-        hitline = &hits[row * ncols];
-        magline = &mags[row * ncols];
+        hitline = &hits[row * stride];
+        magline = &mags[row * stride];
 
         UFor( col, ncols )
         {
@@ -1637,9 +1684,9 @@ cast_row_orthographic (RayImage* restrict image,
     ncols = image->ncols;
     box = &space->box;
 
-    if (image->hits)  hitline = &image->hits[row * ncols];
-    if (image->mags)  magline = &image->mags[row * ncols];
-    if (image->pixels)  pixline = &image->pixels[row * 3 * ncols];
+    if (image->hits)  hitline = &image->hits[row * image->stride];
+    if (image->mags)  magline = &image->mags[row * image->stride];
+    if (image->pixels)  pixline = &image->pixels[row * 3 * image->stride];
 
         /* For orthographic view, origin and direction storage are swapped.*/
     dir = &known->origin;
@@ -1720,9 +1767,9 @@ cast_row_perspective (RayImage* image, uint row,
 
     ncols = image->ncols;
 
-    if (image->hits)  hitline = &image->hits[row * ncols];
-    if (image->mags)  magline = &image->mags[row * ncols];
-    if (image->pixels)  pixline = &image->pixels[row * 3 * ncols];
+    if (image->hits)  hitline = &image->hits[row * image->stride];
+    if (image->mags)  magline = &image->mags[row * image->stride];
+    if (image->pixels)  pixline = &image->pixels[row * 3 * image->stride];
 
     origin = &known->origin;
     Op_Point_2010( &partial_dir
@@ -1883,10 +1930,6 @@ ray_from_RayCastAPriori (Point* origin, Point* dir,
         normalize_Point (dir, dir);
     }
 }
-
-#ifdef PackOpsAvail
-#include "raytrace-pack.c"
-#endif
 
     void
 cast_partial_RayImage (RayImage* restrict image,

@@ -32,10 +32,11 @@ int main (int argc, char** argv)
     init_RayImage (&image);
 
 #if 1
-    image.nrows = 2000;
-    image.ncols = 2000;
-    image.hits = AllocT( uint, image.nrows * image.ncols );
-    image.mags = AllocT( real, image.nrows * image.ncols );
+    image.nrows = 2001;
+    image.ncols = 2001;
+    image.hits = AllocT( uint, 1 );
+    image.mags = AllocT( real, 1 );
+    image.pixels = AllocT( byte, 1 );
     good = setup_testcase_triangles (&space,
                                      &view_origin, &view_basis,
                                      &image.hifov,
@@ -43,14 +44,14 @@ int main (int argc, char** argv)
 #elif 0
     image.nrows = 1000;
     image.ncols = 1000;
-    image.pixels = AllocT( byte, image.nrows * 3 * image.ncols );
+    image.pixels = AllocT( byte, 1 );
     good = setup_testcase_simple (&space, &view_origin,
                                   &view_basis, &image.hifov,
                                   pathname, "machine0.obj");
 #else
     image.nrows = 1500;
     image.ncols = 1500;
-    image.pixels = AllocT( byte, image.nrows * 3 * image.ncols );
+    image.pixels = AllocT( byte, 1 );
     good =
 #if 0
 #elif 0
@@ -69,6 +70,8 @@ int main (int argc, char** argv)
         fputs ("Setup failed!\n", stderr);
         return 1;
     }
+
+    resize_RayImage (&image);
 
         /* output_BoundingBox (out, &space.box);  fputc ('\n', out); */
         /* output_KDTree (out, &space.tree, space.nelems, space.elems); */
@@ -117,6 +120,7 @@ int main (int argc, char** argv)
     if (write_image)
     {
             /* downsample_RayImage (&image, 9); */
+        unstride_RayImage (&image);
         if (image.hits)
         {
             output_PBM_image ("out.pbm", image.nrows, image.ncols,

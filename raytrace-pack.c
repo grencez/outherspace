@@ -423,6 +423,7 @@ cast_packet_RayImage (RayImage* image, uint row_off, uint col_off,
         uint row, j;
 
         row = i + row_off;
+        if (row >= image->nrows)  break;
 
         scat_uintPack (hit_inds, hit.inds[i]);
         scat_uintPack (hit_objs, hit.objs[i]);
@@ -431,7 +432,7 @@ cast_packet_RayImage (RayImage* image, uint row_off, uint col_off,
         UFor( j, RayPacketDimSz )
         {
             uint img_idx;
-            img_idx = j + col_off + row * image->ncols;
+            img_idx = j + col_off + row * image->stride;
 
             if (image->hits)  image->hits[img_idx] = hit_inds[j];
             if (image->mags)  image->mags[img_idx] = hit_mags[j];

@@ -58,6 +58,7 @@ struct RayImage
     byte* pixels;
     uint nrows;
     uint ncols;
+    uint stride;
     real hifov;  /* Large field of view parameter.*/
     bool perspective;
     real ambient[NColors];
@@ -108,7 +109,7 @@ rays_to_hits_fish (RayImage* restrict image,
                    real view_angle);
 void
 rays_to_hits_fixed_plane (uint* hits, real* mags,
-                          uint nrows, uint ncols,
+                          uint nrows, uint ncols, uint stride,
                           const RaySpace* space, real zpos);
 void
 setup_RayCastAPriori (RayCastAPriori* dst,
@@ -159,6 +160,7 @@ init_Scene_KDTreeGrid (KDTreeGrid* grid, const Scene* scene,
                        const BoundingBox* box);
 void init_RayImage (RayImage* image);
 void resize_RayImage (RayImage* image);
+void unstride_RayImage (RayImage* image);
 void downsample_RayImage (RayImage* image, uint inv);
 void cleanup_RayImage (RayImage* image);
 #ifdef INCLUDE_SOURCE

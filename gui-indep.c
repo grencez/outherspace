@@ -472,7 +472,8 @@ render_RayImage (byte* data, uint nrows, uint ncols, uint stride,
 
         image_row = start_row - ray_row;
         if (image_row >= nrows)  continue;
-        pixline = &ray_image->pixels[(ray_row / npixelzoom) * 3 * view_ncols];
+        pixline = &ray_image->pixels[((ray_row / npixelzoom) *
+                                      3 * ray_image->stride)];
         outline = (uint32*) &data[image_row * stride];
 
         UFor( ray_col, npixelzoom * ray_image->ncols )
