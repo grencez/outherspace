@@ -476,8 +476,8 @@ grab_mouse_fn (const SDL_MouseButtonEvent* event, const RaySpace* space)
 
     pilot = &pilots[kbd_pilot_idx];
 
-    row = event->y;
-    col = event->x;
+    row = event->y / nperpixel;
+    col = event->x / nperpixel;
     if (event->y < (int)pilot->image_start_row ||
         event->x < (int)pilot->image_start_col)
     {
@@ -704,7 +704,7 @@ sdl_main (RaySpace* space, const char* pathname)
     if (njoysticks > 0)  npilots = njoysticks;
     init_ui_data (space, pathname);
         /* Assure pilot views will be initialized (trigger a resize).*/
-    resize_nrows = view_nrows;
+    resize_nrows = npilots * view_nrows;
     resize_ncols = view_ncols;
 
         /* Allow the render thread to begin.*/
@@ -815,11 +815,16 @@ sdl_main (RaySpace* space, const char* pathname)
                                            je->state == SDL_PRESSED);
                 }
                 break;
+            case SDL_VIDEORESIZE:
+                resize_nrows = event.resize.h / nperpixel;
+                resize_ncols = event.resize.w / nperpixel;
+                break;
             case SDL_USEREVENT:
-                if (param->resize || resize_nrows != 0) {
+                if (param->resize) {
                     screen = SDL_SetVideoMode (nperpixel * view_ncols,
                                                nperpixel * view_nrows,
                                                32,
+                                               SDL_RESIZABLE|
                                                SDL_DOUBLEBUF|SDL_HWSURFACE);
                 }
 

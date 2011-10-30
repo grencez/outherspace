@@ -501,8 +501,8 @@ render_pilot_images (byte* data, uint nrows, uint ncols, uint stride,
 
         render_RayImage (data, nrows, ncols, stride,
                          &pilot->ray_image,
-                         pilot->image_start_row,
-                         pilot->image_start_col,
+                         pilot->image_start_row * nperpixel,
+                         pilot->image_start_col * nperpixel,
                          argb_order);
     }
 }
