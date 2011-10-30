@@ -64,6 +64,7 @@ key_press_fn (Pilot* pilot, const SDL_keysym* event)
     bool rotate_dir_dim = false;
     bool change_cast_method = false;
     bool print_view_code = false;
+    bool quit_app = false;
     bool recast = true;
     FILE* out = stdout;
     bool shift_mod, ctrl_mod;
@@ -161,6 +162,9 @@ key_press_fn (Pilot* pilot, const SDL_keysym* event)
             else            nperpixel_change = -1;
         case SDLK_p:
             if (shift_mod)  print_view_code = true;
+            break;
+        case SDLK_q:
+            if (ctrl_mod)  quit_app = true;
             break;
         case SDLK_r:
             reflect = true;  break;
@@ -370,6 +374,13 @@ key_press_fn (Pilot* pilot, const SDL_keysym* event)
                          i, j, view_basis->pts[i].coords[j]);
             }
         }
+    }
+    else if (quit_app)
+    {
+        SDL_Event ev;
+        ev.type = SDL_QUIT;
+        SDL_PushEvent (&ev);
+        recast = false;
     }
     else
     {

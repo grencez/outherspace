@@ -3,6 +3,8 @@
 #include "motion.h"
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
+const bool UseNNCollision = false;
+
 static void
 zero_rotations (ObjectMotion* motion);
 static void
@@ -214,6 +216,17 @@ move_object (RaySpace* space, ObjectMotion* motions,
     copy_PointXfrm (&object->orientation, &new_orientation);
     mark_colliding (collisions, refldirs, motions, objidx, space);
 
+    if (NDimensions == 4)
+    {
+        real offset, lo, hi;
+        offset = .5 * (object->box.max.coords[DriftDim] -
+                       object->box.min.coords[DriftDim]);
+        lo = space->main.box.min.coords[DriftDim] + offset;
+        hi = space->main.box.max.coords[DriftDim] - offset;
+        veloc.coords[DriftDim] =
+            drift - object->centroid.coords[DriftDim];
+    }
+
     copy_Point (&motion->veloc, &veloc);
     scale_Point (&veloc, &veloc, dt);
     summ_Point (&new_centroid, &object->centroid, &veloc);
@@ -225,8 +238,13 @@ move_object (RaySpace* space, ObjectMotion* motions,
                        object->box.min.coords[DriftDim]);
         lo = space->main.box.min.coords[DriftDim] + offset;
         hi = space->main.box.max.coords[DriftDim] - offset;
+#if 0
         drift = clamp_real (drift, lo, hi);
         new_centroid.coords[DriftDim] = drift;
+#else
+        new_centroid.coords[DriftDim] =
+            clamp_real (new_centroid.coords[DriftDim], lo, hi);
+#endif
     }
 
     if (motion->collide)
@@ -254,7 +272,6 @@ move_object (RaySpace* space, ObjectMotion* motions,
     }
 }
 
-    /* Gravity just shoots you at 500 m/s to a middle point.*/
     void
 apply_gravity (ObjectMotion* motion, const RaySpace* space,
                uint objidx, real dt)
@@ -319,6 +336,7 @@ apply_gravity (ObjectMotion* motion, const RaySpace* space,
             copy_Point (&motion->track_normal, &normal);
     }
 
+        /* TODO: Totally arbitrary gravity!*/
     accel = -1980;
     zero_Point (&dv);
     dv.coords[0] = accel * dt;
@@ -371,6 +389,7 @@ apply_thrust (Point* veloc,
               real dt)
 {
     const real alpha = 3;  /* Arbitrary coefficient.*/
+        /* TODO: Totally arbitrary thrusters!*/
     real vthrust = 2 * 733;  /* Velocity of thrusters.*/
     real accel;
     real forward_mag, up_mag, drift_mag;
@@ -487,6 +506,9 @@ apply_thrust (Point* veloc,
     copy_PointXfrm (orientation, &basis);
 }
 
+    /** Mark which objects are colliding with which.
+     * I don't much like this function.
+     **/
     void
 mark_colliding (BitString* collisions,
                 Point* refldirs,
@@ -497,6 +519,8 @@ mark_colliding (BitString* collisions,
     const Scene* scene;
     const ObjectRaySpace* object;
     FILE* out = stderr;
+
+    if (!UseNNCollision)  return;
 
     object = &space->objects[objidx];
     scene = &object->scene;
@@ -546,21 +570,6 @@ mark_colliding (BitString* collisions,
             if (!test_BitString (collisions, off + hit_objidx) &&
                 !set1_BitString (collisions, tmp_off + hit_objidx))
             {
-#if 0
-                Point veloc, normal;
-
-                negate_Point (&veloc, &motions[objidx].veloc);
-                diff_Point (&veloc, &veloc, &direct);
-                scale_Point (&normal, &direct, hit_mag);
-                summ_Point (&normal, &normal, &origin);
-                diff_Point (&normal, &object->centroid, &normal);
-                normalize_Point (&normal, &normal);
-
-                reflect_Point (&veloc, &veloc, &normal,
-                               dot_Point (&veloc, &normal));
-
-                copy_Point (&refldirs[tmp_off + hit_objidx], &veloc);
-#else
                 Point veloc, normal;
 
                 Op_Point_1200( &veloc
@@ -577,15 +586,12 @@ mark_colliding (BitString* collisions,
                                dot_Point (&veloc, &normal));
 
                 copy_Point (&refldirs[tmp_off + hit_objidx], &veloc);
-#if 0
                     /* TODO: Need more samples than the first!
                      * Do velocity stuff in loop below!
                      */
                 summ_Point (&refldirs[tmp_off + hit_objidx],
                             &refldirs[tmp_off + hit_objidx],
                             &normal);
-#endif
-#endif
             }
         }
     }
@@ -658,6 +664,8 @@ detect_collision (ObjectMotion* motions,
 
     bs_offset = objidx * (space->nobjects+1);
 
+        /* Detect if we run into other objects' points.*/
+    if (UseNNCollision)
     UFor( i, space->nobjects )
     {
         uint j;
@@ -786,11 +794,15 @@ detect_collision (ObjectMotion* motions,
         }
     }
 
-#if 1
+    if (true)
     UFor( i, scene->nverts )
     {
         Point diff, origin, destin;
         real distance;
+        Point unit_dir;
+        real tmp_mag;
+        uint tmp_hit = Max_uint, tmp_objidx = Max_uint;
+        bool inside_box;
 
         trxfrm_Point (&origin, &object->orientation, &scene->verts[i]);
         trxfrm_Point (&destin, new_orientation, &scene->verts[i]);
@@ -798,20 +810,27 @@ detect_collision (ObjectMotion* motions,
         summ_Point (&origin, &origin, &object->centroid);
         summ_Point (&destin, &destin, new_centroid);
 
+        inside_box = inside_BoundingBox (&space->main.box, &origin);
+
+        diff_Point (&unit_dir, &object->centroid, &origin);
+        distance = magnitude_Point (&unit_dir);
+        tmp_mag = distance;
+        scale_Point (&unit_dir, &unit_dir, 1 / distance);
+
+        cast_nopartition (&tmp_hit, &tmp_mag, &tmp_objidx,
+                          space, &origin, &unit_dir,
+                          inside_box, objidx);
+        if (tmp_mag < distance)  continue;
+
+
         diff_Point (&diff, &destin, &origin);
         distance = magnitude_Point (&diff);
 
 
         if (0 < distance)
         {
-            uint tmp_hit;
-            real tmp_mag;
-            uint tmp_objidx;
-            bool inside_box;
-            Point unit_dir;
 
             scale_Point (&unit_dir, &diff, 1 / distance);
-            inside_box = inside_BoundingBox (&space->main.box, &origin);
 
             tmp_hit = Max_uint;
             tmp_mag = distance;
@@ -832,7 +851,6 @@ detect_collision (ObjectMotion* motions,
             }
         }
     }
-#endif
 
     colliding = false;
     if (hit_objidx <= space->nobjects)

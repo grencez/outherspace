@@ -244,22 +244,30 @@ setup_testcase_track (RaySpace* space,
 
     if (NDimensions == 3)
     {
+#if 0
         good = readin_wavefront (&space->main.scene, pathname, "track1.obj");
+#elif 0
+        good = readin_wavefront (&space->main.scene, pathname, "cone-track-wave.obj");
+#elif 1
+        good = readin_wavefront (&space->main.scene, pathname, "loop.obj");
+#endif
     }
     else
     {
-        const char* const fnames[2] = { "track1.obj", "track1.obj" };
-        const real dcoords[2] = { -0.1, 1.1 };
-        good = interpolate_by_file (&space->main.scene, 2, pathname, fnames, dcoords);
+        const char* const fnames[2] = { "loop.obj", "bentloop.obj" };
+        const real dcoords[2] = { -0.001, 1.001 };
+        good = interpolate_by_file (&space->main.scene, 2,
+                                    pathname, fnames, dcoords);
     }
     if (!good)  return false;
     condense_Scene (&space->main.scene);
+    fixup_wavefront_Scene (&space->main.scene);
 
     if (true)
     {
         PointXfrm fix;
         identity_PointXfrm (&fix);
-        scale_PointXfrm (&fix, &fix, 3);
+        scale_PointXfrm (&fix, &fix, 700);
         xfrm_Scene (&space->main.scene, &fix);
     }
     else if (false)
@@ -271,7 +279,7 @@ setup_testcase_track (RaySpace* space,
         xfrm_Scene (&space->main.scene, &fix);
     }
 
-    good = add_sky_texture (space, pathname, "gradient-sky.ppm");
+    good = add_sky_texture (space, pathname, "iras.png");
     if (!good)  return false;
 
     init_filled_RaySpace (space);
@@ -290,7 +298,8 @@ setup_testcase_track (RaySpace* space,
         view_origin->coords[3] = .5;
     }
 
-#if 1
+#if 0
+#elif 1
     {
         Point loc;
         centroid_BoundingBox (&loc, &space->main.box);
@@ -666,7 +675,6 @@ setup_testcase_sphere (RaySpace* space,
     if (NDimensions == 3)
     {
         good = readin_wavefront (&space->main.scene, pathname, "sphere1.obj");
-        if (!good)  return false;
     }
     else
     {
@@ -675,8 +683,8 @@ setup_testcase_sphere (RaySpace* space,
         const real dcoords[2] = { -0.001, 1.001 };
         good = interpolate_by_file (&space->main.scene,
                                     nscenes, pathname, fnames, dcoords);
-        if (!good)  return false;
     }
+    if (!good)  return false;
 
     init_filled_RaySpace (space);
 
