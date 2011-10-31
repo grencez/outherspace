@@ -28,6 +28,7 @@ struct ObjectMotion
     Point track_normal;
     uint laps;
     uint checkpoint_idx;
+    bool lock_drift;
 };
 
 void

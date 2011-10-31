@@ -47,6 +47,8 @@ void init_SceneElement (SceneElement* elem);
 void copy_SceneElement (SceneElement* dst, const SceneElement* src);
 void cleanup_Scene (Scene* scene);
 void
+copy_Scene (Scene* dst, const Scene* src);
+void
 output_SceneElement (FILE* out, const Scene* scene, uint ei);
 void vert_Scene (Point* dst, const Scene* scene, uint idx);
 void
@@ -55,6 +57,9 @@ void
 setup_1elem_Scene (Scene* scene);
 void
 interpolate_Scene (Scene* dst, uint k, uint nscenes, const Scene* scenes);
+void
+interpolate1_Scene (Scene* dst, real alpha,
+                    const Scene* scene_a, const Scene* scene_b);
 void
 condense_Scene (Scene* scene);
 #ifdef INCLUDE_SOURCE

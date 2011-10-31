@@ -424,13 +424,14 @@ joystick_button_event (MotionInput* mot, uint btnidx, bool pressed)
     tristate value;
 #if 0
     FILE* out = stderr;
-    fprintf (out, "\rdevidx:%u  btnidx:%u  pressed:%u",
-             devidx, btnidx, (uint) pressed);
+    fprintf (out, "\rbtnidx:%u  pressed:%u",
+             btnidx, (uint) pressed);
 #endif
 
     value = pressed ? 1 : 0;
 
     if (btnidx == 0)  mot->boost = pressed;
+    if (btnidx == 1)  mot->lock_drift = pressed;
     if (btnidx == 2)  mot->stride[ForwardDim] =  value;
     if (btnidx == 3)  mot->stride[ForwardDim] = -value;
     if (btnidx == 4)  mot->firing[0] = pressed;

@@ -12,8 +12,12 @@ move_object (RaySpace* space, ObjectMotion* motions,
              BitString* collisions, Point* refldirs,
              uint objidx, real dt);
 static void
-apply_gravity (ObjectMotion* motion, const RaySpace* space,
-               uint objidx, real dt);
+apply_track_gravity (ObjectMotion* motion, const RaySpace* space,
+                     uint objidx, real dt,
+                     const Point* centroid,
+                     const PointXfrm* orientation);
+static void
+apply_gravity (ObjectMotion* motion, real dt);
 static void
 apply_thrust (Point* veloc,
               PointXfrm* orientation,
@@ -67,6 +71,7 @@ init_ObjectMotion (ObjectMotion* motion, const ObjectRaySpace* object)
     motion->track_normal.coords[0] = 1;
     motion->laps = 0;
     motion->checkpoint_idx = 0;
+    motion->lock_drift = false;
 }
 
     /** Rotate the (/xdim/,/ydim/)-plane by /angle/ counterclockwise,
@@ -218,13 +223,10 @@ move_object (RaySpace* space, ObjectMotion* motions,
 
     if (NDimensions == 4)
     {
-        real offset, lo, hi;
-        offset = .5 * (object->box.max.coords[DriftDim] -
-                       object->box.min.coords[DriftDim]);
-        lo = space->main.box.min.coords[DriftDim] + offset;
-        hi = space->main.box.max.coords[DriftDim] - offset;
         veloc.coords[DriftDim] =
             drift - object->centroid.coords[DriftDim];
+        if (motion->lock_drift)
+            veloc.coords[DriftDim] = 0;
     }
 
     copy_Point (&motion->veloc, &veloc);
@@ -247,6 +249,8 @@ move_object (RaySpace* space, ObjectMotion* motions,
 #endif
     }
 
+    apply_track_gravity (motion, space, objidx, dt,
+                         &new_centroid, &new_orientation);
     if (motion->collide)
     {
         bool hit;
@@ -268,20 +272,20 @@ move_object (RaySpace* space, ObjectMotion* motions,
     {
         copy_Point (&object->centroid, &new_centroid);
         copy_PointXfrm (&object->orientation, &new_orientation);
-        apply_gravity (motion, space, objidx, dt);
+        apply_gravity (motion, dt);
     }
 }
 
     void
-apply_gravity (ObjectMotion* motion, const RaySpace* space,
-               uint objidx, real dt)
+apply_track_gravity (ObjectMotion* motion, const RaySpace* space,
+                     uint objidx, real dt,
+                     const Point* centroid,
+                     const PointXfrm* orientation)
 {
     bool inside_box;
     uint hit_idx;
     real hit_mag;
-    real accel;
     Point origin, direct;
-    Point dv;
     const ObjectRaySpace* object;
 
     if (!motion->gravity)  return;
@@ -289,10 +293,10 @@ apply_gravity (ObjectMotion* motion, const RaySpace* space,
     object = &space->objects[objidx];
 
     if (motion->flying)
-        negate_Point (&direct, &space->objects[objidx].orientation.pts[0]);
+        negate_Point (&direct, &orientation->pts[0]);
     else
         negate_Point (&direct, &motion->track_normal);
-    copy_Point (&origin, &object->centroid);
+    copy_Point (&origin, centroid);
     inside_box = inside_BoundingBox (&space->main.box, &origin);
 
     hit_idx = Max_uint;
@@ -336,11 +340,6 @@ apply_gravity (ObjectMotion* motion, const RaySpace* space,
             copy_Point (&motion->track_normal, &normal);
     }
 
-        /* TODO: Totally arbitrary gravity!*/
-    accel = -1980;
-    zero_Point (&dv);
-    dv.coords[0] = accel * dt;
-
     if (!motion->flying)
     {
         real x0, v0;
@@ -369,14 +368,27 @@ apply_gravity (ObjectMotion* motion, const RaySpace* space,
                        ,+, &motion->veloc
                        ,   (v2-v0)*, &motion->track_normal );
 
-        orth_unit_Point (&dv, &dv, &motion->track_normal);
+        if (NDimensions == 4)
+        {
+            motion->track_normal.coords[DriftDim] = 0;
+            normalize_Point (&motion->track_normal, &motion->track_normal);
+        }
     }
+}
 
-    if (NDimensions == 4)
-    {
-        motion->track_normal.coords[DriftDim] = 0;
-        normalize_Point (&motion->track_normal, &motion->track_normal);
-    }
+    void
+apply_gravity (ObjectMotion* motion, real dt)
+{
+
+    Point dv;
+    real accel;
+        /* TODO: Totally arbitrary gravity!*/
+    accel = -1980;
+    zero_Point (&dv);
+    dv.coords[0] = accel * dt;
+
+    if (!motion->flying)
+        orth_unit_Point (&dv, &dv, &motion->track_normal);
 
     summ_Point (&motion->veloc, &motion->veloc, &dv);
 }

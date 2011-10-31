@@ -28,6 +28,9 @@
 #define CopyT( Type, dst, src, lo, count ) \
     (array_cpy (dst, src, lo, count, sizeof (Type)))
 
+#define DuplicaT( Type, src, count ) \
+    ((Type*) array_dup (src, count, sizeof (Type)))
+
 #define Ceil_uint( a, b ) \
     (((a) + (b) - 1) / (b))
 
@@ -160,6 +163,8 @@ uint index_of (const void* e, const void* arr, size_t size);
 void array_set (void* arr, uint i, const void* e, size_t size);
 void
 array_cpy (void* dst, const void* src, uint lo, uint count, size_t size);
+void*
+array_dup (const void* src, uint count, size_t size);
 char* strto_uint (uint* ret, const char* in);
 char* strto_real (real* ret, const char* in);
 const char* strskip_ws (const char* line);

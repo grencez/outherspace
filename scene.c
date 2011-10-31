@@ -82,6 +82,27 @@ void cleanup_Scene (Scene* scene)
 }
 
     void
+copy_Scene (Scene* dst, const Scene* src)
+{
+    uint i;
+    CopyT( Scene, dst, src, 0, 1 );
+    dst->elems = DuplicaT( SceneElement, dst->elems, dst->nelems );
+    dst->verts = DuplicaT( Point, dst->verts, dst->nverts );
+    dst->vnmls = DuplicaT( Point, dst->vnmls, dst->nvnmls );
+    dst->txpts = DuplicaT( BaryPoint, dst->txpts, dst->ntxpts );
+    dst->matls = DuplicaT( Material, dst->matls, dst->nmatls );
+    dst->txtrs = DuplicaT( Texture, dst->txtrs, dst->ntxtrs );
+
+    UFor( i, dst->ntxtrs )
+    {
+        Texture* txtr;
+        txtr = &dst->txtrs[i];
+        txtr->pixels = DuplicaT( byte, txtr->pixels,
+                                 3 * txtr->nrows * txtr->ncols );
+    }
+}
+
+    void
 output_SceneElement (FILE* out, const Scene* scene, uint ei)
 {
     uint i;
@@ -561,6 +582,30 @@ interpolate_Scene (Scene* dst, uint k, uint nscenes, const Scene* scenes)
     ResizeT( Point, dst->verts, dst->nverts );
     dst->nvnmls = vnmlcount;
     ResizeT( Point, dst->vnmls, dst->nvnmls );
+}
+
+    void
+interpolate1_Scene (Scene* dst, real alpha,
+                    const Scene* scene_a, const Scene* scene_b)
+{
+    uint i;
+    assert (alpha >= 0);
+    assert (alpha <= 1);
+
+    copy_Scene (dst, scene_a);
+
+    UFor( i, dst->nverts )
+        Op_Point_21010( &dst->verts[i]
+                        ,+, (1-alpha)*, &dst->verts[i]
+                        ,   alpha*, &scene_b->verts[i] );
+    UFor( i, dst->nvnmls )
+        Op_Point_21010( &dst->vnmls[i]
+                        ,+, (1-alpha)*, &dst->vnmls[i]
+                        ,   alpha*, &scene_b->vnmls[i] );
+    UFor( i, dst->ntxpts )
+        Op_21010( real, NDimensions-1, dst->txpts[i].coords
+                  ,+, (1-alpha)*, dst->txpts[i].coords
+                  ,   alpha*, scene_b->txpts[i].coords );
 }
 
     void

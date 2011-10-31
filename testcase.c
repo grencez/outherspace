@@ -73,6 +73,7 @@ interpolate_by_file (Scene* dst,
 {
     bool good = true;
     uint i;
+    uint prev_idx = 0;
     Scene* scenes;
 
     assert (NDimensions ==  4);
@@ -83,10 +84,27 @@ interpolate_by_file (Scene* dst,
     UFor( i, nscenes )
     {
         uint j;
+        if (!filenames[i])
+        {
+            assert (i > 0);
+            continue;
+        }
+
         good = readin_wavefront (&scenes[i], pathname, filenames[i]);
         if (!good)  return false;
         UFor( j, scenes[i].nverts )
             scenes[i].verts[j].coords[NDimensions-1] = dcoords[i];
+
+        for (j = prev_idx+1; j < i; ++j)
+        {
+            real alpha;
+            alpha =((dcoords[j] - dcoords[prev_idx]) /
+                    (dcoords[i] - dcoords[prev_idx]));
+            interpolate1_Scene (&scenes[j], alpha,
+                                &scenes[prev_idx], &scenes[i]);
+        }
+
+        prev_idx = i;
     }
 
     interpolate_Scene (dst, NDimensions-1, nscenes, scenes);
@@ -248,15 +266,17 @@ setup_testcase_track (RaySpace* space,
         good = readin_wavefront (&space->main.scene, pathname, "track1.obj");
 #elif 0
         good = readin_wavefront (&space->main.scene, pathname, "cone-track-wave.obj");
+#elif 0
+        good = readin_wavefront (&space->main.scene, pathname, "bentlooptex.obj");
 #elif 1
         good = readin_wavefront (&space->main.scene, pathname, "loop.obj");
 #endif
     }
     else
     {
-        const char* const fnames[2] = { "loop.obj", "bentloop.obj" };
-        const real dcoords[2] = { -0.001, 1.001 };
-        good = interpolate_by_file (&space->main.scene, 2,
+        const char* const fnames[5] = { "loop.obj", 0, 0, 0, "bentloop.obj" };
+        const real dcoords[5] = { -0.001, .25, .5, .75, 1.001 };
+        good = interpolate_by_file (&space->main.scene, 5,
                                     pathname, fnames, dcoords);
     }
     if (!good)  return false;

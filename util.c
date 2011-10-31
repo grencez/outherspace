@@ -38,6 +38,16 @@ array_cpy (void* dst, const void* src, uint lo, uint count, size_t size)
                 count * size);
 }
 
+    void*
+array_dup (const void* src, uint count, size_t size)
+{
+    void* dst;
+    if (count * size == 0)  return 0;
+    dst = malloc (count * size);
+    array_cpy (dst, src, 0, count, size);
+    return dst;
+}
+
 char* strto_uint (uint* ret, const char* in)
 {
     unsigned long v;

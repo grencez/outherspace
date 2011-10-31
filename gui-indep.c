@@ -14,6 +14,7 @@ init_MotionInput (MotionInput* mot)
     mot->inv_vert = true;
     mot->use_roll = false;
     UFor( i, 2 )  mot->firing[i] = false;
+    mot->lock_drift = false;
 }
 
     void
@@ -102,6 +103,7 @@ update_object_motion (ObjectMotion* motion, const MotionInput* input)
         motion->thrust[1] = input->thrust[1];
     }
     motion->boost = input->boost;
+    motion->lock_drift = input->lock_drift;
 }
 
     void

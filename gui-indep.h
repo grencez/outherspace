@@ -39,6 +39,7 @@ struct MotionInput
     bool inv_vert;
     bool use_roll;
     bool firing[2];
+    bool lock_drift;
 };
 
 struct RaceCraft
