@@ -3,6 +3,19 @@
 #include <GL/glu.h>
 
 static
+void ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object);
+
+    /** Convert a Point to a 3-vec.**/
+static
+    void
+ogl_vec_Point (GLdouble* dst, const Point* src)
+{
+    dst[0] = src->coords[RightDim];
+    dst[1] = src->coords[UpDim];
+    dst[2] = src->coords[ForwardDim];
+}
+
+static
     void
 ogl_setup ()
 {
@@ -58,12 +71,10 @@ ogl_redraw (const RaySpace* space)
 {
     uint i;
     const Pilot* pilot;
-    const Scene* scene;
 
         /* static GLfloat red[] = { 1, 0, 0, 1 }; */
 
     pilot = &pilots[0];
-    scene = &space->main.scene;
 
     glClearColor (0, 0, 0, 0);
 
@@ -82,7 +93,7 @@ ogl_redraw (const RaySpace* space)
 
         gluPerspective (180 / M_PI * pilot->view_angle,
                         width / (real) height,
-                        1.0, 1024.0);
+                        1.0, 3 * magnitude_Point (&space->main.box.max));
     }
 
         /* Clear the color and depth buffers. */
@@ -90,7 +101,7 @@ ogl_redraw (const RaySpace* space)
 
     {
         Point p;
-        diff_Point (&p, &space->main.centroid, &pilot->view_origin);
+            /* diff_Point (&p, &object->centroid, &pilot->view_origin); */
             /* proj_Point (&p, &pilot->view_basis.pts[ForwardDim], &p); */
             /* summ_Point (&p, &p, &pilot->view_origin); */
         summ_Point (&p, &pilot->view_origin, &pilot->view_basis.pts[ForwardDim]);
@@ -110,6 +121,38 @@ ogl_redraw (const RaySpace* space)
     glMatrixMode (GL_MODELVIEW);
     glLoadIdentity ();
 
+    ogl_redraw_ObjectRaySpace (&space->main);
+    UFor( i, space->nobjects )
+        ogl_redraw_ObjectRaySpace (&space->objects[i]);
+
+    glFlush ();
+    glFinish ();
+    SDL_GL_SwapBuffers ();
+}
+
+    void
+ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object)
+{
+    GLdouble xfrm[16];
+    const Scene* scene;
+    uint i;
+
+    scene = &object->scene;
+
+    glPushMatrix ();
+
+    ogl_vec_Point (&xfrm[0], &object->orientation.pts[RightDim]);
+    ogl_vec_Point (&xfrm[4], &object->orientation.pts[UpDim]);
+    ogl_vec_Point (&xfrm[8], &object->orientation.pts[ForwardDim]);
+    ogl_vec_Point (&xfrm[12], &object->centroid);
+
+    xfrm[3] = xfrm[7] = xfrm[11] = 0;
+    xfrm[15] = 1;
+
+        /* UFor( i, 16 ) fprintf (stderr, "xfrm[%u]=%f\n", i, xfrm[i]); */
+
+    glMultMatrixd (xfrm);
+
 #if 0
     glPushAttrib (GL_LIGHTING_BIT | GL_CURRENT_BIT);
     glMaterialfv (GL_FRONT_AND_BACK, GL_DIFFUSE, red);
@@ -125,7 +168,7 @@ ogl_redraw (const RaySpace* space)
         const SceneElement* elem;
 
         elem = &scene->elems[i];
-        if (elem->material < Max_uint)
+        if (elem->material < scene->nmatls)
         {
             const Material* matl = 0;
             matl = &scene->matls[elem->material];
@@ -141,29 +184,25 @@ ogl_redraw (const RaySpace* space)
         UFor( j, 3 )
         {
             const Point* p;
-            GLfloat v[3];
+            GLdouble v[3];
 
-            if (elem->vnmls[j] < Max_uint)
+            if (elem->vnmls[j] < scene->nvnmls)
                 p = &scene->vnmls[elem->vnmls[j]];
             else
-                p = &space->main.simplices[i].plane.normal;
+                p = &object->simplices[i].plane.normal;
 
-            v[0] = p->coords[RightDim];
-            v[1] = p->coords[UpDim];
-            v[2] = p->coords[ForwardDim];
+            ogl_vec_Point (v, p);
 
-            glNormal3fv (v);
+            glNormal3dv (v);
 
             p = &scene->verts[elem->verts[j]];
-            v[0] = p->coords[RightDim];
-            v[1] = p->coords[UpDim];
-            v[2] = p->coords[ForwardDim];
+            ogl_vec_Point (v, p);
 
                 /* if (j == 0)  glColor3f (1, 0, 0); */
                 /* if (j == 1)  glColor3f (0, 1, 0); */
                 /* if (j == 2)  glColor3f (0, 0, 1); */
 
-            glVertex3fv (v);
+            glVertex3dv (v);
         }
     }
     glEnd ();
@@ -172,8 +211,6 @@ ogl_redraw (const RaySpace* space)
     glPopAttrib ();
 #endif
 
-    glFlush ();
-    glFinish ();
-    SDL_GL_SwapBuffers ();
+    glPopMatrix ();
 }
 
