@@ -697,6 +697,8 @@ sdl_main (RaySpace* space, const char* pathname)
                     SDL_INIT_JOYSTICK |
                     SDL_INIT_TIMER);
     assert (ret == 0);
+        /* Get a fast key repeat.*/
+    SDL_EnableKeyRepeat(50, 50);
 
     SDL_JoystickEventState (SDL_ENABLE);
     njoysticks = SDL_NumJoysticks ();
@@ -779,45 +781,6 @@ sdl_main (RaySpace* space, const char* pathname)
     SDL_WM_SetCaption ("OuTHER SPACE", 0);
     if (icon)  SDL_WM_SetIcon (icon, 0);
 
-#ifdef SupportOpenGL
-    {
-        const SDL_VideoInfo* info;
-        int bpp = 0;
-            /* GLfloat light_ambient[] = {0.2, 0.2, 0.2, 1.0}; */
-            /* GLfloat light_diffuse[] = {1.0, 1.0, 1.0, 1.0}; */
-        GLfloat light_diffuse[] = {1.0, 0.0, 0.0, 1.0};  /* Red diffuse light. */
-            /* GLfloat light_diffuse[] = {0.8, 0.8, 0.8, 1.0}; */
-            /* GLfloat light_specular[] = {1.0, 1.0, 1.0, 1.0}; */
-        GLfloat light_position[] = {1.0, 1.0, 1.0, 0.0};
-
-        info = SDL_GetVideoInfo ();
-        bpp = info->vfmt->BitsPerPixel;
-        printf ("bpp:%d\n", bpp);
-
-
-        SDL_GL_SetAttribute (SDL_GL_DOUBLEBUFFER, 1);
-        SDL_GL_SetAttribute (SDL_GL_RED_SIZE, 5);
-        SDL_GL_SetAttribute (SDL_GL_GREEN_SIZE, 5);
-        SDL_GL_SetAttribute (SDL_GL_BLUE_SIZE, 5);
-        SDL_GL_SetAttribute (SDL_GL_DEPTH_SIZE, 16 );
-
-        glEnable (GL_LIGHT0);
-            /* glDepthFunc (GL_LESS); */
-        glEnable (GL_LIGHTING);
-
-        glEnable (GL_DEPTH_TEST);
-            /* glEnable (GL_COLOR_MATERIAL); */
-
-            /* glLightfv (GL_LIGHT0, GL_AMBIENT, light_ambient); */
-        glLightfv (GL_LIGHT0, GL_DIFFUSE, light_diffuse);
-            /* glLightfv (GL_LIGHT0, GL_SPECULAR, light_specular); */
-        glLightfv (GL_LIGHT0, GL_POSITION, light_position);
-
-            /* glDisable (GL_BLEND); */
-            /* glPolygonMode (GL_FRONT_AND_BACK, GL_FILL); */
-    }
-#endif
-
         /* Add a timer to assure the event loop has
          * an event to process when we should exit.
          * Also, so updates can occur.
@@ -883,6 +846,9 @@ sdl_main (RaySpace* space, const char* pathname)
 #endif
                                                SDL_HWSURFACE|
                                                SDL_RESIZABLE);
+#ifdef SupportOpenGL
+                    ogl_setup ();
+#endif
                 }
 
 
@@ -903,8 +869,6 @@ sdl_main (RaySpace* space, const char* pathname)
                 }
 
 #ifdef SupportOpenGL
-                setup_opengl (npixelzoom * view_ncols,
-                              npixelzoom * view_nrows);
                 ogl_redraw (space);
                 (void) sdl_redraw;
 #else
