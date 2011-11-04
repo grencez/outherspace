@@ -1,6 +1,6 @@
 
 #CC = clang
-#CC = gcc
+CC = gcc
 #CC = llvm-gcc
 #CC = icc
 
@@ -28,6 +28,7 @@ CONFIG += openmp
 #CONFIG += noassert
 #CONFIG += macapp
 #CONFIG += haptic
+#CONFIG += opengl
 #CONFIG += local_sdl
 #CONFIG += sunstudio
 
@@ -65,7 +66,7 @@ ifneq (,$(filter sound,$(CONFIG)))
 	GuiDFlags += -DSupportSound
 endif
 
-GuiMainCSources = gui.c 
+GuiMainCSources = gui.c gui-indep.c gui-opengl.c
 ifneq (,$(filter macapp,$(CONFIG)))
 	# Everything on this OS X setup is 32 bit.
 	CFLAGS += -m32
@@ -100,6 +101,10 @@ else
 	endif
 	ifneq (,$(filter sound,$(CONFIG)))
 		GuiLFlags += -lSDL_mixer
+	endif
+	ifneq (,$(filter opengl,$(CONFIG)))
+		GuiDFlags += -DSupportOpenGL
+		GuiLFlags += -lGLU -lGL
 	endif
 endif
 ifneq (,$(filter haptic,$(CONFIG)))
@@ -247,8 +252,8 @@ cli: cli.c compute.c $(CSources)
 GuiCFlags += $(CFLAGS)
 GuiDFlags += $(DFLAGS)
 GuiLFlags += $(LFLAGS)
-gui: $(GuiMainCSources) gui-indep.c compute.c motion.c $(CSources)
-	$(CC) $(GuiCFlags) $(GuiDFlags) $(GuiMainCSources) -o $@ $(GuiLFlags)
+gui: $(GuiMainCSources) compute.c motion.c $(CSources)
+	$(CC) $(GuiCFlags) $(GuiDFlags) $< -o $@ $(GuiLFlags)
 
 
 VerifyCFlags := $(filter-out -fwhole-program,$(CFLAGS))

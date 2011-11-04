@@ -14,6 +14,10 @@
 #include <SDL_haptic.h>
 #endif
 
+#ifdef SupportOpenGL
+#include "gui-opengl.c"
+#endif
+
     /* SDL on OS X does some weirdo bootstrapping by redefining /main/.*/
 #ifdef main
 #undef main
@@ -26,7 +30,11 @@ static const bool SeparateRenderThread = false;
 extern int wrapped_main_fn (int argc, char* argv[]);
 #else
 static const bool RunFromMyMac = false;
+# ifdef SupportOpenGL
+static const bool SeparateRenderThread = false;
+# else
 static const bool SeparateRenderThread = true;
+# endif
 #define wrapped_main_fn main
 #endif
 
@@ -623,7 +631,11 @@ render_loop_fn (void* data)
         if (!RenderDrawsPattern && needs_recast)
         {
             needs_recast = false;
+#ifdef SupportOpenGL
+            (void) update_pilot_images;
+#else
             update_pilot_images (space, (real) SDL_GetTicks () / 1000);
+#endif
         }
 
         SDL_PushEvent (&draw_event);
@@ -767,6 +779,45 @@ sdl_main (RaySpace* space, const char* pathname)
     SDL_WM_SetCaption ("OuTHER SPACE", 0);
     if (icon)  SDL_WM_SetIcon (icon, 0);
 
+#ifdef SupportOpenGL
+    {
+        const SDL_VideoInfo* info;
+        int bpp = 0;
+            /* GLfloat light_ambient[] = {0.2, 0.2, 0.2, 1.0}; */
+            /* GLfloat light_diffuse[] = {1.0, 1.0, 1.0, 1.0}; */
+        GLfloat light_diffuse[] = {1.0, 0.0, 0.0, 1.0};  /* Red diffuse light. */
+            /* GLfloat light_diffuse[] = {0.8, 0.8, 0.8, 1.0}; */
+            /* GLfloat light_specular[] = {1.0, 1.0, 1.0, 1.0}; */
+        GLfloat light_position[] = {1.0, 1.0, 1.0, 0.0};
+
+        info = SDL_GetVideoInfo ();
+        bpp = info->vfmt->BitsPerPixel;
+        printf ("bpp:%d\n", bpp);
+
+
+        SDL_GL_SetAttribute (SDL_GL_DOUBLEBUFFER, 1);
+        SDL_GL_SetAttribute (SDL_GL_RED_SIZE, 5);
+        SDL_GL_SetAttribute (SDL_GL_GREEN_SIZE, 5);
+        SDL_GL_SetAttribute (SDL_GL_BLUE_SIZE, 5);
+        SDL_GL_SetAttribute (SDL_GL_DEPTH_SIZE, 16 );
+
+        glEnable (GL_LIGHT0);
+            /* glDepthFunc (GL_LESS); */
+        glEnable (GL_LIGHTING);
+
+        glEnable (GL_DEPTH_TEST);
+            /* glEnable (GL_COLOR_MATERIAL); */
+
+            /* glLightfv (GL_LIGHT0, GL_AMBIENT, light_ambient); */
+        glLightfv (GL_LIGHT0, GL_DIFFUSE, light_diffuse);
+            /* glLightfv (GL_LIGHT0, GL_SPECULAR, light_specular); */
+        glLightfv (GL_LIGHT0, GL_POSITION, light_position);
+
+            /* glDisable (GL_BLEND); */
+            /* glPolygonMode (GL_FRONT_AND_BACK, GL_FILL); */
+    }
+#endif
+
         /* Add a timer to assure the event loop has
          * an event to process when we should exit.
          * Also, so updates can occur.
@@ -825,8 +876,13 @@ sdl_main (RaySpace* space, const char* pathname)
                     screen = SDL_SetVideoMode (npixelzoom * view_ncols,
                                                npixelzoom * view_nrows,
                                                32,
-                                               SDL_RESIZABLE|
-                                               SDL_DOUBLEBUF|SDL_HWSURFACE);
+#ifdef SupportOpenGL
+                                               SDL_OPENGL|
+#else
+                                               SDL_DOUBLEBUF|
+#endif
+                                               SDL_HWSURFACE|
+                                               SDL_RESIZABLE);
                 }
 
 
@@ -846,7 +902,15 @@ sdl_main (RaySpace* space, const char* pathname)
 #endif
                 }
 
+#ifdef SupportOpenGL
+                setup_opengl (npixelzoom * view_ncols,
+                              npixelzoom * view_nrows);
+                ogl_redraw (space);
+                (void) sdl_redraw;
+#else
                 sdl_redraw (screen);
+#endif
+
                 needs_recast = true;
                     /* When there is a separate render thread,
                      * it is timely to signal a render at this point.
