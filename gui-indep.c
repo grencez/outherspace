@@ -611,12 +611,16 @@ update_pilot_images (RaySpace* space, real frame_t1)
                                   &racer_motions[pilot->craft_idx],
                                   &pilot->view_origin);
         }
+#ifdef SupportOpenGL
+        ogl_redraw (space, pilot_idx);
+#else
         update_dynamic_RaySpace (space);
         if (ForceFauxFishEye)
             rays_to_hits_fish (ray_image, space,
                                &origin, &basis, pilot->view_angle);
         else
             cast_RayImage (ray_image, space, &origin, &basis);
+#endif
 #endif
     }
 }

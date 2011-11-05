@@ -631,10 +631,11 @@ render_loop_fn (void* data)
         if (!RenderDrawsPattern && needs_recast)
         {
             needs_recast = false;
-#ifdef SupportOpenGL
-            (void) update_pilot_images;
-#else
             update_pilot_images (space, (real) SDL_GetTicks () / 1000);
+#ifdef SupportOpenGL
+            glFlush ();
+            SDL_GL_SwapBuffers ();
+            glClear (GL_COLOR_BUFFER_BIT);
 #endif
         }
 
@@ -847,7 +848,7 @@ sdl_main (RaySpace* space, const char* pathname)
                                                SDL_HWSURFACE|
                                                SDL_RESIZABLE);
 #ifdef SupportOpenGL
-                    ogl_setup ();
+                    ogl_setup (space);
 #endif
                 }
 
@@ -869,7 +870,9 @@ sdl_main (RaySpace* space, const char* pathname)
                 }
 
 #ifdef SupportOpenGL
-                ogl_redraw (space);
+                    /* When OpenGL is being used,
+                     * render_loop_fn() actually does the drawing also.
+                     */
                 (void) sdl_redraw;
 #else
                 sdl_redraw (screen);

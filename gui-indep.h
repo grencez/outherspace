@@ -142,3 +142,9 @@ init_ui_data (RaySpace* space, const char* inpathname);
 static void
 cleanup_ui_data ();
 
+#ifdef SupportOpenGL
+    /* This is found in gui-opengl.c.*/
+static void
+ogl_redraw (const RaySpace* space, uint pilot_idx);
+#endif
+
