@@ -74,8 +74,8 @@ void rotation_PointXfrm (PointXfrm* xfrm, uint xdim, uint ydim, real angle)
 }
 
     /** Rotate /xdim/ in the direction of /ydim/ by /angle/.
-     ** This is the same as pre-multiplying by a matrix representing
-     ** an /angle/ rotation about the (/xdim/,/ydim/)-plane.
+     * This is the same as pre-multiplying by a matrix representing
+     * an /angle/ rotation about the (/xdim/,/ydim/)-plane.
      **/
     void
 rotate_PointXfrm (PointXfrm* xfrm, uint xdim, uint ydim, real angle)
@@ -304,8 +304,9 @@ void orthonormalize_PointXfrm (PointXfrm* dst, const PointXfrm* A)
      * /dst/ can be the same as /A/.
      * /v_in/ need not be normalized.
      **/
-void orthorotate_PointXfrm (PointXfrm* dst, const PointXfrm* A,
-                            const Point* v_in, uint dim)
+    void
+orthorotate_PointXfrm (PointXfrm* dst, const PointXfrm* A,
+                       const Point* v_in, uint dim)
 {
     Point u, v, w;
     uint i;
@@ -328,6 +329,35 @@ void orthorotate_PointXfrm (PointXfrm* dst, const PointXfrm* A,
     }
 
     copy_Point (&dst->pts[dim], &v);
+}
+
+    /** Much like orthorotate_PointXfrm() but
+     * handles half-rotations in a more stable manner
+     * by doing two quarter-rotations.
+     * This bounds the maximal value used in the calculation
+     * (aside from normalization) to 2.
+     **/
+    void
+stable_orthorotate_PointXfrm (PointXfrm* dst, const PointXfrm* A,
+                              const Point* v_in, uint dim)
+{
+    Point v;
+
+    if (0 <= dot_Point (&A->pts[dim], v_in))
+    {
+        orthorotate_PointXfrm (dst, A, v_in, dim);
+        return;
+    }
+
+    orth_unit_Point (&v, v_in, &A->pts[dim]);
+    if (Epsilon_real >= dot_Point (&v, &v))
+    {
+        if (dim == 0)  copy_Point (&v, &A->pts[1]);
+        else           copy_Point (&v, &A->pts[0]);
+    }
+
+    orthorotate_PointXfrm (dst, A, &v, dim);
+    orthorotate_PointXfrm (dst, dst, v_in, dim);
 }
 
 real det2_PointXfrm (const PointXfrm* xfrm,
@@ -402,11 +432,11 @@ spherical3_PointXfrm (PointXfrm* dst, real zenith, real azimuthcc)
     rotate_PointXfrm (dst, UpDim,    ForwardDim, M_PI / 2 - zenith);
 }
 
-/* Take a bounding box, rotate it from a basis,
- * and reposition it around a new centroid.
- * The bounding box volume will grow in most cases,
- * as it is axis aligned and the axes have changed!
- */
+    /** Take a bounding box, rotate it from a basis,
+     * and reposition it around a new centroid.
+     * The bounding box volume will grow in most cases,
+     * as it is axis aligned and the axes have changed!
+     **/
     void
 trxfrm_BoundingBox (BoundingBox* dst,
                     const PointXfrm* basis,

@@ -229,6 +229,44 @@ testfn_PointXfrm ()
     AssertApprox( 6, det, 6, 1e0 );
 }
 
+    /** First crack at a verification function.
+     * This is not a truly good one because it uses random values
+     * instead of iterating through all possible ones.
+     **/
+static
+    void
+verifn_orthorotate_PointXfrm (uint npids, uint pidx)
+{
+    uint i, n;
+    n = 1 << 20;
+
+    for (i = pidx; i < n; i += npids)
+    {
+        PointXfrm A;
+        Point v;
+        srand_t seed;
+        uint j;
+        real det;
+        seed = i;
+
+        random_bool (&seed);
+        identity_PointXfrm (&A);
+
+        UFor( j, NDimensions )
+        {
+            v.coords[j] = random_real (&seed);
+            if (random_bool (&seed))
+                v.coords[j] = - v.coords[j];
+        }
+
+        stable_orthorotate_PointXfrm (&A, &A, &v,
+                                      random_uint (&seed, NDimensions));
+        det = det_PointXfrm (&A);
+            /* fprintf (stderr, "det:%.32f\n", det); */
+        AssertApprox( 1, det, NDimensions, 1e0 );
+    }
+}
+
 static
     void
 testfn_select ()
@@ -309,8 +347,16 @@ testfn_SList ()
     free (membs);
 }
 
-int main ()
+int main (int argc, char** argv)
 {
+    int argidx = 1;
+    uint npids = 1, pidx = 0;
+    if (argidx < argc)
+        strto_uint (&npids, argv[argidx++]);
+
+    if (argidx < argc)
+        strto_uint (&pidx, argv[argidx++]);
+
     testfn_BitString ();
     testfn_BitString_cache ();
     testfn_KPTree ();
@@ -319,6 +365,7 @@ int main ()
     testfn_select ();
     testfn_SList ();
     testfn_pack ();
+    verifn_orthorotate_PointXfrm (npids, pidx);
     return 0;
 }
 
