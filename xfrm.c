@@ -297,44 +297,37 @@ void orthonormalize_PointXfrm (PointXfrm* dst, const PointXfrm* A)
     }
 }
 
-void orthorotate_PointXfrm (PointXfrm* dst, const PointXfrm* A, uint dim)
+    /** Rotate an orthonormal basis given
+     * a new vector /v_in/ to use for the /dim/th basis vector.
+     * The current basis vectors are assumed to be rows in /A/.
+     *
+     * /dst/ can be the same as /A/.
+     * /v_in/ need not be normalized.
+     **/
+void orthorotate_PointXfrm (PointXfrm* dst, const PointXfrm* A,
+                            const Point* v_in, uint dim)
 {
-    uint i = dim;
-    assert (dst != A);
+    Point u, v, w;
+    uint i;
+    real d;
 
-        /* Perform Gram-Schmidt process, but starting from a specific
-         * dimension so it can be adjusted to achieve rotation.
-         */
-    normalize_Point (&dst->pts[i], &A->pts[i]);
-    while (i != 0)
+    normalize_Point (&v, v_in);
+    copy_Point (&u, &A->pts[dim]);
+    d = 1 + dot_Point (&u, &v);
+    summ_Point (&w, &u, &v);
+
+    UFor( i, NDimensions )
     {
-        uint j;
-        Point tmp;
-        --i;
-        copy_Point (&tmp, &A->pts[i]);
+        Point x;
+        real c;
 
-        for (j = dim; j != i; --j)
-        {
-            Point proj;
-            proj_Point (&proj, &tmp, &dst->pts[j]);
-            diff_Point (&tmp, &tmp, &proj);
-        }
-        normalize_Point (&dst->pts[i], &tmp);
+        copy_Point (&x, &A->pts[i]);
+        c = dot_Point (&v, &x) / d;
+
+        Op_Point_2010( &dst->pts[i] ,-, &x ,c*, &w );
     }
 
-    for (i = dim+1; i < NDimensions; ++i)
-    {
-        uint j;
-        Point tmp;
-        copy_Point (&tmp, &A->pts[i]);
-        UFor( j, i )
-        {
-            Point proj;
-            proj_Point (&proj, &tmp, &dst->pts[j]);
-            diff_Point (&tmp, &tmp, &proj);
-        }
-        normalize_Point (&dst->pts[i], &tmp);
-    }
+    copy_Point (&dst->pts[dim], &v);
 }
 
 real det2_PointXfrm (const PointXfrm* xfrm,

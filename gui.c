@@ -525,12 +525,10 @@ grab_mouse_fn (const SDL_MouseButtonEvent* event, const RaySpace* space)
 
     if (do_rotate)
     {
-        PointXfrm tmp_basis;
         copy_Point (&pilot->view_origin, &origin);
 
-        copy_PointXfrm (&tmp_basis, &pilot->view_basis);
-        copy_Point (&tmp_basis.pts[ForwardDim], &dir);
-        orthorotate_PointXfrm (&pilot->view_basis, &tmp_basis, ForwardDim);
+        orthorotate_PointXfrm (&pilot->view_basis, &pilot->view_basis,
+                               &dir, ForwardDim);
 
         fputs ("basis:", out);
         output_PointXfrm (out, &pilot->view_basis);

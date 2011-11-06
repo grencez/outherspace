@@ -121,7 +121,7 @@ setup_testcase_simple (RaySpace* space,
                        const char* file)
 {
     bool good;
-    PointXfrm basis;
+    Point v;
 
     init_RaySpace (space);
     identity_PointXfrm (view_basis);
@@ -135,11 +135,11 @@ setup_testcase_simple (RaySpace* space,
     *view_angle = 2 * M_PI / 3;
     copy_Point (view_origin, &space->main.box.max);
 
-    diff_Point (&view_basis->pts[ForwardDim],
+    diff_Point (&v,
                 &space->main.box.min,
                 &space->main.box.max);
-    orthorotate_PointXfrm (&basis, view_basis, ForwardDim);
-    copy_PointXfrm (view_basis, &basis);
+
+    orthorotate_PointXfrm (view_basis, view_basis, &v, ForwardDim);
 
     setup_camera_light (space, view_origin);
     return good;

@@ -211,7 +211,6 @@ move_object (RaySpace* space, ObjectMotion* motions,
 
     trxfrm_PointXfrm (&new_orientation, &rotation, &object->orientation);
     apply_thrust (&veloc, &new_orientation, &drift, motion, dt);
-        /* orthorotate_PointXfrm (&new_orientation, &basis, 0); */
 
         /* TODO: This applies the rotation early!
          * If this choice is kept, some simplification can
@@ -409,28 +408,32 @@ apply_thrust (Point* veloc,
     Point tmp;
     PointXfrm basis;
 
+    copy_PointXfrm (&basis, orientation);
+
     if (motion->boost)  vthrust *= 2;
 
     if (motion->thrust[0] > motion->thrust[1])  vthrust *= motion->thrust[0];
     else                                        vthrust *= motion->thrust[1];
 
-    copy_PointXfrm (&basis, orientation);
     if (motion->stabilize && !motion->flying)
     {
         if (true)
         {
             real dot;
             Point normal;
-            dot = dot_Point (&basis.pts[0], &motion->track_normal);
+            dot = dot_Point (&basis.pts[UpDim], &motion->track_normal);
             Op_Point_2010( &normal
-                           ,+, &basis.pts[0]
+                           ,+, &basis.pts[UpDim]
                            ,   .01*(1-dot)*dt*, &motion->track_normal );
-            copy_Point (&basis.pts[0], &normal);
+            
+            orthorotate_PointXfrm (&basis, &basis, &normal, UpDim);
         }
         else
         {
-            proj_unit_Point (&basis.pts[0], &basis.pts[0],
+            Point normal;
+            proj_unit_Point (&normal, &basis.pts[UpDim],
                              &motion->track_normal);
+            orthorotate_PointXfrm (&basis, &basis, &normal, UpDim);
         }
     }
     else
@@ -440,7 +443,7 @@ apply_thrust (Point* veloc,
         rotate_PointXfrm (&basis, RightDim, UpDim, roll * dt * (M_PI / 2));
     }
     remove_4d_rotation (&basis);
-    orthorotate_PointXfrm (orientation, &basis, 0);
+    copy_PointXfrm (orientation, &basis);
 
     copy_Point (veloc, &motion->veloc);
 
@@ -504,18 +507,16 @@ apply_thrust (Point* veloc,
 
     if (motion->stabilize && !motion->flying)
     {
-        Op_Point_2100( &orientation->pts[0]
+        Point up;
+        Op_Point_2100( &up
                        ,-, (500+drift_mag)*, &motion->track_normal
                        ,   &drift_veloc );
-        remove_4d_rotation (orientation);
-        orthorotate_PointXfrm (&basis, orientation, 0);
+        orthorotate_PointXfrm (&basis, &basis, &up, UpDim);
     }
-    else
-    {
-        remove_4d_rotation (orientation);
-        orthonormalize_PointXfrm (&basis, orientation);
-    }
-    copy_PointXfrm (orientation, &basis);
+    remove_4d_rotation (&basis);
+    orthonormalize_PointXfrm (orientation, &basis);
+        /* copy_PointXfrm (orientation, &basis); */
+    assert (0 < det_PointXfrm (orientation));
 }
 
     /** Mark which objects are colliding with which.
@@ -963,13 +964,10 @@ remove_4d_rotation (PointXfrm* basis)
 {
     if (NDimensions == 4)
     {
-        uint dim;
-        UFor( dim, NDimensions )
-        {
-            basis->pts[DriftDim].coords[dim] = 0;
-            basis->pts[dim].coords[DriftDim] = 0;
-        }
-        basis->pts[DriftDim].coords[DriftDim] = 1;
+        Point v;
+        zero_Point (&v);
+        v.coords[DriftDim] = 1;
+        orthorotate_PointXfrm (basis, basis, &v, DriftDim);
     }
 }
 

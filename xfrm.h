@@ -46,7 +46,8 @@ void to_basis_PointXfrm (PointXfrm* dst, const PointXfrm* xfrm,
                          const PointXfrm* basis);
 void transpose_PointXfrm (PointXfrm* dst, const PointXfrm* xfrm);
 void orthonormalize_PointXfrm (PointXfrm* dst, const PointXfrm* A);
-void orthorotate_PointXfrm (PointXfrm* dst, const PointXfrm* A, uint dim);
+void orthorotate_PointXfrm (PointXfrm* dst, const PointXfrm* A,
+                            const Point* v_in, uint dim);
 
 real det2_PointXfrm (const PointXfrm* xfrm,
                      uint ri, uint rj, uint ci, uint cj);

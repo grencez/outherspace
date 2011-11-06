@@ -157,7 +157,7 @@ update_view_params (Pilot* pilot,
     real view_zenith, view_azimuthcc;
     real vert_off, fwd_off;
     real dot;
-    Point veloc;
+    Point veloc, fwd;
     PointXfrm basis, rotation;
     PointXfrm* view_basis;
     const ObjectRaySpace* object;
@@ -182,11 +182,10 @@ update_view_params (Pilot* pilot,
         reflect_Point (&veloc, &veloc, &basis.pts[ForwardDim], -dot);
     }
 
-    Op_Point_2010( &basis.pts[ForwardDim]
+    Op_Point_2010( &fwd
                    ,+, &basis.pts[ForwardDim]
                    ,   .002*, &veloc );
-    orthorotate_PointXfrm (view_basis, &basis, ForwardDim);
-    copy_PointXfrm (&basis, view_basis);
+    orthorotate_PointXfrm (&basis, &basis, &fwd, ForwardDim);
 
     view_zenith    = (M_PI / 2) * (1 + input->view_zenith);
     view_azimuthcc =  M_PI      * (1 + input->view_azimuthcc);
