@@ -2,6 +2,7 @@
 #include "testcase.h"
 
 #include "pnm-image.h"
+#include "slist.h"
 #include "wavefront-file.h"
 
 #include <assert.h>
@@ -738,54 +739,6 @@ setup_testcase_sphere (RaySpace* space,
     return good;
 }
 
-    void
-setup_checkplanes_4d_surface (uint* ret_nplanes, Plane** ret_planes,
-                              Point** ret_points)
-{
-    uint i;
-    const uint nplanes = 7;
-    real offset_points[7][3] =
-    {    { -77.9152, -3784.31, 362.3 }
-        ,{ 239.16, -389.33, -2695.52 }
-        ,{ 190.418, 3502.14, -3374.04 }
-        ,{ 430.915, 3893.13, -726.384 }
-        ,{ -95.5732, -3398.58, 3788.98 }
-        ,{ 162.919, 3793.6, 3101.59 }
-        ,{ 10.2566, 3914.34, 3280.88 }
-    };
-    real normals[7][3] =
-    {    {  -0.177766, 0.490335, 0.853212 }
-        ,{  -0.180094, 0.90385, 0.3881 }
-        ,{ 0.00527882, -0.968351, 0.249537 }
-        ,{  0.0208925, -0.178936, -0.983639 }
-        ,{  -0.280181, 0.889428, -0.361133 }
-        ,{ -0.0498265, 0.992046, 0.115591 }
-        ,{  -0.142098, -0.00440444, 0.989843 }
-    };
-    Plane* planes;
-    Point* points;
-
-    planes = AllocT( Plane, nplanes );
-    points = AllocT( Point, nplanes );
-
-    UFor( i, nplanes )
-    {
-        Point normal, point;
-        zero_Point (&normal);
-        zero_Point (&point);
-
-        Op_0( real, 3, normal.coords , normals[i] );
-        Op_0( real, 3, point.coords , offset_points[i] );
-
-        copy_Point (&points[i], &point);
-        init_Plane (&planes[i], &normal, &point);
-    }
-
-    *ret_nplanes = nplanes;;
-    *ret_planes = planes;
-    *ret_points = points;
-}
-
     bool
 setup_testcase_4d_surface (RaySpace* space,
                            Point* view_origin,
@@ -1002,6 +955,79 @@ setup_box_lights (RaySpace* space,
             flags >>= 1;
         }
     }
+}
+
+    bool
+readin_checkplanes (uint* ret_nplanes, Plane** ret_planes, Point** ret_points,
+                    const char* pathname, const char* filename)
+{
+    FILE* in;
+    bool good = true;
+    const uint len = BUFSIZ;
+    char buf[BUFSIZ];
+    const char* line;
+    uint nplanes = 0;
+    uint line_no = 1;
+    SList planelist, pointlist;
+
+    in = fopen_path (pathname, filename, "rb");
+    if (!in)  return false;
+
+    init_SList (&planelist);
+    init_SList (&pointlist);
+
+    for (line = fgets (buf, len, in);
+         good && line;
+         line = fgets (buf, len, in))
+    {
+        Point loc, normal;
+        uint i;
+
+        strstrip_eol (buf);
+        line = strskip_ws (line);
+        if (line[0] == '#' || line[0] == '\0')  continue;
+
+        zero_Point (&loc);
+        UFor( i, 3 )
+            if (line)  line = strto_real (&loc.coords[i], line);
+
+        zero_Point (&normal);
+        UFor( i, 3 )
+            if (line)  line = strto_real (&normal.coords[i], line);
+
+        if (!line)
+        {
+            good = false;
+            fprintf (stderr, "Line:%u  Not enough coordinates, need 6.\n",
+                     line_no);
+        }
+        else
+        {
+            Plane plane;
+            init_Plane (&plane, &normal, &loc);
+            app_SList (&planelist, DuplicaT( Plane, &plane, 1 ));
+            app_SList (&pointlist, DuplicaT( Point, &loc, 1 ));
+            nplanes += 1;
+        }
+        line_no += 1;
+    }
+    fclose (in);
+
+    if (!good)
+    {
+        cleanup_SList (&planelist);
+        cleanup_SList (&pointlist);
+    }
+    else
+    {
+        *ret_nplanes = nplanes;
+        *ret_points = AllocT( Point, nplanes );
+        *ret_planes = AllocT( Plane, nplanes );
+        unroll_SList (*ret_planes, &planelist, sizeof (Plane));
+        unroll_SList (*ret_points, &pointlist, sizeof (Point));
+    }
+
+    return good;
 }
 
     bool

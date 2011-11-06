@@ -72,6 +72,7 @@ key_press_fn (Pilot* pilot, const SDL_keysym* event)
     bool rotate_dir_dim = false;
     bool change_cast_method = false;
     bool print_view_code = false;
+    bool print_plane_line = false;
     bool quit_app = false;
     bool recast = true;
     FILE* out = stdout;
@@ -170,6 +171,7 @@ key_press_fn (Pilot* pilot, const SDL_keysym* event)
             else            nperpixel_change = -1;
         case SDLK_p:
             if (shift_mod)  print_view_code = true;
+            else            print_plane_line = true;
             break;
         case SDLK_q:
             if (ctrl_mod)  quit_app = true;
@@ -382,6 +384,16 @@ key_press_fn (Pilot* pilot, const SDL_keysym* event)
                          i, j, view_basis->pts[i].coords[j]);
             }
         }
+    }
+    else if (print_plane_line)
+    {
+        fprintf (out, "%f %f %f  %f %f %f\n",
+                 view_origin->coords[0],
+                 view_origin->coords[1],
+                 view_origin->coords[2],
+                 view_basis->pts[ForwardDim].coords[0],
+                 view_basis->pts[ForwardDim].coords[1],
+                 view_basis->pts[ForwardDim].coords[2]);
     }
     else if (quit_app)
     {
@@ -980,6 +992,10 @@ int wrapped_main_fn (int argc, char* argv[])
 #elif 0
         setup_testcase_triangles
 #elif 1
+        readin_checkplanes (&ncheckplanes, &checkplanes, &checkpoints,
+                            inpathname, "loop_chk.txt");
+        if (good)
+        good =
         setup_testcase_track
 #elif 0
         setup_testcase_bouncethru
@@ -988,9 +1004,9 @@ int wrapped_main_fn (int argc, char* argv[])
 #elif 0
         setup_testcase_4d_normals
 #elif 1
-        true;
-        setup_checkplanes_4d_surface (&ncheckplanes, &checkplanes,
-                                      &checkpoints);
+        readin_checkplanes (&ncheckplanes, &checkplanes, &checkpoints,
+                            inpathname, "4d-surface_chk.txt");
+        if (good)
         good =
         setup_testcase_4d_surface
 #elif 0

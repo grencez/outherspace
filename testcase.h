@@ -60,6 +60,9 @@ setup_testcase_4d_surface (RaySpace* space,
                            PointXfrm* view_basis,
                            real* view_angle,
                            const char* pathname);
+bool
+readin_checkplanes (uint* ret_nplanes, Plane** ret_planes, Point** ret_points,
+                    const char* pathname, const char* filename);
 
 #ifdef INCLUDE_SOURCE
 #include "testcase.c"
