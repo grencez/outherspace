@@ -92,12 +92,15 @@ rotate_object (ObjectMotion* motion, uint xdim, uint ydim, real angle)
 move_objects (RaySpace* space, ObjectMotion* motions, real dt,
               uint ncheckplanes, const Plane* checkplanes)
 {
-    const uint nincs = 10;
+    uint nincs = 10;
     real inc;
     uint i, nobjects;
     Point* prev_centroids;
     BitString* collisions;
     Point* refldirs;
+
+        /* Make our time increment about 1/200 sec.*/
+    nincs = (uint) (1 + dt * 200);
 
     nobjects = space->nobjects;
     prev_centroids = AllocT( Point, nobjects );
