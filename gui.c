@@ -993,7 +993,10 @@ int wrapped_main_fn (int argc, char* argv[])
         setup_testcase_triangles
 #elif 1
         readin_checkplanes (&ncheckplanes, &checkplanes, &checkpoints,
-                            inpathname, "loop_chk.txt");
+                            inpathname,
+                            "curve-track_chk.txt"
+                           );
+            /* "loop_chk.txt" */
         if (good)
         good =
         setup_testcase_track

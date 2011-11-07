@@ -287,6 +287,8 @@ apply_track_gravity (ObjectMotion* motion, const RaySpace* space,
     Point origin, direct;
     const ObjectRaySpace* object;
 
+    (void) dt;
+
     if (!motion->gravity)  return;
 
     object = &space->objects[objidx];
@@ -354,7 +356,8 @@ apply_track_gravity (ObjectMotion* motion, const RaySpace* space,
                        / (motion->escape_height - motion->hover_height));
 
             /* Note: this dt is optional?*/
-        x1 = x0 + dt * v1;
+            /* x1 = x0 + dt * v1; */
+        x1 = x0 + v1;
 
         if (x1 <= motion->hover_height)
             x2 = motion->hover_height * exp (x1 / motion->hover_height);
@@ -401,7 +404,7 @@ apply_thrust (Point* veloc,
 {
     const real alpha = 3;  /* Arbitrary coefficient.*/
         /* TODO: Totally arbitrary thrusters!*/
-    real vthrust = 2 * 733;  /* Velocity of thrusters.*/
+    real vthrust = 3 * 733;  /* Velocity of thrusters.*/
     real accel;
     real forward_mag, up_mag, drift_mag;
     Point forward_veloc, up_veloc, drift_veloc;
@@ -483,7 +486,7 @@ apply_thrust (Point* veloc,
 
     if (drift_mag != 0)
     {
-        const real grip_min = .5;
+        const real grip_min = .2;
         real grip = 5;
 
         grip -= grip_min;
@@ -511,6 +514,11 @@ apply_thrust (Point* veloc,
         Op_Point_2100( &up
                        ,-, (500+drift_mag)*, &motion->track_normal
                        ,   &drift_veloc );
+
+        normalize_Point (&up, &up);
+        Op_Point_2100( &up
+                        ,+, 10*dt*, &up
+                        ,   &basis.pts[UpDim] );
         orthorotate_PointXfrm (&basis, &basis, &up, UpDim);
     }
     remove_4d_rotation (&basis);

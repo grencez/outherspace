@@ -270,6 +270,8 @@ setup_testcase_track (RaySpace* space,
 #elif 0
         good = readin_wavefront (&space->main.scene, pathname, "bentlooptex.obj");
 #elif 1
+        good = readin_wavefront (&space->main.scene, pathname, "curve-track.obj");
+#elif 1
         good = readin_wavefront (&space->main.scene, pathname, "loop.obj");
 #endif
     }
