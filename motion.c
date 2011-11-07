@@ -100,7 +100,8 @@ move_objects (RaySpace* space, ObjectMotion* motions, real dt,
     Point* refldirs;
 
         /* Make our time increment about 1/200 sec.*/
-    nincs = (uint) (1 + dt * 200);
+    nincs = (uint) (dt * 200);
+    nincs = clamp_real (nincs, 10, 200);
 
     nobjects = space->nobjects;
     prev_centroids = AllocT( Point, nobjects );
