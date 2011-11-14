@@ -640,8 +640,26 @@ init_ui_data (RaySpace* space, const char* inpathname)
 
     if (ncheckplanes > 0)
     {
+        Scene* scene;
+        Material* matl;
         checkplane_objidx = space->nobjects;
         add_1elem_Scene_RaySpace (space);
+
+        scene = &space->objects[checkplane_objidx].scene;
+        scene->nmatls = 1;
+        scene->matls = AllocT( Material, scene->nmatls );
+        matl = &scene->matls[0];
+        scene->elems[0].material = 0;
+
+        init_Material (matl);
+        matl->diffuse[0] = .8824;
+        matl->diffuse[1] = .4824;
+        matl->diffuse[2] = .0510;
+        UFor( i, NColors )
+        {
+            matl->ambient[i] = matl->diffuse[i];
+            matl->specular[i] = 0;
+        }
     }
 
     setup_laser_scenes (space);

@@ -6,6 +6,7 @@
 #include "wavefront-file.h"
 
 #include <assert.h>
+#include <math.h>
 
 static void
 random_Point (Point* p, const BoundingBox* box);
@@ -172,29 +173,27 @@ read_racer (Scene* scene, uint idx, const char* pathname)
     if (!good)  return false;
 
     condense_Scene (scene);
+    fixup_wavefront_Scene (scene);
 
-    switch (idx)
     {
-        case 0:
-            fixup_wavefront_Scene (scene);
-            break;
-        case 2:
-            identity_PointXfrm (&fix);
-            rotate_PointXfrm (&fix, RightDim, ForwardDim, M_PI/2);
-            rotate_PointXfrm (&fix, UpDim, RightDim, M_PI/2);
-            scale_PointXfrm (&fix, &fix, 3);
-            xfrm_Scene (scene, &fix);
-            break;
-        case 3:
-            identity_PointXfrm (&fix);
-            rotate_PointXfrm (&fix, RightDim, UpDim, M_PI/3);
-            swaprows_PointXfrm (&fix, UpDim, ForwardDim);
-            xfrm_Scene (scene, &fix);
-            break;
-        default:
-            break;
-    }
+        BoundingBox box;
+        Point meas;
+        real vol;
+        real a;
+        uint i;
 
+        init_BoundingBox (&box, scene->nverts, scene->verts);
+        measure_BoundingBox (&meas, &box);
+        vol = (meas.coords[UpDim] *
+               meas.coords[RightDim] *
+               meas.coords[ForwardDim]);
+        a = pow (30000 / vol, 1.0 / 3);
+
+        identity_PointXfrm (&fix);
+        UFor( i, 3 )
+            scale_Point (&fix.pts[i], &fix.pts[i], a);
+    }
+    xfrm_Scene (scene, &fix);
     recenter_Scene (scene, 0);
 
     return good;
@@ -268,9 +267,11 @@ setup_testcase_track (RaySpace* space,
 #elif 0
         good = readin_wavefront (&space->main.scene, pathname, "cone-track-wave.obj");
 #elif 0
-        good = readin_wavefront (&space->main.scene, pathname, "bentlooptex.obj");
+        good = readin_wavefront (&space->main.scene, pathname, "figure8-twist.obj");
 #elif 1
         good = readin_wavefront (&space->main.scene, pathname, "curve-track.obj");
+#elif 0
+        good = readin_wavefront (&space->main.scene, pathname, "bentlooptex.obj");
 #elif 1
         good = readin_wavefront (&space->main.scene, pathname, "loop.obj");
 #endif

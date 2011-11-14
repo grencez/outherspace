@@ -68,6 +68,12 @@ invmul_Point (Point* dst, const Point* src)
     }
 }
 
+    void
+quot_Point (Point* dst, const Point* src, real x)
+{
+    Op_20s( real, NDimensions, dst->coords ,/, src->coords , x );
+}
+
 void zero_Point (Point* a)
 {
     uint i;
@@ -504,6 +510,12 @@ centroid_BoundingBox (Point* dst, const BoundingBox* box)
 {
     summ_Point (dst, &box->min, &box->max);
     scale_Point (dst, dst, .5);
+}
+
+    void
+measure_BoundingBox (Point* dst, const BoundingBox* box)
+{
+    diff_Point (dst, &box->max, &box->min);
 }
 
 bool inside_BoundingBox (__global const BoundingBox* box, const Point* point)

@@ -32,6 +32,8 @@ void summ_Point (Point* dst, const Point* a, const Point* b);
 void scale_Point (Point* dst, const Point* a, real k);
 void
 invmul_Point (Point* dst, const Point* src);
+void
+quot_Point (Point* dst, const Point* src, real x);
 void zero_Point (Point* a);
 bool
 equal_Point (const Point* a, const Point* b);
@@ -83,6 +85,8 @@ include_BoundingBox (BoundingBox* dst,
                      const BoundingBox* a, const BoundingBox* b);
 void
 centroid_BoundingBox (Point* dst, const BoundingBox* box);
+void
+measure_BoundingBox (Point* dst, const BoundingBox* box);
 bool inside_BoundingBox (__global const BoundingBox* box, const Point* point);
 real surface_area_BoundingBox (const BoundingBox* box);
 void split_BoundingBox (BoundingBox* lo_box, BoundingBox* hi_box,

@@ -196,6 +196,7 @@ ogl_redraw (const RaySpace* space, uint pilot_idx)
     void
 ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object)
 {
+    Material default_material;
     GLdouble matrix[16];
     const Scene* scene;
     uint i;
@@ -214,32 +215,28 @@ ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object)
     glBegin (GL_TRIANGLES);
     UFor( i, scene->nelems )
     {
-        uint j;
         const SceneElement* elem;
+        const Material* matl;
+        GLfloat color[4];
+        uint j;
 
         elem = &scene->elems[i];
         if (elem->material < scene->nmatls)
-        {
-            GLfloat color[4];
-            const Material* matl = 0;
             matl = &scene->matls[elem->material];
-
-            color[3] = matl->opacity;
-            UFor( j, 3 )  color[j] = matl->ambient[j];
-            glMaterialfv (GL_FRONT_AND_BACK, GL_AMBIENT, color);
-
-            UFor( j, 3 )  color[j] = matl->diffuse[j];
-            glMaterialfv (GL_FRONT_AND_BACK, GL_DIFFUSE, color);
-
-            UFor( j, 3 )  color[j] = matl->specular[j];
-            glMaterialfv (GL_FRONT_AND_BACK, GL_SPECULAR, color);
-
-            glMaterialf (GL_FRONT_AND_BACK, GL_SHININESS, matl->optical_density);
-        }
         else
-        {
-            glColor3f(1.0, 1.0, 1.0);
-        }
+            matl = &default_material;
+
+        color[3] = matl->opacity;
+        UFor( j, 3 )  color[j] = matl->ambient[j];
+        glMaterialfv (GL_FRONT_AND_BACK, GL_AMBIENT, color);
+
+        UFor( j, 3 )  color[j] = matl->diffuse[j];
+        glMaterialfv (GL_FRONT_AND_BACK, GL_DIFFUSE, color);
+
+        UFor( j, 3 )  color[j] = matl->specular[j];
+        glMaterialfv (GL_FRONT_AND_BACK, GL_SPECULAR, color);
+
+        glMaterialf (GL_FRONT_AND_BACK, GL_SHININESS, matl->optical_density);
 
         UFor( j, 3 )
         {
