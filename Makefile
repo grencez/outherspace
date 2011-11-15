@@ -217,6 +217,7 @@ CSources = bitstring.c \
 		   slist.c \
 		   space.c \
 		   testcase.c \
+		   track.c \
 		   util.c \
 		   wavefront-file.c \
 		   xfrm.c

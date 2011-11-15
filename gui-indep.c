@@ -218,8 +218,8 @@ set_checkpoint_light (PointLightSource* light,
     const Plane* checkplane;
     const Point* checkpoint;
     
-    checkplane = &checkplanes[mot->checkpoint_idx];
-    checkpoint = &checkpoints[mot->checkpoint_idx];
+    checkplane = &track.checkplanes[mot->checkpoint_idx];
+    checkpoint = &track.checkpoints[mot->checkpoint_idx];
 
     diff_Point (&direct, checkpoint, view_origin);
     mag = magnitude_Point (&direct);
@@ -562,7 +562,7 @@ update_pilot_images (RaySpace* space, real frame_t1)
                  */
             space->nobjects = nracers;
             move_objects (space, racer_motions, dt,
-                          ncheckplanes, checkplanes);
+                          track.ncheckplanes, track.checkplanes);
             update_health (space, dt);
             space->nobjects = nobjects;
         }
@@ -603,7 +603,7 @@ update_pilot_images (RaySpace* space, real frame_t1)
             copy_Point (&space->lights[0].location, &origin);
             Op_s( real, NColors, space->lights[0].intensity , .5 );
         }
-        if (ncheckplanes > 0)
+        if (track.ncheckplanes > 0)
         {
             set_checkpoint_light (&space->lights[space->nlights-1],
                                   &space->objects[checkplane_objidx],
@@ -638,7 +638,7 @@ init_ui_data (RaySpace* space, const char* inpathname)
             init_ObjectMotion (&racer_motions[i], &space->objects[i]);
     }
 
-    if (ncheckplanes > 0)
+    if (track.ncheckplanes > 0)
     {
         Scene* scene;
         Material* matl;

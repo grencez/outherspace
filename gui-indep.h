@@ -8,6 +8,7 @@
 #include "motion.h"
 #include "pnm-image.h"
 #include "testcase.h"
+#include "track.h"
 
 #include <math.h>
 
@@ -73,9 +74,7 @@ struct Pilot
 };
 
     /* Global state changes.*/
-static uint ncheckplanes = 0;
-static Plane* checkplanes;
-static Point* checkpoints;
+static Track track;
 static uint nracers = 0;
 static uint npilots = 1;
 static uint kbd_pilot_idx = 0;

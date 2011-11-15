@@ -982,18 +982,27 @@ int wrapped_main_fn (int argc, char* argv[])
     assert (ret == IMG_INIT_PNG);
 #endif
 
+    init_Track (&track);
+
     good =
 #if 0
         setup_testcase_simple (space, &view_origin,
                                &view_basis, &view_angle,
                                inpathname, "machine0.obj");
+#elif 1
+    readin_Track (&track, space, inpathname, "curve-track.txt");
+    identity_PointXfrm (&view_basis);
+    zero_Point (&view_origin);
+    view_angle = 2 * M_PI / 3;
 #else
 #if 0
 #elif 0
         setup_testcase_triangles
-#elif 1
+#elif 0
 #if 1
-        readin_checkplanes (&ncheckplanes, &checkplanes, &checkpoints,
+        readin_checkplanes (&track.ncheckplanes,
+                            &track.checkplanes,
+                            &track.checkpoints,
                             inpathname,
                             "curve-track_chk.txt"
                            );
@@ -1009,7 +1018,9 @@ int wrapped_main_fn (int argc, char* argv[])
 #elif 0
         setup_testcase_4d_normals
 #elif 1
-        readin_checkplanes (&ncheckplanes, &checkplanes, &checkpoints,
+        readin_checkplanes (&track.ncheckplanes,
+                            &track.checkplanes,
+                            &track.checkpoints,
                             inpathname, "4d-surface_chk.txt");
         if (good)
         good =
@@ -1067,17 +1078,12 @@ int wrapped_main_fn (int argc, char* argv[])
     IMG_Quit ();
 #endif
 
-    if (ncheckplanes > 0)
-    {
-        free (checkplanes);
-        free (checkpoints);
-    }
-
 #ifdef DistribCompute
     cleanup_compute ();
 #endif
 
     cleanup_RaySpace (space);
+    cleanup_Track (&track);
 
     return 0;
 }
