@@ -119,7 +119,8 @@ output_wavefront (const Scene* scene,
 }
 
     bool
-readin_wavefront (Scene* scene, const char* pathname, const char* filename)
+readin_wavefront (Scene* scene, const AffineMap* map,
+                  const char* pathname, const char* filename)
 {
     const uint ndims = 3;
     uint line_no = 0;
@@ -160,57 +161,58 @@ readin_wavefront (Scene* scene, const char* pathname, const char* filename)
 
         if (0 == strncmp (line, "vn", 2))
         {
-            Point* normal;
-            normal = AllocT( Point, 1 );
-            zero_Point (normal);
-            app_SList (&vnmllist, normal);
+            Point normal;
             line = &line[2];
+            zero_Point (&normal);
             UFor( i, ndims )
+                if (line)  line = strto_real (&normal.coords[i], line);
+
+            good = !!(line);
+            if (good)
             {
-                line = strto_real (&normal->coords[i], line);
-                if (!line)
-                {
-                    good = false;
-                    fprintf (stderr, "Line:%u  Not enough coordinates!\n",
-                             line_no);
-                    break;
-                }
+                mapvec_Point (&normal, map, &normal);
+                normalize_Point (&normal, &normal);
+                app_SList (&vnmllist, DuplicaT( Point, &normal, 1 ));
+            }
+            else
+            {
+                fprintf (stderr, "Line:%u  Not enough coordinates!\n",
+                         line_no);
             }
         }
         else if (0 == strncmp (line, "vt", 2))
         {
-            BaryPoint* point;
-            point = AllocT( BaryPoint, 1 );
-            app_SList (&txptlist, point);
+            BaryPoint bpoint;
             line = &line[2];
+            Op_0( real, NDimensions-1, bpoint.coords , 0 );
             UFor( i, ndims-1 )
-            {
-                line = strto_real (&point->coords[i], line);
-                if (!line)
-                {
-                    good = false;
-                    fprintf (stderr, "Line:%u  Not enough coordinates!\n",
+                if (line)  line = strto_real (&bpoint.coords[i], line);
+
+            good = !!(line);
+            if (good)
+                app_SList (&txptlist, DuplicaT( BaryPoint, &bpoint, 1 ));
+            else
+                fprintf (stderr, "Line:%u  Not enough coordinates!\n",
                              line_no);
-                    break;
-                }
-            }
         }
         else if (line[0] == 'v')
         {
-            Point* vert;
-            vert = AllocT( Point, 1 );
-            app_SList (&vertlist, vert);
+            Point vert;
             line = &line[1];
+            zero_Point (&vert);
             UFor( i, ndims )
+                if (line)  line = strto_real (&vert.coords[i], line);
+
+            good = !!(line);
+            if (good)
             {
-                line = strto_real (&vert->coords[i], line);
-                if (!line)
-                {
-                    good = false;
-                    fprintf (stderr, "Line:%u  Not enough coordinates!\n",
-                             line_no);
-                    break;
-                }
+                map_Point (&vert, map, &vert);
+                app_SList (&vertlist, DuplicaT( Point, &vert, 1 ));
+            }
+            else
+            {
+                fprintf (stderr, "Line:%u  Not enough coordinates!\n",
+                         line_no);
             }
         }
         else if (line[0] == 'f')

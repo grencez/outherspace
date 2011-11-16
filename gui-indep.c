@@ -214,7 +214,7 @@ set_checkpoint_light (PointLightSource* light,
     real scale;
     Point direct, centroid, diff;
     Simplex elem;
-    PointXfrm tmp, raw;
+    PointXfrm raw;
     const Plane* checkplane;
     const Point* checkpoint;
     
@@ -237,8 +237,9 @@ set_checkpoint_light (PointLightSource* light,
     assert (object->scene.nverts == NDimensions);
 
     identity_PointXfrm (&raw);
-    copy_Point (&tmp.pts[0], &checkplane->normal);
-    orthonormalize_PointXfrm (&raw, &tmp);
+    stable_orthorotate_PointXfrm (&raw, &raw,
+                                  &checkplane->normal, 0);
+        /*^ /0/ is arbitrary, I believe.^*/
 
     scale_PointXfrm (&raw, &raw, scale);
 
@@ -633,7 +634,7 @@ init_ui_data (RaySpace* space, const char* inpathname)
         assert (space->nobjects == 0 && "All objects must be racers.");
         nracers = npilots;
         assert (nracers <= NRacersMax);
-        add_racers (space, nracers, inpathname);
+        add_racers (space, nracers, &track, inpathname);
         UFor( i, nracers )
             init_ObjectMotion (&racer_motions[i], &space->objects[i]);
     }

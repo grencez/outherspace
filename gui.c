@@ -998,8 +998,8 @@ int wrapped_main_fn (int argc, char* argv[])
 #if 0
 #elif 0
         setup_testcase_triangles
-#elif 0
-#if 1
+#elif 1
+#if 0
         readin_checkplanes (&track.ncheckplanes,
                             &track.checkplanes,
                             &track.checkpoints,

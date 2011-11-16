@@ -19,6 +19,8 @@
 #include <time.h>
 #endif
 
+static const char WhiteSpaceChars[] = " \t\v\r\n";
+
 uint index_of (const void* e, const void* arr, size_t size)
 {
     return ((size_t) e - (size_t) arr) / size;
@@ -77,10 +79,22 @@ char* strto_real (real* ret, const char* in)
     return out;
 }
 
+    uint
+strcount_ws (const char* s)
+{
+    return strspn (s, WhiteSpaceChars);
+}
+
+    uint
+strcount_non_ws (const char* s)
+{
+    return strcspn (s, WhiteSpaceChars);
+}
+
 const char* strskip_ws (const char* line)
 {
     uint i;
-    i = strspn (line, " \t\v\r\n");
+    i = strspn (line, WhiteSpaceChars);
     return &line[i];
 }
 

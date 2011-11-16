@@ -5,10 +5,10 @@
 #include "compute.h"
 #endif
 
+#include "dynamic-setup.h"
 #include "motion.h"
 #include "pnm-image.h"
 #include "testcase.h"
-#include "track.h"
 
 #include <math.h>
 

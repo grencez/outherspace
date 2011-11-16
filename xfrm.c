@@ -136,66 +136,56 @@ void col_PointXfrm (Point* dst, const PointXfrm* xfrm, uint col)
     void
 xfrm_Point (Point* dst, const PointXfrm* xfrm, const Point* src)
 {
+    Point u;
     uint i;
-    assert (dst != src);
     UFor( i, NDimensions )
-        dst->coords[i] = dot_Point (src, &xfrm->pts[i]);
+        u.coords[i] = dot_Point (src, &xfrm->pts[i]);
+    copy_Point (dst, &u);
 }
 
     void
 trxfrm_Point (Point* dst, const PointXfrm* xfrm, const Point* src)
 {
+    Point u;
     uint i;
-    assert (dst != src);
-    zero_Point (dst);
+    zero_Point (&u);
     UFor( i, NDimensions )
     {
         uint j;
         UFor( j, NDimensions )
-        {
-            dst->coords[i] += src->coords[j] * xfrm->pts[j].coords[i];
-        }
+            u.coords[i] += src->coords[j] * xfrm->pts[j].coords[i];
     }
+    copy_Point (dst, &u);
 }
 
     void
 xfrm_PointXfrm (PointXfrm* dst, const PointXfrm* A, const PointXfrm* B)
 {
     uint j;
-    assert (dst != A);
-    assert (dst != B);
+    PointXfrm C;
 
     UFor( j, NDimensions )
     {
-        uint i;
-        Point B_col, dst_col;
+        Point B_col;
         col_PointXfrm (&B_col, B, j);
-
-        xfrm_Point (&dst_col, A, &B_col);
-
-        UFor( i, NDimensions )
-            dst->pts[i].coords[j] = dst_col.coords[i];
+        xfrm_Point (&C.pts[j], A, &B_col);
     }
+    transpose_PointXfrm (dst, &C);
 }
 
     void
 trxfrm_PointXfrm (PointXfrm* dst, const PointXfrm* A, const PointXfrm* B)
 {
     uint j;
-    assert (dst != A);
-    assert (dst != B);
+    PointXfrm C;
 
     UFor( j, NDimensions )
     {
-        uint i;
-        Point B_col, dst_col;
+        Point B_col;
         col_PointXfrm (&B_col, B, j);
-
-        trxfrm_Point (&dst_col, A, &B_col);
-
-        UFor( i, NDimensions )
-            dst->pts[i].coords[j] = dst_col.coords[i];
+        trxfrm_Point (&C.pts[j], A, &B_col);
     }
+    transpose_PointXfrm (dst, &C);
 }
 
     void

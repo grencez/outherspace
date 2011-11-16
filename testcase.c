@@ -1,12 +1,10 @@
 
 #include "testcase.h"
 
-#include "pnm-image.h"
-#include "slist.h"
+#include "dynamic-setup.h"
 #include "wavefront-file.h"
 
 #include <assert.h>
-#include <math.h>
 
 static void
 random_Point (Point* p, const BoundingBox* box);
@@ -65,56 +63,6 @@ setup_testcase_triangles (RaySpace* space,
     return true;
 }
 
-static
-    bool
-interpolate_by_file (Scene* dst,
-                     uint nscenes,
-                     const char* pathname,
-                     const char* const* filenames,
-                     const real* dcoords)
-{
-    bool good = true;
-    uint i;
-    uint prev_idx = 0;
-    Scene* scenes;
-
-    assert (NDimensions ==  4);
-    if (NDimensions != 4)  return false;
-
-    scenes = AllocT( Scene, nscenes );
-
-    UFor( i, nscenes )
-    {
-        uint j;
-        if (!filenames[i])
-        {
-            assert (i > 0);
-            continue;
-        }
-
-        good = readin_wavefront (&scenes[i], pathname, filenames[i]);
-        if (!good)  return false;
-        UFor( j, scenes[i].nverts )
-            scenes[i].verts[j].coords[NDimensions-1] = dcoords[i];
-
-        for (j = prev_idx+1; j < i; ++j)
-        {
-            real alpha;
-            alpha =((dcoords[j] - dcoords[prev_idx]) /
-                    (dcoords[i] - dcoords[prev_idx]));
-            interpolate1_Scene (&scenes[j], alpha,
-                                &scenes[prev_idx], &scenes[i]);
-        }
-
-        prev_idx = i;
-    }
-
-    interpolate_Scene (dst, NDimensions-1, nscenes, scenes);
-
-    if (scenes)  free (scenes);
-    return good;
-}
-
     bool
 setup_testcase_simple (RaySpace* space,
                        Point* view_origin, PointXfrm* view_basis,
@@ -122,6 +70,7 @@ setup_testcase_simple (RaySpace* space,
                        const char* pathname,
                        const char* file)
 {
+    AffineMap map;
     bool good;
     Point v;
 
@@ -129,7 +78,9 @@ setup_testcase_simple (RaySpace* space,
     identity_PointXfrm (view_basis);
     zero_Point (view_origin);
 
-    good = readin_wavefront (&space->main.scene, pathname, file);
+    identity_AffineMap (&map);
+
+    good = readin_wavefront (&space->main.scene, &map, pathname, file);
     if (!good)  return false;
     condense_Scene (&space->main.scene);
     init_filled_RaySpace (space);
@@ -144,58 +95,6 @@ setup_testcase_simple (RaySpace* space,
     orthorotate_PointXfrm (view_basis, view_basis, &v, ForwardDim);
 
     setup_camera_light (space, view_origin);
-    return good;
-}
-
-static
-    bool
-read_racer (Scene* scene, uint idx, const char* pathname)
-{
-    bool good;
-    char fname[20];
-    PointXfrm fix;
-
-    sprintf (fname, "machine%u.obj", idx);
-
-
-    if (NDimensions == 3)
-    {
-        good = readin_wavefront (scene, pathname, fname);
-    }
-    else
-    {
-        const char* fnames[2];
-        const real dcoords[2] = { 0, 1.0/16 };
-        fnames[0] = fname;
-        fnames[1] = fname;
-        good = interpolate_by_file (scene, 2, pathname, fnames, dcoords);
-    }
-    if (!good)  return false;
-
-    condense_Scene (scene);
-    fixup_wavefront_Scene (scene);
-
-    {
-        BoundingBox box;
-        Point meas;
-        real vol;
-        real a;
-        uint i;
-
-        init_BoundingBox (&box, scene->nverts, scene->verts);
-        measure_BoundingBox (&meas, &box);
-        vol = (meas.coords[UpDim] *
-               meas.coords[RightDim] *
-               meas.coords[ForwardDim]);
-        a = pow (30000 / vol, 1.0 / 3);
-
-        identity_PointXfrm (&fix);
-        UFor( i, 3 )
-            scale_Point (&fix.pts[i], &fix.pts[i], a);
-    }
-    xfrm_Scene (scene, &fix);
-    recenter_Scene (scene, 0);
-
     return good;
 }
 
@@ -217,64 +116,39 @@ add_1elem_Scene_RaySpace (RaySpace* space)
 }
 
     bool
-add_racers (RaySpace* space, uint nracers, const char* pathname)
-{
-    uint i;
-    bool good = true;
-
-    i = space->nobjects;
-    if (i == 0)  space->objects = 0;
-    space->nobjects += nracers;
-    ResizeT( ObjectRaySpace, space->objects, space->nobjects );
-
-    for (; i < space->nobjects; ++i)
-    {
-        ObjectRaySpace* object;
-        object = &space->objects[i];
-
-        init_ObjectRaySpace (object);
-        object->centroid.coords[0] = 75 * i + 300;
-        object->centroid.coords[1] = 75 * i + 300;
-
-        if (NDimensions == 4)
-            object->centroid.coords[3] = 0;
-
-        good = read_racer (&object->scene, 0, pathname);
-        if (!good)  return false;
-        init_filled_ObjectRaySpace (object);
-    }
-    return good;
-}
-
-    bool
 setup_testcase_track (RaySpace* space,
                       Point* view_origin, PointXfrm* view_basis,
                       real* view_angle,
                       const char* pathname)
 {
+    AffineMap map;
     bool good;
 
     init_RaySpace (space);
     identity_PointXfrm (view_basis);
     zero_Point (view_origin);
 
+    identity_AffineMap (&map);
+
     space->objects = AllocT( ObjectRaySpace, space->nobjects );
 
     if (NDimensions == 3)
     {
+        good = readin_wavefront (&space->main.scene, &map, pathname,
 #if 0
-        good = readin_wavefront (&space->main.scene, pathname, "track1.obj");
+                                 "track1.obj"
 #elif 0
-        good = readin_wavefront (&space->main.scene, pathname, "cone-track-wave.obj");
+                                 "cone-track-wave.obj"
 #elif 0
-        good = readin_wavefront (&space->main.scene, pathname, "figure8-twist.obj");
+                                 "figure8-twist.obj"
 #elif 1
-        good = readin_wavefront (&space->main.scene, pathname, "curve-track.obj");
+                                 "curve-track.obj"
 #elif 0
-        good = readin_wavefront (&space->main.scene, pathname, "bentlooptex.obj");
+                                 "bentlooptex.obj"
 #elif 1
-        good = readin_wavefront (&space->main.scene, pathname, "loop.obj");
+                                 "loop.obj"
 #endif
+                                );
     }
     else
     {
@@ -350,6 +224,7 @@ setup_testcase_bouncethru (RaySpace* space,
                            real* view_angle,
                            const char* pathname)
 {
+    AffineMap map;
     bool good;
 
     init_RaySpace (space);
@@ -357,7 +232,10 @@ setup_testcase_bouncethru (RaySpace* space,
     zero_Point (view_origin);
     assert (NDimensions == 3);
 
-    good = readin_wavefront (&space->main.scene, pathname, "reflection.obj");
+    identity_AffineMap (&map);
+
+    good = readin_wavefront (&space->main.scene, &map,
+                             pathname, "reflection.obj");
     if (!good)  return false;
     fixup_wavefront_Scene (&space->main.scene);
 
@@ -398,6 +276,7 @@ setup_testcase_smoothsphere (RaySpace* space,
                              real* view_angle,
                              const char* pathname)
 {
+    AffineMap map;
     uint i;
     bool good;
 
@@ -406,7 +285,10 @@ setup_testcase_smoothsphere (RaySpace* space,
     zero_Point (view_origin);
     assert (NDimensions == 3);
 
-    good = readin_wavefront (&space->main.scene, pathname, "sphere.obj");
+    identity_AffineMap (&map);
+
+    good = readin_wavefront (&space->main.scene, &map,
+                             pathname, "sphere.obj");
     if (!good)  return false;
     fixup_wavefront_Scene (&space->main.scene);
 
@@ -421,7 +303,8 @@ setup_testcase_smoothsphere (RaySpace* space,
 
         if (NDimensions == 3)
         {
-            good = readin_wavefront (&object->scene, pathname, "sphere.obj");
+            good = readin_wavefront (&object->scene, &map,
+                                     pathname, "sphere.obj");
             if (!good)  return false;
             fixup_wavefront_Scene (&object->scene);
         }
@@ -689,6 +572,7 @@ setup_testcase_sphere (RaySpace* space,
                        real* view_angle,
                        const char* pathname)
 {
+    AffineMap map;
     bool good;
     FILE* out = stderr;
 
@@ -696,9 +580,12 @@ setup_testcase_sphere (RaySpace* space,
     identity_PointXfrm (view_basis);
     zero_Point (view_origin);
 
+    identity_AffineMap (&map);
+
     if (NDimensions == 3)
     {
-        good = readin_wavefront (&space->main.scene, pathname, "sphere1.obj");
+        good = readin_wavefront (&space->main.scene, &map,
+                                 pathname, "sphere1.obj");
     }
     else
     {
@@ -749,6 +636,7 @@ setup_testcase_4d_surface (RaySpace* space,
                            real* view_angle,
                            const char* pathname)
 {
+    AffineMap map;
     bool good = true;
     Point new_centroid;
 
@@ -756,12 +644,15 @@ setup_testcase_4d_surface (RaySpace* space,
     identity_PointXfrm (view_basis);
     zero_Point (view_origin);
 
+    identity_AffineMap (&map);
+
     space->objects = AllocT( ObjectRaySpace, space->nobjects );
 
     zero_Point (&new_centroid);
     if (NDimensions == 3)
     {
-        good = readin_wavefront (&space->main.scene, pathname, "sandbox.obj");
+        good = readin_wavefront (&space->main.scene, &map,
+                                 pathname, "sandbox.obj");
     }
     else
     {

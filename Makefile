@@ -205,7 +205,9 @@ ifneq (,$(filter openmp,$(CONFIG)))
 endif
 
 
-CSources = bitstring.c \
+CSources = affine.c \
+		   bitstring.c \
+		   dynamic-setup.c \
 		   kdtree.c \
 		   kptree.c \
 		   material.c \

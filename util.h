@@ -167,6 +167,8 @@ void*
 array_dup (const void* src, uint count, size_t size);
 char* strto_uint (uint* ret, const char* in);
 char* strto_real (real* ret, const char* in);
+uint strcount_ws (const char* s);
+uint strcount_non_ws (const char* s);
 const char* strskip_ws (const char* line);
 void strstrip_eol (char* line);
 uint readin_whitesep (char* buf, FILE* in, uint capacity, uint len);

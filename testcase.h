@@ -15,8 +15,6 @@ setup_testcase_simple (RaySpace* space,
                        const char* pathname,
                        const char* file);
 bool
-add_racers (RaySpace* space, uint nracers, const char* pathname);
-bool
 setup_testcase_track (RaySpace* space,
                       Point* view_origin, PointXfrm* view_basis,
                       real* view_angle,
