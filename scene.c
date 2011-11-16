@@ -53,7 +53,7 @@ void init_SceneElement (SceneElement* elem)
 {
     uint i;
     elem->material = Max_uint;
-    UFor( i, NDimensions-1 )
+    UFor( i, NDimensions )
     {
         elem->vnmls[i] = Max_uint;
         elem->txpts[i] = Max_uint;
@@ -661,7 +661,7 @@ sort_indexed_Points (uint* jumps, uint* indices, real* coords,
 {
     uint dim;
 
-    minimal_unique (nmembs, indices);
+    assert (minimal_unique (nmembs, indices));
 
     jumps[0] = nmembs;
 
@@ -688,7 +688,7 @@ sort_indexed_Points (uint* jumps, uint* indices, real* coords,
         }
     }
 
-    minimal_unique (nmembs, indices);
+    assert (minimal_unique (nmembs, indices));
 
     if (nmembs > 0)
     {
@@ -748,7 +748,7 @@ condense_Points (uint n, Point* pts, uint* jumps, uint* indices, real* coords)
 
     invert_jump_table (q, jumps);
 
-    minimal_unique (q, jumps);
+    assert (minimal_unique (q, jumps));
 
     for (i = q; i < n; ++i)
         assert (equal_Point (&pts[indices[i]],
@@ -778,7 +778,7 @@ condense_Points (uint n, Point* pts, uint* jumps, uint* indices, real* coords)
         }
     }
 
-    minimal_unique (n, indices);
+    assert (minimal_unique (n, indices));
     UFor( i, n )
     {
         uint pi;

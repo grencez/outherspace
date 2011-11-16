@@ -263,7 +263,7 @@ verifn_orthorotate_PointXfrm (uint npids, uint pidx)
                                       random_uint (&seed, NDimensions));
         det = det_PointXfrm (&A);
             /* fprintf (stderr, "det:%.32f\n", det); */
-        AssertApprox( 1, det, NDimensions, 1e0 );
+        AssertApprox( 1, det, NDimensions, 2e0 );
     }
 }
 
