@@ -17,6 +17,8 @@ void
 mapvec_Point (Point* dst, const AffineMap* map, const Point* src);
 void
 map_Point (Point* dst, const AffineMap* map, const Point* src);
+void
+map_Ray (Ray* dst, const AffineMap* map, const Ray* src);
 
 void
 scale0_AffineMap (AffineMap* map, real x);

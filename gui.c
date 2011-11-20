@@ -643,8 +643,9 @@ render_loop_fn (void* data)
             needs_recast = false;
             update_pilot_images (space, (real) SDL_GetTicks () / 1000);
 #ifdef SupportOpenGL
-            glFlush ();
             SDL_GL_SwapBuffers ();
+            glFlush ();
+                /* glFinish (); */
             glClear (GL_COLOR_BUFFER_BIT);
 #endif
         }

@@ -35,9 +35,8 @@ struct BarySimplex
 
 bool
 hit_Simplex (real* restrict ret_dist,
-             const Point* restrict origin,
-             const Point* restrict dir,
-             const Simplex* restrict elem);
+             const Ray ray,
+             const Simplex elem);
 bool hit_proj_Simplex (real* restrict dist,
                         const Point* restrict origin,
                         const Point* restrict kd_dir,
@@ -67,8 +66,7 @@ hit_Plane (real* restrict ret_dist,
            const Plane* restrict plane);
 bool
 hit_BarySimplex (real* restrict ret_dist,
-                 const Point* restrict origin,
-                 const Point* restrict dir,
+                 const Ray* restrict ray,
                  const BarySimplex* restrict elem);
 
 #ifndef __OPENCL_VERSION__

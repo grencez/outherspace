@@ -160,6 +160,7 @@ init_Scene_KDTreeGrid (KDTreeGrid* grid, const Scene* scene,
                        const BoundingBox* box);
 void init_RayImage (RayImage* image);
 void resize_RayImage (RayImage* image);
+void restride_RayImage (RayImage* image);
 void unstride_RayImage (RayImage* image);
 void downsample_RayImage (RayImage* image, uint inv);
 void cleanup_RayImage (RayImage* image);

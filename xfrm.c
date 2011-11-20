@@ -34,13 +34,7 @@ void zero_PointXfrm (PointXfrm* xfrm)
 
 void copy_PointXfrm (PointXfrm* dst, const PointXfrm* src)
 {
-#ifdef __OPENCL_VERSION__
-    uint i;
-    UFor( i, NDimensions )
-        copy_Point (&dst->pts[i], &src->pts[i]);
-#else
-    memcpy (dst, src, sizeof (PointXfrm));
-#endif
+    *dst = *src;
 }
 
 void identity_PointXfrm (PointXfrm* xfrm)

@@ -112,25 +112,12 @@ zero_BoundingBox (BoundingBox* box)
 
 void copy_Point (Point* dst, const Point* src)
 {
-#ifdef __OPENCL_VERSION__
     *dst = *src;
-#else
-    Op_Point_0( dst , src );
-#endif
 }
 
 void copy_BoundingBox (BoundingBox* dst, const BoundingBox* src)
 {
-#ifdef __OPENCL_VERSION__
     *dst = *src;
-#else
-    uint i;
-    UFor( i, NDimensions )
-    {
-        dst->min.coords[i] = src->min.coords[i];
-        dst->max.coords[i] = src->max.coords[i];
-    }
-#endif
 }
 
 void negate_Point (Point* dst, const Point* src)

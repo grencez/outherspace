@@ -22,21 +22,28 @@ map_Point (Point* dst, const AffineMap* map, const Point* src)
     summ_Point (dst, &u, &map->xlat);
 }
 
-    /* Post-multiply by a scaling operation.*/
+    void
+map_Ray (Ray* dst, const AffineMap* map, const Ray* src)
+{
+    map_Point (&dst->origin, map, &src->origin);
+    mapvec_Point (&dst->direct, map, &src->direct);
+}
+
+    /** Post-multiply by a scaling operation.**/
     void
 scale0_AffineMap (AffineMap* map, real x)
 {
     scale_PointXfrm (&map->xfrm, &map->xfrm, x);
 }
 
-    /* Post-multiply by a translate operation.*/
+    /** Post-multiply by a translate operation.**/
     void
 xlat0_AffineMap (AffineMap* map, const Point* a)
 {
     map_Point (&map->xlat, map, a);
 }
 
-    /* Post-multiply by a general linear transform operation.*/
+    /** Post-multiply by a general linear transform operation.**/
     void
 xfrm0_AffineMap (AffineMap* map, const PointXfrm* a)
 {

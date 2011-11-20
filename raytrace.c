@@ -137,9 +137,7 @@ init_PointLightSource (PointLightSource* light)
     void
 copy_PointLightSource (PointLightSource* dst, const PointLightSource* src)
 {
-    copy_Point (&dst->location, &src->location);
-    Op_0( real, NColors, dst->intensity , src->intensity );
-    dst->diffuse = src->diffuse;
+    *dst = *src;
 }
 
     void
@@ -464,6 +462,33 @@ void resize_RayImage (RayImage* image)
     if (image->pixels)  ResizeT( byte, image->pixels, 3 * npixels );
 }
 
+void restride_RayImage (RayImage* image)
+{
+    uint i;
+        /* This should be set to the desired stride,
+         * initialized by a resize.
+         */
+    assert (image->stride >= image->ncols);
+    if (image->stride == image->ncols)  return;
+    UFor( i, image->nrows )
+    {
+        uint row, dst_idx, src_idx;
+        row = image->nrows - i - 1;
+        dst_idx = row * image->stride;
+        src_idx = row * image->ncols;
+
+        if (image->hits)
+            memmove (&image->hits[dst_idx], &image->hits[src_idx],
+                     image->ncols * sizeof (uint));
+        if (image->mags)
+            memmove (&image->mags[dst_idx], &image->mags[src_idx],
+                     image->ncols * sizeof (real));
+        if (image->pixels)
+            memmove (&image->pixels[3 * dst_idx], &image->pixels[3 * src_idx],
+                     image->ncols * 3 * sizeof (byte));
+    }
+}
+
     /** Remove the stride from a RayImage to make
      * /image->cols == image->stride/.
      **/
@@ -511,17 +536,16 @@ void downsample_RayImage (RayImage* image, uint inv)
     memset (o_pixline, 0, 3 * o_ncols * sizeof(byte));
     memset (o_fracline, 0, 3 * o_ncols * sizeof(byte));
 
-    UFor( row, i_nrows )
+    if (image->pixels)
     {
-        uint col;
-        byte* i_pixline = 0;
-
-        if (image->pixels)
-            i_pixline = &image->pixels[row * 3 * i_ncols];
-
-        UFor( col, i_ncols )
+        UFor( row, i_nrows )
         {
-            if (i_pixline)
+            uint col;
+            byte* i_pixline;
+
+            i_pixline = &image->pixels[row * 3 * image->stride];
+
+            UFor( col, i_ncols )
             {
                 uint i, o_off;
                 o_off = 3 * (col / inv);
@@ -536,16 +560,30 @@ void downsample_RayImage (RayImage* image, uint inv)
                     o_fracline[o_off+i] = y;
                 }
             }
+
+            if ((row + 1) % inv == 0)
+            {
+                uint n;
+                n = 3 * o_ncols;
+                CopyT( byte, &image->pixels[(row/inv) * n], o_pixline, 0, n );
+                memset (o_pixline,  0, n * sizeof(byte));
+                memset (o_fracline, 0, n * sizeof(byte));
+            }
         }
+    }
 
-        if ((row + 1) % inv == 0)
+    UFor( row, o_nrows )
+    {
+        uint col;
+        UFor( col, o_ncols )
         {
-            memcpy (&image->pixels[(row/inv) * 3 * image->stride],
-                    o_pixline,
-                    3 * o_ncols * sizeof(byte));
-
-            memset (o_pixline,  0, 3 * o_ncols * sizeof(byte));
-            memset (o_fracline, 0, 3 * o_ncols * sizeof(byte));
+            uint dst_idx, src_idx;
+            dst_idx =        row * o_ncols       + col;
+            src_idx = inv * (row * image->stride + col);
+            if (image->hits)
+                image->hits[dst_idx] = image->hits[src_idx];
+            if (image->mags)
+                image->mags[dst_idx] = image->mags[src_idx];
         }
     }
 
@@ -555,6 +593,7 @@ void downsample_RayImage (RayImage* image, uint inv)
     image->nrows = o_nrows;
     image->ncols = o_ncols;
     resize_RayImage (image);
+    image->stride = image->ncols;
 }
 
 void cleanup_RayImage (RayImage* image)
@@ -860,11 +899,7 @@ fill_pixel (real* ret_colors,
         copy_Point (&normal, &simplex->plane.normal);
         /* Rotate it when necessary.*/
     if (objidx != space->nobjects)
-    {
-        Point tmp;
-        trxfrm_Point (&tmp, &object->orientation, &normal);
-        copy_Point (&normal, &tmp);
-    }
+        trxfrm_Point (&normal, &object->orientation, &normal);
 
         /* Assure the normal is in our direction.*/
     cos_normal = dot_Point (dir, &normal);
@@ -1067,8 +1102,7 @@ static
     void
 test_intersections (uint* ret_hit,
                     real* ret_mag,
-                    const Point* restrict origin,
-                    const Point* restrict dir,
+                    const Ray* restrict ray,
                     uint nelemidcs,
                     __global const uint* restrict elemidcs,
                     __global const BarySimplex* restrict simplices,
@@ -1090,21 +1124,12 @@ test_intersections (uint* ret_hit,
 
         if (BarycentricRayTrace)
         {
-            didhit = hit_BarySimplex (&tmp_mag, origin, dir,
+            didhit = hit_BarySimplex (&tmp_mag, ray,
                                       &simplices[tmp_hit]);
         }
         else
         {
-            const Simplex* restrict tri;
-#if __OPENCL_VERSION__
-            const Simplex stri = tris[tmp_hit];
-            tri = &stri;
-#else
-            tri = &tris[tmp_hit];
-#endif
-                /* Simplex tri; */
-                /* elem_Scene (&tri, &space->scene, leaf->elems[i]); */
-            didhit = hit_Simplex (&tmp_mag, origin, dir, tri);
+            didhit = hit_Simplex (&tmp_mag, *ray, tris[tmp_hit]);
         }
 
         if (didhit && tmp_mag < hit_mag)
@@ -1122,9 +1147,8 @@ test_intersections (uint* ret_hit,
 
 static
     void
-cast_ray (uint* restrict ret_hit, real* restrict ret_mag,
-          const Point* restrict origin,
-          const Point* restrict direct,
+cast_Ray (uint* restrict ret_hit, real* restrict ret_mag,
+          const Ray* restrict ray,
           const uint nelems,
           __global const uint* restrict elemidcs,
           __global const KDTreeNode* restrict nodes,
@@ -1144,7 +1168,7 @@ cast_ray (uint* restrict ret_hit, real* restrict ret_mag,
 
     if (!KDTreeRayTrace)
     {
-        test_intersections (&hit_idx, &hit_mag, origin, direct,
+        test_intersections (&hit_idx, &hit_mag, ray,
                             nelems, elemidcs,
                             simplices, tris);
         *ret_hit = hit_idx;
@@ -1152,8 +1176,8 @@ cast_ray (uint* restrict ret_hit, real* restrict ret_mag,
         return;
     }
 
-    invmul_Point (&invdirect, direct);
-    node_idx = first_KDTreeNode (&parent, origin, direct,
+    invmul_Point (&invdirect, &ray->direct);
+    node_idx = first_KDTreeNode (&parent, &ray->origin, &ray->direct,
                                  nodes, box, inside_box);
 
     while (node_idx != Max_uint)
@@ -1161,11 +1185,11 @@ cast_ray (uint* restrict ret_hit, real* restrict ret_mag,
         __global const KDTreeLeaf* restrict leaf;
 
         leaf = &nodes[node_idx].as.leaf;
-        test_intersections (&hit_idx, &hit_mag, origin, direct,
+        test_intersections (&hit_idx, &hit_mag, ray,
                             leaf->nelems, &elemidcs[leaf->elemidcs],
                             simplices, tris);
 
-        node_idx = next_KDTreeNode (&parent, origin, direct, &invdirect,
+        node_idx = next_KDTreeNode (&parent, &ray->origin, &ray->direct, &invdirect,
                                     hit_mag,
                                     node_idx, nodes);
     }
@@ -1181,7 +1205,10 @@ cast1_ObjectRaySpace (uint* ret_hit, real* ret_mag,
                       const ObjectRaySpace* object,
                       bool inside_box)
 {
-    cast_ray (ret_hit, ret_mag, origin, direct,
+    Ray ray;
+    ray.origin = *origin;
+    ray.direct = *direct;
+    cast_Ray (ret_hit, ret_mag, &ray,
               object->nelems,
               object->tree.elemidcs, object->tree.nodes,
               object->simplices, object->elems,

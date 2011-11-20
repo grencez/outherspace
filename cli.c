@@ -119,7 +119,7 @@ int main (int argc, char** argv)
 
     if (write_image)
     {
-            /* downsample_RayImage (&image, 9); */
+            /* downsample_RayImage (&image, 4); */
         unstride_RayImage (&image);
         if (image.hits)
         {

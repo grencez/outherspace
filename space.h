@@ -13,11 +13,18 @@
 #endif
 
 typedef struct Point Point;
+typedef struct Ray Ray;
 typedef struct BoundingBox BoundingBox;
 
 struct Point
 {
     real coords[NDimensions];
+};
+
+struct Ray
+{
+    Point origin;
+    Point direct;
 };
 
 struct BoundingBox

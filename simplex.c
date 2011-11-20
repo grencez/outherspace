@@ -39,9 +39,8 @@ cross_Point (Point* restrict dst,
 
     bool
 hit_Simplex (real* restrict ret_dist,
-             const Point* restrict origin,
-             const Point* restrict dir,
-             const Simplex* restrict elem)
+             const Ray ray,
+             const Simplex elem)
 {
         /* const real epsilon = (real) 0.000001; */
     const real epsilon = 0;
@@ -49,16 +48,10 @@ hit_Simplex (real* restrict ret_dist,
     real det, inv_det;
     real u, v;
 
-#if 0
-    diff_Point (&tvec, origin, &elem->pts[0]);
-    diff_Point (&edge2, &elem->pts[2], &elem->pts[0]);
-    diff_Point (&edge1, &elem->pts[1], &elem->pts[0]);
-#else
-    Op_Point_200( &tvec  ,-, origin        , &elem->pts[0] );
-    Op_Point_200( &edge2 ,-, &elem->pts[2] , &elem->pts[0] );
-    Op_Point_200( &edge1 ,-, &elem->pts[1] , &elem->pts[0] );
-#endif
-    cross_Point (&pvec, dir, &edge2);
+    Op_Point_200( &tvec  ,-, &ray.origin  , &elem.pts[0] );
+    Op_Point_200( &edge2 ,-, &elem.pts[2] , &elem.pts[0] );
+    Op_Point_200( &edge1 ,-, &elem.pts[1] , &elem.pts[0] );
+    cross_Point (&pvec, &ray.direct, &edge2);
     u = dot_Point (&tvec, &pvec);
     det = dot_Point (&edge1, &pvec);
 
@@ -68,7 +61,7 @@ hit_Simplex (real* restrict ret_dist,
             return false;
 
         cross_Point (&qvec, &tvec, &edge1);
-        v = dot_Point (dir, &qvec);
+        v = dot_Point (&ray.direct, &qvec);
         if (v < 0 || u + v > det)
             return false;
 
@@ -79,7 +72,7 @@ hit_Simplex (real* restrict ret_dist,
             return false;
 
         cross_Point (&qvec, &tvec, &edge1);
-        v = dot_Point (dir, &qvec);
+        v = dot_Point (&ray.direct, &qvec);
         if (v > 0 || u + v < det)
             return false;
     }
@@ -129,9 +122,8 @@ solve_3x3 (real x[3], const PointXfrm* A, const real b[3])
     /* BROKE! */
     bool
 hit_Simplex (real* restrict ret_dist,
-             const Point* restrict origin,
-             const Point* restrict direct,
-             const Simplex* restrict elem)
+             const Ray ray,
+             const Simplex in_elem)
 {
     uint i;
     uint axes[3];
@@ -141,6 +133,13 @@ hit_Simplex (real* restrict ret_dist,
     real x[3];
     PointXfrm A, B;
     Point normal, isect;
+    const Point* restrict origin;
+    const Point* restrict direct;
+    const Simplex* restrict elem;
+
+    origin = &ray.origin;
+    direct = &ray.direct;
+    elem = &in_elem;
         /* puts ("Z"); */
 
     diff_Point (&B.pts[1], &elem->pts[1], &elem->pts[0]);
@@ -523,8 +522,7 @@ hit_Plane (real* restrict ret_dist,
 
     bool
 hit_BarySimplex (real* restrict ret_dist,
-                 const Point* restrict origin,
-                 const Point* restrict dir,
+                 const Ray* restrict ray,
                  const BarySimplex* restrict elem)
 {
 #if 0
@@ -533,8 +531,8 @@ hit_BarySimplex (real* restrict ret_dist,
     BaryPoint bpoint;
     Point isect;
 
-    dist = distance_Plane (&elem->plane, origin);
-    dot = dot_Point (&elem->plane.normal, dir);
+    dist = distance_Plane (&elem->plane, &ray->origin);
+    dot = dot_Point (&elem->plane.normal, &ray->direct);
 
     if (dot < 0)
     {
@@ -553,7 +551,7 @@ hit_BarySimplex (real* restrict ret_dist,
 
 # if 0
     dist *= 1 / dot;
-    Op_Point_2010 ( &isect ,+, origin ,dist*, dir );
+    Op_Point_2010 ( &isect ,+, &ray->origin ,dist*, &ray->direct );
     
     bcoord_sum = 0;
     UFor( i, NDimensions-1 )
@@ -568,8 +566,8 @@ hit_BarySimplex (real* restrict ret_dist,
 
     
     Op_Point_21010( &isect
-                    ,+, dist*, dir
-                    ,   dot*, origin );
+                    ,+, dist*, &ray->direct
+                    ,   dot*, &ray->origin );
     
     bcoord_sum = 0;
     UFor( i, NDimensions-1 )
@@ -595,15 +593,15 @@ hit_BarySimplex (real* restrict ret_dist,
     Point isect;
 
     bcoord_sum = fuzz;
-    dist = distance_Plane (&elem->plane, origin);
-    dot = - dot_Point (&elem->plane.normal, dir);
+    dist = distance_Plane (&elem->plane, &ray->origin);
+    dot = - dot_Point (&elem->plane.normal, &ray->direct);
     if (dot > 0)
     {
         if (dist < 0)  return false;
 
         Op_Point_21010( &isect
-                        ,+, dist*, dir
-                        ,   dot*, origin );
+                        ,+, dist*, &ray->direct
+                        ,   dot*, &ray->origin );
 
         UFor( i, NDimensions-1 )
         {
@@ -623,8 +621,8 @@ hit_BarySimplex (real* restrict ret_dist,
         if (dist > 0)  return false;
 
         Op_Point_21010( &isect
-                        ,+, dist*, dir
-                        ,   dot*, origin );
+                        ,+, dist*, &ray->direct
+                        ,   dot*, &ray->origin );
 
         UFor( i, NDimensions-1 )
         {
