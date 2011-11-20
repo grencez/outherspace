@@ -132,6 +132,7 @@ init_PointLightSource (PointLightSource* light)
     zero_Point (&light->location);
     Op_s( real, NColors, light->intensity , 1 );
     light->diffuse = false;
+    light->on = true;
 }
 
     void
@@ -993,6 +994,7 @@ fill_pixel (real* ret_colors,
             const PointLightSource* light;
 
             light = &space->lights[i];
+            if (!light->on)  continue;
             diff_Point (&tolight, &light->location, &isect);
 
             magtolight = magnitude_Point (&tolight);

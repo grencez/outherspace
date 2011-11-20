@@ -21,6 +21,10 @@ bool
 readin_checkplanes (uint* ret_nplanes, Plane** ret_planes, Point** ret_points,
                     const AffineMap* map,
                     const char* pathname, const char* filename);
+void
+setup_box_lights (RaySpace* space,
+                  const PointLightSource* light,
+                  const BoundingBox* box);
 
 #ifdef INCLUDE_SOURCE
 #include "dynamic-setup.c"

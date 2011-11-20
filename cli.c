@@ -57,8 +57,6 @@ int main (int argc, char** argv)
 #elif 0
         setup_testcase_track
 #elif 1
-        setup_testcase_4d_surface
-#elif 1
         setup_testcase_sphere
 #endif
         (&space, &view_origin, &view_basis, &image.hifov,

@@ -16,6 +16,10 @@ struct Track
     Point* startdirs;
 
     Scene scene;
+
+    uint nmorphs;
+    real* morph_dcoords;
+    Scene* morph_scenes;
 };
 
 void

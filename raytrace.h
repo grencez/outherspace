@@ -35,6 +35,7 @@ struct PointLightSource
     Point location;
     real intensity[NColors];
     bool diffuse;
+    bool on;
 };
 
 struct RaySpace

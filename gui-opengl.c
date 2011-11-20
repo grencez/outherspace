@@ -77,7 +77,7 @@ ogl_setup (const RaySpace* space)
             /* for (i = 0; i < 8; ++i) */
         for (i = 0; i < 1; ++i)
         {
-            if (i >= space->nlights)
+            if (i >= space->nlights || !space->lights[i].on)
             {
                 glDisable (light_idcs[i]);
                 continue;

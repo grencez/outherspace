@@ -64,6 +64,40 @@ interpolate_by_file (Scene* dst,
     return good;
 }
 
+static
+    void
+interpolate_Track (Track* track)
+{
+    const real max_drift = 1000;
+    real scale;
+    uint i;
+    Scene* scenes;
+
+    assert (NDimensions == 4);
+    assert (track->nmorphs > 1);
+
+    scale = max_drift / track->morph_dcoords[track->nmorphs-1];
+
+    scenes = AllocT( Scene, track->nmorphs );
+
+    UFor( i, track->nmorphs )
+    {
+        uint j;
+        real dcoord;
+        Scene* scene;
+
+        scene = &track->morph_scenes[i];
+        dcoord = scale * track->morph_dcoords[i];
+
+        UFor( j, scene->nverts )
+            scene->verts[j].coords[NDimensions-1] = dcoord;
+        copy_Scene (&scenes[i], scene);
+    }
+
+    interpolate_Scene (&track->scene, NDimensions-1, track->nmorphs, scenes);
+    if (scenes)  free (scenes);
+}
+
     bool
 add_racers (RaySpace* space, uint nracers, const Track* track,
             const char* pathname)
@@ -141,6 +175,8 @@ readin_Track (Track* track, RaySpace* space,
     real scale = 1;
     Point location;
     SList startloclist, startdirlist;
+    Scene* scene = 0;
+    Texture* skytex = 0;
 
     in = fopen_path (pathname, filename, "rb");
     if (!in)  return false;
@@ -161,7 +197,7 @@ readin_Track (Track* track, RaySpace* space,
     init_PointLightSource (&space->lights[0]);
     init_PointLightSource (&space->lights[1]);
     Op_s( real, NColors, space->lights[0].intensity , .5 );
-    Op_s( real, NColors, space->lights[1].intensity , 0 );
+    space->lights[1].on = false;
 
     for (line = fgets (buf, len, in);
          good && line;
@@ -207,30 +243,47 @@ readin_Track (Track* track, RaySpace* space,
         }
         else if (0 == strncmp (line, "model:", 6))
         {
+            bool doit = true;
             line = &line[6];
-            good = readin_wavefront (&track->scene, map, pathname, line);
+            if (NDimensions == 4)
+            {
+                real dcoord = 0;
+                if (track->nmorphs > 0)
+                    dcoord = track->morph_dcoords[track->nmorphs-1] + 1;
+
+                ++ track->nmorphs;
+                ResizeT( real, track->morph_dcoords, track->nmorphs );
+                ResizeT( Scene, track->morph_scenes, track->nmorphs );
+                track->morph_dcoords[track->nmorphs-1] = dcoord;
+                scene = &track->morph_scenes[track->nmorphs-1];
+            }
+            else if (!scene)
+            {
+                scene = &track->scene;
+            }
+            else
+            {
+                    /* Ignore because we are not in 4d mode.*/
+                doit = false;
+            }
+            if (doit)  good = readin_wavefront (scene, map, pathname, line);
         }
         else if (0 == strncmp (line, "concat-model:", 13))
         {
             Scene tmp;
             line = &line[13];
-            good = readin_wavefront (&tmp, map, pathname, line);
-            concat0_Scene (&track->scene, &tmp);
+            good = !!(scene);
+            if (good)  good = readin_wavefront (&tmp, map, pathname, line);
+            else       fprintf (out, "Line:%u  No scene for concat!\n",
+                                line_no);
+            if (good)  concat0_Scene (scene, &tmp);
         }
         else if (0 == strncmp (line, "sky:", 4))
         {
-            Scene* scene;
-
             line = &line[4];
 
-            scene = &track->scene;
-            i = scene->ntxtrs;
-            if (i == 0)  scene->txtrs = 0;  /* Assure this is NULL.*/
-            scene->ntxtrs = i+1;
-            ResizeT( Texture, scene->txtrs, i+1 );
-            good = readin_Texture (&scene->txtrs[i], pathname, line);
-            if (good)  space->skytxtr = i;
-
+            skytex = AllocT( Texture, 1 );
+            good = readin_Texture (skytex, pathname, line);
             if (!good)
                 fprintf (out, "Line:%u  Sky failed!\n", line_no);
         }
@@ -306,7 +359,15 @@ readin_Track (Track* track, RaySpace* space,
             scale0_AffineMap (map, scale);
         }
     }
+
     fclose (in);
+
+    if (good && !scene)
+    {
+        good = false;
+        fputs ("No model provided for track!\n", out);
+    }
+
     if (!good)
     {
         cleanup_SList (&startloclist);
@@ -314,8 +375,22 @@ readin_Track (Track* track, RaySpace* space,
     }
     else
     {
-        condense_Scene (&track->scene);
-        copy_Scene (&space->main.scene, &track->scene);
+        if (track->nmorphs > 0)
+        {
+            interpolate_Track (track);
+            scene = &track->scene;
+        }
+        condense_Scene (scene);
+
+        if (skytex)
+        {
+            if (scene->ntxtrs == 0)  scene->txtrs = 0;  /* Assure NULL.*/
+            space->skytxtr = scene->ntxtrs;
+            ConcaT( Texture, scene->txtrs, skytex, scene->ntxtrs, 1 );
+            free (skytex);
+        }
+
+        copy_Scene (&space->main.scene, scene);
         init_filled_RaySpace (space);
 
         assert (startloclist.nmembs == startdirlist.nmembs);
@@ -512,4 +587,72 @@ read_racer (Scene* scene, uint idx, const char* pathname)
     return good;
 }
 
+    /** Setup lights at the corners of the bounding box.
+     * WARNING: This was used (at some point) in a testcase which was removed.
+     *          It's neat code, but I'm not sure how well it works!
+     **/
+    void
+setup_box_lights (RaySpace* space,
+                  const PointLightSource* light,
+                  const BoundingBox* box)
+{
+    PointLightSource dflt_light;
+    BoundingBox dflt_box;
+    uint i, ndims = 0;
+    uint dims[NDimensions];
+
+    if (!light)
+    {
+        init_PointLightSource (&dflt_light);
+        Op_20s( real, NColors, dflt_light.intensity
+                ,/, dflt_light.intensity
+                ,   exp2_uint (NDimensions-1) );
+        dflt_light.diffuse = true;
+        light = &dflt_light;
+    }
+
+    if (!box)
+    {
+        copy_BoundingBox (&dflt_box, &space->main.box);
+        dflt_box.min.coords[UpDim] = dflt_box.max.coords[UpDim];
+        dflt_box.min.coords[UpDim] += 1000;
+        dflt_box.max.coords[UpDim] += 2000;
+        box = &dflt_box;
+    }
+
+    UFor( i, NDimensions )
+    {
+        if (box->min.coords[i] != box->max.coords[i])
+        {
+            dims[ndims] = i;
+            ndims += 1;
+        }
+    }
+
+    space->nlights = exp2_uint (ndims);
+    space->lights = AllocT( PointLightSource, space->nlights );
+
+    UFor( i, space->nlights )
+    {
+        uint di, flags;
+        Point* loc;
+
+        flags = i;
+        loc = &space->lights[i].location;
+
+        copy_PointLightSource (&space->lights[i], light);
+        copy_Point (loc, &box->max);
+
+        UFor( di, ndims )
+        {
+            uint dim;
+            dim = dims[di];
+            if (even_uint (flags))
+                loc->coords[dim] = box->min.coords[dim];
+            else
+                loc->coords[dim] = box->max.coords[dim];
+            flags >>= 1;
+        }
+    }
+}
 

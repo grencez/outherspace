@@ -12,10 +12,6 @@
 #define MaxKDTreeDepth 50
     /* #define MaxKDTreeDepth 0 */
 
-#ifdef _OPENMP
-#include <omp.h>
-#endif
-
     void
 output_KDTreeGrid (FILE* out, const KDTreeGrid* grid)
 {

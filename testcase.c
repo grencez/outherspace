@@ -14,10 +14,6 @@ static void
 random_Scene (Scene* scene, uint nelems, const BoundingBox* box);
 static void
 setup_camera_light (RaySpace* space, const Point* origin);
-static void
-setup_box_lights (RaySpace* space,
-                  const PointLightSource* light,
-                  const BoundingBox* box);
 static bool
 add_sky_texture (RaySpace* space,
                  const char* pathname,
@@ -505,107 +501,6 @@ setup_testcase_sphere (RaySpace* space,
     return good;
 }
 
-    bool
-setup_testcase_4d_surface (RaySpace* space,
-                           Point* view_origin,
-                           PointXfrm* view_basis,
-                           real* view_angle,
-                           const char* pathname)
-{
-    AffineMap map;
-    bool good = true;
-    Point new_centroid;
-
-    init_RaySpace (space);
-    identity_PointXfrm (view_basis);
-    zero_Point (view_origin);
-
-    identity_AffineMap (&map);
-
-    space->objects = AllocT( ObjectRaySpace, space->nobjects );
-
-    zero_Point (&new_centroid);
-    if (NDimensions == 3)
-    {
-        good = readin_wavefront (&space->main.scene, &map,
-                                 pathname, "sandbox.obj");
-    }
-    else
-    {
-        const char* const fnames[2] = { "sandbox_flat.obj", "sandbox.obj" };
-        const real dcoords[2] = { -0.001, 1000.001 };
-        good = interpolate_by_file (&space->main.scene, 2,
-                                    pathname, fnames, dcoords);
-        new_centroid.coords[3] = (dcoords[0] + dcoords[1]) / 2;
-    }
-    if (!good)  return false;
-
-    condense_Scene (&space->main.scene);
-    fixup_wavefront_Scene (&space->main.scene);
-    recenter_Scene (&space->main.scene, &new_centroid);
-
-    good = add_sky_texture (space, pathname, "iras.png");
-    if (!good)  return false;
-
-    init_filled_RaySpace (space);
-
-#if 0
-#elif 0
-    *view_angle = 1.0472;
-    view_origin->coords[0] = -4818.89;
-    view_basis->pts[0].coords[0] = -0.987767;
-    view_basis->pts[0].coords[1] = -0.146868;
-    view_basis->pts[0].coords[2] = -0.0524107;
-    view_origin->coords[1] = -2013.33;
-    view_basis->pts[1].coords[0] = -0.0790953;
-    view_basis->pts[1].coords[1] = 0.182214;
-    view_basis->pts[1].coords[2] = 0.980073;
-    view_origin->coords[2] = -1762.03;
-    view_basis->pts[2].coords[0] = -0.134392;
-    view_basis->pts[2].coords[1] = 0.972228;
-    view_basis->pts[2].coords[2] = -0.191601;
-#elif 1
-    *view_angle = 2 * M_PI / 3;
-    view_origin->coords[UpDim] = 200;
-    view_origin->coords[RightDim] = 3000;
-    view_origin->coords[ForwardDim] = -4000;
-    if (NDimensions == 4)
-        view_origin->coords[3] = 700;
-    rotate_PointXfrm (view_basis, ForwardDim, UpDim, M_PI/5);
-#endif
-
-    if (true)
-    {
-        Point p;
-        zero_Point (&p);
-        p.coords[0] = 5000;
-        setup_camera_light (space, &p);
-        Op_s( real, NColors, space->lights[0].intensity , .5 );
-        space->lights[0].diffuse = true;
-    }
-    else
-    {
-        BoundingBox box;
-        PointLightSource light;
-
-        copy_BoundingBox (&box, &space->main.box);
-        box.min.coords[UpDim] = box.max.coords[UpDim];
-        box.min.coords[UpDim] += 1000;
-        box.max.coords[UpDim] += 2000;
-
-        init_PointLightSource (&light);
-        Op_20s( real, NColors, light.intensity
-                ,/, light.intensity
-                ,   exp2_uint (NDimensions-1) );
-        light.diffuse = true;
-
-        setup_box_lights (space, &light, &box);
-    }
-
-    return good;
-}
-
-
     void
 random_Point (Point* p, const BoundingBox* box)
 {
@@ -669,7 +564,6 @@ random_Scene (Scene* scene, uint nelems, const BoundingBox* box)
     }
 }
 
-
     void
 setup_camera_light (RaySpace* space, const Point* origin)
 {
@@ -680,52 +574,9 @@ setup_camera_light (RaySpace* space, const Point* origin)
     init_PointLightSource (&space->lights[1]);
     copy_Point (&space->lights[0].location, origin);
     copy_Point (&space->lights[1].location, origin);
-    Op_s( real, NColors,space->lights[1].intensity , 0 );
+    space->lights[1].on = false;
 }
 
-    void
-setup_box_lights (RaySpace* space,
-                  const PointLightSource* light,
-                  const BoundingBox* box)
-{
-    uint i, ndims = 0;
-    uint dims[NDimensions];
-
-    UFor( i, NDimensions )
-    {
-        if (box->min.coords[i] != box->max.coords[i])
-        {
-            dims[ndims] = i;
-            ndims += 1;
-        }
-    }
-
-    space->nlights = exp2_uint (ndims);
-    space->lights = AllocT( PointLightSource, space->nlights );
-
-    UFor( i, space->nlights )
-    {
-        uint di, flags;
-        Point* loc;
-
-        flags = i;
-        loc = &space->lights[i].location;
-
-        copy_PointLightSource (&space->lights[i], light);
-        copy_Point (loc, &box->max);
-
-        UFor( di, ndims )
-        {
-            uint dim;
-            dim = dims[di];
-            if (even_uint (flags))
-                loc->coords[dim] = box->min.coords[dim];
-            else
-                loc->coords[dim] = box->max.coords[dim];
-            flags >>= 1;
-        }
-    }
-}
 
     bool
 add_sky_texture (RaySpace* space,

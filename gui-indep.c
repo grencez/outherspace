@@ -218,6 +218,7 @@ set_checkpoint_light (PointLightSource* light,
     const Plane* checkplane;
     const Point* checkpoint;
     
+    light->on = true;
     checkplane = &track.checkplanes[mot->checkpoint_idx];
     checkpoint = &track.checkpoints[mot->checkpoint_idx];
 

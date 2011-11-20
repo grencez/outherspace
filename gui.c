@@ -1014,14 +1014,6 @@ int wrapped_main_fn (int argc, char* argv[])
         setup_testcase_track
 #elif 0
         setup_testcase_4d_normals
-#elif 1
-        readin_checkplanes (&track.ncheckplanes,
-                            &track.checkplanes,
-                            &track.checkpoints,
-                            inpathname, "4d-surface_chk.txt");
-        if (good)
-        good =
-        setup_testcase_4d_surface
 #elif 0
         setup_testcase_manual_interp
 #elif 1
