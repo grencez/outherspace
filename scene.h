@@ -49,6 +49,8 @@ void cleanup_Scene (Scene* scene);
 void
 copy_Scene (Scene* dst, const Scene* src);
 void
+concat0_Scene (Scene* scene, Scene* a);
+void
 output_SceneElement (FILE* out, const Scene* scene, uint ei);
 void vert_Scene (Point* dst, const Scene* scene, uint idx);
 void

@@ -1013,10 +1013,6 @@ int wrapped_main_fn (int argc, char* argv[])
 #endif
         setup_testcase_track
 #elif 0
-        setup_testcase_bouncethru
-#elif 0
-        setup_testcase_smoothsphere
-#elif 0
         setup_testcase_4d_normals
 #elif 1
         readin_checkplanes (&track.ncheckplanes,

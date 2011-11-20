@@ -184,7 +184,7 @@ readin_wavefront (Scene* scene, const AffineMap* map,
         {
             BaryPoint bpoint;
             line = &line[2];
-            Op_0( real, NDimensions-1, bpoint.coords , 0 );
+            Op_s( real, NDimensions-1, bpoint.coords , 0 );
             UFor( i, ndims-1 )
                 if (line)  line = strto_real (&bpoint.coords[i], line);
 

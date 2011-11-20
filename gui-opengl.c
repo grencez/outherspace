@@ -212,7 +212,6 @@ ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object)
     glMultMatrixd (matrix);
 
         /* Send our triangle data to the pipeline. */
-    glBegin (GL_TRIANGLES);
     UFor( i, scene->nelems )
     {
         const SceneElement* elem;
@@ -223,6 +222,9 @@ ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object)
         {
             const Material* matl;
             GLfloat color[4];
+
+            if (i > 0)  glEnd ();
+
             if (elem->material < scene->nmatls)
                 matl = &scene->matls[elem->material];
             else
@@ -240,6 +242,8 @@ ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object)
 
             glMaterialf (GL_FRONT_AND_BACK, GL_SHININESS,
                          matl->optical_density);
+
+            glBegin (GL_TRIANGLES);
         }
 
         UFor( j, 3 )
@@ -266,7 +270,7 @@ ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object)
             glVertex3dv (v);
         }
     }
-    glEnd ();
+    if (scene->nelems > 0)  glEnd ();
 
     glPopMatrix ();
 }

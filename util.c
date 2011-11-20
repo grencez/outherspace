@@ -50,6 +50,17 @@ array_dup (const void* src, uint count, size_t size)
     return dst;
 }
 
+    void*
+array_cat (void* dst, const void* src, uint* end, uint count, size_t size)
+{
+    uint n;
+    n = *end + count;
+    dst = realloc (dst, n * size);
+    array_cpy (dst, src, *end, count, size);
+    *end = n;
+    return dst;
+}
+
 char* strto_uint (uint* ret, const char* in)
 {
     unsigned long v;

@@ -20,18 +20,6 @@ setup_testcase_track (RaySpace* space,
                       real* view_angle,
                       const char* pathname);
 bool
-setup_testcase_bouncethru (RaySpace* space,
-                           Point* view_origin,
-                           PointXfrm* view_basis,
-                           real* view_angle,
-                           const char* pathname);
-bool
-setup_testcase_smoothsphere (RaySpace* space,
-                             Point* view_origin,
-                             PointXfrm* view_basis,
-                             real* view_angle,
-                             const char* pathname);
-bool
 setup_testcase_4d_normals (RaySpace* space,
                            Point* view_origin,
                            PointXfrm* view_basis,

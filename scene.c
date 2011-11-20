@@ -103,6 +103,53 @@ copy_Scene (Scene* dst, const Scene* src)
 }
 
     void
+concat0_Scene (Scene* scene, Scene* src)
+{
+    uint i;
+    Scene orig;
+    orig = *scene;
+
+    ConcaT( SceneElement, scene->elems, src->elems,
+            scene->nelems, src->nelems );
+    ConcaT( Point, scene->verts, src->verts, scene->nverts, src->nverts );
+    ConcaT( Point, scene->vnmls, src->vnmls, scene->nvnmls, src->nvnmls );
+    ConcaT( BaryPoint, scene->txpts, src->txpts, scene->ntxpts, src->ntxpts );
+    ConcaT( Material, scene->matls, src->matls, scene->nmatls, src->nmatls );
+    ConcaT( Texture, scene->txtrs, src->txtrs, scene->ntxtrs, src->ntxtrs );
+
+    UFor( i, src->nelems )
+    {
+        uint dim;
+        SceneElement* elem;
+        elem = &scene->elems[i + orig.nelems];
+        UFor( dim, NDimensions )
+        {
+            if (elem->verts[dim] < Max_uint)
+                elem->verts[dim] += orig.nverts;
+            if (elem->vnmls[dim] < Max_uint)
+                elem->vnmls[dim] += orig.nvnmls;
+            if (elem->txpts[dim] < Max_uint)
+                elem->txpts[dim] += orig.ntxpts;
+        }
+        if (elem->material < Max_uint)
+            elem->material += orig.nmatls;
+    }
+
+    UFor( i, src->nmatls )
+    {
+        Material* matl;
+        matl = &scene->matls[i + orig.nmatls];
+        if (matl->ambient_texture < Max_uint)
+            matl->ambient_texture += orig.ntxtrs;
+        if (matl->diffuse_texture < Max_uint)
+            matl->diffuse_texture += orig.ntxtrs;
+    }
+
+    src->ntxtrs = 0;
+    cleanup_Scene (src);
+}
+
+    void
 output_SceneElement (FILE* out, const Scene* scene, uint ei)
 {
     uint i;

@@ -520,9 +520,11 @@ apply_thrust (Point* veloc,
                        ,   &drift_veloc );
 
         normalize_Point (&up, &up);
+#if 0
         Op_Point_2100( &up
                         ,+, 10*dt*, &up
                         ,   &basis.pts[UpDim] );
+#endif
         orthorotate_PointXfrm (&basis, &basis, &up, UpDim);
     }
     remove_4d_rotation (&basis);

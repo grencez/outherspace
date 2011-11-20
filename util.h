@@ -31,6 +31,10 @@
 #define DuplicaT( Type, src, count ) \
     ((Type*) array_dup (src, count, sizeof (Type)))
 
+#define ConcaT( Type, dst, src, end, count ) \
+    ((dst) = (Type*) array_cat (dst, src, &end, count, sizeof (Type)))
+        
+
 #define Ceil_uint( a, b ) \
     (((a) + (b) - 1) / (b))
 
@@ -63,7 +67,7 @@ typedef byte bool;
 #endif  /* #ifdef __OPENCL_VERSION__ */
 
 
-#define UFor( i, bel )  for (i = 0; i < bel; ++i)
+#define UFor( i, bel )  for (i = 0; i < (bel); ++i)
 
     /* Does not scope /j/.*/
 #define UUFor( i, ibel, j, jbel )  UFor( i, ibel )  UFor( j, jbel )
@@ -165,6 +169,8 @@ void
 array_cpy (void* dst, const void* src, uint lo, uint count, size_t size);
 void*
 array_dup (const void* src, uint count, size_t size);
+void*
+array_cat (void* dst, const void* src, uint* end, uint count, size_t size);
 char* strto_uint (uint* ret, const char* in);
 char* strto_real (real* ret, const char* in);
 uint strcount_ws (const char* s);

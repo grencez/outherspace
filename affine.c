@@ -34,6 +34,7 @@ map_Ray (Ray* dst, const AffineMap* map, const Ray* src)
 scale0_AffineMap (AffineMap* map, real x)
 {
     scale_PointXfrm (&map->xfrm, &map->xfrm, x);
+    scale_Point (&map->xlat, &map->xlat, x);
 }
 
     /** Post-multiply by a translate operation.**/

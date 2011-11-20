@@ -139,6 +139,7 @@ readin_Track (Track* track, RaySpace* space,
     AffineMap affine_map;
     AffineMap* map;
     real scale = 1;
+    Point location;
     SList startloclist, startdirlist;
 
     in = fopen_path (pathname, filename, "rb");
@@ -147,6 +148,7 @@ readin_Track (Track* track, RaySpace* space,
     identity_PointXfrm (&coord_system);
     map = &affine_map;
     identity_AffineMap (map);
+    zero_Point (&location);
 
     init_SList (&startloclist);
     init_SList (&startdirlist);
@@ -178,21 +180,42 @@ readin_Track (Track* track, RaySpace* space,
             if (line[0] == ':')  line = &line[1];
 
             line = strto_real (&scale, line);
-            if (line)
+            good = !!(line);
+            if (good)
+                recalc_map = true;
+            else
+                fprintf (out, "Line:%u  Need scale value!\n", line_no);
+        }
+        else if (0 == strncmp (line, "loc", 3))
+        {
+            line = &line[3];
+            if (line[0] == ':')  line = &line[1];
+
+            UFor( i, 3 )
+                if (line)  line = strto_real (&location.coords[i], line);
+
+            good = !!(line);
+            if (good)
             {
+                xfrm_Point (&location, &coord_system, &location);
                 recalc_map = true;
             }
             else
             {
-                good = false;
-                fprintf (out, "Line:%u  Need scale value!\n", line_no);
+                fprintf (out, "Line:%u  Need 3 location values!\n", line_no);
             }
         }
         else if (0 == strncmp (line, "model:", 6))
         {
             line = &line[6];
-            readin_wavefront (&track->scene, map, pathname, line);
-            condense_Scene (&track->scene);
+            good = readin_wavefront (&track->scene, map, pathname, line);
+        }
+        else if (0 == strncmp (line, "concat-model:", 13))
+        {
+            Scene tmp;
+            line = &line[13];
+            good = readin_wavefront (&tmp, map, pathname, line);
+            concat0_Scene (&track->scene, &tmp);
         }
         else if (0 == strncmp (line, "sky:", 4))
         {
@@ -278,6 +301,7 @@ readin_Track (Track* track, RaySpace* space,
         if (recalc_map)
         {
             identity_AffineMap (map);
+            xlat0_AffineMap (map, &location);
             xfrm0_AffineMap (map, &coord_system);
             scale0_AffineMap (map, scale);
         }
@@ -290,6 +314,7 @@ readin_Track (Track* track, RaySpace* space,
     }
     else
     {
+        condense_Scene (&track->scene);
         copy_Scene (&space->main.scene, &track->scene);
         init_filled_RaySpace (space);
 
