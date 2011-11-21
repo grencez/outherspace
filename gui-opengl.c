@@ -3,7 +3,18 @@
 #include <GL/glu.h>
 
 static void
-ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object);
+ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object,
+                           const Point* view_origin,
+                           const PointXfrm* view_basis);
+#if NDimensions == 4
+static uint
+view_element (GLdouble* ret_verts,
+              GLdouble* ret_vnmls,
+              const SceneElement* elem,
+              const Scene* scene,
+              const AffineMap* map,
+              const Point* normal);
+#endif
 
     /** Convert a Point to a 3-vec.**/
 static
@@ -47,12 +58,11 @@ ogl_setup (const RaySpace* space)
 {
     const SDL_VideoInfo* info;
     int bpp = 0;
-    GLfloat light_ambient[] = {0.2, 0.2, 0.2, 1.0};
+    const GLfloat light_ambient[] = {0.2, 0.2, 0.2, 1.0};
         /* GLfloat light_ambient[] = {0, 0, 0, 1}; */
-    GLfloat light_diffuse[] = {1.0, 1.0, 1.0, 1.0};
+    const GLfloat light_diffuse[] = {1.0, 1.0, 1.0, 1.0};
         /* GLfloat light_diffuse[] = {1.0, 0.0, 0.0, 1.0}; */
-    GLfloat light_specular[] = {1.0, 1.0, 1.0, 1.0};
-    GLfloat light_position[] = {0.0, 1.0, 0.0, 0.0};
+    const GLfloat light_specular[] = {1.0, 1.0, 1.0, 1.0};
     const GLenum light_idcs[8] =
     {   GL_LIGHT0, GL_LIGHT1, GL_LIGHT2, GL_LIGHT3,
         GL_LIGHT4, GL_LIGHT5, GL_LIGHT6, GL_LIGHT7
@@ -77,17 +87,32 @@ ogl_setup (const RaySpace* space)
             /* for (i = 0; i < 8; ++i) */
         for (i = 0; i < 1; ++i)
         {
-            if (i >= space->nlights || !space->lights[i].on)
+            uint j;
+            GLfloat v[4];
+            const PointLightSource* light = 0;
+
+            if (i < space->nlights)  light = &space->lights[i];
+            if (!light || !light->on)
             {
                 glDisable (light_idcs[i]);
                 continue;
             }
 
-            ogl_fvec_Point (light_position, &space->lights[i].location);
-            glLightfv (light_idcs[i], GL_AMBIENT, light_ambient);
-            glLightfv (light_idcs[i], GL_DIFFUSE, light_diffuse);
-            glLightfv (light_idcs[i], GL_SPECULAR, light_specular);
-            glLightfv (light_idcs[i], GL_POSITION, light_position);
+            v[3] = 1;
+                /* Position.*/
+            ogl_fvec_Point (v, &light->location);
+            glLightfv (light_idcs[i], GL_POSITION, v);
+                /* Ambient.*/
+            UFor( j, 3 )  v[j] = light_ambient[j] * light->intensity[j];
+            glLightfv (light_idcs[i], GL_AMBIENT, v);
+                /* Diffuse.*/
+            UFor( j, 3 )  v[j] = light_diffuse[j] * light->intensity[j];
+            glLightfv (light_idcs[i], GL_DIFFUSE, v);
+                /* Specular.*/
+            UFor( j, 3 )  v[j] = light_specular[j] * light->intensity[j];
+            if (light->diffuse)  UFor( j, 3 )  v[j] = 0;
+            glLightfv (light_idcs[i], GL_SPECULAR, v);
+
             glEnable (light_idcs[i]);
         }
         glEnable (GL_LIGHTING);
@@ -188,18 +213,38 @@ ogl_redraw (const RaySpace* space, uint pilot_idx)
     glMatrixMode (GL_MODELVIEW);
     glLoadIdentity ();
 
-    ogl_redraw_ObjectRaySpace (&space->main);
+    ogl_redraw_ObjectRaySpace (&space->main,
+                               &pilot->view_origin, &pilot->view_basis);
     UFor( i, space->nobjects )
-        ogl_redraw_ObjectRaySpace (&space->objects[i]);
+        ogl_redraw_ObjectRaySpace (&space->objects[i],
+                                   &pilot->view_origin, &pilot->view_basis);
 }
 
     void
-ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object)
+ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object,
+                           const Point* view_origin,
+                           const PointXfrm* view_basis)
 {
     Material default_material;
     GLdouble matrix[16];
     const Scene* scene;
     uint i;
+    bool first_elem = true;
+    uint material_idx = Max_uint;
+#if NDimensions == 4
+    AffineMap affine_map;
+    AffineMap* map;
+
+    map = &affine_map;
+    identity_AffineMap (map);
+    map->xlat.coords[DriftDim] = (+ object->centroid.coords[DriftDim]
+                                  - view_origin->coords[DriftDim]);
+    (void) view_basis;
+        /* copy_PointXfrm (&map->xfrm, view_basis); */
+#else
+    (void) view_origin;
+    (void) view_basis;
+#endif
 
     if (!object->visible)  return;
 
@@ -215,18 +260,44 @@ ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object)
     UFor( i, scene->nelems )
     {
         const SceneElement* elem;
+        uint nelems = 1;
+        GLdouble verts[6*3];
+        GLdouble vnmls[6*3];
         uint j;
 
         elem = &scene->elems[i];
-        if (i == 0 || elem->material != scene->elems[i-1].material)
+
+#if NDimensions == 4
+        nelems = view_element (verts, vnmls, elem, scene, map,
+                               &object->simplices[i].plane.normal);
+        if (nelems == 0)  continue;
+#else
+        UFor( j, 3 )
+        {
+            const Point* p;
+
+            if (elem->vnmls[j] < scene->nvnmls)
+                p = &scene->vnmls[elem->vnmls[j]];
+            else
+                p = &object->simplices[i].plane.normal;
+            ogl_vec_Point (&vnmls[j*3], p);
+
+            p = &scene->verts[elem->verts[j]];
+            ogl_vec_Point (&verts[j*3], p);
+        }
+#endif
+
+        if (first_elem || elem->material != material_idx)
         {
             const Material* matl;
             GLfloat color[4];
 
-            if (i > 0)  glEnd ();
+            if (!first_elem)  glEnd ();
+            else              first_elem = false;
 
-            if (elem->material < scene->nmatls)
-                matl = &scene->matls[elem->material];
+            material_idx = elem->material;
+            if (material_idx < scene->nmatls)
+                matl = &scene->matls[material_idx];
             else
                 matl = &default_material;
 
@@ -246,32 +317,118 @@ ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object)
             glBegin (GL_TRIANGLES);
         }
 
-        UFor( j, 3 )
+        UFor( j, 3 * nelems )
         {
-            const Point* p;
-            GLdouble v[3];
-
-            if (elem->vnmls[j] < scene->nvnmls)
-                p = &scene->vnmls[elem->vnmls[j]];
-            else
-                p = &object->simplices[i].plane.normal;
-
-            ogl_vec_Point (v, p);
-
-            glNormal3dv (v);
-
-            p = &scene->verts[elem->verts[j]];
-            ogl_vec_Point (v, p);
-
-                /* if (j == 0)  glColor3f (1, 0, 0); */
-                /* if (j == 1)  glColor3f (0, 1, 0); */
-                /* if (j == 2)  glColor3f (0, 0, 1); */
-
-            glVertex3dv (v);
+                /* if (j % 3 == 0)  glColor3f (1, 0, 0); */
+                /* if (j % 3 == 1)  glColor3f (0, 1, 0); */
+                /* if (j % 3 == 2)  glColor3f (0, 0, 1); */
+            glNormal3dv (&vnmls[j*3]);
+            glVertex3dv (&verts[j*3]);
         }
     }
     if (scene->nelems > 0)  glEnd ();
 
     glPopMatrix ();
 }
+
+#if NDimensions == 4
+static void
+view_element_helpfn (GLdouble* ret_verts,
+                     GLdouble* ret_vnmls,
+                     const real* alphas,
+                     uint (* inds)[2],
+                     const Point* verts,
+                     const Point* vnmls)
+{
+    uint i;
+    UFor( i, 3 )
+    {
+        real alpha;
+        Point v;
+
+        alpha = alphas[i];
+        zero_Point (&v);
+
+        Op_21010( real, 3, v.coords
+                  ,+, (    alpha)*, verts[inds[i][0]].coords
+                  ,   (1 - alpha)*, verts[inds[i][1]].coords );
+
+        ogl_vec_Point (&ret_verts[i*3], &v);
+
+        Op_21010( real, 3, v.coords
+                  ,+, (    alpha)*, vnmls[inds[i][0]].coords
+                  ,   (1 - alpha)*, vnmls[inds[i][1]].coords );
+
+        normalize_Point (&v, &v);
+        ogl_vec_Point (&ret_vnmls[i*3], &v);
+    }
+}
+
+    uint
+view_element (GLdouble* ret_verts,
+              GLdouble* ret_vnmls,
+              const SceneElement* elem,
+              const Scene* scene,
+              const AffineMap* map,
+              const Point* normal)
+{
+    uint i, k = 0;
+    uint nabove = 0;
+    Point verts[NDimensions];
+    Point vnmls[NDimensions];
+    real d[NDimensions];
+    bool positives[4];
+    real alphas[4];
+    uint inds[4][2];
+
+    UFor( i, NDimensions )
+    {
+        copy_Point (&verts[i], &scene->verts[elem->verts[i]]);
+        map_Point (&verts[i], map, &verts[i]);
+        d[i] = verts[i].coords[DriftDim];
+        positives[i] = (d[i] > 0);
+        if (positives[i])  ++ nabove;
+    }
+    if (nabove == 0 || nabove == NDimensions)  return 0;
+
+    UFor( i, NDimensions-1 )
+    {
+        uint j;
+        for (j = i+1; j < NDimensions; ++j)
+        {
+            if (positives[i] != positives[j])
+            {
+                alphas[k] = fabs (d[j] / (d[j] - d[i]));
+                inds[k][0] = i;
+                inds[k][1] = j;
+                ++ k;
+            }
+        }
+    }
+
+    assert (k >= 3);
+    assert (k <= 4);
+    UFor( i, NDimensions )
+    {
+        uint j;
+        j = elem->vnmls[i];
+
+        if (j < scene->nvnmls)
+            copy_Point (&vnmls[i], &scene->vnmls[j]);
+        else
+            copy_Point (&vnmls[i], normal);
+
+        mapvec_Point (&vnmls[i], map, &vnmls[i]);
+    }
+
+    view_element_helpfn (ret_verts, ret_vnmls, alphas, inds, verts, vnmls);
+    if (k == 3)  return 1;
+
+    inds[0][0] = inds[3][0];
+    inds[0][1] = inds[3][1];
+    view_element_helpfn (&ret_verts[3*3], &ret_vnmls[3*3],
+                         alphas, inds, verts, vnmls);
+    return 2;
+}
+#endif
 

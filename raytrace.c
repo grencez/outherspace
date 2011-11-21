@@ -897,7 +897,7 @@ fill_pixel (real* ret_colors,
     if (compute_bary_coords && 0 < scene->nvnmls)
         map_vertex_normal (&normal, scene->vnmls, elem, &bpoint);
     else
-        copy_Point (&normal, &simplex->plane.normal);
+        normalize_Point (&normal, &simplex->plane.normal);
         /* Rotate it when necessary.*/
     if (objidx != space->nobjects)
         trxfrm_Point (&normal, &object->orientation, &normal);

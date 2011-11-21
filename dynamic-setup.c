@@ -196,7 +196,7 @@ readin_Track (Track* track, RaySpace* space,
     space->lights = AllocT( PointLightSource, space->nlights );
     init_PointLightSource (&space->lights[0]);
     init_PointLightSource (&space->lights[1]);
-    Op_s( real, NColors, space->lights[0].intensity , .5 );
+        /* Op_s( real, NColors, space->lights[0].intensity , .5 ); */
     space->lights[1].on = false;
 
     for (line = fgets (buf, len, in);
