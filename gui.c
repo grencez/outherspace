@@ -1000,17 +1000,6 @@ int wrapped_main_fn (int argc, char* argv[])
 #elif 0
         setup_testcase_triangles
 #elif 1
-#if 0
-        readin_checkplanes (&track.ncheckplanes,
-                            &track.checkplanes,
-                            &track.checkpoints,
-                            inpathname,
-                            "curve-track_chk.txt"
-                           );
-            /* "loop_chk.txt" */
-        if (good)
-        good =
-#endif
         setup_testcase_track
 #elif 0
         setup_testcase_4d_normals

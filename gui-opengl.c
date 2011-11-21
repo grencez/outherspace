@@ -2,11 +2,20 @@
 #include <GL/gl.h>
 #include <GL/glu.h>
 
+#if NDimensions != 4
+    /* Force Match4dGeom to imply NDimensions == 4
+     * since it is assumed in this file.
+     */
+# ifdef Match4dGeom
+#  undef Match4dGeom
+# endif
+#endif
+
 static void
 ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object,
                            const Point* view_origin,
                            const PointXfrm* view_basis);
-#if NDimensions == 4
+#ifdef Match4dGeom
 static uint
 view_element (GLdouble* ret_verts,
               GLdouble* ret_vnmls,
@@ -213,8 +222,13 @@ ogl_redraw (const RaySpace* space, uint pilot_idx)
     glMatrixMode (GL_MODELVIEW);
     glLoadIdentity ();
 
+#ifndef Match4dGeom
+        /* Use this as a flag to say this is the main object (track).*/
+    ogl_redraw_ObjectRaySpace (&space->main, &pilot->view_origin, 0);
+#else
     ogl_redraw_ObjectRaySpace (&space->main,
                                &pilot->view_origin, &pilot->view_basis);
+#endif
     UFor( i, space->nobjects )
         ogl_redraw_ObjectRaySpace (&space->objects[i],
                                    &pilot->view_origin, &pilot->view_basis);
@@ -232,23 +246,43 @@ ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object,
     bool first_elem = true;
     uint material_idx = Max_uint;
 #if NDimensions == 4
+# ifdef Match4dGeom
     AffineMap affine_map;
     AffineMap* map;
-
-    map = &affine_map;
-    identity_AffineMap (map);
-    map->xlat.coords[DriftDim] = (+ object->centroid.coords[DriftDim]
-                                  - view_origin->coords[DriftDim]);
     (void) view_basis;
-        /* copy_PointXfrm (&map->xfrm, view_basis); */
+# else
+    Scene interp4d_scene;
+# endif
 #else
     (void) view_origin;
     (void) view_basis;
 #endif
 
     if (!object->visible)  return;
-
     scene = &object->scene;
+
+#if NDimensions == 4
+# ifdef Match4dGeom
+    map = &affine_map;
+    identity_AffineMap (map);
+    map->xlat.coords[DriftDim] = (+ object->centroid.coords[DriftDim]
+                                  - view_origin->coords[DriftDim]);
+        /* copy_PointXfrm (&map->xfrm, view_basis); */
+# else
+
+    if (!view_basis)
+    {
+        real alpha;
+        alpha = ((view_origin->coords[DriftDim] - track.morph_dcoords[0]) /
+                 (track.morph_dcoords[1] - track.morph_dcoords[0]));
+        alpha = clamp_real (alpha, 0, 1);
+        interpolate1_Scene (&interp4d_scene, alpha,
+                            &track.morph_scenes[0], &track.morph_scenes[1]);
+        scene = &interp4d_scene;
+    }
+# endif
+#endif
+
 
     glPushMatrix ();
 
@@ -267,23 +301,45 @@ ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object,
 
         elem = &scene->elems[i];
 
-#if NDimensions == 4
+#ifdef Match4dGeom
         nelems = view_element (verts, vnmls, elem, scene, map,
                                &object->simplices[i].plane.normal);
         if (nelems == 0)  continue;
 #else
+# if NDimensions == 4
+        if (view_basis)
+        {
+            real d[4];
+            UFor( j, 4 )
+                d[j] = scene->verts[elem->verts[j]].coords[DriftDim];
+            if (d[0] < d[1] || d[1] != d[2] || d[2] != d[3])  continue;
+        }
+# endif
         UFor( j, 3 )
         {
+            Point dflt_normal;
             const Point* p;
+            uint idx;
 
-            if (elem->vnmls[j] < scene->nvnmls)
-                p = &scene->vnmls[elem->vnmls[j]];
-            else
-                p = &object->simplices[i].plane.normal;
-            ogl_vec_Point (&vnmls[j*3], p);
+            idx = j;
+# if NDimensions == 4
+            if (view_basis)  idx += 1;
+# endif
 
-            p = &scene->verts[elem->verts[j]];
+            p = &scene->verts[elem->verts[idx]];
             ogl_vec_Point (&verts[j*3], p);
+
+            if (elem->vnmls[idx] < scene->nvnmls)
+            {
+                p = &scene->vnmls[elem->vnmls[idx]];
+            }
+            else
+            {
+                normalize_Point (&dflt_normal,
+                                 &object->simplices[i].plane.normal);
+                p = &dflt_normal;
+            }
+            ogl_vec_Point (&vnmls[j*3], p);
         }
 #endif
 
@@ -329,9 +385,15 @@ ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object,
     if (scene->nelems > 0)  glEnd ();
 
     glPopMatrix ();
-}
 
 #if NDimensions == 4
+# ifndef Match4dGeom
+    if (!view_basis)  cleanup_Scene (&interp4d_scene);
+# endif
+#endif
+}
+
+#ifdef Match4dGeom
 static void
 view_element_helpfn (GLdouble* ret_verts,
                      GLdouble* ret_vnmls,

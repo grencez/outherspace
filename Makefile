@@ -28,6 +28,7 @@ CONFIG += openmp
 #CONFIG += noassert
 #CONFIG += macapp
 #CONFIG += haptic
+#CONFIG += opengl match4dgeom
 #CONFIG += opengl
 #CONFIG += local_sdl
 #CONFIG += sunstudio
@@ -202,6 +203,12 @@ ifneq (,$(filter openmp,$(CONFIG)))
 	else
 		CFLAGS += -fopenmp
 	endif
+endif
+## When using OpenGL, make rendering match the ray tracer.
+## This shows slices thru tetrahedra instead of a smooth
+## interpolation between triangles.
+ifneq (,$(filter match4dgeom,$(CONFIG)))
+	GuiDFlags += -DMatch4dGeom
 endif
 
 

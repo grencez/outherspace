@@ -88,6 +88,7 @@ interpolate_Track (Track* track)
 
         scene = &track->morph_scenes[i];
         dcoord = scale * track->morph_dcoords[i];
+        track->morph_dcoords[i] = dcoord;
 
         UFor( j, scene->nverts )
             scene->verts[j].coords[NDimensions-1] = dcoord;
