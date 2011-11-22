@@ -31,9 +31,12 @@ void init_Material (Material* mat)
 map_Texture (real* colors, const Texture* texture, const BaryPoint* p)
 {
     uint i, row, col;
+    real x;
     const byte* pixels;
-    row = texture->nrows * p->coords[1];
-    col = texture->ncols * p->coords[0];
+    x = fmod (texture->nrows * p->coords[1], texture->nrows);
+    row = ((uint) x + texture->nrows) % texture->nrows;
+    x = fmod (texture->nrows * p->coords[0], texture->ncols);
+    col = ((uint) x + texture->ncols) % texture->ncols;
     if (row >= texture->nrows)
     {
         fprintf (stderr, "Passed nrows by:%u\n", row - texture->nrows);
