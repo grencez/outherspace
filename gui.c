@@ -1005,8 +1005,6 @@ int wrapped_main_fn (int argc, char* argv[])
         setup_testcase_4d_normals
 #elif 0
         setup_testcase_manual_interp
-#elif 1
-        setup_testcase_sphere
 #endif
         (space, &view_origin, &view_basis, &view_angle,
          inpathname);

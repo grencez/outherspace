@@ -75,8 +75,20 @@ setup_testcase_simple (RaySpace* space,
     zero_Point (view_origin);
 
     identity_AffineMap (&map);
+    parse_coord_system (&map.xfrm, "right up back");
 
-    good = readin_wavefront (&space->main.scene, &map, pathname, file);
+    if (NDimensions == 3)
+    {
+        good = readin_wavefront (&space->main.scene, &map, pathname, file);
+    }
+    else
+    {
+        const char* filenames[2];
+        const real dcoords[2] = { 0, 1000 };
+        filenames[0] = filenames[1] = file;
+        good = interpolate_by_file (&space->main.scene, 2, pathname,
+                                    filenames, dcoords, &map);
+    }
     if (!good)  return false;
     condense_Scene (&space->main.scene);
     init_filled_RaySpace (space);
@@ -87,6 +99,12 @@ setup_testcase_simple (RaySpace* space,
     diff_Point (&v,
                 &space->main.box.min,
                 &space->main.box.max);
+
+#if NDimensions == 4
+    view_origin->coords[DriftDim] =
+        space->main.box.min.coords[DriftDim] - v.coords[DriftDim] / 2;
+    v.coords[DriftDim] = 0;
+#endif
 
     orthorotate_PointXfrm (view_basis, view_basis, &v, ForwardDim);
 
@@ -125,6 +143,7 @@ setup_testcase_track (RaySpace* space,
     zero_Point (view_origin);
 
     identity_AffineMap (&map);
+    parse_coord_system (&map.xfrm, "right up back");
 
     space->objects = AllocT( ObjectRaySpace, space->nobjects );
 
@@ -151,11 +170,10 @@ setup_testcase_track (RaySpace* space,
         const char* const fnames[5] = { "loop.obj", 0, 0, 0, "bentloop.obj" };
         const real dcoords[5] = { -0.001, .25, .5, .75, 1.001 };
         good = interpolate_by_file (&space->main.scene, 5,
-                                    pathname, fnames, dcoords);
+                                    pathname, fnames, dcoords, &map);
     }
     if (!good)  return false;
     condense_Scene (&space->main.scene);
-    fixup_wavefront_Scene (&space->main.scene);
 
     if (true)
     {
@@ -167,7 +185,6 @@ setup_testcase_track (RaySpace* space,
     else if (false)
     {
         PointXfrm fix;
-        fixup_wavefront_Scene (&space->main.scene);
         identity_PointXfrm (&fix);
         scale_PointXfrm (&fix, &fix, 20);
         xfrm_Scene (&space->main.scene, &fix);
@@ -435,70 +452,6 @@ setup_testcase_manual_interp (RaySpace* space,
 
     setup_camera_light (space, view_origin);
     return true;
-}
-
-    bool
-setup_testcase_sphere (RaySpace* space,
-                       Point* view_origin,
-                       PointXfrm* view_basis,
-                       real* view_angle,
-                       const char* pathname)
-{
-    AffineMap map;
-    bool good;
-    FILE* out = stderr;
-
-    init_RaySpace (space);
-    identity_PointXfrm (view_basis);
-    zero_Point (view_origin);
-
-    identity_AffineMap (&map);
-
-    if (NDimensions == 3)
-    {
-        good = readin_wavefront (&space->main.scene, &map,
-                                 pathname, "sphere1.obj");
-    }
-    else
-    {
-        const uint nscenes = 2;
-        const char* const fnames[2] = { "sphere1.obj", "sphere2.obj" };
-        const real dcoords[2] = { -0.001, 1.001 };
-        good = interpolate_by_file (&space->main.scene,
-                                    nscenes, pathname, fnames, dcoords);
-    }
-    if (!good)  return false;
-
-    init_filled_RaySpace (space);
-
-#if 0
-#elif 1
-    *view_angle = 1.0472;
-    view_origin->coords[0] = 1.01034;
-    view_basis->pts[0].coords[0] = -0.49957;
-    view_basis->pts[0].coords[1] = 0.840569;
-    view_basis->pts[0].coords[2] = 0.209461;
-    view_origin->coords[1] = 0.648768;
-    view_basis->pts[1].coords[0] = -0.708308;
-    view_basis->pts[1].coords[1] = -0.257146;
-    view_basis->pts[1].coords[2] = -0.657401;
-    view_origin->coords[2] = -1.02315;
-    view_basis->pts[2].coords[0] = -0.498728;
-    view_basis->pts[2].coords[1] = -0.476781;
-    view_basis->pts[2].coords[2] = 0.723844;
-
-
-    if (NDimensions == 4)
-    {
-        swaprows_PointXfrm (view_basis, 2, 3);
-        view_origin->coords[3] = 26.2109;
-        view_origin->coords[3] = 0;
-    }
-#endif
-
-    setup_camera_light (space, view_origin);
-    output_BoundingBox (out, &space->main.box);
-    return good;
 }
 
     void

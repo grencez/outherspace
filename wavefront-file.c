@@ -9,8 +9,6 @@
 
 static bool
 streql (const void* a, const void* b);
-static void
-fixup_wavefront_Point (Point* p);
 static bool
 strto_real_colors (real* a, const char* line);
 static bool
@@ -29,26 +27,6 @@ parse_texture (SList* texlist, SList* texnamelist,
 streql (const void* a, const void* b)
 {
     return 0 == strcmp ((char*) a, (char*) b);
-}
-
-    void
-fixup_wavefront_Point (Point* p)
-{
-    Point a;
-    copy_Point (&a, p);
-    p->coords[UpDim] = a.coords[1];
-    p->coords[RightDim] = a.coords[2];
-    p->coords[ForwardDim] = a.coords[0];
-}
-
-    void
-fixup_wavefront_Scene (Scene* scene)
-{
-    uint i;
-    UFor( i, scene->nverts )
-        fixup_wavefront_Point (&scene->verts[i]);
-    UFor( i, scene->nvnmls )
-        fixup_wavefront_Point (&scene->vnmls[i]);
 }
 
     bool
@@ -90,24 +68,24 @@ output_wavefront (const Scene* scene,
         UFor( j, 3 )
         {
             uint a, b, c;
-            a = 1+elem->verts[j];
-            b = 1+elem->txpts[j];
-            c = 1+elem->vnmls[j];
+            a = elem->verts[j];
+            b = elem->txpts[j];
+            c = elem->vnmls[j];
             assert (a < Max_uint);
             if (b < Max_uint)
             {
                 if (c < Max_uint)
-                    off += sprintf (&buf[off], "%u/%u/%u", a, b, c);
+                    off += sprintf (&buf[off], "%u/%u/%u", a+1, b+1, c+1);
                 else
-                    off += sprintf (&buf[off], "%u/%u/", a, b);
+                    off += sprintf (&buf[off], "%u/%u/", a+1, b+1);
             }
             else if (c < Max_uint)
             {
-                off += sprintf (&buf[off], "%u//%u", a, c);
+                off += sprintf (&buf[off], "%u//%u", a+1, c+1);
             }
             else
             {
-                off += sprintf (&buf[off], "%u", a);
+                off += sprintf (&buf[off], "%u", a+1);
             }
         }
         buf[off++] = '\n';
@@ -346,13 +324,15 @@ parse_face_field (uint* v, uint* vt, uint* vn, const char* line)
     }
     if (line)
     {
-        *vt -= 1;
+            /* Leave as Max_uint if not specified.*/
+        if (*vt < Max_uint)  *vt -= 1;
         if (line[0] == '/')
             line = strto_uint (vn, &line[1]);
     }
     if (line)
     {
-        *vn -= 1;
+            /* Leave as Max_uint if not specified.*/
+        if (*vn < Max_uint)  *vn -= 1;
     }
 
     return line;

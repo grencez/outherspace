@@ -31,12 +31,6 @@ setup_testcase_manual_interp (RaySpace* space,
                               PointXfrm* view_basis,
                               real* view_angle,
                               const char* pathname);
-bool
-setup_testcase_sphere (RaySpace* space,
-                       Point* view_origin,
-                       PointXfrm* view_basis,
-                       real* view_angle,
-                       const char* pathname);
 #ifdef INCLUDE_SOURCE
 #include "testcase.c"
 #endif

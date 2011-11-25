@@ -9,8 +9,6 @@
 #include <string.h>
 
 static bool
-parse_coord_system (PointXfrm* a, const char* line);
-static bool
 read_racer (Scene* scene, uint idx, const char* pathname);
 
     bool
@@ -18,19 +16,18 @@ interpolate_by_file (Scene* dst,
                      uint nscenes,
                      const char* pathname,
                      const char* const* filenames,
-                     const real* dcoords)
+                     const real* dcoords,
+                     const AffineMap* map)
 {
     bool good = true;
     uint i;
     uint prev_idx = 0;
-    AffineMap map;
     Scene* scenes;
 
     assert (NDimensions ==  4);
     if (NDimensions != 4)  return false;
 
     scenes = AllocT( Scene, nscenes );
-    identity_AffineMap (&map);
 
     UFor( i, nscenes )
     {
@@ -41,7 +38,7 @@ interpolate_by_file (Scene* dst,
             continue;
         }
 
-        good = readin_wavefront (&scenes[i], &map, pathname, filenames[i]);
+        good = readin_wavefront (&scenes[i], map, pathname, filenames[i]);
         if (!good)  return false;
         UFor( j, scenes[i].nverts )
             scenes[i].verts[j].coords[NDimensions-1] = dcoords[i];
@@ -541,11 +538,11 @@ read_racer (Scene* scene, uint idx, const char* pathname)
     AffineMap map;
     bool good;
     char fname[20];
-    PointXfrm fix;
 
     sprintf (fname, "machine%u.obj", idx);
 
     identity_AffineMap (&map);
+    parse_coord_system (&map.xfrm, "right up back");
 
     if (NDimensions == 3)
     {
@@ -557,15 +554,16 @@ read_racer (Scene* scene, uint idx, const char* pathname)
         const real dcoords[2] = { 0, 1.0/16 };
         fnames[0] = fname;
         fnames[1] = fname;
-        good = interpolate_by_file (scene, 2, pathname, fnames, dcoords);
+        good = interpolate_by_file (scene, 2, pathname, fnames,
+                                    dcoords, &map);
     }
     if (!good)  return false;
 
     condense_Scene (scene);
-    fixup_wavefront_Scene (scene);
 
     {
         BoundingBox box;
+        PointXfrm fix;
         Point meas;
         real vol;
         real a;
@@ -581,8 +579,8 @@ read_racer (Scene* scene, uint idx, const char* pathname)
         identity_PointXfrm (&fix);
         UFor( i, 3 )
             scale_Point (&fix.pts[i], &fix.pts[i], a);
+        xfrm_Scene (scene, &fix);
     }
-    xfrm_Scene (scene, &fix);
     recenter_Scene (scene, 0);
 
     return good;
