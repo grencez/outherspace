@@ -2,6 +2,7 @@
 #include "testcase.h"
 
 #include "dynamic-setup.h"
+#include "motion.h"
 #include "wavefront-file.h"
 
 #include <assert.h>
@@ -445,10 +446,6 @@ setup_testcase_manual_interp (RaySpace* space,
 
     *view_angle = 1.0472;
     swaprows_PointXfrm (view_basis, 2, 3);
-
-#if 0
-#elif 0
-#endif
 
     setup_camera_light (space, view_origin);
     return true;

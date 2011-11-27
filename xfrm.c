@@ -420,6 +420,7 @@ spherical3_PointXfrm (PointXfrm* dst, real zenith, real azimuthcc)
      * and reposition it around a new centroid.
      * The bounding box volume will grow in most cases,
      * as it is axis aligned and the axes have changed!
+     * Note: View /new_centroid/ as a displacement.
      **/
     void
 trxfrm_BoundingBox (BoundingBox* dst,
@@ -454,12 +455,19 @@ trxfrm_BoundingBox (BoundingBox* dst,
          */
     xfrm_PointXfrm (&robox, &bbox, basis);
 
+        /* Set /diff/ to be the displacement,
+         * taking into account the original bbox centroid.
+         */
+    centroid_BoundingBox (&diff, box);
+    trxfrm_Point (&diff, basis, &diff);
+    summ_Point (&diff, &diff, new_centroid);
+
     UFor( i, NDimensions )
     {
         uint j;
         real a, b;
         a = robox.pts[i].coords[i];
-        b = new_centroid->coords[i];
+        b = diff.coords[i];
         dst->min.coords[i] = - a + b;
         dst->max.coords[i] = + a + b;
 

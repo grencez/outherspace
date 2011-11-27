@@ -712,30 +712,33 @@ refraction_ray (Point* dst, const Point* dir, const Point* normal,
 
 static
     uint
-splitting_plane_count (const Point* origin, const Point* direct,
-                       real mag, const ObjectRaySpace* object)
+splitting_plane_count (const Point* origin, const Point* direct, real mag,
+                       const KDTree* tree, const BoundingBox* box)
 {
     uint count = 0;
     uint node_idx, parent, destin_nodeidx;
     Point destin;
     Point invdirect;
-    const BoundingBox* box;
     bool inside_box;
-
-    box = &object->box;
 
     Op_Point_2010( &destin ,+, origin ,mag*, direct );
     if (inside_BoundingBox (box, &destin))
         destin_nodeidx = find_KDTreeNode (&parent, &destin,
-                                          object->tree.nodes);
+                                          tree->nodes);
     else
         destin_nodeidx = Max_uint;
     
+#if 0
+        /* Return the number of elements in the hit node.*/
+    return ((destin_nodeidx == Max_uint) ? 0 :
+            tree->nodes[destin_nodeidx].as.leaf.nelems);
+#endif
+
     inside_box = inside_BoundingBox (box, origin);
 
     invmul_Point (&invdirect, direct);
     node_idx = first_KDTreeNode (&parent, origin, direct,
-                                 object->tree.nodes,
+                                 tree->nodes,
                                  box, inside_box);
 
     if (node_idx != Max_uint && inside_box)
@@ -746,7 +749,7 @@ splitting_plane_count (const Point* origin, const Point* direct,
         count += 1;
         node_idx = next_KDTreeNode (&parent, origin, direct, &invdirect,
                                     Max_real,
-                                    node_idx, object->tree.nodes);
+                                    node_idx, tree->nodes);
     }
     return count;
 }
@@ -809,7 +812,15 @@ fill_pixel (real* ret_colors,
         real red;
         uint nplanes;
 
-        nplanes = splitting_plane_count (origin, dir, mag, &space->main);
+        nplanes = splitting_plane_count (origin, dir, mag,
+#if 1
+                                         &space->main.tree,
+                                         &space->main.box
+#else
+                                         &space->object_tree,
+                                         &space->box
+#endif
+                                        );
 
         red = 1;
         UFor( i, nplanes )

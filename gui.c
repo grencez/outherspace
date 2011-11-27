@@ -558,6 +558,10 @@ grab_mouse_fn (const SDL_MouseButtonEvent* event, const RaySpace* space)
         real hit_mag = Max_real;
         uint hit_objidx = Max_uint;
 
+            /* Use /cast_partitioned/ here and
+             * set /SeparateRenderThread/ to false
+             * to cast rays matching exactly what you see.
+             */
         cast_nopartition (&hit_idx, &hit_mag, &hit_objidx,
                           space, &origin, &dir,
                           priori.inside_box,

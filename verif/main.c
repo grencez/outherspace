@@ -229,6 +229,30 @@ testfn_PointXfrm ()
     AssertApprox( 6, det, 6, 1e0 );
 }
 
+static
+    void
+testfn_trxfrm_BoundingBox ()
+{
+    BoundingBox box;
+    Point centroid;
+    PointXfrm basis;
+
+    zero_BoundingBox (&box);
+    box.min.coords[0] = 2;
+    box.max.coords[0] = 5;
+
+    zero_Point (&centroid);
+
+    rotation_PointXfrm (&basis, 0, 1,  M_PI / 2);
+    transpose_PointXfrm (&basis, &basis);
+
+    trxfrm_BoundingBox (&box, &basis, &box, &centroid);
+    AssertApprox( 0, box.min.coords[0], 2, 1e0 );
+    AssertApprox( 2, box.min.coords[1], 2, 1e0 );
+    AssertApprox( 0, box.max.coords[0], 5, 1e0 );
+    AssertApprox( 5, box.max.coords[1], 5, 1e0 );
+}
+
     /** First crack at a verification function.
      * This is not a truly good one because it uses random values
      * instead of iterating through all possible ones.
@@ -362,6 +386,7 @@ int main (int argc, char** argv)
     testfn_KPTree ();
     testfn_partition ();
     testfn_PointXfrm ();
+    testfn_trxfrm_BoundingBox ();
     testfn_select ();
     testfn_SList ();
     testfn_pack ();
