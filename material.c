@@ -118,10 +118,11 @@ map_sky_Texture (real* colors, const Texture* texture, const Point* p)
         colors[i] = (real) pixels[i] / 255;
 }
 
-    bool
-readin_Texture (Texture* texture, const char* pathname, const char* filename)
-{
 #ifdef SupportImage
+static bool
+readin_SDL_Image (Texture* texture,
+                  const char* pathname, const char* filename)
+{
     SDL_PixelFormat* fmt;
     SDL_Surface* surface;
     char* path;
@@ -161,10 +162,22 @@ readin_Texture (Texture* texture, const char* pathname, const char* filename)
     }
     SDL_FreeSurface (surface);
     return true;
+}
+#endif
+
+    bool
+readin_Texture (Texture* texture, const char* pathname, const char* filename)
+{
+    if (strends_with (filename, ".ppm"))
+    {
+        texture->pixels = readin_PPM_image (&texture->nrows, &texture->ncols,
+                                            pathname, filename);
+        return (texture->pixels != 0);
+    }
+#ifdef SupportImage
+    return readin_SDL_Image (texture, pathname, filename);
 #else
-    texture->pixels = readin_PPM_image (&texture->nrows, &texture->ncols,
-                                        pathname, filename);
-    return (texture->pixels != 0);
+    return false;
 #endif
 }
 

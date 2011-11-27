@@ -392,15 +392,9 @@ readin_materials (SList* matlist, SList* namelist,
 
         if (0 == strncmp (line, "newmtl", 6))
         {
-            uint namelen;
-            char* name;
-
             line = strskip_ws (&line[6]);
 
-            namelen = strlen (line);
-            name = AllocT( char, namelen+1 );
-            memcpy (name, line, (namelen+1) * sizeof(char));
-            app_SList (namelist, name);
+            app_SList (namelist, DuplicaT( char, line, strlen (line) + 1 ));
 
             material = AllocT( Material, 1 );
             init_Material (material);
@@ -475,23 +469,16 @@ parse_texture (SList* texlist, SList* texnamelist,
     if (i == Max_uint)
     {
         bool good;
-        Texture* texture;
-        texture = AllocT( Texture, 1 );
+        Texture texture;
 
-        good = readin_Texture (texture, pathname, filename);
+        good = readin_Texture (&texture, pathname, filename);
 
         if (good)
         {
-            char* s;
             i = texlist->nmembs;
-            s = AllocT( char, strlen(filename) + 1 );
-            strcpy (s, filename);
-            app_SList (texlist, texture);
-            app_SList (texnamelist, s);
-        }
-        else
-        {
-            free (texture);
+            app_SList (texlist, DuplicaT( Texture, &texture, 1 ));
+            app_SList (texnamelist, DuplicaT( char, filename,
+                                              strlen (filename) + 1 ));
         }
     }
     return i;

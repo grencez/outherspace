@@ -164,6 +164,17 @@ cat_strings (uint n, const char* const* a)
     return s;
 }
 
+    /** Check if a string ends with a certain suffix.**/
+    bool
+strends_with (const char* str, const char* sfx)
+{
+    uint a, b;
+    a = strlen (str);
+    b = strlen (sfx);
+    if (a < b)  return false;
+    return (0 == strncmp (&str[a-b], sfx, b));
+}
+
     /* Create a full filepath from a pathname and filename.*/
     char*
 cat_filepath (const char* pathname, const char* filename)

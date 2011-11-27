@@ -283,6 +283,17 @@ ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object,
 # endif
 #endif
 
+    UFor( i, scene->ntxtrs )
+    {
+        const Texture* txtr;
+        txtr = &scene->txtrs[i];
+        glBindTexture (GL_TEXTURE_2D, i);
+        glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexImage2D (GL_TEXTURE_2D, 0, 3, txtr->ncols, txtr->nrows, 0,
+                      GL_RGB, GL_UNSIGNED_BYTE, txtr->pixels);
+    }
+
 
     glPushMatrix ();
 
@@ -370,6 +381,16 @@ ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object,
             glMaterialf (GL_FRONT_AND_BACK, GL_SHININESS,
                          matl->optical_density);
 
+            if (matl->diffuse_texture < Max_uint)
+            {
+                glEnable (GL_TEXTURE_2D);
+                glBindTexture (GL_TEXTURE_2D, matl->diffuse_texture);
+            }
+            else
+            {
+                glDisable (GL_TEXTURE_2D);
+            }
+
             glBegin (GL_TRIANGLES);
         }
 
@@ -379,12 +400,29 @@ ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object,
                 /* if (j % 3 == 1)  glColor3f (0, 1, 0); */
                 /* if (j % 3 == 2)  glColor3f (0, 0, 1); */
             glNormal3dv (&vnmls[j*3]);
+
+            if (elem->txpts[j%3] < Max_uint)
+            {
+                const BaryPoint* p;
+                p = &scene->txpts[elem->txpts[j%3]];
+                glTexCoord2f (p->coords[0], p->coords[1]);
+            }
+
             glVertex3dv (&verts[j*3]);
         }
     }
     if (scene->nelems > 0)  glEnd ();
 
     glPopMatrix ();
+
+    if (scene->ntxtrs > 0)
+    {
+        GLuint* ids;
+        ids = AllocT( GLuint, scene->ntxtrs );
+        UFor( i, scene->ntxtrs )  ids[i] = i;
+        glDeleteTextures (scene->ntxtrs, ids);
+        free (ids);
+    }
 
 #if NDimensions == 4
 # ifndef Match4dGeom

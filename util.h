@@ -182,6 +182,8 @@ char*
 cat_strings (uint n, const char* const* a);
 char*
 cat_filepath (const char* pathname, const char* filename);
+bool
+strends_with (const char* str, const char* sfx);
 FILE*
 fopen_path (const char* pathname, const char* filename, const char* mode);
 real monotime ();
