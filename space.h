@@ -76,8 +76,7 @@ real
 hit_inner_BoundingBox (Point* isect,
                        uint* ret_dim,
                        const BoundingBox* box,
-                       const Point* origin,
-                       const Point* direct,
+                       const Ray* ray,
                        const Point* invdirect);
 bool hit_outer_BoundingBox (Point* entrance,
                             __global const BoundingBox* box,

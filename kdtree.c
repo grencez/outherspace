@@ -849,8 +849,7 @@ static
     uint
 upnext_KDTreeNode (Point* entrance,
                    uint* ret_parent,
-                   const Point* origin,
-                   const Point* direct,
+                   const Ray* ray,
                    const Point* invdirect,
                    real hit_mag,
                    uint node_idx,
@@ -868,14 +867,14 @@ upnext_KDTreeNode (Point* entrance,
         assert (leaf_KDTreeNode (node));
         box = &node->as.leaf.box;
         mag = hit_inner_BoundingBox (entrance, &split_dim, box,
-                                     origin, direct, invdirect);
+                                     ray, invdirect);
         if (hit_mag < mag)
             return Max_uint;
     }
 
         /* Subtlety: Inclusive case opposite when descending tree.*/
-    if (direct->coords[split_dim] < 0)  to_idx = 0;
-    else                                to_idx = 1;
+    to_idx = ((ray->direct.coords[split_dim] < 0)
+              ? 0 : 1);
 
     child_idx = node_idx;
     assert (ret_parent);
@@ -932,10 +931,9 @@ descend_KDTreeNode (uint* ret_parent,
              * inclusive case in upnext_KDTreeNode to avoid infinite
              * iteration on rays in the splitting plane's subspace.
              */
-        if (entrance->coords[node->split_dim] <= inner->split_pos)
-            node_idx = inner->children[0];
-        else
-            node_idx = inner->children[1];
+        node_idx = ((entrance->coords[node->split_dim] <= inner->split_pos)
+                    ? inner->children[0]
+                    : inner->children[1]);
 
         node = &nodes[node_idx];
     }
@@ -955,8 +953,7 @@ find_KDTreeNode (uint* ret_parent,
 
     uint
 first_KDTreeNode (uint* ret_parent,
-                  const Point* restrict origin,
-                  const Point* restrict dir,
+                  const Ray* restrict ray,
                   __global const KDTreeNode* restrict nodes,
                   const BoundingBox* restrict box,
                   bool inside_box)
@@ -966,14 +963,15 @@ first_KDTreeNode (uint* ret_parent,
     if (inside_box)
     {
             /* Find the initial node.*/
-        node_idx = find_KDTreeNode (&parent, origin, nodes);
+        node_idx = find_KDTreeNode (&parent, &ray->origin, nodes);
         box = &nodes[node_idx].as.leaf.box;
-        assert (inside_BoundingBox (box, origin));
+        assert (inside_BoundingBox (box, &ray->origin));
     }
     else
     {
         Point entrance;
-        if (hit_outer_BoundingBox (&entrance, box, origin, dir))
+        if (hit_outer_BoundingBox (&entrance, box,
+                                   &ray->origin, &ray->direct))
             node_idx = descend_KDTreeNode (&parent, &entrance, 0, nodes);
         else
             node_idx = parent = Max_uint;
@@ -985,8 +983,7 @@ first_KDTreeNode (uint* ret_parent,
 
     uint
 next_KDTreeNode (uint* ret_parent,
-                 const Point* origin,
-                 const Point* dir,
+                 const Ray* ray,
                  const Point* invdir,
                  real hit_mag,
                  uint node_idx,
@@ -996,8 +993,7 @@ next_KDTreeNode (uint* ret_parent,
     Point entrance;
     parent = *ret_parent;
 
-    node_idx = upnext_KDTreeNode (&entrance, &parent,
-                                  origin, dir, invdir,
+    node_idx = upnext_KDTreeNode (&entrance, &parent, ray, invdir,
                                   hit_mag,
                                   node_idx, nodes);
 

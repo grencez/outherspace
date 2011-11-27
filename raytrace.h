@@ -90,10 +90,6 @@ map_isect_height (Point* ret_isect,
                   const SceneElement* elem,
                   const Point* verts,
                   const Point* vnmls);
-const ObjectRaySpace*
-ray_to_ObjectRaySpace (Point* ret_origin, Point* ret_dir,
-                       const Point* origin, const Point* dir,
-                       const RaySpace* space, uint objidx);
 void
 cast1_ObjectRaySpace (uint* ret_hit, real* ret_mag,
                       const Point* origin,

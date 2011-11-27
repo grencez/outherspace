@@ -62,15 +62,13 @@ find_KDTreeNode (uint* ret_parent,
                  __global const KDTreeNode* nodes);
 uint
 first_KDTreeNode (uint* ret_parent,
-                  const Point* restrict origin,
-                  const Point* restrict dir,
+                  const Ray* restrict ray,
                   __global const KDTreeNode* restrict nodes,
                   const BoundingBox* restrict box,
                   bool inside_box);
 uint
 next_KDTreeNode (uint* ret_parent,
-                 const Point* origin,
-                 const Point* dir,
+                 const Ray* ray,
                  const Point* invdir,
                  real hit_mag,
                  uint node_idx,

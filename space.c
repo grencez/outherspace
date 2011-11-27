@@ -266,13 +266,14 @@ hit_inner_BoundingPlane (Point* entrance,
 hit_inner_BoundingBox (Point* isect,
                        uint* ret_dim,
                        const BoundingBox* box,
-                       const Point* origin,
-                       const Point* direct,
+                       const Ray* ray,
                        const Point* invdirect)
 {
     uint dim, hit_dim;
     real planes[NDimensions];
     real mags[NDimensions];
+    const Point* origin;
+    origin = &ray->origin;
     UFor( dim, NDimensions )
     {
         real x;
@@ -304,8 +305,8 @@ hit_inner_BoundingBox (Point* isect,
             hit_dim = dim;
 
     Op_Point_2010( isect
-                   ,+, origin
-                   ,   mags[hit_dim]*, direct );
+                   ,+, &ray->origin
+                   ,   mags[hit_dim]*, &ray->direct );
 
     isect->coords[hit_dim] = planes[hit_dim];
     *ret_dim = hit_dim;

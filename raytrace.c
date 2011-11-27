@@ -651,6 +651,7 @@ map_isect_height (Point* ret_isect,
     copy_Point (ret_isect, &tmp_isect);
 }
 
+static
     const ObjectRaySpace*
 ray_to_ObjectRaySpace (Point* ret_origin,
                        Point* ret_dir,
@@ -719,7 +720,11 @@ splitting_plane_count (const Point* origin, const Point* direct, real mag,
     uint node_idx, parent, destin_nodeidx;
     Point destin;
     Point invdirect;
+    Ray ray;
     bool inside_box;
+
+    copy_Point (&ray.origin, origin);
+    copy_Point (&ray.direct, direct);
 
     Op_Point_2010( &destin ,+, origin ,mag*, direct );
     if (inside_BoundingBox (box, &destin))
@@ -737,7 +742,7 @@ splitting_plane_count (const Point* origin, const Point* direct, real mag,
     inside_box = inside_BoundingBox (box, origin);
 
     invmul_Point (&invdirect, direct);
-    node_idx = first_KDTreeNode (&parent, origin, direct,
+    node_idx = first_KDTreeNode (&parent, &ray,
                                  tree->nodes,
                                  box, inside_box);
 
@@ -747,7 +752,7 @@ splitting_plane_count (const Point* origin, const Point* direct, real mag,
     while (node_idx != Max_uint && node_idx != destin_nodeidx)
     {
         count += 1;
-        node_idx = next_KDTreeNode (&parent, origin, direct, &invdirect,
+        node_idx = next_KDTreeNode (&parent, &ray, &invdirect,
                                     Max_real,
                                     node_idx, tree->nodes);
     }
@@ -1190,7 +1195,7 @@ cast_Ray (uint* restrict ret_hit, real* restrict ret_mag,
     }
 
     invmul_Point (&invdirect, &ray->direct);
-    node_idx = first_KDTreeNode (&parent, &ray->origin, &ray->direct,
+    node_idx = first_KDTreeNode (&parent, ray,
                                  nodes, box, inside_box);
 
     while (node_idx != Max_uint)
@@ -1202,7 +1207,7 @@ cast_Ray (uint* restrict ret_hit, real* restrict ret_mag,
                             leaf->nelems, &elemidcs[leaf->elemidcs],
                             simplices, tris);
 
-        node_idx = next_KDTreeNode (&parent, &ray->origin, &ray->direct, &invdirect,
+        node_idx = next_KDTreeNode (&parent, ray, &invdirect,
                                     hit_mag,
                                     node_idx, nodes);
     }
@@ -1299,8 +1304,7 @@ test_object_intersections (uint* ret_hit,
                            real* ret_mag,
                            uint* ret_object,
                            BitString* tested,
-                           const Point* origin,
-                           const Point* dir,
+                           const Ray* ray,
                            uint nobjectidcs,
                            const uint* objectidcs,
                            const RaySpace* space)
@@ -1320,7 +1324,8 @@ test_object_intersections (uint* ret_hit,
         if (set1_BitString (tested, objidx))  continue;
 
         object = ray_to_ObjectRaySpace (&rel_origin, &rel_dir,
-                                        origin, dir, space, objidx);
+                                        &ray->origin, &ray->direct,
+                                        space, objidx);
 
         rel_inside_box =
             inside_BoundingBox (&object->box, &rel_origin);
@@ -1360,6 +1365,10 @@ cast_partitioned (uint* ret_hit,
     uint hit_idx;
     real hit_mag;
     uint hit_object;
+    Ray ray;
+
+    copy_Point (&ray.origin, origin);
+    copy_Point (&ray.direct, dir);
 
     assert (space->nobjects < ntestedbits);
     zero_BitString (tested, ntestedbits);
@@ -1373,8 +1382,8 @@ cast_partitioned (uint* ret_hit,
     hit_mag = *ret_mag;
     hit_object = *ret_object;
 
-    invmul_Point (&invdirect, dir);
-    node_idx = first_KDTreeNode (&parent, origin, dir, nodes,
+    invmul_Point (&invdirect, &ray.direct);
+    node_idx = first_KDTreeNode (&parent, &ray, nodes,
                                  &space->box, inside_box);
 
     while (node_idx != Max_uint)
@@ -1384,10 +1393,11 @@ cast_partitioned (uint* ret_hit,
         leaf = &nodes[node_idx].as.leaf;
         test_object_intersections (&hit_idx, &hit_mag, &hit_object,
                                    tested,
-                                   origin, dir, leaf->nelems,
+                                   &ray, leaf->nelems,
                                    &elemidcs[leaf->elemidcs],
                                    space);
-        node_idx = next_KDTreeNode (&parent, origin, dir, &invdirect,
+        node_idx = next_KDTreeNode (&parent, &ray,
+                                    &invdirect,
                                     hit_mag,
                                     node_idx, nodes);
     }
