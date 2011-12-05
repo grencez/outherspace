@@ -1526,7 +1526,11 @@ rays_to_hits_fish (RayImage* image,
                    const PointXfrm* view_basis,
                    real view_angle)
 {
+#ifndef _WIN32
     uint row;
+#else
+    int row;
+#endif
     bool inside_box;
     const uint row_dim = UpDim;
     const uint col_dim = RightDim;
@@ -1606,7 +1610,11 @@ rays_to_hits_fixed_plane (uint* hits, real* mags,
                           uint nrows, uint ncols, uint stride,
                           const RaySpace* space, real zpos)
 {
+#ifndef _WIN32
     uint row;
+#else
+    int row;
+#endif
     bool inside_box;
     const uint row_dim = UpDim;
     const uint col_dim = RightDim;
@@ -1987,7 +1995,12 @@ cast_partial_RayImage (RayImage* restrict image,
                        const RaySpace* restrict space,
                        const RayCastAPriori* restrict known)
 {
-    uint i, inc, nprocs, myrank;
+#ifndef _WIN32
+    uint i;
+#else
+    int i;
+#endif
+    uint inc, nprocs, myrank;
 
 #ifdef TrivialMpiRayTrace
     MPI_Comm_size (MPI_COMM_WORLD, (int*) &nprocs);

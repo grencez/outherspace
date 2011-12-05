@@ -1,6 +1,13 @@
 
+#ifdef _WIN32
+# include <windows.h>
+#endif
 #include <GL/gl.h>
 #include <GL/glu.h>
+
+#ifdef main
+# undef main
+#endif
 
 #if NDimensions != 4
     /* Force Match4dGeom to imply NDimensions == 4

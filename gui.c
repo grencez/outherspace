@@ -24,7 +24,7 @@
 #endif
 
 #ifdef RunFromMyMac
-#undef RunFromMyMac
+# undef RunFromMyMac
 static const bool RunFromMyMac = true;
 static const bool SeparateRenderThread = false;
 extern int wrapped_main_fn (int argc, char* argv[]);
@@ -35,7 +35,7 @@ static const bool SeparateRenderThread = false;
 # else
 static const bool SeparateRenderThread = true;
 # endif
-#define wrapped_main_fn main
+# define wrapped_main_fn main
 #endif
 
 static bool needs_recast = true;
@@ -944,7 +944,12 @@ sdl_main (RaySpace* space, const char* pathname)
     if (icon)  SDL_FreeSurface (icon);
 }
 
+    /* int wrapped_main_fn (int argc, char* argv[]) */
+#ifdef _WIN32
+int SDL_main (int argc, char* argv[])
+#else
 int wrapped_main_fn (int argc, char* argv[])
+#endif
 {
     FILE* out = stderr;
     bool good = true;
