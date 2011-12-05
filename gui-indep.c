@@ -1,6 +1,11 @@
 
 #include "gui-indep.h"
 
+#include "raytrace.h"
+#include "testcase.h"
+
+#include <assert.h>
+
     void
 init_MotionInput (MotionInput* mot)
 {

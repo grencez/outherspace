@@ -96,6 +96,15 @@ cast1_ObjectRaySpace (uint* ret_hit, real* ret_mag,
                       const Point* direct,
                       const ObjectRaySpace* object,
                       bool inside_box);
+void
+cast_nopartition (uint* ret_hit,
+                  real* ret_mag,
+                  uint* ret_object,
+                  const RaySpace* restrict space,
+                  const Point* restrict origin,
+                  const Point* restrict dir,
+                  bool inside_box,
+                  uint ignore_object);
 
 #ifndef __OPENCL_VERSION__
 void

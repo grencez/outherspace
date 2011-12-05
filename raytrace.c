@@ -1233,7 +1233,6 @@ cast1_ObjectRaySpace (uint* ret_hit, real* ret_mag,
               &object->box, inside_box);
 }
 
-static
     void
 cast_nopartition (uint* ret_hit,
                   real* ret_mag,

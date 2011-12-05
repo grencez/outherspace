@@ -14,6 +14,8 @@ setup_testcase_simple (RaySpace* space,
                        real* view_angle,
                        const char* pathname,
                        const char* file);
+void
+add_1elem_Scene_RaySpace (RaySpace* space);
 bool
 setup_testcase_track (RaySpace* space,
                       Point* view_origin, PointXfrm* view_basis,

@@ -1,6 +1,12 @@
 
 #ifndef __OPENCL_VERSION__
 #include "motion.h"
+
+#include "bitstring.h"
+
+#include <assert.h>
+#include <math.h>
+#include <string.h>
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
 const bool UseNNCollision = false;
