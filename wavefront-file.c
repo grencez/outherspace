@@ -137,7 +137,7 @@ readin_wavefront (Scene* scene, const AffineMap* map,
         strstrip_eol (buf);
         line = strskip_ws (line);
 
-        if (0 == strncmp (line, "vn", 2))
+        if (line[0] == 'v' && line[1] == 'n')
         {
             Point normal;
             line = &line[2];
@@ -158,7 +158,7 @@ readin_wavefront (Scene* scene, const AffineMap* map,
                          line_no);
             }
         }
-        else if (0 == strncmp (line, "vt", 2))
+        else if (line[0] == 'v' && line[1] == 't')
         {
             BaryPoint bpoint;
             line = &line[2];
@@ -224,9 +224,9 @@ readin_wavefront (Scene* scene, const AffineMap* map,
             if (!good)
                 fprintf (stderr, "Line:%u  Failed to read face!\n", line_no);
         }
-        else if (0 == strncmp (line, "mtllib", 6))
+        else if (AccepTok( line, "mtllib" ))
         {
-            line = strskip_ws (&line[6]);
+            line = strskip_ws (line);
             good = readin_materials (&matlist, &matnamelist,
                                      &texlist, &texnamelist,
                                      pathname, line);
@@ -236,9 +236,9 @@ readin_wavefront (Scene* scene, const AffineMap* map,
                          line_no);
             }
         }
-        else if (0 == strncmp (line, "usemtl", 6))
+        else if (AccepTok( line, "usemtl" ))
         {
-            line = strskip_ws (&line[6]);
+            line = strskip_ws (line);
             material = search_SList (&matnamelist, line, streql);
         }
     }
@@ -390,9 +390,9 @@ readin_materials (SList* matlist, SList* namelist,
         strstrip_eol (buf);
         line = strskip_ws (line);
 
-        if (0 == strncmp (line, "newmtl", 6))
+        if (AccepTok( line, "newmtl" ))
         {
-            line = strskip_ws (&line[6]);
+            line = strskip_ws (line);
 
             app_SList (namelist, DuplicaT( char, line, strlen (line) + 1 ));
 
@@ -400,51 +400,59 @@ readin_materials (SList* matlist, SList* namelist,
             init_Material (material);
             app_SList (matlist, material);
         }
-        else if (0 == strncmp (line, "Ns", 2))
+        else if (AccepTok( line, "Ns" ))
         {
-            line = strto_real (&material->shininess, &line[2]);
+            line = strto_real (&material->shininess, line);
             if (!line)  good = false;
         }
-        else if (0 == strncmp (line, "Ni", 2))
+        else if (AccepTok( line, "Ni" ))
         {
-            line = strto_real (&material->optical_density, &line[2]);
+            line = strto_real (&material->optical_density, line);
             if (!line)  good = false;
         }
-        else if (0 == strncmp (line, "d", 1))
+        else if (AccepTok( line, "d" ))
         {
-            line = strto_real (&material->opacity, &line[1]);
+            line = strto_real (&material->opacity, line);
             if (!line)  good = false;
         }
-        else if (0 == strncmp (line, "Tf", 2))
+        else if (AccepTok( line, "Tf" ))
         {
-            good = strto_real_colors (material->transmission, &line[2]);
+            good = strto_real_colors (material->transmission, line);
         }
-        else if (0 == strncmp (line, "Ka", 2))
+        else if (AccepTok( line, "Ka" ))
         {
-            good = strto_real_colors (material->ambient, &line[2]);
+            good = strto_real_colors (material->ambient, line);
         }
-        else if (0 == strncmp (line, "Kd", 2))
+        else if (AccepTok( line, "Kd" ))
         {
-            good = strto_real_colors (material->diffuse, &line[2]);
+            good = strto_real_colors (material->diffuse, line);
         }
-        else if (0 == strncmp (line, "Ks", 2))
+        else if (AccepTok( line, "Ks" ))
         {
-            good = strto_real_colors (material->specular, &line[2]);
+            good = strto_real_colors (material->specular, line);
         }
-        else if (0 == strncmp (line, "map_Ka", 6))
+        else if (AccepTok( line, "map_Ka" ))
         {
             material->ambient_texture =
                 parse_texture (texlist, texnamelist,
-                               pathname, strskip_ws (&line[6]));
+                               pathname, strskip_ws (line));
             if (material->ambient_texture == Max_uint)
                 good = false;
         }
-        else if (0 == strncmp (line, "map_Kd", 6))
+        else if (AccepTok( line, "map_Kd" ))
         {
             material->diffuse_texture =
                 parse_texture (texlist, texnamelist,
-                               pathname, strskip_ws (&line[6]));
+                               pathname, strskip_ws (line));
             if (material->diffuse_texture == Max_uint)
+                good = false;
+        }
+        else if (AccepTok( line, "map_Bump" ))
+        {
+            material->bump_texture =
+                parse_texture (texlist, texnamelist,
+                               pathname, strskip_ws (line));
+            if (material->bump_texture == Max_uint)
                 good = false;
         }
     }

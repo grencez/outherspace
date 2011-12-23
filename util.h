@@ -34,6 +34,10 @@
 #define ConcaT( Type, dst, src, end, count ) \
     ((dst) = (Type*) array_cat (dst, src, &end, count, sizeof (Type)))
         
+#define AccepTok( line, tok ) \
+    ((0 == strncmp ((line), (tok), strlen(tok))) \
+     ? ((line) = &(line)[strlen(tok)]) \
+     : 0)
 
 #define Ceil_uint( a, b ) \
     (((a) + (b) - 1) / (b))

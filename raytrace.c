@@ -621,7 +621,6 @@ map_vertex_normal (Point* normal,
                        ,+, normal
                        ,   bpoint->coords[i]*, &vnmls[elem->vnmls[i]] );
     }
-    normalize_Point (normal, normal);
 }
 
     /* TODO: Make this function useful.*/
@@ -785,6 +784,7 @@ fill_pixel (real* ret_colors,
     bool hit_front;
     real cos_normal;
     Point bpoint, normal;
+    BaryPoint texpoint;
     uint i;
 
     if (show_splitting_planes)
@@ -907,16 +907,36 @@ fill_pixel (real* ret_colors,
         Point rel_isect;
         Op_Point_2010( &rel_isect ,+, &rel_origin ,mag*, &rel_dir );
         barycentric_Point (&bpoint, &rel_isect, simplex);
+
+        if (elem->txpts[0] < Max_uint)
+        {
+            Op_s( real, NDimensions-1, texpoint.coords , 0 );
+
+            UFor( i, NDimensions )
+            {
+                assert (elem->txpts[i] < Max_uint);
+                Op_2020s( real, NDimensions-1, texpoint.coords
+                          ,+, texpoint.coords
+                          ,   *, scene->txpts[elem->txpts[i]].coords
+                          ,      bpoint.coords[i] );
+            }
+        }
     }
 
+
         /* Get the normal.*/
-    if (compute_bary_coords && 0 < scene->nvnmls)
+    if (material && material->bump_texture < Max_uint)
+        map_bump_Texture (&normal, &scene->txtrs[material->bump_texture],
+                          &texpoint);
+    else if (compute_bary_coords && 0 < scene->nvnmls)
         map_vertex_normal (&normal, scene->vnmls, elem, &bpoint);
     else
-        normalize_Point (&normal, &simplex->plane.normal);
+        copy_Point (&normal, &simplex->plane.normal);
         /* Rotate it when necessary.*/
     if (objidx != space->nobjects)
         trxfrm_Point (&normal, &object->orientation, &normal);
+        /* The above cases do not give a normalized vector!*/
+    normalize_Point (&normal, &normal);
 
         /* Assure the normal is in our direction.*/
     cos_normal = dot_Point (dir, &normal);
@@ -952,21 +972,7 @@ fill_pixel (real* ret_colors,
     {
             /* Texture mapping.*/
         const Texture* ambient_texture;
-        BaryPoint texpoint;
-        assert (NColors == 3);
         ambient_texture = &scene->txtrs[material->ambient_texture];
-        UFor( i, NDimensions-1 )
-            texpoint.coords[i] = 0;
-
-        UFor( i, 3 )
-        {
-            uint j;
-            const BaryPoint* tmp;
-            tmp = &scene->txpts[elem->txpts[i]];
-
-            UFor( j, NDimensions-1 )
-                texpoint.coords[j] += bpoint.coords[i] * tmp->coords[j];
-        }
         map_Texture (colors, ambient_texture, &texpoint);
     }
 

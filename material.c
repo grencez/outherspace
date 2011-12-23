@@ -25,14 +25,15 @@ void init_Material (Material* mat)
     mat->illumination = 1;
     mat->ambient_texture = Max_uint;
     mat->diffuse_texture = Max_uint;
+    mat->bump_texture = Max_uint;
 }
 
-    void
-map_Texture (real* colors, const Texture* texture, const BaryPoint* p)
+    /** Coords are row/col.**/
+static void
+map_coords_Texture (uint* coords, const Texture* texture, const BaryPoint* p)
 {
-    uint i, row, col;
+    uint row, col;
     real x;
-    const byte* pixels;
     x = fmod (texture->nrows * p->coords[1], texture->nrows);
     row = ((uint) x + texture->nrows) % texture->nrows;
     x = fmod (texture->nrows * p->coords[0], texture->ncols);
@@ -47,10 +48,41 @@ map_Texture (real* colors, const Texture* texture, const BaryPoint* p)
         fprintf (stderr, "Passed nrows by:%u\n", col - texture->ncols);
         col = texture->ncols - 1;
     }
+    coords[0] = row;
+    coords[1] = col;
+}
 
-    pixels = &texture->pixels[NColors * (col + row * texture->ncols)];
+    void
+map_Texture (real* colors, const Texture* texture, const BaryPoint* p)
+{
+    uint i;
+    uint coords[2];
+    const byte* pixels;
+
+    map_coords_Texture (coords, texture, p);
+    i = coords[1] + coords[0] * texture->ncols;
+    pixels = &texture->pixels[NColors * i];
+
     UFor( i, NColors )
         colors[i] = (real) pixels[i] / 255;
+}
+
+    void
+map_bump_Texture (Point* normal, const Texture* texture, const BaryPoint* p)
+{
+    uint i;
+    uint coords[2];
+    const signed char* pixels;
+
+    map_coords_Texture (coords, texture, p);
+    i = coords[1] + coords[0] * texture->ncols;
+    pixels = (signed char*) &texture->pixels[NColors * i];
+
+    zero_Point (normal);
+        /* TODO: Fix my damn coordinate mappings!*/
+    normal->coords[RightDim] = pixels[0];
+    normal->coords[UpDim] = pixels[1];
+    normal->coords[ForwardDim] = pixels[2];
 }
 
     void

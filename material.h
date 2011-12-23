@@ -27,11 +27,14 @@ struct Material
     bool illumination;
     uint ambient_texture;
     uint diffuse_texture;
+    uint bump_texture;
 };
     
 void init_Material (Material* mat);
 void
 map_Texture (real* colors, const Texture* texture, const BaryPoint* p);
+void
+map_bump_Texture (Point* normal, const Texture* texture, const BaryPoint* p);
 void
 map_sky_Texture (real* colors, const Texture* texture, const Point* p);
 

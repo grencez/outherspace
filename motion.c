@@ -323,6 +323,8 @@ apply_track_gravity (ObjectMotion* motion, const RaySpace* space,
         const BarySimplex* simplex;
         real cos_normal;
         simplex = &space->main.simplices[hit_idx];
+
+            /* TODO: Add a case for normal calculated from bump map.*/
         if (space->main.scene.nvnmls > 0)
         {
             Point isect, bpoint;
@@ -338,6 +340,9 @@ apply_track_gravity (ObjectMotion* motion, const RaySpace* space,
         {
             copy_Point (&normal, &simplex->plane.normal);
         }
+
+            /* Neither of the above cases give a normalized vector!*/
+        normalize_Point (&normal, &normal);
 
         cos_normal = dot_Point (&simplex->plane.normal, &direct);
         if (0 > cos_normal)

@@ -208,9 +208,8 @@ readin_Track (Track* track, RaySpace* space,
         strstrip_eol (buf);
         line = strskip_ws (line);
 
-        if (0 == strncmp (line, "scale", 5))
+        if (AccepTok( line, "scale" ))
         {
-            line = &line[5];
             if (line[0] == ':')  line = &line[1];
 
             line = strto_real (&scale, line);
@@ -220,9 +219,8 @@ readin_Track (Track* track, RaySpace* space,
             else
                 fprintf (out, "Line:%u  Need scale value!\n", line_no);
         }
-        else if (0 == strncmp (line, "loc", 3))
+        else if (AccepTok( line, "loc" ))
         {
-            line = &line[3];
             if (line[0] == ':')  line = &line[1];
 
             UFor( i, 3 )
@@ -239,10 +237,9 @@ readin_Track (Track* track, RaySpace* space,
                 fprintf (out, "Line:%u  Need 3 location values!\n", line_no);
             }
         }
-        else if (0 == strncmp (line, "model:", 6))
+        else if (AccepTok( line, "model:" ))
         {
             bool doit = true;
-            line = &line[6];
             if (NDimensions == 4)
             {
                 real dcoord = 0;
@@ -266,39 +263,35 @@ readin_Track (Track* track, RaySpace* space,
             }
             if (doit)  good = readin_wavefront (scene, map, pathname, line);
         }
-        else if (0 == strncmp (line, "concat-model:", 13))
+        else if (AccepTok( line, "concat-model:" ))
         {
             Scene tmp;
-            line = &line[13];
             good = !!(scene);
             if (good)  good = readin_wavefront (&tmp, map, pathname, line);
             else       fprintf (out, "Line:%u  No scene for concat!\n",
                                 line_no);
             if (good)  concat0_Scene (scene, &tmp);
         }
-        else if (0 == strncmp (line, "sky:", 4))
+        else if (AccepTok( line, "sky:" ))
         {
-            line = &line[4];
-
             skytex = AllocT( Texture, 1 );
             good = readin_Texture (skytex, pathname, line);
             if (!good)
                 fprintf (out, "Line:%u  Sky failed!\n", line_no);
         }
-        else if (0 == strncmp (line, "checkplanes:", 12))
+        else if (AccepTok( line, "checkplanes:" ))
         {
             good = readin_checkplanes (&track->ncheckplanes,
                                        &track->checkplanes,
                                        &track->checkpoints,
-                                       map, pathname, &line[12]);
+                                       map, pathname, line);
             if (!good)
                 fprintf (out, "Line:%u  Checkplanes failed!\n", line_no);
         }
-        else if (0 == strncmp (line, "light", 5))
+        else if (AccepTok( line, "light" ))
         {
             Point* loc;
 
-            line = &line[5];
             if (line[0] == ':')  line = &line[1];
             loc = &space->lights[0].location;
 
@@ -313,10 +306,9 @@ readin_Track (Track* track, RaySpace* space,
                 fprintf (out, "Line:%u  Not enough coordinates for light!\n",
                          line_no);
         }
-        else if (0 == strncmp (line, "start", 5))
+        else if (AccepTok( line, "start" ))
         {
             Point loc, dir;
-            line = &line[5];
             if (line[0] == ':')  line = &line[1];
 
             zero_Point (&loc);
@@ -341,9 +333,8 @@ readin_Track (Track* track, RaySpace* space,
                          line_no);
             }
         }
-        else if (0 == strncmp (line, "coords", 6))
+        else if (AccepTok( line, "coords" ))
         {
-            line = &line[6];
             if (line[0] == ':')  line = &line[1];
             good = parse_coord_system (&coord_system, line);
             if (good)  recalc_map = true;
