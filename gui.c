@@ -960,11 +960,8 @@ int wrapped_main_fn (int argc, char* argv[])
 #endif
     RaySpace ray_space;
     char inpathname[1024];
-    Point view_origin;
-    PointXfrm view_basis;
-    real view_angle;
+    Pilot dflt_pilot;
     RaySpace* space;
-
     if (argc > 1)
         fputs ("No options for this program, ignoring.\n", out);
 
@@ -993,17 +990,17 @@ int wrapped_main_fn (int argc, char* argv[])
 #endif
 
     init_Track (&track);
+    init_Pilot (&dflt_pilot);
 
     good =
 #if 0
-        setup_testcase_simple (space, &view_origin,
-                               &view_basis, &view_angle,
+        setup_testcase_simple (space,
+                               &dflt_pilot.view_origin,
+                               &dflt_pilot.view_basis,
+                               &dflt_pilot.view_angle,
                                inpathname, "machine0.obj");
 #elif 1
     readin_Track (&track, space, inpathname, "curve-track.txt");
-    identity_PointXfrm (&view_basis);
-    zero_Point (&view_origin);
-    view_angle = 2 * M_PI / 3;
 #else
 #if 0
 #elif 0
@@ -1015,7 +1012,10 @@ int wrapped_main_fn (int argc, char* argv[])
 #elif 0
         setup_testcase_manual_interp
 #endif
-        (space, &view_origin, &view_basis, &view_angle,
+        (space,
+         &dflt_pilot.view_origin,
+         &dflt_pilot.view_basis,
+         &dflt_pilot.view_angle,
          inpathname);
 #endif  /* Pre-rolled testcase.*/
 
@@ -1034,21 +1034,12 @@ int wrapped_main_fn (int argc, char* argv[])
         UFor( i, NRacersMax )
         {
             Pilot* pilot;
-            RayImage* ray_image;
+
             pilot = &pilots[i];
-            init_Pilot (pilot);
-            init_RaceCraft (&crafts[i]);
+            *pilot = dflt_pilot;
 
             pilot->craft_idx = i;
-
-            copy_Point (&pilot->view_origin, &view_origin); 
-            copy_PointXfrm (&pilot->view_basis, &view_basis); 
-            pilot->view_angle = view_angle;
-
-            ray_image = &pilot->ray_image;
-            ray_image->view_light = 0;
-            ray_image->color_distance_on = true;
-
+            init_RaceCraft (&crafts[pilot->craft_idx]);
         }
 
         sdl_main (space, inpathname);

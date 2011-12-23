@@ -77,6 +77,8 @@ setup_testcase_simple (RaySpace* space,
 
     identity_AffineMap (&map);
     parse_coord_system (&map.xfrm, "right up back");
+        /* Actually though, we probably want to look at the thing head-on.*/
+    parse_coord_system (&map.xfrm, "right up for");
 
     if (NDimensions == 3)
     {

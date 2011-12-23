@@ -188,15 +188,33 @@ ogl_redraw (const RaySpace* space, uint pilot_idx)
     if (pilot->ray_image.perspective)
     {
         Point p;
+        real near_mag = 0.1;
+        real far_mag = 0;
+        Ray ray;
+        const BoundingBox* box;
+        box = &space->main.box;
+
+        copy_Point (&ray.origin, &pilot->view_origin);
+        copy_Point (&ray.direct, &pilot->view_basis.pts[ForwardDim]);
+
+        UFor( i, NDimensions )
+        {
+            real m;
+            m = (ray.direct.coords[i] > 0)
+                ? box->max.coords[i] - ray.origin.coords[i]
+                : ray.origin.coords[i] - box->min.coords[i];
+
+            if (m > 0)  far_mag += m;
+        }
 
         gluPerspective (180 / M_PI * pilot->ray_image.hifov,
                         width / (real) height,
-                        1.0, 3 * magnitude_Point (&space->main.box.max));
+                        near_mag, far_mag);
 
             /* diff_Point (&p, &object->centroid, &pilot->view_origin); */
             /* proj_Point (&p, &pilot->view_basis.pts[ForwardDim], &p); */
             /* summ_Point (&p, &p, &pilot->view_origin); */
-        summ_Point (&p, &pilot->view_origin, &pilot->view_basis.pts[ForwardDim]);
+        summ_Point (&p, &ray.origin, &ray.direct);
 
         gluLookAt (pilot->view_origin.coords[RightDim],
                    pilot->view_origin.coords[UpDim],
@@ -267,6 +285,8 @@ ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object,
 
     if (!object->visible)  return;
     scene = &object->scene;
+
+    init_Material (&default_material);
 
 #if NDimensions == 4
 # ifdef Match4dGeom

@@ -33,14 +33,16 @@ init_Pilot (Pilot* p)
 {
     p->craft_idx = 0;
     init_MotionInput (&p->input);
+    zero_Point (&p->view_origin);
+    identity_PointXfrm (&p->view_basis);
     p->image_start_row = 0;
     p->image_start_col = 0;
     init_RayImage (&p->ray_image);
     p->stride_magnitude = 10;
-    p->view_angle = 2 * M_PI / 3;
+    p->view_angle = 2 * atan (1.0 / 3);
     p->view_width = 100;
-    p->up_offset = 30;
-    p->forward_offset = -130;
+    p->up_offset = 90;
+    p->forward_offset = -380;
 }
 
     void

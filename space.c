@@ -58,7 +58,7 @@ void scale_Point (Point* dst, const Point* a, real k)
 }
 
     void
-invmul_Point (Point* dst, const Point* src)
+reci_Point (Point* dst, const Point* src)
 {
     uint i;
     UFor( i, NDimensions )

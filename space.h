@@ -38,7 +38,7 @@ real dot_Point (const Point* a, const Point* b);
 void summ_Point (Point* dst, const Point* a, const Point* b);
 void scale_Point (Point* dst, const Point* a, real k);
 void
-invmul_Point (Point* dst, const Point* src);
+reci_Point (Point* dst, const Point* src);
 void
 quot_Point (Point* dst, const Point* src, real x);
 void zero_Point (Point* a);

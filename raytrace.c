@@ -443,7 +443,7 @@ void init_RayImage (RayImage* image)
         image->ambient[i] = 0.2;
     image->view_light = 0;
     image->shading_on = true;
-    image->color_distance_on = false;
+    image->color_distance_on = true;
     image->nbounces_max = 2;
 }
 
@@ -741,7 +741,7 @@ splitting_plane_count (const Point* origin, const Point* direct, real mag,
 
     inside_box = inside_BoundingBox (box, origin);
 
-    invmul_Point (&invdirect, direct);
+    reci_Point (&invdirect, direct);
     node_idx = first_KDTreeNode (&parent, &ray,
                                  tree->nodes,
                                  box, inside_box);
@@ -1194,7 +1194,7 @@ cast_Ray (uint* restrict ret_hit, real* restrict ret_mag,
         return;
     }
 
-    invmul_Point (&invdirect, &ray->direct);
+    reci_Point (&invdirect, &ray->direct);
     node_idx = first_KDTreeNode (&parent, ray,
                                  nodes, box, inside_box);
 
@@ -1381,7 +1381,7 @@ cast_partitioned (uint* ret_hit,
     hit_mag = *ret_mag;
     hit_object = *ret_object;
 
-    invmul_Point (&invdirect, &ray.direct);
+    reci_Point (&invdirect, &ray.direct);
     node_idx = first_KDTreeNode (&parent, &ray, nodes,
                                  &space->box, inside_box);
 
