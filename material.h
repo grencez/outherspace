@@ -3,6 +3,7 @@
 #define MATERIAL_H_
 #include "util.h"
 
+#include "affine.h"
 #include "simplex.h"
 
 typedef struct Texture Texture;
@@ -40,6 +41,9 @@ map_sky_Texture (real* colors, const Texture* texture, const Point* p);
 
 bool
 readin_Texture (Texture* texture, const char* pathname, const char* filename);
+
+void
+remap_bumps_Texture (Texture* texture, const AffineMap* map);
 
 #ifdef INCLUDE_SOURCE
 #include "material.c"

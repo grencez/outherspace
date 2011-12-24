@@ -15,6 +15,8 @@ init_MotionInput (MotionInput* mot)
     mot->drift = 0;
     UFor( i, NDimensions )  mot->stride[i] = 0;
     UFor( i, 2 )  mot->thrust[i] = 0;
+    mot->view_azimuthcc = 0;
+    mot->view_zenith = 0;
     mot->boost = false;
     mot->inv_vert = true;
     mot->use_roll = false;

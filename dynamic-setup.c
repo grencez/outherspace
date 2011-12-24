@@ -16,8 +16,7 @@ interpolate_by_file (Scene* dst,
                      uint nscenes,
                      const char* pathname,
                      const char* const* filenames,
-                     const real* dcoords,
-                     const AffineMap* map)
+                     const real* dcoords)
 {
     bool good = true;
     uint i;
@@ -38,7 +37,7 @@ interpolate_by_file (Scene* dst,
             continue;
         }
 
-        good = readin_wavefront (&scenes[i], map, pathname, filenames[i]);
+        good = readin_wavefront (&scenes[i], pathname, filenames[i]);
         if (!good)  return false;
         UFor( j, scenes[i].nverts )
             scenes[i].verts[j].coords[NDimensions-1] = dcoords[i];
@@ -63,7 +62,7 @@ interpolate_by_file (Scene* dst,
 
 static
     void
-interpolate_Track (Track* track)
+interpolate_Track (Track* track, real map_scale)
 {
     const real max_drift = 1000;
     real scale;
@@ -73,7 +72,8 @@ interpolate_Track (Track* track)
     assert (NDimensions == 4);
     assert (track->nmorphs > 1);
 
-    scale = max_drift / track->morph_dcoords[track->nmorphs-1];
+    scale = max_drift;
+    scale /= map_scale * track->morph_dcoords[track->nmorphs-1];
 
     scenes = AllocT( Scene, track->nmorphs );
 
@@ -168,6 +168,7 @@ readin_Track (Track* track, RaySpace* space,
     FILE* in;
     FILE* out = stderr;
     PointXfrm coord_system;
+    AffineMap model_map;  /* Use to save model transformation.*/
     AffineMap affine_map;
     AffineMap* map;
     real scale = 1;
@@ -182,6 +183,7 @@ readin_Track (Track* track, RaySpace* space,
     identity_PointXfrm (&coord_system);
     map = &affine_map;
     identity_AffineMap (map);
+    model_map = *map;
     zero_Point (&location);
 
     init_SList (&startloclist);
@@ -240,6 +242,7 @@ readin_Track (Track* track, RaySpace* space,
         else if (AccepTok( line, "model:" ))
         {
             bool doit = true;
+            model_map = *map;
             if (NDimensions == 4)
             {
                 real dcoord = 0;
@@ -261,15 +264,16 @@ readin_Track (Track* track, RaySpace* space,
                     /* Ignore because we are not in 4d mode.*/
                 doit = false;
             }
-            if (doit)  good = readin_wavefront (scene, map, pathname, line);
+            if (doit)  good = readin_wavefront (scene, pathname, line);
         }
         else if (AccepTok( line, "concat-model:" ))
         {
             Scene tmp;
             good = !!(scene);
-            if (good)  good = readin_wavefront (&tmp, map, pathname, line);
+            if (good)  good = readin_wavefront (&tmp, pathname, line);
             else       fprintf (out, "Line:%u  No scene for concat!\n",
                                 line_no);
+                /* TODO: Some sort of scene mapping should happen?*/
             if (good)  concat0_Scene (scene, &tmp);
         }
         else if (AccepTok( line, "sky:" ))
@@ -366,10 +370,14 @@ readin_Track (Track* track, RaySpace* space,
     {
         if (track->nmorphs > 0)
         {
-            interpolate_Track (track);
+            uint i;
+            interpolate_Track (track, model_map.scale);
             scene = &track->scene;
+            UFor( i, track->nmorphs )
+                map_Scene (&track->morph_scenes[i], &model_map);
         }
         condense_Scene (scene);
+        map_Scene (scene, &model_map);
 
         if (skytex)
         {
@@ -526,18 +534,14 @@ parse_coord_system (PointXfrm* a, const char* line)
     bool
 read_racer (Scene* scene, uint idx, const char* pathname)
 {
-    AffineMap map;
     bool good;
     char fname[20];
 
     sprintf (fname, "machine%u.obj", idx);
 
-    identity_AffineMap (&map);
-    parse_coord_system (&map.xfrm, "right up back");
-
     if (NDimensions == 3)
     {
-        good = readin_wavefront (scene, &map, pathname, fname);
+        good = readin_wavefront (scene, pathname, fname);
     }
     else
     {
@@ -545,20 +549,17 @@ read_racer (Scene* scene, uint idx, const char* pathname)
         const real dcoords[2] = { 0, 1.0/16 };
         fnames[0] = fname;
         fnames[1] = fname;
-        good = interpolate_by_file (scene, 2, pathname, fnames,
-                                    dcoords, &map);
+        good = interpolate_by_file (scene, 2, pathname, fnames, dcoords);
     }
     if (!good)  return false;
 
     condense_Scene (scene);
 
     {
+        AffineMap map;
         BoundingBox box;
-        PointXfrm fix;
         Point meas;
-        real vol;
-        real a;
-        uint i;
+        real vol, a;
 
         init_BoundingBox (&box, scene->nverts, scene->verts);
         measure_BoundingBox (&meas, &box);
@@ -567,12 +568,12 @@ read_racer (Scene* scene, uint idx, const char* pathname)
                meas.coords[ForwardDim]);
         a = pow (30000 / vol, 1.0 / 3);
 
-        identity_PointXfrm (&fix);
-        UFor( i, 3 )
-            scale_Point (&fix.pts[i], &fix.pts[i], a);
-        xfrm_Scene (scene, &fix);
+        identity_AffineMap (&map);
+        parse_coord_system (&map.xfrm, "right up back");
+        recenter_Scene (&map, scene, 0);
+        scale0_AffineMap (&map, a);
+        map_Scene (scene, &map);
     }
-    recenter_Scene (scene, 0);
 
     return good;
 }

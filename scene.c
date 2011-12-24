@@ -62,7 +62,7 @@ void init_SceneElement (SceneElement* elem)
 
 void copy_SceneElement (SceneElement* dst, const SceneElement* src)
 {
-    memcpy (dst, src, sizeof (SceneElement));
+    *dst = *src;
 }
 
 void cleanup_Scene (Scene* scene)
@@ -656,49 +656,45 @@ interpolate1_Scene (Scene* dst, real alpha,
 }
 
     void
-xlate_Scene (Scene* scene, const Point* displacement)
+map_Scene (Scene* scene, const AffineMap* map)
 {
     uint i;
-    UFor( i, scene->nverts )
-        summ_Point (&scene->verts[i], &scene->verts[i], displacement);
-}
-
-    void
-xfrm_Scene (Scene* scene, const PointXfrm* xfrm)
-{
-    uint i;
+    uint prevtex = Max_uint;
 
     UFor( i, scene->nverts )
-    {
-        Point* p;
-        Point tmp;
-        p = &scene->verts[i];
-        xfrm_Point (&tmp, xfrm, p);
-        copy_Point (p, &tmp);
-    }
+        map_Point (&scene->verts[i], map, &scene->verts[i]);
 
     UFor( i, scene->nvnmls )
+        xfrm_Point (&scene->vnmls[i], &map->xfrm, &scene->vnmls[i]);
+
+    UFor( i, scene->nmatls )
     {
-        Point* p;
-        Point tmp;
-        p = &scene->vnmls[i];
-        xfrm_Point (&tmp, xfrm, p);
-        normalize_Point (p, &tmp);
+        uint texidx;
+        texidx = scene->matls[i].bump_texture;
+        if (texidx < Max_uint && texidx != prevtex)
+        {
+            prevtex = texidx;
+            remap_bumps_Texture (&scene->txtrs[texidx], map);
+        }
     }
 }
 
     void
-recenter_Scene (Scene* scene, const Point* new_centroid)
+recenter_Scene (AffineMap* map, const Scene* scene,
+                const Point* new_centroid)
 {
     BoundingBox box;
-    Point displacement;
+    Point centroid, displacement;
+
     init_BoundingBox (&box, scene->nverts, scene->verts);
-    centroid_BoundingBox (&displacement, &box);
+    centroid_BoundingBox (&centroid, &box);
+    map_Point (&centroid, map, &centroid);
+
     if (new_centroid)
-        diff_Point (&displacement, new_centroid, &displacement);
+        diff_Point (&displacement, new_centroid, &centroid);
     else
-        negate_Point (&displacement, &displacement);
-    xlate_Scene (scene, &displacement);
+        negate_Point (&displacement, &centroid);
+    xlat0_AffineMap (map, &displacement);
 }
 
 static

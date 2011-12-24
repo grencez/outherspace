@@ -5,20 +5,34 @@
 
 typedef struct AffineMap AffineMap;
 
+    /**
+     * map (x) = xlat + scale xfrm x
+     * map^-1 (x) = (xfrm^-1 (x - xlat)) / scale
+     **/
 struct AffineMap
 {
     PointXfrm xfrm;
     Point xlat;
+    real scale;
 };
 
 void
 identity_AffineMap (AffineMap* map);
+void
+mapo_Point (Point* dst, const AffineMap* map, const Point* src);
 void
 mapvec_Point (Point* dst, const AffineMap* map, const Point* src);
 void
 map_Point (Point* dst, const AffineMap* map, const Point* src);
 void
 map_Ray (Ray* dst, const AffineMap* map, const Ray* src);
+
+void
+invmapvec_Point (Point* dst, const AffineMap* map, const Point* src);
+void
+invmap_Point (Point* dst, const AffineMap* map, const Point* src);
+void
+invmap_Ray (Ray* dst, const AffineMap* map, const Ray* src);
 
 void
 scale0_AffineMap (AffineMap* map, real x);

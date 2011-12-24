@@ -1,16 +1,42 @@
 
+#include "affine.h"
 #include "bitstring.h"
 #include "kdtree.h"
 #include "kptree.h"
 #include "order.h"
-#include "util.h"
 #include "slist.h"
+#include "util.h"
 #include "xfrm.h"
 
 #include <assert.h>
 #include <math.h>
 
 void testfn_pack ();
+
+static void
+testfn_AffineMap ()
+{
+    AffineMap map;
+    Point u, v;
+
+    zero_Point (&u);
+    u.coords[0] =  1;
+    u.coords[1] = -2;
+    identity_AffineMap (&map);
+    scale0_AffineMap (&map, 3);
+    xlat0_AffineMap (&map, &u);
+
+    zero_Point (&v);
+    map_Point (&v, &map, &v);
+    AssertApprox(  3, v.coords[0], 1, 1e0 );
+    AssertApprox( -6, v.coords[1], 1, 1e0 );
+
+    identity_AffineMap (&map);
+    scale0_AffineMap (&map, .5);
+    map_Point (&v, &map, &v);
+    AssertApprox(  1.5, v.coords[0], 1, 1e0 );
+    AssertApprox( -3.0, v.coords[1], 1, 1e0 );
+}
 
 static
     void
@@ -381,6 +407,7 @@ int main (int argc, char** argv)
     if (argidx < argc)
         strto_uint (&pidx, argv[argidx++]);
 
+    testfn_AffineMap ();
     testfn_BitString ();
     testfn_BitString_cache ();
     testfn_KPTree ();

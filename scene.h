@@ -3,6 +3,7 @@
 #ifndef __OPENCL_VERSION__
 #define SCENE_H_
 
+#include "affine.h"
 #include "simplex.h"
 #include "material.h"
 #endif  /* #ifndef __OPENCL_VERSION__ */
@@ -35,11 +36,10 @@ struct Scene
 };
 
 void
-xlate_Scene (Scene* scene, const Point* displacement);
+map_Scene (Scene* scene, const AffineMap* map);
 void
-xfrm_Scene (Scene* scene, const PointXfrm* xfrm);
-void
-recenter_Scene (Scene* scene, const Point* new_centroid);
+recenter_Scene (AffineMap* map, const Scene* scene,
+                const Point* new_centroid);
 
 #ifndef __OPENCL_VERSION__
 void init_Scene (Scene* scene);

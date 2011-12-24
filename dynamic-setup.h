@@ -10,8 +10,7 @@ interpolate_by_file (Scene* dst,
                      uint nscenes,
                      const char* pathname,
                      const char* const* filenames,
-                     const real* dcoords,
-                     const AffineMap* map);
+                     const real* dcoords);
 bool
 add_racers (RaySpace* space, uint nracers, const Track* track,
             const char* pathname);

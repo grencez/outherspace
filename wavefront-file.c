@@ -97,8 +97,7 @@ output_wavefront (const Scene* scene,
 }
 
     bool
-readin_wavefront (Scene* scene, const AffineMap* map,
-                  const char* pathname, const char* filename)
+readin_wavefront (Scene* scene, const char* pathname, const char* filename)
 {
     const uint ndims = 3;
     uint line_no = 0;
@@ -148,7 +147,6 @@ readin_wavefront (Scene* scene, const AffineMap* map,
             good = !!(line);
             if (good)
             {
-                mapvec_Point (&normal, map, &normal);
                 normalize_Point (&normal, &normal);
                 app_SList (&vnmllist, DuplicaT( Point, &normal, 1 ));
             }
@@ -184,7 +182,6 @@ readin_wavefront (Scene* scene, const AffineMap* map,
             good = !!(line);
             if (good)
             {
-                map_Point (&vert, map, &vert);
                 app_SList (&vertlist, DuplicaT( Point, &vert, 1 ));
             }
             else
@@ -260,6 +257,7 @@ readin_wavefront (Scene* scene, const AffineMap* map,
     {
         uint ei;
 
+        init_Scene (scene);
         scene->nelems = elemlist.nmembs;
         scene->nverts = vertlist.nmembs;
         scene->nvnmls = vnmllist.nmembs;

@@ -79,10 +79,8 @@ map_bump_Texture (Point* normal, const Texture* texture, const BaryPoint* p)
     pixels = (signed char*) &texture->pixels[NColors * i];
 
     zero_Point (normal);
-        /* TODO: Fix my damn coordinate mappings!*/
-    normal->coords[RightDim] = pixels[0];
-    normal->coords[UpDim] = pixels[1];
-    normal->coords[ForwardDim] = pixels[2];
+    UFor( i, 3 )
+        normal->coords[i] = pixels[i];
 }
 
     void
@@ -211,5 +209,34 @@ readin_Texture (Texture* texture, const char* pathname, const char* filename)
 #else
     return false;
 #endif
+}
+
+    void
+remap_bumps_Texture (Texture* texture, const AffineMap* map)
+{
+    uint i, n;
+    signed char* pixels;
+
+    n = texture->nrows * texture->ncols;
+    pixels = (signed char*) texture->pixels;
+
+    UFor( i, n )
+    {
+        Point p;
+        real m;
+        uint j;
+        zero_Point (&p);
+        UFor( j, 3 )
+            p.coords[j] = pixels[3*i+j];
+
+        xfrm_Point (&p, &map->xfrm, &p);
+        
+        m = match_real (abs_real (p.coords[0]),
+                        match_real (p.coords[1], p.coords[2]));
+        m = 127.5 / m;
+
+        UFor( j, 3 )
+            pixels[3*i+j] = (signed char) (int) (m * p.coords[j]);
+    }
 }
 

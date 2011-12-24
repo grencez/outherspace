@@ -75,14 +75,10 @@ setup_testcase_simple (RaySpace* space,
     identity_PointXfrm (view_basis);
     zero_Point (view_origin);
 
-    identity_AffineMap (&map);
-    parse_coord_system (&map.xfrm, "right up back");
-        /* Actually though, we probably want to look at the thing head-on.*/
-    parse_coord_system (&map.xfrm, "right up for");
 
     if (NDimensions == 3)
     {
-        good = readin_wavefront (&space->main.scene, &map, pathname, file);
+        good = readin_wavefront (&space->main.scene, pathname, file);
     }
     else
     {
@@ -90,10 +86,17 @@ setup_testcase_simple (RaySpace* space,
         const real dcoords[2] = { 0, 1000 };
         filenames[0] = filenames[1] = file;
         good = interpolate_by_file (&space->main.scene, 2, pathname,
-                                    filenames, dcoords, &map);
+                                    filenames, dcoords);
     }
     if (!good)  return false;
     condense_Scene (&space->main.scene);
+
+    identity_AffineMap (&map);
+    parse_coord_system (&map.xfrm, "right up back");
+        /* Actually though, we probably want to look at the thing head-on.*/
+    parse_coord_system (&map.xfrm, "right up for");
+    map_Scene (&space->main.scene, &map);
+
     init_filled_RaySpace (space);
 
     *view_angle = 2 * M_PI / 3;
@@ -145,14 +148,11 @@ setup_testcase_track (RaySpace* space,
     identity_PointXfrm (view_basis);
     zero_Point (view_origin);
 
-    identity_AffineMap (&map);
-    parse_coord_system (&map.xfrm, "right up back");
-
     space->objects = AllocT( ObjectRaySpace, space->nobjects );
 
     if (NDimensions == 3)
     {
-        good = readin_wavefront (&space->main.scene, &map, pathname,
+        good = readin_wavefront (&space->main.scene, pathname,
 #if 0
                                  "track1.obj"
 #elif 0
@@ -173,25 +173,19 @@ setup_testcase_track (RaySpace* space,
         const char* const fnames[5] = { "loop.obj", 0, 0, 0, "bentloop.obj" };
         const real dcoords[5] = { -0.001, .25, .5, .75, 1.001 };
         good = interpolate_by_file (&space->main.scene, 5,
-                                    pathname, fnames, dcoords, &map);
+                                    pathname, fnames, dcoords);
     }
     if (!good)  return false;
     condense_Scene (&space->main.scene);
 
+    identity_AffineMap (&map);
+    parse_coord_system (&map.xfrm, "right up back");
+
     if (true)
-    {
-        PointXfrm fix;
-        identity_PointXfrm (&fix);
-        scale_PointXfrm (&fix, &fix, 700);
-        xfrm_Scene (&space->main.scene, &fix);
-    }
+        scale0_AffineMap (&map, 700);
     else if (false)
-    {
-        PointXfrm fix;
-        identity_PointXfrm (&fix);
-        scale_PointXfrm (&fix, &fix, 20);
-        xfrm_Scene (&space->main.scene, &fix);
-    }
+        scale0_AffineMap (&map, 20);
+    map_Scene (&space->main.scene, &map);
 
     good = add_sky_texture (space, pathname, "iras.png");
     if (!good)  return false;
