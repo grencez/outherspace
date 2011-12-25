@@ -9,6 +9,7 @@ varying vec3 H;
 void main()
 {
     gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;
+    gl_TexCoord[0] = gl_MultiTexCoord0;
 
     vec4 eyePosition = gl_ModelViewMatrix * gl_Vertex;
     vec4 eyeLightPos = gl_LightSource[0].position;
@@ -17,6 +18,5 @@ void main()
     L = normalize(eyeLightPos.xyz - eyePosition.xyz);
     E = -normalize(eyePosition.xyz);
     H = normalize(L + E);
-
-   
 }
+

@@ -1792,7 +1792,14 @@ setup_ray_pixel_deltas_perspective (Point* dir_start,
     zero_Point (&rdelta);
     zero_Point (&cdelta);
 
-    if (nrows >= ncols)
+        /* Make view angle...
+         * Vertical: true
+         * Min Angle: nrows <= ncols
+         * Max Angle: nrows >= ncols 
+         *
+         * OpenGL version fixes FOV to vertical, use that.
+         */
+    if (true)
     {
         dstart.coords[row_dim] = - halflen;
         dstart.coords[col_dim] = - (halflen * ncols) / nrows;

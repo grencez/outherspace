@@ -458,6 +458,7 @@ ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object,
         {
             const Material* matl;
             GLfloat color[4];
+            GLint loc;
 
             if (!first_elem)  glEnd ();
             else              first_elem = false;
@@ -481,13 +482,19 @@ ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object,
             glMaterialf (GL_FRONT_AND_BACK, GL_SHININESS,
                          matl->optical_density);
 
+            loc = glGetUniformLocation (shader_program, "HaveDiffuseTex");
             if (matl->diffuse_texture < Max_uint)
             {
+                glUniform1i (loc, 1);
                 glEnable (GL_TEXTURE_2D);
+                glActiveTexture (GL_TEXTURE0);
                 glBindTexture (GL_TEXTURE_2D, matl->diffuse_texture);
+                loc = glGetUniformLocation (shader_program, "DiffuseTex");
+                glUniform1i (loc, 0);
             }
             else
             {
+                glUniform1i (loc, 0);
                 glDisable (GL_TEXTURE_2D);
             }
 

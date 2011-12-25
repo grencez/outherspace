@@ -71,25 +71,39 @@ macro (setup_dbgn_defines)
 endmacro ()
 
 setup_dbgn_defines (${CSources})
-add_executable (gui gui.c motion.c ${CSources})
 
+add_executable (file2array file2array.c util.c)
+set_target_properties (file2array PROPERTIES
+    PREFIX "" OUTPUT_NAME file2array)
+
+add_custom_command (OUTPUT phong.glsl.h
+    COMMAND file2array phong.glsl.h phong.vert phong.frag
+    DEPENDS phong.vert phong.frag)
+
+add_executable (verify verif/main.c verif/pack.c ${CSources})
+set_target_properties (verify PROPERTIES
+    PREFIX "" OUTPUT_NAME verify)
+
+add_executable (gui gui.c motion.c phong.glsl.h ${CSources})
 set_target_properties (gui PROPERTIES
-    OUTPUT_NAME "${GuiName}"
-    PREFIX ""
+    PREFIX "" OUTPUT_NAME "${GuiName}"
     COMPILE_DEFINITIONS "${GuiDFLAGS}"
     LINK_FLAGS "${GuiLFLAGS}")
 
 set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
 
-include_directories (${SDL_INCLUDE_DIR})
-include_directories (${SDLIMAGE_INCLUDE_DIR})
-include_directories (${OPENGL_INCLUDE_DIR})
+include_directories (".")
+include_directories (SYSTEM ${SDL_INCLUDE_DIR})
+include_directories (SYSTEM ${SDLIMAGE_INCLUDE_DIR})
+include_directories (SYSTEM ${OPENGL_INCLUDE_DIR})
 
 target_link_libraries (gui ${SDL_LIBRARY})
 target_link_libraries (gui ${SDLIMAGE_LIBRARY})
 target_link_libraries (gui ${OPENGL_LIBRARIES})
 
 if (UNIX)
+    target_link_libraries (file2array m)
     target_link_libraries (gui m)
+    target_link_libraries (verify m)
 endif ()
 
