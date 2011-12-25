@@ -197,6 +197,22 @@ xfrmtr_PointXfrm (PointXfrm* dst, const PointXfrm* A, const PointXfrm* B)
     }
 }
 
+    /** Create a matrix that maps vectors to a different permutation of its
+     * coordinates. Odd values in the permutation array mark negation.
+     * The identity matrix is formed by /perms[i]=2*i/.
+     *
+     * The equation for applying the matrix to a vector /x/ is
+     *   /x'[i] = x[perms[i]/2] * (-1)^perms[i]/
+     **/
+    void
+permutation_PointXfrm (PointXfrm* a, const uint* perms)
+{
+    uint i;
+    zero_PointXfrm (a);
+    UFor( i, NDimensions )
+        a->pts[i].coords[perms[i]/2] = even_uint (perms[i]) ? 1 : -1;
+}
+
 void reflect_PointXfrm (PointXfrm* xfrm, uint j, uint k)
 {
     Point rows[2];

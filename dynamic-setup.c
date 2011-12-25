@@ -481,52 +481,44 @@ readin_checkplanes (uint* ret_nplanes, Plane** ret_planes, Point** ret_points,
     bool
 parse_coord_system (PointXfrm* a, const char* line)
 {
+    bool cover[NDimensions];
+    uint perms[NDimensions];
     bool good = true;
     uint i;
-    bool cover[NDimensions];
-    const char* const keys[6] =
-    {   "up", "down",
-        "right", "left",
-        "for", "back"
-    };
-    const uint lens[6] = { 2, 4, 5, 4, 3, 4 };
-    const uint dims[3] = { UpDim, RightDim, ForwardDim };
 
     UFor( i, NDimensions )  cover[i] = false;
-
-    identity_PointXfrm (a);
-    a->pts[UpDim].coords[UpDim] = 0;
-    a->pts[RightDim].coords[RightDim] = 0;
-    a->pts[ForwardDim].coords[ForwardDim] = 0;
+    UFor( i, NDimensions )  perms[i] = 2*i;
 
     for (i = 0; i < 3 && good; ++i)
     {
-        uint j;
-        uint d = 6;
+        uint d = Max_uint;
+
         line = strskip_ws (line);
-        if (!line)
-        {
-            good = false;
-            break;
-        }
+        good = !!line;
+        if (!good)  break;
 
-        UFor( j, 6 )
-            if (0 == strncmp (line, keys[j], lens[j]))
-                d = j;
+        if      (AccepTok( line, "up" ))     d = 2 * UpDim;
+        else if (AccepTok( line, "down" ))   d = 2 * UpDim + 1;
+        else if (AccepTok( line, "right" ))  d = 2 * RightDim;
+        else if (AccepTok( line, "left" ))   d = 2 * RightDim + 1;
+        else if (AccepTok( line, "for" ))    d = 2 * ForwardDim;
+        else if (AccepTok( line, "back" ))   d = 2 * ForwardDim + 1;
 
-        good = (d < 6);
+        good = (d < Max_uint);
         if (good)
         {
-            line = &line[lens[d]];
-            j = dims[d/2];
-            cover[j] = true;
-            a->pts[j].coords[i] = even_uint (d) ? 1 : -1;
+            cover[d/2] = true;
+            perms[d/2] = 2 * i + (d % 2);
         }
     }
 
-    assert (cover[UpDim]);
-    assert (cover[RightDim]);
-    assert (cover[ForwardDim]);
+    if (good)
+    {
+        assert (cover[UpDim]);
+        assert (cover[RightDim]);
+        assert (cover[ForwardDim]);
+        permutation_PointXfrm (a, perms);
+    }
 
     return good;
 }

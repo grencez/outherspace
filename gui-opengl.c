@@ -2,8 +2,9 @@
 #ifdef _WIN32
 # include <windows.h>
 #endif
-#include <GL/gl.h>
-#include <GL/glu.h>
+
+#define GL_GLEXT_PROTOTYPES
+#include <SDL_opengl.h>
 
 #ifdef main
 # undef main
@@ -32,14 +33,18 @@ view_element (GLdouble* ret_verts,
               const Point* normal);
 #endif
 
+GLuint vert_shader;
+GLuint frag_shader;
+GLuint shader_program;
+
     /** Convert a Point to a 3-vec.**/
 static
     void
 ogl_vec_Point (GLdouble* dst, const Point* src)
 {
-    dst[0] = src->coords[RightDim];
-    dst[1] = src->coords[UpDim];
-    dst[2] = - src->coords[ForwardDim];
+    dst[0] = src->coords[0];
+    dst[1] = src->coords[1];
+    dst[2] = src->coords[2];
 }
 
     /** Convert a Point to a 3-vec.**/
@@ -57,15 +62,84 @@ static
     void
 ogl_matrix (GLdouble* dst, const Point* origin, const PointXfrm* basis)
 {
+    PointXfrm m;
+    Point p;
+    uint perms[NDimensions];
     uint i;
-    ogl_vec_Point (&dst[0], &basis->pts[RightDim]);
-    ogl_vec_Point (&dst[4], &basis->pts[UpDim]);
-    ogl_vec_Point (&dst[8], &basis->pts[ForwardDim]);
-    UFor( i, 3 )  dst[8+i] = - dst[8+i];
-    ogl_vec_Point (&dst[12], origin);
 
-    dst[3] = dst[7] = dst[11] = 0;
+    UFor( i, NDimensions )  perms[i] = 2 * i;
+    perms[0] = 2 * RightDim;
+    perms[1] = 2 * UpDim;
+    perms[2] = 2 * ForwardDim + 1;
+    permutation_PointXfrm (&m, perms);
+
+    xfrm_Point (&p, &m, origin);
+    xfrm_PointXfrm (&m, basis, &m);
+
+    UFor( i, 3 )
+    {
+        uint j;
+        UFor( j, 3 )
+            dst[4 * i + j] = m.pts[i].coords[j];
+        dst[4 * i + 3] = 0;
+        dst[4 * 3 + i] = p.coords[i];
+    }
     dst[15] = 1;
+}
+
+static
+    void
+init_ogl_ui_data ()
+{
+#include "phong.glsl.h"
+    GLint status = GL_NO_ERROR; 
+    FILE* err = stderr;
+
+    (void) nfiles;
+
+        /* Create program objects.*/
+    vert_shader = glCreateShader (GL_VERTEX_SHADER);
+    frag_shader = glCreateShader (GL_FRAGMENT_SHADER);
+    shader_program = glCreateProgram ();
+    glAttachShader (shader_program, vert_shader);
+    glAttachShader (shader_program, frag_shader);
+
+        /* Fill program contents.*/
+    glShaderSource (vert_shader, 1,
+                    (const GLchar**) &files_bytes[0],
+                    (const GLint*) &files_nbytes[0]);
+    glShaderSource (frag_shader, 1,
+                    (const GLchar**) &files_bytes[1],
+                    (const GLint*) &files_nbytes[1]);
+
+        /* Compile/link shader program.*/
+    glCompileShader (vert_shader);
+    glCompileShader (frag_shader);
+    glLinkProgram (shader_program);
+
+        /* Check for errors.*/
+    glGetShaderiv (vert_shader, GL_COMPILE_STATUS, &status);
+    if (status != GL_TRUE)
+    {
+        fputs ("Failed to compile vertex shader!\n", err);
+        exit (1);
+    }
+
+    glGetShaderiv (frag_shader, GL_COMPILE_STATUS, &status);
+    if (status != GL_TRUE)
+    {
+        fputs ("Failed to compile fragment shader!\n", err);
+        exit (1);
+    }
+
+    glGetShaderiv (shader_program, GL_LINK_STATUS, &status);
+    if (status != GL_TRUE)
+    {
+        fputs ("Failed to link shader program!\n", err);
+        exit (1);
+    }
+
+    glUseProgram (shader_program);
 }
 
 static
@@ -294,7 +368,6 @@ ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object,
     identity_AffineMap (map);
     map->xlat.coords[DriftDim] = (+ object->centroid.coords[DriftDim]
                                   - view_origin->coords[DriftDim]);
-        /* copy_PointXfrm (&map->xfrm, view_basis); */
 # else
 
     if (!view_basis)
@@ -545,7 +618,7 @@ view_element (GLdouble* ret_verts,
         else
             copy_Point (&vnmls[i], normal);
 
-        mapvec_Point (&vnmls[i], map, &vnmls[i]);
+        mapovec_Point (&vnmls[i], map, &vnmls[i]);
     }
 
     view_element_helpfn (ret_verts, ret_vnmls, alphas, inds, verts, vnmls);

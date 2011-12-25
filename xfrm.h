@@ -40,6 +40,8 @@ void
 trxfrm_PointXfrm (PointXfrm* dst, const PointXfrm* A, const PointXfrm* B);
 void
 xfrmtr_PointXfrm (PointXfrm* dst, const PointXfrm* A, const PointXfrm* B);
+void
+permutation_PointXfrm (PointXfrm* xfrm, const uint* perms);
 void reflect_PointXfrm (PointXfrm* xfrm, uint j, uint k);
 void swaprows_PointXfrm (PointXfrm* xfrm, uint j, uint k);
 void to_basis_PointXfrm (PointXfrm* dst, const PointXfrm* xfrm,

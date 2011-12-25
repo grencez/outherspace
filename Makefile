@@ -242,7 +242,7 @@ LFLAGS += -lm
 default: cli gui verify
 	# Done!
 
-all: imgdiff cli gui verify
+all: imgdiff file2array cli gui verify
 	# Done!
 
 # Note: OpenCL code does not function at this time, don't bother.
@@ -262,9 +262,11 @@ cli: cli.c compute.c $(CSources)
 GuiCFlags += $(CFLAGS)
 GuiDFlags += $(DFLAGS)
 GuiLFlags += $(LFLAGS)
-gui: $(GuiMainCSources) compute.c motion.c $(CSources)
+gui: $(GuiMainCSources) compute.c motion.c $(CSources) phong.glsl.h
 	$(CC) $(GuiCFlags) $(GuiDFlags) $< -o $@ $(GuiLFlags)
 
+phong.glsl.h: phong.vert phong.frag file2array
+	./file2array $@ phong.vert phong.frag
 
 VerifyCFlags := $(filter-out -fwhole-program,$(CFLAGS))
 VerifyDFlags := $(filter-out -DINCLUDE_SOURCE,$(DFLAGS))
@@ -276,6 +278,9 @@ verify: $(VerifyCSources) $(CSources)
 imgdiff: imgdiff.c pnm-image.c
 	$(CC) $(CFLAGS) $(DFLAGS) -I . $< -o $@ $(LFLAGS)
 
+file2array: file2array.c util.c
+	$(CC) $(CFLAGS) $(DFLAGS) -I . $< -o $@ $(LFLAGS)
+
 .PHONY: test
 test: cli
 	#valgrind --track-origins=yes ./$<
@@ -283,5 +288,5 @@ test: cli
 
 .PHONY: clean
 clean:
-	rm -f hello cli gui verify imgdiff
+	rm -f hello cli gui verify imgdiff file2array phong.glsl.h
 

@@ -741,6 +741,7 @@ sdl_main (RaySpace* space, const char* pathname)
         /* Allow the render thread to begin.*/
     param->space = space;
     param->continue_running = true;
+    needs_recast = false;
     if (SeparateRenderThread)
     {
         param->sig = SDL_CreateSemaphore (0);
@@ -750,6 +751,21 @@ sdl_main (RaySpace* space, const char* pathname)
     {
         render_loop_fn (param);
     }
+
+    screen = SDL_SetVideoMode (npixelzoom * view_ncols,
+                               npixelzoom * view_nrows,
+                               32,
+#ifdef SupportOpenGL
+                               SDL_OPENGL|
+#else
+                               SDL_DOUBLEBUF|
+#endif
+                               SDL_HWSURFACE|
+                               SDL_RESIZABLE);
+#ifdef SupportOpenGL
+    init_ogl_ui_data ();
+    ogl_setup (space);
+#endif
 
 #ifdef SupportHaptic
     memset (&haptic_effect, 0, sizeof (SDL_HapticEffect));
