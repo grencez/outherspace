@@ -1526,7 +1526,7 @@ cast_record (uint* hitline,
 
 #ifndef __OPENCL_VERSION__
     void
-rays_to_hits_fish (RayImage* image,
+rays_to_hits_fish (RayImage* restrict image,
                    const RaySpace* space,
                    const Point* origin,
                    const PointXfrm* view_basis,

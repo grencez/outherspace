@@ -8,6 +8,18 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#ifdef _WIN32
+    /* Disable warning: 'fopen' unsafe, use fopen_s instead */
+    /* REF CMakeLists.txt: Define _CRT_SECURE_NO_WARNINGS */
+
+    /* Disable: conditional expression is constant */
+# pragma warning (disable : 4127)
+    /* Disable: conversion from 'uint' to 'real' */
+# pragma warning (disable : 4244)
+    /* Disable: conversion from 'double' to 'float' */
+# pragma warning (disable : 4305)
+#endif
+
 
 #define AllocT( Type, capacity ) \
     (((capacity) == 0) ? (Type*) 0 : \

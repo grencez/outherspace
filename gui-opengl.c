@@ -1,10 +1,22 @@
 
-#ifdef _WIN32
-# include <windows.h>
+#ifndef _WIN32
+# define GL_GLEXT_PROTOTYPES
 #endif
-
-#define GL_GLEXT_PROTOTYPES
 #include <SDL_opengl.h>
+
+#ifdef _WIN32
+static PFNGLUSEPROGRAMPROC glUseProgram = 0;
+static PFNGLLINKPROGRAMPROC glLinkProgram = 0;
+static PFNGLCOMPILESHADERPROC glCompileShader = 0;
+static PFNGLSHADERSOURCEPROC glShaderSource = 0;
+static PFNGLATTACHSHADERPROC glAttachShader = 0;
+static PFNGLCREATEPROGRAMPROC glCreateProgram = 0;
+static PFNGLCREATESHADERPROC glCreateShader = 0;
+static PFNGLACTIVETEXTUREPROC glActiveTexture = 0;
+static PFNGLUNIFORM1IPROC glUniform1i = 0;
+static PFNGLGETUNIFORMLOCATIONPROC glGetUniformLocation = 0;
+static PFNGLGETSHADERIVPROC glGetShaderiv = 0;
+#endif
 
 #ifdef main
 # undef main
@@ -96,6 +108,33 @@ init_ogl_ui_data ()
     FILE* err = stderr;
 
     (void) nfiles;
+
+#ifdef _WIN32
+    glUseProgram = (PFNGLUSEPROGRAMPROC) SDL_GL_GetProcAddress ("glUseProgram");
+    glLinkProgram = (PFNGLLINKPROGRAMPROC) SDL_GL_GetProcAddress ("glLinkProgram");
+    glCompileShader = (PFNGLCOMPILESHADERPROC) SDL_GL_GetProcAddress ("glCompileShader");
+    glShaderSource = (PFNGLSHADERSOURCEPROC) SDL_GL_GetProcAddress ("glShaderSource");
+    glAttachShader = (PFNGLATTACHSHADERPROC) SDL_GL_GetProcAddress ("glAttachShader");
+    glCreateProgram = (PFNGLCREATEPROGRAMPROC) SDL_GL_GetProcAddress ("glCreateProgram");
+    glCreateShader = (PFNGLCREATESHADERPROC) SDL_GL_GetProcAddress ("glCreateShader");
+    glActiveTexture = (PFNGLACTIVETEXTUREPROC) SDL_GL_GetProcAddress ("glActiveTexture");
+    glUniform1i = (PFNGLUNIFORM1IPROC) SDL_GL_GetProcAddress ("glUniform1i");
+    glGetUniformLocation = (PFNGLGETUNIFORMLOCATIONPROC) SDL_GL_GetProcAddress ("glGetUniformLocation");
+    glGetShaderiv = (PFNGLGETSHADERIVPROC) SDL_GL_GetProcAddress ("glGetShaderiv");
+
+    if (!glUseProgram) { fputs ("glUseProgram\n", err); exit(1); }
+    if (!glLinkProgram) { fputs ("glLinkProgram\n", err); exit(1); }
+    if (!glCompileShader) { fputs ("glCompileShader\n", err); exit(1); }
+    if (!glShaderSource) { fputs ("glShaderSource\n", err); exit(1); }
+    if (!glAttachShader) { fputs ("glAttachShader\n", err); exit(1); }
+    if (!glCreateProgram) { fputs ("glCreateProgram\n", err); exit(1); }
+    if (!glCreateShader) { fputs ("glCreateShader\n", err); exit(1); }
+    if (!glActiveTexture) { fputs ("glActiveTexture\n", err); exit(1); }
+    if (!glUniform1i) { fputs ("glUniform1i\n", err); exit(1); }
+    if (!glGetUniformLocation) { fputs ("glGetUniformLocation\n", err); exit(1); }
+    if (!glGetShaderiv) { fputs ("glGetShaderiv\n", err); exit(1); }
+    fputs ("Loaded all required function pointers!\n", err);
+#endif
 
         /* Create program objects.*/
     vert_shader = glCreateShader (GL_VERTEX_SHADER);

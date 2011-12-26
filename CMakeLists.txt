@@ -46,7 +46,13 @@ if (UNIX)
     set (CMAKE_C_FLAGS "-Wall -Wextra -ansi -pedantic")
     find_package (SDL REQUIRED)
     find_package (SDL_image REQUIRED)
+    find_package (OpenMP REQUIRED)
 else ()
+    set (CMAKE_C_FLAGS "/W4 /MP")
+    # Disable warning: 'fopen' unsafe, use fopen_s instead
+    add_definitions ("-D_CRT_SECURE_NO_WARNINGS")
+    # Other warnings disabled in util.h via #pragmas.
+
     set (CMAKE_BUILD_TYPE RELEASE)
     set (SDL_pfx "../SDL-1.2.14")
     set (SDL_LIBRARY "${SDL_pfx}/lib/SDL")
@@ -59,7 +65,6 @@ else ()
 endif ()
 
 find_package (OpenGL REQUIRED)
-find_package (OpenMP REQUIRED)
 
 # Usage:
 #   setup_dbgn_defines (${my_sources})
@@ -90,7 +95,9 @@ set_target_properties (gui PROPERTIES
     COMPILE_DEFINITIONS "${GuiDFLAGS}"
     LINK_FLAGS "${GuiLFLAGS}")
 
-set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+if (OPENMP_FOUND)
+    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+endif ()
 
 include_directories (".")
 include_directories (SYSTEM ${SDL_INCLUDE_DIR})
