@@ -22,6 +22,8 @@ parse_face_field (uint* v, uint* vt, uint* vn, const char* line);
 static uint
 parse_texture (SList* texlist, SList* texnamelist,
                const char* pathname, const char* filename);
+static void
+reshuffle_for_surfaces (Scene* scene);
 
     bool
 streql (const void* a, const void* b)
@@ -106,11 +108,16 @@ readin_wavefront (Scene* scene, const char* pathname, const char* filename)
     bool good = true;
     const char* line;
     FILE* in;
-    SList elemlist, vertlist,
-          vnmllist, txptlist,
+    FILE* err = stderr;
+    SList elemlist, surflist,
+          vertlist, vnmllist, txptlist,
           matlist, matnamelist,
           texlist, texnamelist;
-    uint material = Max_uint;
+    ObjectSurface object_surface;
+    ObjectSurface* surf;
+
+    surf = &object_surface;
+    init_ObjectSurface (surf);
 
     buf[len-1] = 0;
 
@@ -118,6 +125,7 @@ readin_wavefront (Scene* scene, const char* pathname, const char* filename)
     if (!in)  return false;
 
     init_SList (&elemlist);
+    init_SList (&surflist);
     init_SList (&vertlist);
     init_SList (&vnmllist);
     init_SList (&txptlist);
@@ -152,8 +160,7 @@ readin_wavefront (Scene* scene, const char* pathname, const char* filename)
             }
             else
             {
-                fprintf (stderr, "Line:%u  Not enough coordinates!\n",
-                         line_no);
+                fprintf (err, "Line:%u  Not enough coordinates!\n", line_no);
             }
         }
         else if (line[0] == 'v' && line[1] == 't')
@@ -168,8 +175,7 @@ readin_wavefront (Scene* scene, const char* pathname, const char* filename)
             if (good)
                 app_SList (&txptlist, DuplicaT( BaryPoint, &bpoint, 1 ));
             else
-                fprintf (stderr, "Line:%u  Not enough coordinates!\n",
-                             line_no);
+                fprintf (err, "Line:%u  Not enough coordinates!\n", line_no);
         }
         else if (line[0] == 'v')
         {
@@ -186,15 +192,14 @@ readin_wavefront (Scene* scene, const char* pathname, const char* filename)
             }
             else
             {
-                fprintf (stderr, "Line:%u  Not enough coordinates!\n",
-                         line_no);
+                fprintf (err, "Line:%u  Not enough coordinates!\n", line_no);
             }
         }
         else if (line[0] == 'f')
         {
             SceneElement elem;
             init_SceneElement (&elem);
-            elem.material = material;
+
             good = false;
 
             line = &line[1];
@@ -214,12 +219,13 @@ readin_wavefront (Scene* scene, const char* pathname, const char* filename)
                 tri_elt = AllocT( SceneElement, 1 );
                 copy_SceneElement (tri_elt, &elem);
                 app_SList (&elemlist, tri_elt);
+                surf->nelems += 1;
 
                 elem.verts[1] = elem.verts[2];
                 elem.txpts[1] = elem.txpts[2];
             }
             if (!good)
-                fprintf (stderr, "Line:%u  Failed to read face!\n", line_no);
+                fprintf (err, "Line:%u  Failed to read face!\n", line_no);
         }
         else if (AccepTok( line, "mtllib" ))
         {
@@ -229,14 +235,19 @@ readin_wavefront (Scene* scene, const char* pathname, const char* filename)
                                      pathname, line);
             if (!good)
             {
-                fprintf (stderr, "Line:%u  Failed to read materials!\n",
-                         line_no);
+                fprintf (err, "Line:%u  Failed to read materials!\n", line_no);
             }
         }
         else if (AccepTok( line, "usemtl" ))
         {
             line = strskip_ws (line);
-            material = search_SList (&matnamelist, line, streql);
+            if (surf->nelems > 0)
+            {
+                app_SList (&surflist, DuplicaT( ObjectSurface, surf, 1 ));
+                surf->nelems = 0;
+            }
+
+            surf->material = search_SList (&matnamelist, line, streql);
         }
     }
     fclose (in);
@@ -247,6 +258,7 @@ readin_wavefront (Scene* scene, const char* pathname, const char* filename)
     if (!good)
     {
         cleanup_SList (&elemlist);
+        cleanup_SList (&surflist);
         cleanup_SList (&vertlist);
         cleanup_SList (&vnmllist);
         cleanup_SList (&txptlist);
@@ -257,20 +269,26 @@ readin_wavefront (Scene* scene, const char* pathname, const char* filename)
     {
         uint ei;
 
+        if (surf->nelems > 0)
+            app_SList (&surflist, DuplicaT( ObjectSurface, surf, 1 ));
+
         init_Scene (scene);
         scene->nelems = elemlist.nmembs;
+        scene->nsurfs = surflist.nmembs;
         scene->nverts = vertlist.nmembs;
         scene->nvnmls = vnmllist.nmembs;
         scene->ntxpts = txptlist.nmembs;
         scene->nmatls = matlist.nmembs;
         scene->ntxtrs = texlist.nmembs;
         scene->elems = AllocT( SceneElement, elemlist.nmembs );
+        scene->surfs = AllocT( ObjectSurface, surflist.nmembs );
         scene->verts = AllocT( Point, vertlist.nmembs );
         scene->vnmls = AllocT( Point, vnmllist.nmembs );
         scene->txpts = AllocT( BaryPoint, txptlist.nmembs );
         scene->matls = AllocT( Material, matlist.nmembs );
         scene->txtrs = AllocT( Texture, texlist.nmembs );
         unroll_SList (scene->elems, &elemlist, sizeof (SceneElement));
+        unroll_SList (scene->surfs, &surflist, sizeof (ObjectSurface));
         unroll_SList (scene->verts, &vertlist, sizeof (Point));
         unroll_SList (scene->vnmls, &vnmllist, sizeof (Point));
         unroll_SList (scene->txpts, &txptlist, sizeof (BaryPoint));
@@ -290,11 +308,12 @@ readin_wavefront (Scene* scene, const char* pathname, const char* filename)
                 vi = elem->verts[pi];
                 if (vi >= scene->nverts)
                 {
-                    fprintf (stderr, "Bad vertex:%u\n", vi);
+                    fprintf (err, "Bad vertex:%u\n", vi);
                     good = false;
                 }
             }
         }
+        reshuffle_for_surfaces (scene);
     }
 
     return good;
@@ -365,6 +384,7 @@ readin_materials (SList* matlist, SList* namelist,
     bool good = true;
     const char* line;
     FILE* in;
+    FILE* err = stderr;
     Material scrap_material;
     Material* material;
 
@@ -375,7 +395,7 @@ readin_materials (SList* matlist, SList* namelist,
     in = fopen_path (pathname, filename, "rb");
     if (!in)
     {
-        fprintf (stderr, "Could not open file:%s/%s\n", pathname, filename);
+        fprintf (err, "Could not open file:%s/%s\n", pathname, filename);
         return false;
     }
 
@@ -456,8 +476,7 @@ readin_materials (SList* matlist, SList* namelist,
     }
 
     if (!good)
-        fprintf (stderr, "Material read falied at %s:%u\n",
-                 filename, line_no);
+        fprintf (err, "Material read falied at %s:%u\n", filename, line_no);
 
     assert (matlist->nmembs == namelist->nmembs);
     fclose (in);
@@ -488,5 +507,107 @@ parse_texture (SList* texlist, SList* texnamelist,
         }
     }
     return i;
+}
+
+    void
+reshuffle_for_surfaces (Scene* scene)
+{
+    const uint ndims = 3;
+    Point* verts;  Point* vnmls;  BaryPoint* txpts;
+    uint surfi;
+    uint elems_offset = 0;
+    ObjectSurface pos;
+
+    pos.verts_offset = 0;
+    pos.vnmls_offset = 0;
+    pos.txpts_offset = 0;
+
+    verts = scene->verts;
+    vnmls = scene->vnmls;
+    txpts = scene->txpts;
+    if (scene->nelems > 0)
+        scene->verts = AllocT( Point, ndims * scene->nelems );
+    if (scene->nvnmls > 0)
+        scene->vnmls = AllocT( Point, ndims * scene->nelems );
+    if (scene->ntxpts > 0)
+        scene->txpts = AllocT( BaryPoint, ndims * scene->nelems );
+
+    UFor( surfi, scene->nsurfs )
+    {
+        ObjectSurface* surf;
+        SceneElement* elem;
+        uint ei;
+
+        surf = &scene->surfs[surfi];
+        assert (surf->nelems > 0);
+        elem = &scene->elems[elems_offset];
+
+            /* Set the offsets, they should come in as Max_uint.*/
+        surf->verts_offset = pos.verts_offset;
+        pos.verts_offset += ndims * surf->nelems;
+        if (elem->vnmls[0] < Max_uint)
+        {
+            surf->vnmls_offset = pos.vnmls_offset;
+            pos.vnmls_offset += ndims * surf->nelems;
+        }
+        if (elem->txpts[0] < Max_uint)
+        {
+            surf->txpts_offset = pos.txpts_offset;
+            pos.txpts_offset += ndims * surf->nelems;
+        }
+
+        UFor( ei, surf->nelems )
+        {
+            uint i;
+            elem = &scene->elems[ei + elems_offset];
+            elem->surface = surfi;
+            elem->material = surf->material;
+            UFor( i, ndims )
+            {
+                uint idx;
+                idx = i + ei * ndims + surf->verts_offset;
+                scene->verts[idx] = verts[elem->verts[i]];
+                elem->verts[i] = idx;
+
+                assert ((elem->vnmls[i]     < Max_uint) ==
+                        (surf->vnmls_offset < Max_uint));
+                if (surf->vnmls_offset < Max_uint)
+                {
+                    idx = i + ei * ndims + surf->vnmls_offset;
+                    scene->vnmls[idx] = vnmls[elem->vnmls[i]];
+                    elem->vnmls[i] = idx;
+                }
+
+                assert ((elem->txpts[i]     < Max_uint) ==
+                        (surf->txpts_offset < Max_uint));
+                if (surf->txpts_offset < Max_uint)
+                {
+                    idx = i + ei * ndims + surf->txpts_offset;
+                    scene->txpts[idx] = txpts[elem->txpts[i]];
+                    elem->txpts[i] = idx;
+                }
+            }
+        }
+        elems_offset += surf->nelems;
+    }
+
+    if (scene->nverts > 0)
+    {
+        free (verts);
+        scene->nverts = pos.verts_offset;
+        ResizeT( Point, scene->verts, scene->nverts );
+    }
+    if (scene->nvnmls > 0)
+    {
+        free (vnmls);
+        scene->nvnmls = pos.vnmls_offset;
+        ResizeT( Point, scene->vnmls, scene->nvnmls );
+    }
+    if (scene->ntxpts > 0)
+    {
+        free (txpts);
+        scene->ntxpts = pos.txpts_offset;
+        ResizeT( BaryPoint, scene->txpts, scene->ntxpts );
+    }
 }
 

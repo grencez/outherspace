@@ -55,8 +55,15 @@ array_cat (void* dst, const void* src, uint* end, uint count, size_t size)
 {
     uint n;
     n = *end + count;
-    dst = realloc (dst, n * size);
-    array_cpy (dst, src, *end, count, size);
+    if (n == count)
+    {
+        dst = array_dup (src, count, size);
+    }
+    else
+    {
+        dst = realloc (dst, n * size);
+        array_cpy (dst, src, *end, count, size);
+    }
     *end = n;
     return dst;
 }

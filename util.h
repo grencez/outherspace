@@ -76,11 +76,10 @@ typedef byte bool;
 #endif
 
 #define __global
-
-#else  /* #ifndef __OPENCL_VERSION__ */
+#else  /* ^^^ !defined(__OPENCL_VERSION__) */
 #define assert (void)
 #define static
-#endif  /* #ifdef __OPENCL_VERSION__ */
+#endif  /* defined(__OPENCL_VERSION__) */
 
 
 #define UFor( i, bel )  for (i = 0; i < (bel); ++i)
@@ -96,6 +95,7 @@ typedef double real;
 #define Small_real DBL_MIN
 #define Epsilon_real DBL_EPSILON
 #define realPackSz 2
+#define GL_REAL GL_DOUBLE
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -112,6 +112,7 @@ typedef float real;
 #define Small_real FLT_MIN
 #define Epsilon_real FLT_EPSILON
 #define realPackSz 4
+#define GL_REAL GL_FLOAT
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846f

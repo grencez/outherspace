@@ -31,49 +31,35 @@ static PFNGLGETSHADERIVPROC glGetShaderiv = 0;
 # endif
 #endif
 
+GLuint vert_shader;
+GLuint frag_shader;
+GLuint shader_program;
+
+
+
 static void
 ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object,
                            const Point* view_origin,
                            const PointXfrm* view_basis);
 #ifdef Match4dGeom
 static uint
-view_element (GLdouble* ret_verts,
-              GLdouble* ret_vnmls,
+view_element (Point* ret_verts,
+              Point* ret_vnmls,
               const SceneElement* elem,
               const Scene* scene,
               const AffineMap* map,
               const Point* normal);
 #endif
 
-GLuint vert_shader;
-GLuint frag_shader;
-GLuint shader_program;
-
-    /** Convert a Point to a 3-vec.**/
+    /** Set the current OpenGL transformation matrix.
+     * This implicitly takes coordinate system differences into account!
+     * Assume identity values for NULL /origin/ or /basis/.
+     **/
 static
     void
-ogl_vec_Point (GLdouble* dst, const Point* src)
+map0_ogl_matrix (const Point* origin, const PointXfrm* basis)
 {
-    dst[0] = src->coords[0];
-    dst[1] = src->coords[1];
-    dst[2] = src->coords[2];
-}
-
-    /** Convert a Point to a 3-vec.**/
-static
-    void
-ogl_fvec_Point (GLfloat* dst, const Point* src)
-{
-    dst[0] = src->coords[RightDim];
-    dst[1] = src->coords[UpDim];
-    dst[2] = - src->coords[ForwardDim];
-}
-
-    /** Convert to an OpenGL-style matrix.**/
-static
-    void
-ogl_matrix (GLdouble* dst, const Point* origin, const PointXfrm* basis)
-{
+    GLdouble matrix[16];
     PointXfrm m;
     Point p;
     uint perms[NDimensions];
@@ -85,18 +71,20 @@ ogl_matrix (GLdouble* dst, const Point* origin, const PointXfrm* basis)
     perms[2] = 2 * ForwardDim + 1;
     permutation_PointXfrm (&m, perms);
 
-    xfrm_Point (&p, &m, origin);
-    xfrm_PointXfrm (&m, basis, &m);
+    if (origin)  xfrm_Point (&p, &m, origin);
+    else         zero_Point (&p);
+    if (basis)  xfrm_PointXfrm (&m, basis, &m);
 
     UFor( i, 3 )
     {
         uint j;
         UFor( j, 3 )
-            dst[4 * i + j] = m.pts[i].coords[j];
-        dst[4 * i + 3] = 0;
-        dst[4 * 3 + i] = p.coords[i];
+            matrix[4 * i + j] = m.pts[i].coords[j];
+        matrix[4 * i + 3] = 0;
+        matrix[4 * 3 + i] = p.coords[i];
     }
-    dst[15] = 1;
+    matrix[15] = 1;
+    glMultMatrixd (matrix);
 }
 
 static
@@ -181,6 +169,15 @@ init_ogl_ui_data ()
     glUseProgram (shader_program);
 }
 
+static void
+cleanup_ogl_ui_data ()
+{
+    glUseProgram (0);
+    glDeleteProgram (shader_program);
+    glDeleteShader (vert_shader);
+    glDeleteShader (frag_shader);
+}
+
 static
     void
 ogl_setup (const RaySpace* space)
@@ -213,6 +210,11 @@ ogl_setup (const RaySpace* space)
     if (space->nlights > 0)
     {
         uint i;
+
+        glMatrixMode (GL_MODELVIEW);
+        glLoadIdentity ();
+        map0_ogl_matrix (0, 0);
+
             /* for (i = 0; i < 8; ++i) */
         for (i = 0; i < 1; ++i)
         {
@@ -227,9 +229,10 @@ ogl_setup (const RaySpace* space)
                 continue;
             }
 
+            UFor( j, 3 )  v[j] = light->location.coords[j];
             v[3] = 1;
+
                 /* Position.*/
-            ogl_fvec_Point (v, &light->location);
             glLightfv (light_idcs[i], GL_POSITION, v);
                 /* Ambient.*/
             UFor( j, 3 )  v[j] = light_ambient[j] * light->intensity[j];
@@ -324,9 +327,6 @@ ogl_redraw (const RaySpace* space, uint pilot_idx)
                         width / (real) height,
                         near_mag, far_mag);
 
-            /* diff_Point (&p, &object->centroid, &pilot->view_origin); */
-            /* proj_Point (&p, &pilot->view_basis.pts[ForwardDim], &p); */
-            /* summ_Point (&p, &p, &pilot->view_origin); */
         summ_Point (&p, &ray.origin, &ray.direct);
 
         gluLookAt (pilot->view_origin.coords[RightDim],
@@ -341,9 +341,9 @@ ogl_redraw (const RaySpace* space, uint pilot_idx)
     }
     else
     {
+            /* TODO: Orthographic mode doesn't work!*/
         uint max_n;
         real horz, vert;
-        GLdouble matrix[16];
         if (width >= height)  max_n = width;
         else                  max_n = height;
         horz = .5 * pilot->ray_image.hifov * (width / (real) max_n);
@@ -351,9 +351,7 @@ ogl_redraw (const RaySpace* space, uint pilot_idx)
 
         glOrtho (-horz, horz, -vert, vert,
                  1, 3 * magnitude_Point (&space->main.box.max));
-
-        ogl_matrix (matrix, &pilot->view_origin, &pilot->view_basis);
-        glMultMatrixd (matrix);
+        map0_ogl_matrix (&pilot->view_origin, &pilot->view_basis);
     }
 
         /* We don't want to modify the projection matrix. */
@@ -372,18 +370,65 @@ ogl_redraw (const RaySpace* space, uint pilot_idx)
                                    &pilot->view_origin, &pilot->view_basis);
 }
 
+static void
+ogl_set_ObjectSurface (const ObjectSurface* surf, const Scene* scene)
+{
+    Material default_material;
+    const Material* matl;
+    GLfloat color[4];
+    GLint loc;
+    uint j;
+
+    if (surf->material < scene->nmatls)
+    {
+        matl = &scene->matls[surf->material];
+    }
+    else
+    {
+        init_Material (&default_material);
+        matl = &default_material;
+    }
+
+    color[3] = matl->opacity;
+    UFor( j, 3 )  color[j] = matl->ambient[j];
+    glMaterialfv (GL_FRONT_AND_BACK, GL_AMBIENT, color);
+
+    UFor( j, 3 )  color[j] = matl->diffuse[j];
+    glMaterialfv (GL_FRONT_AND_BACK, GL_DIFFUSE, color);
+
+    UFor( j, 3 )  color[j] = matl->specular[j];
+    glMaterialfv (GL_FRONT_AND_BACK, GL_SPECULAR, color);
+
+    glMaterialf (GL_FRONT_AND_BACK, GL_SHININESS,
+                 matl->optical_density);
+
+    loc = glGetUniformLocation (shader_program, "HaveDiffuseTex");
+    if (matl->diffuse_texture < Max_uint)
+    {
+        glUniform1i (loc, 1);
+        glEnable (GL_TEXTURE_2D);
+        glActiveTexture (GL_TEXTURE0);
+        glBindTexture (GL_TEXTURE_2D, matl->diffuse_texture);
+        loc = glGetUniformLocation (shader_program, "DiffuseTex");
+        glUniform1i (loc, 0);
+    }
+    else
+    {
+        glUniform1i (loc, 0);
+        glDisable (GL_TEXTURE_2D);
+    }
+}
+
     void
 ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object,
                            const Point* view_origin,
                            const PointXfrm* view_basis)
 {
-    Material default_material;
-    GLdouble matrix[16];
     const Scene* scene;
     uint i;
+#if NDimensions == 4
     bool first_elem = true;
     uint material_idx = Max_uint;
-#if NDimensions == 4
 # ifdef Match4dGeom
     AffineMap affine_map;
     AffineMap* map;
@@ -391,15 +436,14 @@ ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object,
 # else
     Scene interp4d_scene;
 # endif
-#else
+#else  /* ^^^ NDimensions == 4 */
+    GLuint vbos[3];
     (void) view_origin;
     (void) view_basis;
-#endif
+#endif  /* NDimensions != 4 */
 
     if (!object->visible)  return;
     scene = &object->scene;
-
-    init_Material (&default_material);
 
 #if NDimensions == 4
 # ifdef Match4dGeom
@@ -420,7 +464,7 @@ ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object,
         scene = &interp4d_scene;
     }
 # endif
-#endif
+#endif  /* NDimensions == 4 */
 
     UFor( i, scene->ntxtrs )
     {
@@ -436,17 +480,16 @@ ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object,
 
     glPushMatrix ();
 
-    ogl_matrix (matrix, &object->centroid, &object->orientation);
+    map0_ogl_matrix (&object->centroid, &object->orientation);
 
-    glMultMatrixd (matrix);
-
+#if NDimensions == 4
         /* Send our triangle data to the pipeline. */
     UFor( i, scene->nelems )
     {
         const SceneElement* elem;
         uint nelems = 1;
-        GLdouble verts[6*3];
-        GLdouble vnmls[6*3];
+        Point verts[6];
+        Point vnmls[6];
         uint j;
 
         elem = &scene->elems[i];
@@ -455,8 +498,8 @@ ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object,
         nelems = view_element (verts, vnmls, elem, scene, map,
                                &object->simplices[i].plane.normal);
         if (nelems == 0)  continue;
-#else
-# if NDimensions == 4
+#else  /* ^^^ defined(Match4dGeom) */
+
         if (view_basis)
         {
             real d[4];
@@ -464,78 +507,31 @@ ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object,
                 d[j] = scene->verts[elem->verts[j]].coords[DriftDim];
             if (d[0] < d[1] || d[1] != d[2] || d[2] != d[3])  continue;
         }
-# endif
+
         UFor( j, 3 )
         {
-            Point dflt_normal;
-            const Point* p;
             uint idx;
 
             idx = j;
-# if NDimensions == 4
             if (view_basis)  idx += 1;
-# endif
 
-            p = &scene->verts[elem->verts[idx]];
-            ogl_vec_Point (&verts[j*3], p);
+            verts[j] = scene->verts[elem->verts[idx]];
 
             if (elem->vnmls[idx] < scene->nvnmls)
-            {
-                p = &scene->vnmls[elem->vnmls[idx]];
-            }
+                vnmls[j] = scene->vnmls[elem->vnmls[idx]];
             else
-            {
-                normalize_Point (&dflt_normal,
+                normalize_Point (&vnmls[j],
                                  &object->simplices[i].plane.normal);
-                p = &dflt_normal;
-            }
-            ogl_vec_Point (&vnmls[j*3], p);
         }
-#endif
+#endif  /* !defined(Match4dGeom) */
 
         if (first_elem || elem->material != material_idx)
         {
-            const Material* matl;
-            GLfloat color[4];
-            GLint loc;
-
             if (!first_elem)  glEnd ();
             else              first_elem = false;
 
             material_idx = elem->material;
-            if (material_idx < scene->nmatls)
-                matl = &scene->matls[material_idx];
-            else
-                matl = &default_material;
-
-            color[3] = matl->opacity;
-            UFor( j, 3 )  color[j] = matl->ambient[j];
-            glMaterialfv (GL_FRONT_AND_BACK, GL_AMBIENT, color);
-
-            UFor( j, 3 )  color[j] = matl->diffuse[j];
-            glMaterialfv (GL_FRONT_AND_BACK, GL_DIFFUSE, color);
-
-            UFor( j, 3 )  color[j] = matl->specular[j];
-            glMaterialfv (GL_FRONT_AND_BACK, GL_SPECULAR, color);
-
-            glMaterialf (GL_FRONT_AND_BACK, GL_SHININESS,
-                         matl->optical_density);
-
-            loc = glGetUniformLocation (shader_program, "HaveDiffuseTex");
-            if (matl->diffuse_texture < Max_uint)
-            {
-                glUniform1i (loc, 1);
-                glEnable (GL_TEXTURE_2D);
-                glActiveTexture (GL_TEXTURE0);
-                glBindTexture (GL_TEXTURE_2D, matl->diffuse_texture);
-                loc = glGetUniformLocation (shader_program, "DiffuseTex");
-                glUniform1i (loc, 0);
-            }
-            else
-            {
-                glUniform1i (loc, 0);
-                glDisable (GL_TEXTURE_2D);
-            }
+            ogl_set_ObjectSurface (&scene->surfs[elem->surface], scene);
 
             glBegin (GL_TRIANGLES);
         }
@@ -545,7 +541,10 @@ ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object,
                 /* if (j % 3 == 0)  glColor3f (1, 0, 0); */
                 /* if (j % 3 == 1)  glColor3f (0, 1, 0); */
                 /* if (j % 3 == 2)  glColor3f (0, 0, 1); */
-            glNormal3dv (&vnmls[j*3]);
+
+            glNormal3f (vnmls[j].coords[0],
+                        vnmls[j].coords[1],
+                        vnmls[j].coords[2]);
 
             if (elem->txpts[j%3] < Max_uint)
             {
@@ -553,11 +552,70 @@ ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object,
                 p = &scene->txpts[elem->txpts[j%3]];
                 glTexCoord2f (p->coords[0], p->coords[1]);
             }
+            glVertex3f (verts[j].coords[0],
+                        verts[j].coords[1],
+                        verts[j].coords[2]);
 
-            glVertex3dv (&verts[j*3]);
+
         }
     }
     if (scene->nelems > 0)  glEnd ();
+#else  /* ^^^ NDimensions == 4 */
+
+    glGenBuffers(3, vbos);
+    glBindBuffer (GL_ARRAY_BUFFER, vbos[0]);
+    glBufferData (GL_ARRAY_BUFFER, scene->nverts * sizeof (Point),
+                  scene->verts, GL_STATIC_DRAW);
+    glBindBuffer (GL_ARRAY_BUFFER, vbos[1]);
+    glBufferData (GL_ARRAY_BUFFER, scene->nvnmls * sizeof (Point),
+                  scene->vnmls, GL_STATIC_DRAW);
+    glBindBuffer (GL_ARRAY_BUFFER, vbos[2]);
+    glBufferData (GL_ARRAY_BUFFER, scene->ntxpts * sizeof (BaryPoint),
+                  scene->txpts, GL_STATIC_DRAW);
+#if 0
+    glBindBuffer (GL_ELEMENT_ARRAY_BUFFER, elem_indices);
+    glBufferData (GL_ELEMENT_ARRAY_BUFFER,
+                  scene->nelems * sizeof (SceneElement),
+                  scene->elems,
+                  GL_STATIC_DRAW);
+#endif
+
+    UFor( i, scene->nsurfs )
+    {
+        const ObjectSurface* surf;
+        surf = &scene->surfs[i];
+        ogl_set_ObjectSurface (surf, scene);
+
+        glBindBuffer (GL_ARRAY_BUFFER, vbos[0]);
+        glVertexPointer (3, GL_REAL, sizeof (Point),
+                         surf->verts_offset + (Point*) 0);
+        glEnableClientState (GL_VERTEX_ARRAY);
+        if (surf->vnmls_offset < Max_uint)
+        {
+            glBindBuffer (GL_ARRAY_BUFFER, vbos[1]);
+            glNormalPointer (GL_REAL, sizeof (Point),
+                             surf->vnmls_offset + (Point*) 0);
+            glEnableClientState (GL_NORMAL_ARRAY);
+        }
+        if (surf->txpts_offset < Max_uint)
+        {
+            glBindBuffer (GL_ARRAY_BUFFER, vbos[2]);
+            glTexCoordPointer (2, GL_REAL, sizeof (BaryPoint),
+                               surf->txpts_offset + (BaryPoint*) 0);
+            glEnableClientState (GL_TEXTURE_COORD_ARRAY);
+        }
+        glDrawArrays (GL_TRIANGLES, 0, 3 * surf->nelems);
+
+        glDisableClientState (GL_VERTEX_ARRAY);
+        if (surf->vnmls_offset < Max_uint)
+            glDisableClientState (GL_NORMAL_ARRAY);
+        if (surf->txpts_offset < Max_uint)
+            glDisableClientState (GL_TEXTURE_COORD_ARRAY);
+    }
+
+    glBindBuffer (GL_ARRAY_BUFFER, 0);
+    glDeleteBuffers (3, vbos);
+#endif  /* NDimensions != 4 */
 
     glPopMatrix ();
 
@@ -579,8 +637,8 @@ ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object,
 
 #ifdef Match4dGeom
 static void
-view_element_helpfn (GLdouble* ret_verts,
-                     GLdouble* ret_vnmls,
+view_element_helpfn (Point* ret_verts,
+                     Point* ret_vnmls,
                      const real* alphas,
                      uint (* inds)[2],
                      const Point* verts,
@@ -599,20 +657,19 @@ view_element_helpfn (GLdouble* ret_verts,
                   ,+, (    alpha)*, verts[inds[i][0]].coords
                   ,   (1 - alpha)*, verts[inds[i][1]].coords );
 
-        ogl_vec_Point (&ret_verts[i*3], &v);
+        ret_verts[i] = v;
 
         Op_21010( real, 3, v.coords
                   ,+, (    alpha)*, vnmls[inds[i][0]].coords
                   ,   (1 - alpha)*, vnmls[inds[i][1]].coords );
 
-        normalize_Point (&v, &v);
-        ogl_vec_Point (&ret_vnmls[i*3], &v);
+        normalize_Point (&ret_vnmls[i], &v);
     }
 }
 
     uint
-view_element (GLdouble* ret_verts,
-              GLdouble* ret_vnmls,
+view_element (Point* ret_verts,
+              Point* ret_vnmls,
               const SceneElement* elem,
               const Scene* scene,
               const AffineMap* map,
@@ -664,17 +721,18 @@ view_element (GLdouble* ret_verts,
         else
             copy_Point (&vnmls[i], normal);
 
-        mapovec_Point (&vnmls[i], map, &vnmls[i]);
+        mapo_Point (&vnmls[i], map, &vnmls[i]);
     }
 
-    view_element_helpfn (ret_verts, ret_vnmls, alphas, inds, verts, vnmls);
+    view_element_helpfn (&ret_verts[0], &ret_vnmls[0],
+                         alphas, inds, verts, vnmls);
     if (k == 3)  return 1;
 
     inds[0][0] = inds[3][0];
     inds[0][1] = inds[3][1];
-    view_element_helpfn (&ret_verts[3*3], &ret_vnmls[3*3],
+    view_element_helpfn (&ret_verts[3], &ret_vnmls[3],
                          alphas, inds, verts, vnmls);
     return 2;
 }
-#endif
+#endif  /* defined(Match4dGeom) */
 

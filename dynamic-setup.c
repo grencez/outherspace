@@ -25,6 +25,7 @@ interpolate_by_file (Scene* dst,
 
     assert (NDimensions ==  4);
     if (NDimensions != 4)  return false;
+    if (nscenes == 0)  return false;
 
     scenes = AllocT( Scene, nscenes );
 
@@ -56,7 +57,9 @@ interpolate_by_file (Scene* dst,
 
     interpolate_Scene (dst, NDimensions-1, nscenes, scenes);
 
-    if (scenes)  free (scenes);
+    UFor( i, nscenes )
+        cleanup_Scene (&scenes[i]);
+    free (scenes);
     return good;
 }
 
@@ -67,15 +70,11 @@ interpolate_Track (Track* track, real map_scale)
     const real max_drift = 1000;
     real scale;
     uint i;
-    Scene* scenes;
 
     assert (NDimensions == 4);
     assert (track->nmorphs > 1);
 
-    scale = max_drift;
-    scale /= map_scale * track->morph_dcoords[track->nmorphs-1];
-
-    scenes = AllocT( Scene, track->nmorphs );
+    scale = max_drift / track->morph_dcoords[track->nmorphs-1];
 
     UFor( i, track->nmorphs )
     {
@@ -84,16 +83,16 @@ interpolate_Track (Track* track, real map_scale)
         Scene* scene;
 
         scene = &track->morph_scenes[i];
-        dcoord = scale * track->morph_dcoords[i];
-        track->morph_dcoords[i] = dcoord;
+
+        track->morph_dcoords[i] *= scale;
+        dcoord = track->morph_dcoords[i] / map_scale;
 
         UFor( j, scene->nverts )
             scene->verts[j].coords[NDimensions-1] = dcoord;
-        copy_Scene (&scenes[i], scene);
     }
 
-    interpolate_Scene (&track->scene, NDimensions-1, track->nmorphs, scenes);
-    if (scenes)  free (scenes);
+    interpolate_Scene (&track->scene, NDimensions-1,
+                       track->nmorphs, track->morph_scenes);
 }
 
     bool

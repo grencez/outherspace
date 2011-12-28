@@ -181,9 +181,17 @@ readin_SDL_Image (Texture* texture,
         {
             uint idx;
             Uint8 r, g, b;
-            Uint32 pixel;
-            pixel = *(Uint32*)&scanline[col*fmt->BytesPerPixel];
-            SDL_GetRGB (pixel, fmt, &r, &g, &b);
+            union LocalUnion
+            {
+                Uint32 u;
+                byte bytes[Ceil_uint( 32, NBitsInByte )];
+            } pixel;
+
+            pixel.u = 0;
+            UFor( idx, fmt->BytesPerPixel )
+                pixel.bytes[idx] = scanline[idx + col*fmt->BytesPerPixel];
+
+            SDL_GetRGB (pixel.u, fmt, &r, &g, &b);
             idx = 3 * (row * ncols + col);
             texture->pixels[idx+0] = r;
             texture->pixels[idx+1] = g;
@@ -193,7 +201,7 @@ readin_SDL_Image (Texture* texture,
     SDL_FreeSurface (surface);
     return true;
 }
-#endif
+#endif  /* defined(SupportImage) */
 
     bool
 readin_Texture (Texture* texture, const char* pathname, const char* filename)

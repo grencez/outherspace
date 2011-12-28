@@ -9,6 +9,7 @@
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
 typedef struct SceneElement SceneElement;
+typedef struct ObjectSurface ObjectSurface;
 typedef struct Scene Scene;
 
 struct SceneElement
@@ -17,17 +18,29 @@ struct SceneElement
     uint vnmls[NDimensions];
     uint txpts[NDimensions];
     uint material;
+    uint surface;
+};
+
+struct ObjectSurface
+{
+    uint nelems;
+    uint verts_offset;
+    uint vnmls_offset;
+    uint txpts_offset;
+    uint material;
 };
 
 struct Scene
 {
     uint nelems;
+    uint nsurfs;
     uint nverts;
     uint nvnmls;
     uint ntxpts;
     uint nmatls;
     uint ntxtrs;
     SceneElement* elems; /* Elements.*/
+    ObjectSurface* surfs; /* Surfaces.*/
     Point* verts; /* Vertices.*/
     Point* vnmls; /* Vertex normals.*/
     BaryPoint* txpts; /* Texture points.*/
@@ -44,6 +57,8 @@ recenter_Scene (AffineMap* map, const Scene* scene,
 #ifndef __OPENCL_VERSION__
 void init_Scene (Scene* scene);
 void init_SceneElement (SceneElement* elem);
+void
+init_ObjectSurface (ObjectSurface* surf);
 void copy_SceneElement (SceneElement* dst, const SceneElement* src);
 void cleanup_Scene (Scene* scene);
 void

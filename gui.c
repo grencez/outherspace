@@ -956,6 +956,9 @@ sdl_main (RaySpace* space, const char* pathname)
         SDL_DestroySemaphore (param->sig);
     }
 
+#ifdef SupportOpenGL
+    cleanup_ogl_ui_data ();
+#endif
     SDL_Quit ();
     if (icon)  SDL_FreeSurface (icon);
 }

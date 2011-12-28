@@ -42,6 +42,7 @@ brutefill_between_simplices (SceneElement* dst_elems,
 void init_Scene (Scene* scene)
 {
     scene->nelems = 0;
+    scene->nsurfs = 0;
     scene->nverts = 0;
     scene->nvnmls = 0;
     scene->ntxpts = 0;
@@ -53,6 +54,7 @@ void init_SceneElement (SceneElement* elem)
 {
     uint i;
     elem->material = Max_uint;
+    elem->surface = Max_uint;
     UFor( i, NDimensions )
     {
         elem->vnmls[i] = Max_uint;
@@ -65,9 +67,21 @@ void copy_SceneElement (SceneElement* dst, const SceneElement* src)
     *dst = *src;
 }
 
+    void
+init_ObjectSurface (ObjectSurface* surf)
+{
+    surf->nelems = 0;
+    surf->verts_offset = Max_uint;
+    surf->vnmls_offset = Max_uint;
+    surf->txpts_offset = Max_uint;
+    surf->material = Max_uint;
+}
+
+
 void cleanup_Scene (Scene* scene)
 {
     if (scene->nelems > 0)  free (scene->elems);
+    if (scene->nsurfs > 0)  free (scene->surfs);
     if (scene->nverts > 0)  free (scene->verts);
     if (scene->nvnmls > 0)  free (scene->vnmls);
     if (scene->ntxpts > 0)  free (scene->txpts);
@@ -87,6 +101,7 @@ copy_Scene (Scene* dst, const Scene* src)
     uint i;
     CopyT( Scene, dst, src, 0, 1 );
     dst->elems = DuplicaT( SceneElement, dst->elems, dst->nelems );
+    dst->surfs = DuplicaT( ObjectSurface, dst->surfs, dst->nsurfs );
     dst->verts = DuplicaT( Point, dst->verts, dst->nverts );
     dst->vnmls = DuplicaT( Point, dst->vnmls, dst->nvnmls );
     dst->txpts = DuplicaT( BaryPoint, dst->txpts, dst->ntxpts );
@@ -111,6 +126,8 @@ concat0_Scene (Scene* scene, Scene* src)
 
     ConcaT( SceneElement, scene->elems, src->elems,
             scene->nelems, src->nelems );
+    ConcaT( ObjectSurface, scene->surfs, src->surfs,
+            scene->nsurfs, src->nsurfs );
     ConcaT( Point, scene->verts, src->verts, scene->nverts, src->nverts );
     ConcaT( Point, scene->vnmls, src->vnmls, scene->nvnmls, src->nvnmls );
     ConcaT( BaryPoint, scene->txpts, src->txpts, scene->ntxpts, src->ntxpts );
@@ -131,8 +148,18 @@ concat0_Scene (Scene* scene, Scene* src)
             if (elem->txpts[dim] < Max_uint)
                 elem->txpts[dim] += orig.ntxpts;
         }
-        if (elem->material < Max_uint)
-            elem->material += orig.nmatls;
+        if (elem->material < Max_uint)  elem->material += orig.nmatls;
+        if (elem->surface < Max_uint)  elem->surface += orig.nsurfs;
+    }
+
+    UFor( i, src->nsurfs )
+    {
+        ObjectSurface* surf;
+        surf = &scene->surfs[i + orig.nsurfs];
+        if (surf->verts_offset < Max_uint)  surf->verts_offset += orig.nverts;
+        if (surf->vnmls_offset < Max_uint)  surf->vnmls_offset += orig.nvnmls;
+        if (surf->txpts_offset < Max_uint)  surf->txpts_offset += orig.ntxpts;
+        if (surf->material < Max_uint)  surf->material += orig.nmatls;
     }
 
     UFor( i, src->nmatls )
@@ -188,11 +215,18 @@ setup_1elem_Scene (Scene* scene)
     init_Scene (scene);
 
     scene->nelems = 1;
+    scene->nsurfs = 1;
     scene->nverts = NDimensions;
     scene->elems = AllocT( SceneElement, scene->nelems );
+    scene->surfs = AllocT( ObjectSurface, scene->nsurfs );
     scene->verts = AllocT( Point, scene->nverts );
 
+    init_ObjectSurface (&scene->surfs[0]);
+    scene->surfs[0].nelems = 1;
+    scene->surfs[0].verts_offset = 0;
+
     init_SceneElement (&scene->elems[0]);
+    scene->elems[0].surface = 0;
 
     UFor( i, scene->nverts )
     {
@@ -386,7 +420,6 @@ midfill_between_simplices (SceneElement* dst_elems,
         SceneElement* elem;
         elem = &dst_elems[i];
         init_SceneElement (elem);
-        elem->material = a->material;
         UFor( j, k+1 )
         {
             elem->verts[j] = vertidcs[elems[i][j]];
@@ -475,7 +508,6 @@ brutefill_between_simplices (SceneElement* dst_elems,
         if (!degenerate_Simplex (&simplex))
         {
             ecount += 1;
-            elem->material = a->material;
         }
 #if 0
         else
@@ -497,13 +529,14 @@ brutefill_between_simplices (SceneElement* dst_elems,
 interpolate_Scene (Scene* dst, uint k, uint nscenes, const Scene* scenes)
 {
     uint i;
-    uint nelems, nverts, nvnmls, nmatls;
+    uint nelems, nsurfs, nverts, nvnmls, nmatls;
     uint ecount = 0;  /* Element count.*/
     uint vcount = 0;  /* Vertex count.*/
     uint vnmlcount = 0;  /* Vertex normal count.*/
 
     assert (nscenes > 0);
     nelems = scenes[0].nelems;
+    nsurfs = scenes[0].nsurfs;
     nverts = scenes[0].nverts;
     nvnmls = scenes[0].nvnmls;
     nmatls = scenes[0].nmatls;
@@ -521,6 +554,8 @@ interpolate_Scene (Scene* dst, uint k, uint nscenes, const Scene* scenes)
             /* This assertion is necessary.*/
         assert (scenes[i+1].nelems == nelems);
             /* This assertion would be difficult to work around.*/
+        assert (scenes[i+1].nsurfs == nsurfs);
+            /* This assertion would be difficult to work around.*/
         assert (scenes[i+1].nverts == nverts);
             /* Constant vertex normal counts.*/
         assert (scenes[i+1].nvnmls == nvnmls);
@@ -537,6 +572,10 @@ interpolate_Scene (Scene* dst, uint k, uint nscenes, const Scene* scenes)
                 /* Don't feel like interpolating materials.*/
             assert (scenes[0].elems[ei].material ==
                     scenes[i+1].elems[ei].material);
+
+                /* Don't feel like chopping up surfaces.*/
+            assert (scenes[0].elems[ei].surface ==
+                    scenes[i+1].elems[ei].surface);
         }
             /* The /k/+1th coordinate of each vertex has a total order
              * from scene to scene. Stronger assertions against crossing
@@ -559,6 +598,9 @@ interpolate_Scene (Scene* dst, uint k, uint nscenes, const Scene* scenes)
     dst->nelems = (nscenes-1) * nelems * simplex_fill_count (k);
     dst->elems = AllocT( SceneElement, dst->nelems );
 
+    dst->nsurfs = nsurfs;
+    dst->surfs = DuplicaT( ObjectSurface, scenes[0].surfs, dst->nsurfs );
+
     vcount = nscenes * nverts;
     dst->nverts = vcount + dst->nelems;
     dst->verts = AllocT( Point, dst->nverts );
@@ -567,7 +609,7 @@ interpolate_Scene (Scene* dst, uint k, uint nscenes, const Scene* scenes)
     dst->nvnmls = vnmlcount + dst->nelems;
     dst->vnmls = AllocT( Point, dst->nvnmls );
     dst->nmatls = nmatls;
-    dst->matls = AllocT( Material, dst->nmatls );
+    dst->matls = DuplicaT( Material, scenes[0].matls, dst->nmatls );
     
         /* Copy info.*/
     UFor( i, nscenes )
@@ -575,7 +617,8 @@ interpolate_Scene (Scene* dst, uint k, uint nscenes, const Scene* scenes)
         CopyT( Point, dst->verts, scenes[i].verts, i * nverts, nverts );
         CopyT( Point, dst->vnmls, scenes[i].vnmls, i * nvnmls, nvnmls );
     }
-    CopyT( Material, dst->matls, scenes[0].matls, 0, nmatls );
+    UFor( i, nsurfs )
+        dst->surfs[i].nelems = 0;
 
         /* Create /k/-dimensional simplices.*/
     UFor( i, nscenes-1 )
@@ -596,12 +639,18 @@ interpolate_Scene (Scene* dst, uint k, uint nscenes, const Scene* scenes)
         UFor( ei, nelems )
         {
             uint x;
+            uint j;
+            const SceneElement* a_elem;  const SceneElement* b_elem;
             SceneElement* dst_elems;
+
+            a_elem = &a->elems[ei];
+            b_elem = &b->elems[ei];
             dst_elems = &dst->elems[ecount];
+
             if (false)
                 x = brutefill_between_simplices (dst_elems,
                                                  k,
-                                                 &a->elems[ei], &b->elems[ei],
+                                                 a_elem, b_elem,
                                                  a_vert_offset, b_vert_offset,
                                                  a_vnml_offset, b_vnml_offset,
                                                  dst->verts);
@@ -611,15 +660,22 @@ interpolate_Scene (Scene* dst, uint k, uint nscenes, const Scene* scenes)
                                                &vcount, dst->verts,
                                                &vnmlcount, dst->vnmls,
                                                k,
-                                               &a->elems[ei], &b->elems[ei],
+                                               a_elem, b_elem,
                                                a_vert_offset, b_vert_offset,
                                                a_vnml_offset, b_vnml_offset);
             else
                 x = fill_between_simplices (dst_elems, k,
-                                            &a->elems[ei], &b->elems[ei],
+                                            a_elem, b_elem,
                                             a_vert_offset, b_vert_offset,
                                             a_vnml_offset, b_vnml_offset);
+
             ecount += x;
+
+            UFor( j, x )
+            {
+                dst_elems[j].material = a_elem->material;
+                dst_elems[j].surface = a_elem->surface;
+            }
         }
     }
 
@@ -846,6 +902,9 @@ condense_Scene (Scene* scene)
     uint* jumps;
     uint* indices;
     real* coords;
+
+        /* TODO: Do something here?*/
+    return;
 
     max_n = scene->nverts;
     if (scene->nvnmls > max_n)  max_n = scene->nvnmls;

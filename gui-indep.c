@@ -321,6 +321,7 @@ setup_laser_scenes (RaySpace* space)
             object->scene.nmatls = 1;
             object->scene.matls = mat;
             object->scene.elems[0].material = 0;
+            object->scene.surfs[0].material = 0;
 
             relative_laser_origin (&origin, side, &space->objects[i]);
             copy_Point (&destin, &origin);
@@ -661,6 +662,7 @@ init_ui_data (RaySpace* space, const char* inpathname)
         scene->matls = AllocT( Material, scene->nmatls );
         matl = &scene->matls[0];
         scene->elems[0].material = 0;
+        scene->surfs[0].material = 0;
 
         init_Material (matl);
         matl->diffuse[0] = .8824;
