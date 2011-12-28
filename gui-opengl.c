@@ -91,7 +91,11 @@ static
     void
 init_ogl_ui_data ()
 {
-#include "phong.glsl.h"
+#ifndef ShaderSourceInclude
+#define ShaderSourceInclude "phong.glsl.h"
+#endif
+#include ShaderSourceInclude
+
     GLint status = GL_NO_ERROR; 
     FILE* err = stderr;
 

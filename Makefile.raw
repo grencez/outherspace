@@ -1,4 +1,8 @@
 
+# Optional user-defined variables:
+Flags=  # Override default CONFIG value (see below).
+Pfx= # Prefix all output files. May include directory path.
+
 #CC = clang
 CC = gcc
 #CC = llvm-gcc
@@ -6,13 +10,12 @@ CC = gcc
 
 # Use CONFIG += c++ with these.
 #CXX = clang++
-#CXX = g++
-
-DFLAGS += -DNDimensions=3
+CXX = g++
 
 CONFIG += image
-CONFIG += sound
+#CONFIG += sound
 
+#CONFIG += 4d
 #CONFIG += c++
 CONFIG += ansi
 #CONFIG += c99
@@ -29,13 +32,19 @@ CONFIG += openmp
 #CONFIG += macapp
 #CONFIG += haptic
 #CONFIG += opengl match4dgeom
-#CONFIG += opengl
+CONFIG += opengl
 #CONFIG += local_sdl
 #CONFIG += sunstudio
 
 # Use only for testing, slower in the general case.
 #CONFIG += sse
 
+ifneq (,$(Flags))
+	CONFIG = $(Flags)
+endif
+
+
+###### Notes for me ######
 
 # For ICC:
 #   source $HOME/local/stow/icc-2011.5.220/bin/iccvars.sh intel64
@@ -65,6 +74,10 @@ ifneq (,$(filter image,$(CONFIG)))
 endif
 ifneq (,$(filter sound,$(CONFIG)))
 	GuiDFlags += -DSupportSound
+endif
+
+ifneq (,$(filter 4d,$(CONFIG)))
+	DFLAGS += -DNDimensions=4
 endif
 
 GuiMainCSources = gui.c gui-indep.c gui-opengl.c
@@ -211,6 +224,16 @@ ifneq (,$(filter match4dgeom,$(CONFIG)))
 	GuiDFlags += -DMatch4dGeom
 endif
 
+ifneq (,$(Pfx))
+	DFLAGS += '-DShaderSourceInclude="$(Pfx)phong.glsl.h"'
+endif
+
+ifeq ($(Pfx),$(notdir $(Pfx)))
+	RunPfx = ./$(Pfx)
+else
+	RunPfx = $(Pfx)
+endif
+
 
 CSources = affine.c \
 		   bitstring.c \
@@ -239,11 +262,14 @@ endif
 
 LFLAGS += -lm
 
-default: cli gui verify
-	# Done!
+default_exes = $(Pfx)cli $(Pfx)gui $(Pfx)verify
+all_exes = $(default_exes) $(Pfx)imgdiff $(Pfx)file2array
 
-all: imgdiff file2array cli gui verify
-	# Done!
+default: $(default_exes)
+	# Finished: default
+
+all: $(all_exes)
+	# Finished: all
 
 # Note: OpenCL code does not function at this time, don't bother.
 OpenCLPath = /home/grencez/ati-stream-sdk-v2.3-lnx64
@@ -256,37 +282,45 @@ hello: hello.c $(CSources)
 test-hello: hello
 	LD_LIBRARY_PATH=$(OpenCLLibPath) ./$<
 
-cli: cli.c compute.c $(CSources)
+$(Pfx)cli: cli.c compute.c $(CSources)
 	$(CC) $(CFLAGS) $(DFLAGS) $< -o $@ $(LFLAGS)
 
 GuiCFlags += $(CFLAGS)
 GuiDFlags += $(DFLAGS)
 GuiLFlags += $(LFLAGS)
-gui: $(GuiMainCSources) compute.c motion.c $(CSources) phong.glsl.h
+$(Pfx)gui: $(GuiMainCSources) compute.c motion.c $(CSources) $(Pfx)phong.glsl.h
 	$(CC) $(GuiCFlags) $(GuiDFlags) $< -o $@ $(GuiLFlags)
 
-phong.glsl.h: phong.vert phong.frag file2array
-	./file2array $@ phong.vert phong.frag
+$(Pfx)phong.glsl.h: phong.vert phong.frag $(Pfx)file2array
+	$(RunPfx)file2array $@ phong.vert phong.frag
 
 VerifyCFlags := $(filter-out -fwhole-program,$(CFLAGS))
 VerifyDFlags := $(filter-out -DINCLUDE_SOURCE,$(DFLAGS))
 VerifyCSources = verif/main.c verif/pack.c
 
-verify: $(VerifyCSources) $(CSources)
+$(Pfx)verify: $(VerifyCSources) $(CSources)
 	$(CC) $(VerifyCFlags) $(VerifyDFlags) -I . $^ -o $@ $(LFLAGS)
 
-imgdiff: imgdiff.c pnm-image.c
+$(Pfx)imgdiff: imgdiff.c pnm-image.c
 	$(CC) $(CFLAGS) $(DFLAGS) -I . $< -o $@ $(LFLAGS)
 
-file2array: file2array.c util.c
+$(Pfx)file2array: file2array.c util.c
 	$(CC) $(CFLAGS) $(DFLAGS) -I . $< -o $@ $(LFLAGS)
 
 .PHONY: test
-test: cli
+test: $(Pfx)cli
 	#valgrind --track-origins=yes ./$<
 	./$<
 
+.PHONY: ways
+ways:
+	$(MAKE) -f Makefile.ways
+
+.PHONY: cleanways
+cleanways:
+	$(MAKE) -f Makefile.ways clean
+
 .PHONY: clean
 clean:
-	rm -f hello cli gui verify imgdiff file2array phong.glsl.h
+	rm -f hello $(all_exes) $(Pfx)phong.glsl.h
 

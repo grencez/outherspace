@@ -1,0 +1,35 @@
+
+# Make some configs.
+
+Pfxs=
+
+define Rule
+Pfxs += way-$(1)-
+.PHONY: way-$(1)-
+way-$(1)-:
+	$(MAKE) Pfx="way-$(1)-" Flags="$(2)" $(3)
+
+.PHONY: clean-way-$(1)-
+clean-way-$(1)-:
+	$(MAKE) Pfx="way-$(1)-" Flags="$(2)" clean
+
+endef
+
+default: all
+
+strict = ansi fast
+$(eval \
+  $(call Rule,common, $(strict) image sound opengl) \
+  $(call Rule,4d-ray,$(strict) 4d) \
+  $(call Rule,4d-ogl,$(strict) 4d) \
+  $(call Rule,4dgeom-ogl,$(strict) 4d match4dgeom) \
+  $(call Rule,pack,$(strict) pack) \
+  $(call Rule,trivialmpi,$(strict) trivialmpi) \
+  $(call Rule,mpi,$(strict) mpi) \
+ )
+
+all: $(Pfxs)
+
+.PHONY: clean
+clean: $(addprefix clean-,$(Pfxs))
+
