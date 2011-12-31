@@ -957,7 +957,7 @@ sdl_main (RaySpace* space, const char* pathname)
     }
 
 #ifdef SupportOpenGL
-    cleanup_ogl_ui_data ();
+    cleanup_ogl_ui_data (space);
 #endif
     SDL_Quit ();
     if (icon)  SDL_FreeSurface (icon);

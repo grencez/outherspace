@@ -7,10 +7,18 @@ varying vec3 E;
 varying vec3 H; // normalize(L+E);
 uniform sampler2D DiffuseTex;
 uniform int HaveDiffuseTex;
+uniform sampler2D NormalTex;
+uniform int HaveNormalTex;
 
 void main()
 {
-    vec3 Normal = normalize(N);
+        /* This part is always == N. Normal mapping doesn't work yet!*/
+    vec3 Normal = ((HaveNormalTex == 2)
+                    ? (gl_NormalMatrix *
+                       texture2D(NormalTex, gl_TexCoord[0].st).xyz)
+                    : N);
+    Normal = normalize(Normal);
+
     vec3 Light  = normalize(L);
     vec3 Eye    = normalize(E);
     vec3 Half   = normalize(H);

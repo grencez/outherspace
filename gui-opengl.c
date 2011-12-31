@@ -4,7 +4,7 @@
 #endif
 #include <SDL_opengl.h>
 
-#ifdef _WIN32
+#ifndef GL_GLEXT_PROTOTYPES
 static PFNGLUSEPROGRAMPROC glUseProgram = 0;
 static PFNGLLINKPROGRAMPROC glLinkProgram = 0;
 static PFNGLCOMPILESHADERPROC glCompileShader = 0;
@@ -16,6 +16,12 @@ static PFNGLACTIVETEXTUREPROC glActiveTexture = 0;
 static PFNGLUNIFORM1IPROC glUniform1i = 0;
 static PFNGLGETUNIFORMLOCATIONPROC glGetUniformLocation = 0;
 static PFNGLGETSHADERIVPROC glGetShaderiv = 0;
+
+static PFNGLDELETEPROGRAMPROC glDeleteProgram = 0;
+static PFNGLDELETESHADERPROC glDeleteShader = 0;
+static PFNGLGENBUFFERSPROC glGenBuffers = 0;
+static PFNGLBINDBUFFERPROC glBindBuffer = 0;
+static PFNGLBUFFERDATAPROC glBufferData = 0;
 #endif
 
 #ifdef main
@@ -31,14 +37,25 @@ static PFNGLGETSHADERIVPROC glGetShaderiv = 0;
 # endif
 #endif
 
+typedef struct SceneGL SceneGL;
+
+struct SceneGL
+{
+    GLuint verts_buffer;
+    GLuint vnmls_buffer;
+    GLuint txpts_buffer;
+    GLuint texture_offset;
+};
+
+SceneGL* scenegls = 0;
 GLuint vert_shader;
 GLuint frag_shader;
 GLuint shader_program;
 
 
-
 static void
 ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object,
+                           uint objidx,
                            const Point* view_origin,
                            const PointXfrm* view_basis);
 #ifdef Match4dGeom
@@ -101,7 +118,7 @@ init_ogl_ui_data ()
 
     (void) nfiles;
 
-#ifdef _WIN32
+#ifndef GL_GLEXT_PROTOTYPES
     glUseProgram = (PFNGLUSEPROGRAMPROC) SDL_GL_GetProcAddress ("glUseProgram");
     glLinkProgram = (PFNGLLINKPROGRAMPROC) SDL_GL_GetProcAddress ("glLinkProgram");
     glCompileShader = (PFNGLCOMPILESHADERPROC) SDL_GL_GetProcAddress ("glCompileShader");
@@ -114,6 +131,12 @@ init_ogl_ui_data ()
     glGetUniformLocation = (PFNGLGETUNIFORMLOCATIONPROC) SDL_GL_GetProcAddress ("glGetUniformLocation");
     glGetShaderiv = (PFNGLGETSHADERIVPROC) SDL_GL_GetProcAddress ("glGetShaderiv");
 
+    glDeleteProgram = (PFNGLDELETEPROGRAMPROC) SDL_GL_GetProcAddress ("glDeleteProgram");
+    glDeleteShader = (PFNGLDELETESHADERPROC) SDL_GL_GetProcAddress ("glDeleteShader");
+    glGenBuffers = (PFNGLGENBUFFERSPROC) SDL_GL_GetProcAddress ("glGenBuffers");
+    glBindBuffer = (PFNGLBINDBUFFERPROC) SDL_GL_GetProcAddress ("glBindBuffer");
+    glBufferData = (PFNGLBUFFERDATAPROC) SDL_GL_GetProcAddress ("glBufferData");
+
     if (!glUseProgram) { fputs ("glUseProgram\n", err); exit(1); }
     if (!glLinkProgram) { fputs ("glLinkProgram\n", err); exit(1); }
     if (!glCompileShader) { fputs ("glCompileShader\n", err); exit(1); }
@@ -125,6 +148,12 @@ init_ogl_ui_data ()
     if (!glUniform1i) { fputs ("glUniform1i\n", err); exit(1); }
     if (!glGetUniformLocation) { fputs ("glGetUniformLocation\n", err); exit(1); }
     if (!glGetShaderiv) { fputs ("glGetShaderiv\n", err); exit(1); }
+
+    if (!glDeleteProgram) { fputs ("glDeleteProgram\n", err); exit(1); }
+    if (!glDeleteShader) { fputs ("glDeleteShader\n", err); exit(1); }
+    if (!glGenBuffers) { fputs ("glGenBuffers\n", err); exit(1); }
+    if (!glBindBuffer) { fputs ("glBindBuffer\n", err); exit(1); }
+    if (!glBufferData) { fputs ("glBufferData\n", err); exit(1); }
     fputs ("Loaded all required function pointers!\n", err);
 #endif
 
@@ -174,12 +203,39 @@ init_ogl_ui_data ()
 }
 
 static void
-cleanup_ogl_ui_data ()
+cleanup_ogl_ui_data (const RaySpace* space)
 {
+    uint scenei;
     glUseProgram (0);
     glDeleteProgram (shader_program);
     glDeleteShader (vert_shader);
     glDeleteShader (frag_shader);
+
+    UFor( scenei, space->nobjects+1 )
+    {
+            /* GLuint vbos[3]; */
+        SceneGL* scenegl;
+        const Scene* scene;
+
+        scenegl = &scenegls[scenei];
+        if (scenei < space->nobjects)
+            scene = &space->objects[scenei].scene;
+        else
+            scene = &space->main.scene;
+
+            /* glDeleteBuffers (3, vbos); */
+
+        if (scene->ntxtrs > 0)
+        {
+            GLuint* ids;
+            uint i;
+            ids = AllocT( GLuint, scene->ntxtrs );
+            UFor( i, scene->ntxtrs )
+                ids[i] = i + scenegl->texture_offset;
+            glDeleteTextures (scene->ntxtrs, ids);
+            free (ids);
+        }
+    }
 }
 
 static
@@ -197,6 +253,60 @@ ogl_setup (const RaySpace* space)
     {   GL_LIGHT0, GL_LIGHT1, GL_LIGHT2, GL_LIGHT3,
         GL_LIGHT4, GL_LIGHT5, GL_LIGHT6, GL_LIGHT7
     };
+    uint i;
+    uint ntextures = 0;
+
+    if (!scenegls)
+    {
+        scenegls = AllocT( SceneGL, space->nobjects+1 );
+        UFor( i, space->nobjects+1 )
+        {
+            GLuint vbos[3];
+            SceneGL* scenegl;
+            const Scene* scene;
+            uint texi;
+
+            scenegl = &scenegls[i];
+            if (i < space->nobjects)
+                scene = &space->objects[i].scene;
+            else
+                scene = &space->main.scene;
+
+            glGenBuffers(3, vbos);
+            scenegl->verts_buffer = vbos[0];
+            scenegl->vnmls_buffer = vbos[1];
+            scenegl->txpts_buffer = vbos[2];
+
+            glBindBuffer (GL_ARRAY_BUFFER, scenegl->verts_buffer);
+            glBufferData (GL_ARRAY_BUFFER, scene->nverts * sizeof (Point),
+                          scene->verts, GL_STATIC_DRAW);
+            glBindBuffer (GL_ARRAY_BUFFER, scenegl->vnmls_buffer);
+            glBufferData (GL_ARRAY_BUFFER, scene->nvnmls * sizeof (Point),
+                          scene->vnmls, GL_STATIC_DRAW);
+            glBindBuffer (GL_ARRAY_BUFFER, scenegl->txpts_buffer);
+            glBufferData (GL_ARRAY_BUFFER, scene->ntxpts * sizeof (BaryPoint),
+                          scene->txpts, GL_STATIC_DRAW);
+#if 0
+            glBindBuffer (GL_ELEMENT_ARRAY_BUFFER, elem_indices);
+            glBufferData (GL_ELEMENT_ARRAY_BUFFER,
+                          scene->nelems * sizeof (SceneElement),
+                          scene->elems,
+                          GL_STATIC_DRAW);
+#endif
+
+            scenegl->texture_offset = ntextures;
+            UFor( texi, scene->ntxtrs )
+            {
+                const Texture* txtr;
+                txtr = &scene->txtrs[texi];
+                glBindTexture (GL_TEXTURE_2D, texi);
+                glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+                glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+                glTexImage2D (GL_TEXTURE_2D, 0, 3, txtr->ncols, txtr->nrows, 0,
+                              GL_RGB, GL_UNSIGNED_BYTE, txtr->pixels);
+            }
+        }
+    }
 
         /* TODO: This video info does nothing, and is misplaced to boot!*/
     info = SDL_GetVideoInfo ();
@@ -213,8 +323,6 @@ ogl_setup (const RaySpace* space)
     assert (space->nlights < 8);
     if (space->nlights > 0)
     {
-        uint i;
-
         glMatrixMode (GL_MODELVIEW);
         glLoadIdentity ();
         map0_ogl_matrix (0, 0);
@@ -364,18 +472,21 @@ ogl_redraw (const RaySpace* space, uint pilot_idx)
 
 #ifndef Match4dGeom
         /* Use this as a flag to say this is the main object (track).*/
-    ogl_redraw_ObjectRaySpace (&space->main, &pilot->view_origin, 0);
+    ogl_redraw_ObjectRaySpace (&space->main, space->nobjects,
+                               &pilot->view_origin, 0);
 #else
-    ogl_redraw_ObjectRaySpace (&space->main,
+    ogl_redraw_ObjectRaySpace (&space->main, space->nobjects,
                                &pilot->view_origin, &pilot->view_basis);
 #endif
     UFor( i, space->nobjects )
         ogl_redraw_ObjectRaySpace (&space->objects[i],
+                                   i,
                                    &pilot->view_origin, &pilot->view_basis);
 }
 
 static void
-ogl_set_ObjectSurface (const ObjectSurface* surf, const Scene* scene)
+ogl_set_ObjectSurface (const ObjectSurface* surf,
+                       const Scene* scene, const SceneGL* scenegl)
 {
     Material default_material;
     const Material* matl;
@@ -406,29 +517,49 @@ ogl_set_ObjectSurface (const ObjectSurface* surf, const Scene* scene)
     glMaterialf (GL_FRONT_AND_BACK, GL_SHININESS,
                  matl->optical_density);
 
+    glDisable (GL_TEXTURE_2D);
+
     loc = glGetUniformLocation (shader_program, "HaveDiffuseTex");
     if (matl->diffuse_texture < Max_uint)
     {
         glUniform1i (loc, 1);
         glEnable (GL_TEXTURE_2D);
         glActiveTexture (GL_TEXTURE0);
-        glBindTexture (GL_TEXTURE_2D, matl->diffuse_texture);
+        glBindTexture (GL_TEXTURE_2D,
+                       scenegl->texture_offset + matl->diffuse_texture);
         loc = glGetUniformLocation (shader_program, "DiffuseTex");
         glUniform1i (loc, 0);
     }
     else
     {
         glUniform1i (loc, 0);
-        glDisable (GL_TEXTURE_2D);
+    }
+
+    loc = glGetUniformLocation (shader_program, "HaveNormalTex");
+    if (matl->bump_texture < Max_uint)
+    {
+        glUniform1i (loc, 1);
+        glEnable (GL_TEXTURE_2D);
+        glActiveTexture (GL_TEXTURE1);
+        glBindTexture (GL_TEXTURE_2D,
+                       scenegl->texture_offset + matl->diffuse_texture);
+        loc = glGetUniformLocation (shader_program, "NormalTex");
+        glUniform1i (loc, 1);
+    }
+    else
+    {
+        glUniform1i (loc, 0);
     }
 }
 
     void
 ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object,
+                           uint objidx,
                            const Point* view_origin,
                            const PointXfrm* view_basis)
 {
     const Scene* scene;
+    const SceneGL* scenegl;
     uint i;
 #if NDimensions == 4
     bool first_elem = true;
@@ -441,13 +572,20 @@ ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object,
     Scene interp4d_scene;
 # endif
 #else  /* ^^^ NDimensions == 4 */
-    GLuint vbos[3];
     (void) view_origin;
     (void) view_basis;
 #endif  /* NDimensions != 4 */
 
     if (!object->visible)  return;
     scene = &object->scene;
+    scenegl = &scenegls[objidx];
+        /* Single-element objects are the only ones that change.*/
+    if (scene->nelems == 1)
+    {
+        glBindBuffer (GL_ARRAY_BUFFER, scenegl->verts_buffer);
+        glBufferData (GL_ARRAY_BUFFER, scene->nverts * sizeof (Point),
+                      scene->verts, GL_DYNAMIC_DRAW);
+    }
 
 #if NDimensions == 4
 # ifdef Match4dGeom
@@ -469,18 +607,6 @@ ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object,
     }
 # endif
 #endif  /* NDimensions == 4 */
-
-    UFor( i, scene->ntxtrs )
-    {
-        const Texture* txtr;
-        txtr = &scene->txtrs[i];
-        glBindTexture (GL_TEXTURE_2D, i);
-        glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexImage2D (GL_TEXTURE_2D, 0, 3, txtr->ncols, txtr->nrows, 0,
-                      GL_RGB, GL_UNSIGNED_BYTE, txtr->pixels);
-    }
-
 
     glPushMatrix ();
 
@@ -535,7 +661,8 @@ ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object,
             else              first_elem = false;
 
             material_idx = elem->material;
-            ogl_set_ObjectSurface (&scene->surfs[elem->surface], scene);
+            ogl_set_ObjectSurface (&scene->surfs[elem->surface],
+                                   scene, scenegl);
 
             glBegin (GL_TRIANGLES);
         }
@@ -566,44 +693,26 @@ ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object,
     if (scene->nelems > 0)  glEnd ();
 #else  /* ^^^ NDimensions == 4 */
 
-    glGenBuffers(3, vbos);
-    glBindBuffer (GL_ARRAY_BUFFER, vbos[0]);
-    glBufferData (GL_ARRAY_BUFFER, scene->nverts * sizeof (Point),
-                  scene->verts, GL_STATIC_DRAW);
-    glBindBuffer (GL_ARRAY_BUFFER, vbos[1]);
-    glBufferData (GL_ARRAY_BUFFER, scene->nvnmls * sizeof (Point),
-                  scene->vnmls, GL_STATIC_DRAW);
-    glBindBuffer (GL_ARRAY_BUFFER, vbos[2]);
-    glBufferData (GL_ARRAY_BUFFER, scene->ntxpts * sizeof (BaryPoint),
-                  scene->txpts, GL_STATIC_DRAW);
-#if 0
-    glBindBuffer (GL_ELEMENT_ARRAY_BUFFER, elem_indices);
-    glBufferData (GL_ELEMENT_ARRAY_BUFFER,
-                  scene->nelems * sizeof (SceneElement),
-                  scene->elems,
-                  GL_STATIC_DRAW);
-#endif
-
     UFor( i, scene->nsurfs )
     {
         const ObjectSurface* surf;
         surf = &scene->surfs[i];
-        ogl_set_ObjectSurface (surf, scene);
+        ogl_set_ObjectSurface (surf, scene, scenegl);
 
-        glBindBuffer (GL_ARRAY_BUFFER, vbos[0]);
+        glBindBuffer (GL_ARRAY_BUFFER, scenegl->verts_buffer);
         glVertexPointer (3, GL_REAL, sizeof (Point),
                          surf->verts_offset + (Point*) 0);
         glEnableClientState (GL_VERTEX_ARRAY);
         if (surf->vnmls_offset < Max_uint)
         {
-            glBindBuffer (GL_ARRAY_BUFFER, vbos[1]);
+            glBindBuffer (GL_ARRAY_BUFFER, scenegl->vnmls_buffer);
             glNormalPointer (GL_REAL, sizeof (Point),
                              surf->vnmls_offset + (Point*) 0);
             glEnableClientState (GL_NORMAL_ARRAY);
         }
         if (surf->txpts_offset < Max_uint)
         {
-            glBindBuffer (GL_ARRAY_BUFFER, vbos[2]);
+            glBindBuffer (GL_ARRAY_BUFFER, scenegl->txpts_buffer);
             glTexCoordPointer (2, GL_REAL, sizeof (BaryPoint),
                                surf->txpts_offset + (BaryPoint*) 0);
             glEnableClientState (GL_TEXTURE_COORD_ARRAY);
@@ -618,19 +727,9 @@ ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object,
     }
 
     glBindBuffer (GL_ARRAY_BUFFER, 0);
-    glDeleteBuffers (3, vbos);
 #endif  /* NDimensions != 4 */
 
     glPopMatrix ();
-
-    if (scene->ntxtrs > 0)
-    {
-        GLuint* ids;
-        ids = AllocT( GLuint, scene->ntxtrs );
-        UFor( i, scene->ntxtrs )  ids[i] = i;
-        glDeleteTextures (scene->ntxtrs, ids);
-        free (ids);
-    }
 
 #if NDimensions == 4
 # ifndef Match4dGeom
