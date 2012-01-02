@@ -41,6 +41,7 @@ brutefill_between_simplices (SceneElement* dst_elems,
 
 void init_Scene (Scene* scene)
 {
+    scene->ndims = NDimensions;
     scene->nelems = 0;
     scene->nsurfs = 0;
     scene->nverts = 0;
@@ -48,6 +49,7 @@ void init_Scene (Scene* scene)
     scene->ntxpts = 0;
     scene->nmatls = 0;
     scene->ntxtrs = 0;
+    scene->vidcs = 0;
 }
 
 void init_SceneElement (SceneElement* elem)
@@ -71,6 +73,7 @@ void copy_SceneElement (SceneElement* dst, const SceneElement* src)
 init_ObjectSurface (ObjectSurface* surf)
 {
     surf->nelems = 0;
+    surf->vidcs_offset = Max_uint;
     surf->verts_offset = Max_uint;
     surf->vnmls_offset = Max_uint;
     surf->txpts_offset = Max_uint;
@@ -82,6 +85,7 @@ void cleanup_Scene (Scene* scene)
 {
     if (scene->nelems > 0)  free (scene->elems);
     if (scene->nsurfs > 0)  free (scene->surfs);
+    if (scene->vidcs)       free (scene->vidcs);
     if (scene->nverts > 0)  free (scene->verts);
     if (scene->nvnmls > 0)  free (scene->vnmls);
     if (scene->ntxpts > 0)  free (scene->txpts);
@@ -102,6 +106,8 @@ copy_Scene (Scene* dst, const Scene* src)
     CopyT( Scene, dst, src, 0, 1 );
     dst->elems = DuplicaT( SceneElement, dst->elems, dst->nelems );
     dst->surfs = DuplicaT( ObjectSurface, dst->surfs, dst->nsurfs );
+    if (dst->vidcs)
+        dst->vidcs = DuplicaT( uint, dst->vidcs, dst->ndims * dst->nelems );
     dst->verts = DuplicaT( Point, dst->verts, dst->nverts );
     dst->vnmls = DuplicaT( Point, dst->vnmls, dst->nvnmls );
     dst->txpts = DuplicaT( BaryPoint, dst->txpts, dst->ntxpts );
@@ -123,6 +129,8 @@ concat0_Scene (Scene* scene, Scene* src)
     uint i;
     Scene orig;
     orig = *scene;
+
+    assert (scene->ndims == src->ndims);
 
     ConcaT( SceneElement, scene->elems, src->elems,
             scene->nelems, src->nelems );
@@ -156,6 +164,8 @@ concat0_Scene (Scene* scene, Scene* src)
     {
         ObjectSurface* surf;
         surf = &scene->surfs[i + orig.nsurfs];
+        if (surf->vidcs_offset < Max_uint)
+            surf->vidcs_offset += orig.ndims * orig.nelems;
         if (surf->verts_offset < Max_uint)  surf->verts_offset += orig.nverts;
         if (surf->vnmls_offset < Max_uint)  surf->vnmls_offset += orig.nvnmls;
         if (surf->txpts_offset < Max_uint)  surf->txpts_offset += orig.ntxpts;
@@ -595,6 +605,7 @@ interpolate_Scene (Scene* dst, uint k, uint nscenes, const Scene* scenes)
     }
 
     init_Scene (dst);
+    dst->ndims = k+1;
     dst->nelems = (nscenes-1) * nelems * simplex_fill_count (k);
     dst->elems = AllocT( SceneElement, dst->nelems );
 
@@ -685,6 +696,8 @@ interpolate_Scene (Scene* dst, uint k, uint nscenes, const Scene* scenes)
     ResizeT( Point, dst->verts, dst->nverts );
     dst->nvnmls = vnmlcount;
     ResizeT( Point, dst->vnmls, dst->nvnmls );
+
+    setup_surfaces_Scene (dst);
 }
 
     void
@@ -753,246 +766,338 @@ recenter_Scene (AffineMap* map, const Scene* scene,
     xlat0_AffineMap (map, &displacement);
 }
 
-static
     void
-sort_indexed_Points (uint* jumps, uint* indices, real* coords,
-                     uint nmembs, const Point* pts)
+reshuffle_for_surfaces_Scene (Scene* scene)
 {
-    uint dim;
+    Point* verts;  Point* vnmls;  BaryPoint* txpts;
+    uint surfi;
+    uint elems_offset = 0;
+    const uint ndims = scene->ndims;
+    ObjectSurface pos;
 
-    assert (minimal_unique (nmembs, indices));
+    pos.verts_offset = 0;
+    pos.vnmls_offset = 0;
+    pos.txpts_offset = 0;
 
-    jumps[0] = nmembs;
+    verts = scene->verts;
+    vnmls = scene->vnmls;
+    txpts = scene->txpts;
+    if (scene->nelems > 0)
+        scene->verts = AllocT( Point, ndims * scene->nelems );
+    if (scene->nvnmls > 0)
+        scene->vnmls = AllocT( Point, ndims * scene->nelems );
+    if (scene->ntxpts > 0)
+        scene->txpts = AllocT( BaryPoint, ndims * scene->nelems );
 
-    UFor( dim, NDimensions )
+    UFor( surfi, scene->nsurfs )
     {
-        uint q = 0;
-        while (q < nmembs)
+        ObjectSurface* surf;
+        SceneElement* elem;
+        uint ei;
+
+        surf = &scene->surfs[surfi];
+        assert (surf->nelems > 0);
+        elem = &scene->elems[elems_offset];
+
+            /* Set the offsets, they should come in as Max_uint.*/
+        surf->verts_offset = pos.verts_offset;
+        pos.verts_offset += ndims * surf->nelems;
+        if (elem->vnmls[0] < Max_uint)
         {
-            uint i, s;
-
-            s = jumps[q];
-            for (i = q; i < s; ++i)
-                coords[indices[i]] = pts[indices[i]].coords[dim];
-            sort_indexed_reals (indices, q, s, coords);
-
-            while (q < s)
-            {
-                uint r;
-                r = consecutive_indexed_reals (q, s, indices, coords);
-                jumps[q] = r;
-                q = r;
-            }
-            assert (q == s);
+            surf->vnmls_offset = pos.vnmls_offset;
+            pos.vnmls_offset += ndims * surf->nelems;
         }
+        if (elem->txpts[0] < Max_uint)
+        {
+            surf->txpts_offset = pos.txpts_offset;
+            pos.txpts_offset += ndims * surf->nelems;
+        }
+
+        UFor( ei, surf->nelems )
+        {
+            uint i;
+            elem = &scene->elems[ei + elems_offset];
+            elem->surface = surfi;
+            elem->material = surf->material;
+            UFor( i, ndims )
+            {
+                uint idx;
+                idx = i + ei * ndims + surf->verts_offset;
+                scene->verts[idx] = verts[elem->verts[i]];
+                elem->verts[i] = idx;
+
+                assert ((elem->vnmls[i]     < Max_uint) ==
+                        (surf->vnmls_offset < Max_uint));
+                if (surf->vnmls_offset < Max_uint)
+                {
+                    idx = i + ei * ndims + surf->vnmls_offset;
+                    scene->vnmls[idx] = vnmls[elem->vnmls[i]];
+                    elem->vnmls[i] = idx;
+                }
+
+                assert ((elem->txpts[i]     < Max_uint) ==
+                        (surf->txpts_offset < Max_uint));
+                if (surf->txpts_offset < Max_uint)
+                {
+                    idx = i + ei * ndims + surf->txpts_offset;
+                    scene->txpts[idx] = txpts[elem->txpts[i]];
+                    elem->txpts[i] = idx;
+                }
+            }
+        }
+        elems_offset += surf->nelems;
     }
 
-    assert (minimal_unique (nmembs, indices));
-
-    if (nmembs > 0)
+    if (scene->nverts > 0)
     {
-        uint i;
-        UFor( i, nmembs-1 )
-            assert (ordered_Point (&pts[indices[i]], &pts[indices[i+1]]));
+        free (verts);
+        scene->nverts = pos.verts_offset;
+        ResizeT( Point, scene->verts, scene->nverts );
+    }
+    if (scene->nvnmls > 0)
+    {
+        free (vnmls);
+        scene->nvnmls = pos.vnmls_offset;
+        ResizeT( Point, scene->vnmls, scene->nvnmls );
+    }
+    if (scene->ntxpts > 0)
+    {
+        free (txpts);
+        scene->ntxpts = pos.txpts_offset;
+        ResizeT( BaryPoint, scene->txpts, scene->ntxpts );
     }
 }
 
-static
-    uint
-condense_Points (uint n, Point* pts, uint* jumps, uint* indices, real* coords)
+    void
+setup_surfaces_Scene (Scene* scene)
 {
-    uint i, q;
+    uint i;
+    uint nsurfs = 0;
+    SceneElement* elems;
+    uint* elems_offsets;
 
-    UFor( i, n )  indices[i] = i;
-    sort_indexed_Points (jumps, indices, coords, n, pts);
+    if (scene->nelems == 0)  return;
 
-    i = 0;
-    q = 0;
-    while (i < n)
+    UFor( i, scene->nelems )
+        nsurfs = max_uint (scene->elems[i].surface, nsurfs);
+    ++ nsurfs;
+
+#if 0
+    scene->nsurfs = nsurfs;
+    ResizeT( ObjectSurface, scene->surfs, scene->nsurfs );
+#else
+    assert (scene->nsurfs == nsurfs);
+#endif
+    UFor( i, scene->nsurfs )
     {
-        uint r;
-        r = jumps[i];
-        assert (i < r);
-
-        jumps[i] = jumps[q];
-        jumps[q] = q;
-        swap_uint (&indices[q], &indices[i]);
-
-        ++i;
-        while (i < r)
-        {
-            assert (equal_Point (&pts[indices[q]],
-                                 &pts[indices[i]]));
-            jumps[i] = q;
-            ++i;
-        }
-        ++q;
+        ObjectSurface* surf;
+        uint material;
+        surf = &scene->surfs[i];
+        material = surf->material;
+        init_ObjectSurface (surf);
+        surf->material = material;
     }
+
+    UFor( i, scene->nelems )
+        ++ scene->surfs[scene->elems[i].surface].nelems;
+
+    elems_offsets = AllocT( uint, scene->nsurfs );
+    elems_offsets[0] = 0;
+    UFor( i, scene->nsurfs-1 )
+        elems_offsets[i+1] = elems_offsets[i] + scene->surfs[i].nelems;
+
+        /* TODO: Perhaps use a different reordering algo here.
+         * I think condense_Points() uses one.
+         * We would probably need a temporary index array
+         * instead of a temporary scene element array.
+         */
+    elems = DuplicaT( SceneElement, scene->elems, scene->nelems );
+    UFor( i, scene->nelems )
+    {
+        uint* elems_offset;
+        elems_offset = &elems_offsets[elems[i].surface];
+        scene->elems[*elems_offset] = elems[i];
+        *elems_offset += 1;
+    }
+    free (elems);
+
+    reshuffle_for_surfaces_Scene (scene);
+}
+
+static uint
+condense_lexi_surf (real* lexis, const ObjectSurface* surf,
+                    const Scene* scene)
+{
+    const uint ndims = scene->ndims;
+    uint vnml_offset = Max_uint;
+    uint txpt_offset = Max_uint;
+    uint i, n, stride;
+
+    stride = ndims;  /* Vertices.*/
+    if (surf->vnmls_offset < Max_uint)
+    {
+        vnml_offset = stride;
+        stride += ndims;  /* Normals.*/
+    }
+    if (surf->txpts_offset < Max_uint)
+    {
+        txpt_offset = stride;
+        stride += ndims - 1;
+    }
+    n = surf->nelems * ndims;
 
     UFor( i, n )
-        assert (equal_Point (&pts[indices[i]],
-                             &pts[indices[jumps[i]]]));
-
-        /* Fixup indices so points in range don't move.*/
-    UFor( i, q )
     {
-        uint* e;
-        e = &indices[i];
-        while (*e < q && *e != i)
+        uint j;
+        real* lexi;
+
+        lexi = &lexis[stride * i];
+        if (true)
         {
-            swap_uint (&jumps[*e], &jumps[i]);
-            swap_uint (&indices[*e], e);
+            Point p = scene->verts[i + surf->verts_offset];
+            UFor( j, ndims )  lexi[j] = p.coords[j];
+        }
+
+        if (vnml_offset < Max_uint)
+        {
+            Point p = scene->vnmls[i + surf->vnmls_offset];
+            UFor( j, ndims )  lexi[j + vnml_offset] = p.coords[j];
+        }
+
+        if (txpt_offset < Max_uint)
+        {
+            BaryPoint p = scene->txpts[i + surf->txpts_offset];
+            UFor( j, ndims-1 )  lexi[j + txpt_offset] = p.coords[j];
         }
     }
+    return stride;
+}
 
-    invert_jump_table (q, jumps);
-
-    assert (minimal_unique (q, jumps));
-
-    for (i = q; i < n; ++i)
-        assert (equal_Point (&pts[indices[i]],
-                             &pts[indices[jumps[jumps[i]]]]));
-
-        /* Fixup duplicates' jumps to indices.*/
-    for (i = q; i < n; ++i)
-        jumps[i] = jumps[jumps[i]];
-
-        /* And make the uniques' jumps consistent.*/
-
-    UFor( i, q )
-        jumps[i] = i;
+static void
+apply_jumps_surf (Scene* scene,
+                  const ObjectSurface* surf,
+                  const ObjectSurface* old_surf,
+                  uint elems_offset,
+                  uint n, uint* jumps, uint* indices)
+{
+    const uint ndims = scene->ndims;
+    uint i;
 
     UFor( i, n )
-        assert (equal_Point (&pts[indices[i]],
-                             &pts[indices[jumps[i]]]));
-
-    UFor( i, q )
     {
-        uint pi;
-        pi = indices[i];
-        if (pi != i)
+        scene->verts[i + surf->verts_offset] =
+            scene->verts[indices[i] + old_surf->verts_offset];
+
+        if (surf->vnmls_offset < Max_uint)
+            scene->vnmls[i + surf->vnmls_offset] =
+                scene->vnmls[indices[i] + old_surf->vnmls_offset];
+
+        if (surf->txpts_offset < Max_uint)
+            scene->txpts[i + surf->txpts_offset] =
+                scene->txpts[indices[i] + old_surf->txpts_offset];
+    }
+
+    shuffle_jump_table (ndims * old_surf->nelems, jumps, indices);
+
+    UFor( i, surf->nelems )
+    {
+        uint dim;
+        SceneElement* elem = &scene->elems[i + elems_offset];
+
+        UFor( dim, ndims )
         {
-            assert (q <= pi);
-            copy_Point (&pts[i], &pts[pi]);
+            uint x = jumps[elem->verts[dim] - old_surf->verts_offset];
+            elem->verts[dim] = x + surf->verts_offset;
+            if (elem->vnmls[dim] < Max_uint)
+                elem->vnmls[dim] = x + surf->vnmls_offset;
+            if (elem->txpts[dim] < Max_uint)
+                elem->txpts[dim] = x + surf->txpts_offset;
         }
     }
 
-    assert (minimal_unique (n, indices));
-    UFor( i, n )
-    {
-        uint pi;
-        pi = indices[i];
-        indices[i] = n;  /* Never get info from this location again!*/
-        while (pi != i)
-        {
-            assert (i < pi);
-            swap_uint (&jumps[i], &jumps[pi]);
-            swap_uint (&pi, &indices[pi]);
-        }
-    }
-
-    return q;
+    CopyT( uint, scene->vidcs, jumps, surf->vidcs_offset, ndims * surf->nelems );
 }
 
     void
 condense_Scene (Scene* scene)
 {
-    uint i;
-    uint max_n;
-    uint* jumps;
-    uint* indices;
-    real* coords;
+    const uint ndims = scene->ndims;
+    uint surfi;
+    uint max_n = 0;
+    uint* jumps;   uint* indices;
+    real* coords;  real* lexis;
+    ObjectSurface pos;
 
-        /* TODO: Do something here?*/
-    return;
+    pos.nelems = 0;
+    pos.vidcs_offset = 0;
+    pos.verts_offset = 0;
+    pos.vnmls_offset = 0;
+    pos.txpts_offset = 0;
 
-    max_n = scene->nverts;
-    if (scene->nvnmls > max_n)  max_n = scene->nvnmls;
-    if (scene->nelems > max_n)  max_n = scene->nelems;
+    assert (!scene->vidcs);
+    scene->vidcs = AllocT( uint, ndims * scene->nelems );
 
-    jumps  = AllocT( uint, max_n );
+    UFor( surfi, scene->nsurfs )
+        max_n = max_uint (max_n, scene->surfs[surfi].nelems);
+
+        /* Max number of vertices in a surface.*/
+    max_n *= ndims;
+
+    jumps = AllocT( uint, max_n );
     indices = AllocT( uint, max_n );
     coords  = AllocT( real, max_n );
+    lexis = AllocT( real, max_n * (3 * NDimensions - 1) );
 
-    if (scene->nverts > 0)
+    UFor( surfi, scene->nsurfs )
     {
-        uint prev_nverts;
-        prev_nverts = scene->nverts;
-            /* printf ("Before nverts:%u\n", scene->nverts); */
-        scene->nverts = condense_Points (scene->nverts, scene->verts,
-                                         jumps, indices, coords);
-            /* printf ("After nverts:%u\n", scene->nverts); */
-        ResizeT( Point, scene->verts, scene->nverts );
-        UFor( i, scene->nelems )
+        ObjectSurface old_surf;
+        ObjectSurface* surf;
+        uint stride, n;
+
+        surf = &scene->surfs[surfi];
+        old_surf = *surf;
+
+        stride = condense_lexi_surf (lexis, surf, scene);
+        n = condense_lexi_reals (jumps, indices, coords,
+                                 ndims * surf->nelems, stride, lexis);
+
+        surf->vidcs_offset = pos.vidcs_offset;
+        pos.vidcs_offset += ndims * surf->nelems;
+        surf->verts_offset = pos.verts_offset;
+        pos.verts_offset += n;
+        if (surf->vnmls_offset < Max_uint)
         {
-            uint dim;
-            UFor( dim, NDimensions )
-            {
-                uint* e;
-                e = &scene->elems[i].verts[dim];
-                assert (*e < prev_nverts);
-                *e = jumps[*e];
-            }
+            surf->vnmls_offset = pos.vnmls_offset;
+            pos.vnmls_offset += n;
         }
+        if (surf->txpts_offset < Max_uint)
+        {
+            surf->txpts_offset = pos.txpts_offset;
+            pos.txpts_offset += n;
+        }
+
+        apply_jumps_surf (scene, surf, &old_surf,
+                          pos.nelems, n, jumps, indices);
+
+        pos.nelems += surf->nelems;
     }
 
+    scene->nverts = pos.verts_offset;
+    scene->nvnmls = pos.vnmls_offset;
+    scene->ntxpts = pos.txpts_offset;
+
+    ResizeT( Point, scene->verts, scene->nverts );
     if (scene->nvnmls > 0)
-    {
-        uint prev_nvnmls;
-        prev_nvnmls = scene->nvnmls;
-            /* printf ("Before nvnmls:%u\n", scene->nvnmls); */
-        scene->nvnmls = condense_Points (scene->nvnmls, scene->vnmls,
-                                         jumps, indices, coords);
-            /* printf ("After nvnmls:%u\n", scene->nvnmls); */
         ResizeT( Point, scene->vnmls, scene->nvnmls );
-        UFor( i, scene->nelems )
-        {
-            uint dim;
-            UFor( dim, NDimensions )
-            {
-                uint* e;
-                e = &scene->elems[i].vnmls[dim];
-                assert (*e < prev_nvnmls);
-                *e = jumps[*e];
-            }
-        }
-    }
-
-    if (false && scene->nelems > 0)
-    {
-        Point* tmp_pts;
-        tmp_pts = AllocT( Point, scene->nelems );
-        UFor( i, scene->nelems )
-        {
-            uint dim;
-            UFor( dim, NDimensions )
-                tmp_pts[i].coords[dim] = scene->elems[i].verts[dim];
-        }
-        printf ("Before nelems:%u\n", scene->nelems);
-        scene->nelems = condense_Points (scene->nelems, tmp_pts,
-                                         jumps, indices, coords);
-        printf ("After nelems:%u\n", scene->nelems);
-        UFor( i, scene->nelems )
-        {
-            uint dim;
-            const SceneElement* src;
-            SceneElement* dst;
-
-            src = &scene->elems[jumps[i]];
-            dst = &scene->elems[i];
-
-            UFor( dim, NDimensions )
-                dst->verts[dim] = src->verts[dim];
-        }
-        ResizeT( SceneElement, scene->elems, scene->nelems );
-        free (tmp_pts);
-    }
+    if (scene->ntxpts > 0)
+        ResizeT( BaryPoint, scene->txpts, scene->ntxpts );
 
     if (max_n > 0)
     {
         free (jumps);
         free (indices);
         free (coords);
+        free (lexis);
     }
 }
 

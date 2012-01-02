@@ -24,6 +24,7 @@ struct SceneElement
 struct ObjectSurface
 {
     uint nelems;
+    uint vidcs_offset;
     uint verts_offset;
     uint vnmls_offset;
     uint txpts_offset;
@@ -32,6 +33,7 @@ struct ObjectSurface
 
 struct Scene
 {
+    uint ndims;
     uint nelems;
     uint nsurfs;
     uint nverts;
@@ -41,6 +43,7 @@ struct Scene
     uint ntxtrs;
     SceneElement* elems; /* Elements.*/
     ObjectSurface* surfs; /* Surfaces.*/
+    uint* vidcs; /* Vertex indices.*/
     Point* verts; /* Vertices.*/
     Point* vnmls; /* Vertex normals.*/
     BaryPoint* txpts; /* Texture points.*/
@@ -77,6 +80,10 @@ interpolate_Scene (Scene* dst, uint k, uint nscenes, const Scene* scenes);
 void
 interpolate1_Scene (Scene* dst, real alpha,
                     const Scene* scene_a, const Scene* scene_b);
+void
+reshuffle_for_surfaces_Scene (Scene* scene);
+void
+setup_surfaces_Scene (Scene* scene);
 void
 condense_Scene (Scene* scene);
 #ifdef INCLUDE_SOURCE

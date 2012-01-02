@@ -333,3 +333,167 @@ invert_jump_table (uint n, uint* jumps)
         jumps[sweepi] -= n;
 }
 
+static bool
+ordered_lexi_real (uint ndims, const real* a, const real* b)
+{
+    uint i;
+    UFor( i, ndims )
+    {
+        if (a[i] < b[i])  return true;
+        if (a[i] > b[i])  return false;
+    }
+    return true;
+}
+
+static void
+sort_indexed_lexi_reals (uint* jumps, uint* indices, real* coords,
+                         uint nmembs, uint ndims, const real* lexis)
+{
+    uint dim;
+
+    assert (minimal_unique (nmembs, indices));
+
+    jumps[0] = nmembs;
+
+    UFor( dim, ndims )
+    {
+        uint q = 0;
+        while (q < nmembs)
+        {
+            uint i, s;
+
+            s = jumps[q];
+            for (i = q; i < s; ++i)
+                coords[indices[i]] = lexis[dim + ndims * indices[i]];
+            sort_indexed_reals (indices, q, s, coords);
+
+            while (q < s)
+            {
+                uint r;
+                r = consecutive_indexed_reals (q, s, indices, coords);
+                jumps[q] = r;
+                q = r;
+            }
+            assert (q == s);
+        }
+    }
+
+    assert (minimal_unique (nmembs, indices));
+
+    if (nmembs > 0)
+    {
+        uint i;
+        UFor( i, nmembs-1 )
+        {
+            assert (ordered_lexi_real (ndims,
+                                       &lexis[ndims * indices[i]],
+                                       &lexis[ndims * indices[i+1]]));
+        }
+    }
+}
+
+    /**
+     * Be sure to call shuffle_jump_table() afterwards if you want to
+     * use /jumps/. Calculating it fully destroys /indices/.
+     **/
+    uint
+condense_lexi_reals (uint* jumps, uint* indices, real* coords,
+                     uint n, uint ndims, const real* lexis)
+{
+    uint i, q;
+
+    UFor( i, n )  indices[i] = i;
+    sort_indexed_lexi_reals (jumps, indices, coords, n, ndims, lexis);
+
+    i = 0;
+    q = 0;
+    while (i < n)
+    {
+        uint r;
+        r = jumps[i];
+        assert (i < r);
+
+        jumps[i] = jumps[q];
+        jumps[q] = q;
+        swap_uint (&indices[q], &indices[i]);
+
+        ++i;
+        while (i < r)
+        {
+            AssertEqA( ndims, lexis, lexis,
+                       ndims * indices[q],
+                       ndims * indices[i] );
+            jumps[i] = q;
+            ++i;
+        }
+        ++q;
+    }
+
+    UFor( i, n )
+        AssertEqA( ndims, lexis, lexis,
+                   ndims * indices[i],
+                   ndims * indices[jumps[i]] );
+
+        /* Fixup indices so points in range don't move.*/
+    UFor( i, q )
+    {
+        uint* e;
+        e = &indices[i];
+        while (*e < q && *e != i)
+        {
+            swap_uint (&jumps[*e], &jumps[i]);
+            swap_uint (&indices[*e], e);
+        }
+    }
+
+    invert_jump_table (q, jumps);
+
+    assert (minimal_unique (q, jumps));
+
+    for (i = q; i < n; ++i)
+        AssertEqA( ndims, lexis, lexis,
+                   ndims * indices[i],
+                   ndims * indices[jumps[jumps[i]]] );
+
+        /* Fixup duplicates' jumps to indices.*/
+    for (i = q; i < n; ++i)
+        jumps[i] = jumps[jumps[i]];
+
+        /* And make the uniques' jumps consistent.*/
+
+    UFor( i, q )
+        jumps[i] = i;
+
+    UFor( i, n )
+        AssertEqA( ndims, lexis, lexis,
+                   ndims * indices[i],
+                   ndims * indices[jumps[i]] );
+
+    assert (minimal_unique (n, indices));
+
+    return q;
+}
+
+    /** Finish calculation of /jumps/.
+     * Both /jumps/ and /indices/ come in with valid data.
+     * When finished, /indices/ is thrashed.
+     **/
+    void
+shuffle_jump_table (uint n, uint* jumps, uint* indices)
+{
+    uint i;
+
+    UFor( i, n )
+    {
+        uint pi;
+        pi = indices[i];
+        indices[i] = n;  /* Never get info from this location again!*/
+        while (pi != i)
+        {
+            assert (i < pi);
+            swap_uint (&jumps[i], &jumps[pi]);
+            swap_uint (&pi, &indices[pi]);
+        }
+    }
+}
+

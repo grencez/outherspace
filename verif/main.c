@@ -4,6 +4,7 @@
 #include "kdtree.h"
 #include "kptree.h"
 #include "order.h"
+#include "scene.h"
 #include "slist.h"
 #include "util.h"
 #include "xfrm.h"
@@ -11,6 +12,7 @@
 #include <assert.h>
 #include <math.h>
 
+void testfn_order ();
 void testfn_pack ();
 
 static void
@@ -186,17 +188,6 @@ testfn_KPTree ()
 
 static
     void
-testfn_partition ()
-{
-    uint indices[] = { 0, 1, 2, 3, 4, 5 };
-    const real membs[] = { 10, 112, 333, 254, 305, 406 };
-    uint q, r;
-    partition_indexed_reals (indices, &q, &r, membs, 0, 4, 6);
-    assert (indices[3] == 4);
-}
-
-static
-    void
 testfn_PointXfrm ()
 {
     uint i, j;
@@ -319,25 +310,6 @@ verifn_orthorotate_PointXfrm (uint npids, uint pidx)
 
 static
     void
-testfn_select ()
-{
-    uint i;
-    const uint nmembs = 7;
-    uint indices[7];
-    const uint ordered[] = { 0, 6, 1, 3, 4, 2, 5 };
-    const real membs[] = { 10, 112, 333, 254, 305, 406, 19 };
-
-    UFor( i, nmembs )
-    {
-        uint j;
-        UFor( j, nmembs )  indices[j] = j;
-        select_indexed_reals (indices, membs, 0, i, nmembs);
-        assert (indices[i] == ordered[i]);
-    }
-}
-
-static
-    void
 testfn_SList ()
 {
     const uint counts[]  = { 19,  1, 0, 13,  5 };
@@ -411,11 +383,10 @@ int main (int argc, char** argv)
     testfn_BitString ();
     testfn_BitString_cache ();
     testfn_KPTree ();
-    testfn_partition ();
     testfn_PointXfrm ();
     testfn_trxfrm_BoundingBox ();
-    testfn_select ();
     testfn_SList ();
+    testfn_order ();
     testfn_pack ();
     verifn_orthorotate_PointXfrm (npids, pidx);
     return 0;

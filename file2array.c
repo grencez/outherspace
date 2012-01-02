@@ -80,7 +80,7 @@ int main (int argc, char** argv)
         if (i > 0)  fputc (',', out);
         fprintf (out, "%s_%u", arrsym, i);
     }
-    fputs ("};", out);
+    fputs ("};\n", out);
 
     free (files_nbytes);
     return 0;

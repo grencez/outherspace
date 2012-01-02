@@ -22,8 +22,6 @@ parse_face_field (uint* v, uint* vt, uint* vn, const char* line);
 static uint
 parse_texture (SList* texlist, SList* texnamelist,
                const char* pathname, const char* filename);
-static void
-reshuffle_for_surfaces (Scene* scene);
 
     bool
 streql (const void* a, const void* b)
@@ -273,6 +271,7 @@ readin_wavefront (Scene* scene, const char* pathname, const char* filename)
             app_SList (&surflist, DuplicaT( ObjectSurface, surf, 1 ));
 
         init_Scene (scene);
+        scene->ndims = ndims;
         scene->nelems = elemlist.nmembs;
         scene->nsurfs = surflist.nmembs;
         scene->nverts = vertlist.nmembs;
@@ -313,7 +312,7 @@ readin_wavefront (Scene* scene, const char* pathname, const char* filename)
                 }
             }
         }
-        reshuffle_for_surfaces (scene);
+        reshuffle_for_surfaces_Scene (scene);
     }
 
     return good;
@@ -507,107 +506,5 @@ parse_texture (SList* texlist, SList* texnamelist,
         }
     }
     return i;
-}
-
-    void
-reshuffle_for_surfaces (Scene* scene)
-{
-    const uint ndims = 3;
-    Point* verts;  Point* vnmls;  BaryPoint* txpts;
-    uint surfi;
-    uint elems_offset = 0;
-    ObjectSurface pos;
-
-    pos.verts_offset = 0;
-    pos.vnmls_offset = 0;
-    pos.txpts_offset = 0;
-
-    verts = scene->verts;
-    vnmls = scene->vnmls;
-    txpts = scene->txpts;
-    if (scene->nelems > 0)
-        scene->verts = AllocT( Point, ndims * scene->nelems );
-    if (scene->nvnmls > 0)
-        scene->vnmls = AllocT( Point, ndims * scene->nelems );
-    if (scene->ntxpts > 0)
-        scene->txpts = AllocT( BaryPoint, ndims * scene->nelems );
-
-    UFor( surfi, scene->nsurfs )
-    {
-        ObjectSurface* surf;
-        SceneElement* elem;
-        uint ei;
-
-        surf = &scene->surfs[surfi];
-        assert (surf->nelems > 0);
-        elem = &scene->elems[elems_offset];
-
-            /* Set the offsets, they should come in as Max_uint.*/
-        surf->verts_offset = pos.verts_offset;
-        pos.verts_offset += ndims * surf->nelems;
-        if (elem->vnmls[0] < Max_uint)
-        {
-            surf->vnmls_offset = pos.vnmls_offset;
-            pos.vnmls_offset += ndims * surf->nelems;
-        }
-        if (elem->txpts[0] < Max_uint)
-        {
-            surf->txpts_offset = pos.txpts_offset;
-            pos.txpts_offset += ndims * surf->nelems;
-        }
-
-        UFor( ei, surf->nelems )
-        {
-            uint i;
-            elem = &scene->elems[ei + elems_offset];
-            elem->surface = surfi;
-            elem->material = surf->material;
-            UFor( i, ndims )
-            {
-                uint idx;
-                idx = i + ei * ndims + surf->verts_offset;
-                scene->verts[idx] = verts[elem->verts[i]];
-                elem->verts[i] = idx;
-
-                assert ((elem->vnmls[i]     < Max_uint) ==
-                        (surf->vnmls_offset < Max_uint));
-                if (surf->vnmls_offset < Max_uint)
-                {
-                    idx = i + ei * ndims + surf->vnmls_offset;
-                    scene->vnmls[idx] = vnmls[elem->vnmls[i]];
-                    elem->vnmls[i] = idx;
-                }
-
-                assert ((elem->txpts[i]     < Max_uint) ==
-                        (surf->txpts_offset < Max_uint));
-                if (surf->txpts_offset < Max_uint)
-                {
-                    idx = i + ei * ndims + surf->txpts_offset;
-                    scene->txpts[idx] = txpts[elem->txpts[i]];
-                    elem->txpts[i] = idx;
-                }
-            }
-        }
-        elems_offset += surf->nelems;
-    }
-
-    if (scene->nverts > 0)
-    {
-        free (verts);
-        scene->nverts = pos.verts_offset;
-        ResizeT( Point, scene->verts, scene->nverts );
-    }
-    if (scene->nvnmls > 0)
-    {
-        free (vnmls);
-        scene->nvnmls = pos.vnmls_offset;
-        ResizeT( Point, scene->vnmls, scene->nvnmls );
-    }
-    if (scene->ntxpts > 0)
-    {
-        free (txpts);
-        scene->ntxpts = pos.txpts_offset;
-        ResizeT( BaryPoint, scene->txpts, scene->ntxpts );
-    }
 }
 

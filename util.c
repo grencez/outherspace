@@ -329,6 +329,12 @@ tristate compare_real (real a, real b)
     return 0;
 }
 
+    uint
+max_uint (uint a, uint b)
+{
+    return (a >= b) ? a : b;
+}
+
     /** Find the highest magnitude number, change the sign to that of /a/.**/
     real
 match_real (real a, real b)

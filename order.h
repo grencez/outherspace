@@ -28,6 +28,11 @@ consecutive_indexed_reals (uint q, uint s,
                            const real* membs);
 void
 invert_jump_table (uint n, uint* jumps);
+uint
+condense_lexi_reals (uint* jumps, uint* indices, real* coords,
+                     uint n, uint ndims, const real* lexis);
+void
+shuffle_jump_table (uint n, uint* jumps, uint* indices);
 #ifdef INCLUDE_SOURCE
 #include "order.c"
 #endif

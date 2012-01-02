@@ -5,6 +5,7 @@
 #include <SDL_opengl.h>
 
 #ifndef GL_GLEXT_PROTOTYPES
+    /* #define glActiveTexture glActiveTextureFunc */
 static PFNGLUSEPROGRAMPROC glUseProgram = 0;
 static PFNGLLINKPROGRAMPROC glLinkProgram = 0;
 static PFNGLCOMPILESHADERPROC glCompileShader = 0;
@@ -20,6 +21,7 @@ static PFNGLGETSHADERIVPROC glGetShaderiv = 0;
 static PFNGLDELETEPROGRAMPROC glDeleteProgram = 0;
 static PFNGLDELETESHADERPROC glDeleteShader = 0;
 static PFNGLGENBUFFERSPROC glGenBuffers = 0;
+static PFNGLDELETEBUFFERSPROC glDeleteBuffers = 0;
 static PFNGLBINDBUFFERPROC glBindBuffer = 0;
 static PFNGLBUFFERDATAPROC glBufferData = 0;
 #endif
@@ -41,6 +43,7 @@ typedef struct SceneGL SceneGL;
 
 struct SceneGL
 {
+    GLuint vidcs_buffer;
     GLuint verts_buffer;
     GLuint vnmls_buffer;
     GLuint txpts_buffer;
@@ -134,6 +137,7 @@ init_ogl_ui_data ()
     glDeleteProgram = (PFNGLDELETEPROGRAMPROC) SDL_GL_GetProcAddress ("glDeleteProgram");
     glDeleteShader = (PFNGLDELETESHADERPROC) SDL_GL_GetProcAddress ("glDeleteShader");
     glGenBuffers = (PFNGLGENBUFFERSPROC) SDL_GL_GetProcAddress ("glGenBuffers");
+    glDeleteBuffers = (PFNGLDELETEBUFFERSPROC) SDL_GL_GetProcAddress ("glDeleteBuffers");
     glBindBuffer = (PFNGLBINDBUFFERPROC) SDL_GL_GetProcAddress ("glBindBuffer");
     glBufferData = (PFNGLBUFFERDATAPROC) SDL_GL_GetProcAddress ("glBufferData");
 
@@ -152,6 +156,7 @@ init_ogl_ui_data ()
     if (!glDeleteProgram) { fputs ("glDeleteProgram\n", err); exit(1); }
     if (!glDeleteShader) { fputs ("glDeleteShader\n", err); exit(1); }
     if (!glGenBuffers) { fputs ("glGenBuffers\n", err); exit(1); }
+    if (!glDeleteBuffers) { fputs ("glDeleteBuffers\n", err); exit(1); }
     if (!glBindBuffer) { fputs ("glBindBuffer\n", err); exit(1); }
     if (!glBufferData) { fputs ("glBufferData\n", err); exit(1); }
     fputs ("Loaded all required function pointers!\n", err);
@@ -213,7 +218,7 @@ cleanup_ogl_ui_data (const RaySpace* space)
 
     UFor( scenei, space->nobjects+1 )
     {
-            /* GLuint vbos[3]; */
+        GLuint vbos[4];
         SceneGL* scenegl;
         const Scene* scene;
 
@@ -222,8 +227,6 @@ cleanup_ogl_ui_data (const RaySpace* space)
             scene = &space->objects[scenei].scene;
         else
             scene = &space->main.scene;
-
-            /* glDeleteBuffers (3, vbos); */
 
         if (scene->ntxtrs > 0)
         {
@@ -235,6 +238,12 @@ cleanup_ogl_ui_data (const RaySpace* space)
             glDeleteTextures (scene->ntxtrs, ids);
             free (ids);
         }
+
+        vbos[0] = scenegl->vidcs_buffer;
+        vbos[1] = scenegl->verts_buffer;
+        vbos[2] = scenegl->vnmls_buffer;
+        vbos[3] = scenegl->txpts_buffer;
+        glDeleteBuffers (ArraySz( vbos ), vbos);
     }
 }
 
@@ -261,7 +270,7 @@ ogl_setup (const RaySpace* space)
         scenegls = AllocT( SceneGL, space->nobjects+1 );
         UFor( i, space->nobjects+1 )
         {
-            GLuint vbos[3];
+            GLuint vbos[4];
             SceneGL* scenegl;
             const Scene* scene;
             uint texi;
@@ -272,10 +281,11 @@ ogl_setup (const RaySpace* space)
             else
                 scene = &space->main.scene;
 
-            glGenBuffers(3, vbos);
-            scenegl->verts_buffer = vbos[0];
-            scenegl->vnmls_buffer = vbos[1];
-            scenegl->txpts_buffer = vbos[2];
+            glGenBuffers (ArraySz( vbos ), vbos);
+            scenegl->vidcs_buffer = vbos[0];
+            scenegl->verts_buffer = vbos[1];
+            scenegl->vnmls_buffer = vbos[2];
+            scenegl->txpts_buffer = vbos[3];
 
             glBindBuffer (GL_ARRAY_BUFFER, scenegl->verts_buffer);
             glBufferData (GL_ARRAY_BUFFER, scene->nverts * sizeof (Point),
@@ -286,13 +296,14 @@ ogl_setup (const RaySpace* space)
             glBindBuffer (GL_ARRAY_BUFFER, scenegl->txpts_buffer);
             glBufferData (GL_ARRAY_BUFFER, scene->ntxpts * sizeof (BaryPoint),
                           scene->txpts, GL_STATIC_DRAW);
-#if 0
-            glBindBuffer (GL_ELEMENT_ARRAY_BUFFER, elem_indices);
-            glBufferData (GL_ELEMENT_ARRAY_BUFFER,
-                          scene->nelems * sizeof (SceneElement),
-                          scene->elems,
-                          GL_STATIC_DRAW);
-#endif
+
+            if (scene->vidcs)
+            {
+                glBindBuffer (GL_ELEMENT_ARRAY_BUFFER, scenegl->vidcs_buffer);
+                glBufferData (GL_ELEMENT_ARRAY_BUFFER,
+                              3 * scene->nelems * sizeof (uint),
+                              scene->vidcs, GL_STATIC_DRAW);
+            }
 
             scenegl->texture_offset = ntextures;
             UFor( texi, scene->ntxtrs )
@@ -307,6 +318,8 @@ ogl_setup (const RaySpace* space)
             }
         }
     }
+    glBindBuffer (GL_ARRAY_BUFFER, 0);
+    glBindBuffer (GL_ELEMENT_ARRAY_BUFFER, 0);
 
         /* TODO: This video info does nothing, and is misplaced to boot!*/
     info = SDL_GetVideoInfo ();
@@ -579,6 +592,8 @@ ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object,
     if (!object->visible)  return;
     scene = &object->scene;
     scenegl = &scenegls[objidx];
+
+#if NDimensions != 4
         /* Single-element objects are the only ones that change.*/
     if (scene->nelems == 1)
     {
@@ -586,8 +601,7 @@ ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object,
         glBufferData (GL_ARRAY_BUFFER, scene->nverts * sizeof (Point),
                       scene->verts, GL_DYNAMIC_DRAW);
     }
-
-#if NDimensions == 4
+#else  /* ^^^ NDimensions != 4 */
 # ifdef Match4dGeom
     map = &affine_map;
     identity_AffineMap (map);
@@ -717,7 +731,20 @@ ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object,
                                surf->txpts_offset + (BaryPoint*) 0);
             glEnableClientState (GL_TEXTURE_COORD_ARRAY);
         }
-        glDrawArrays (GL_TRIANGLES, 0, 3 * surf->nelems);
+
+        if (surf->vidcs_offset < Max_uint)
+        {
+            glBindBuffer (GL_ELEMENT_ARRAY_BUFFER, scenegl->vidcs_buffer);
+            glDrawElements (GL_TRIANGLES,
+                            3 * surf->nelems,
+                            GL_UNSIGNED_INT,
+                            surf->vidcs_offset + (uint*) 0);
+        }
+        else
+        {
+            glBindBuffer (GL_ELEMENT_ARRAY_BUFFER, 0);
+            glDrawArrays (GL_TRIANGLES, 0, 3 * surf->nelems);
+        }
 
         glDisableClientState (GL_VERTEX_ARRAY);
         if (surf->vnmls_offset < Max_uint)
@@ -726,6 +753,7 @@ ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object,
             glDisableClientState (GL_TEXTURE_COORD_ARRAY);
     }
 
+    glBindBuffer (GL_ELEMENT_ARRAY_BUFFER, 0);
     glBindBuffer (GL_ARRAY_BUFFER, 0);
 #endif  /* NDimensions != 4 */
 
@@ -797,6 +825,7 @@ view_element (Point* ret_verts,
     }
     if (nabove == 0 || nabove == NDimensions)  return 0;
 
+        /* Find all edges which cross the view plane (3 or 4).*/
     UFor( i, NDimensions-1 )
     {
         uint j;

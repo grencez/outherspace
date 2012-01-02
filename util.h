@@ -54,6 +54,8 @@
 #define Ceil_uint( a, b ) \
     (((a) + (b) - 1) / (b))
 
+#define ArraySz( a )  sizeof(a) / sizeof(*a)
+
 typedef unsigned int uint;
 typedef unsigned char byte;
 
@@ -149,6 +151,8 @@ swap_uint (uint* x, uint* y);
 void
 swap_real (real* x, real* y);
 tristate compare_real (real a, real b);
+uint
+max_uint (uint a, uint b);
 real match_real (real a, real b);
 real
 clamp_real (real x, real lo, real hi);
@@ -178,6 +182,21 @@ random_bool (srand_t* seed);
 #define AssertStatus( stat, msg ) \
     assert_status (stat, msg, __FILE__, __LINE__)
 #endif
+
+#define AssertEq( expect, result )  assert ((expect) == (result))
+#define AssertEqA( N, expect, result, off_expect, off_result )  do \
+{ \
+    uint AssertEqA_i; \
+    uint AssertEqA_off_expect; \
+    uint AssertEqA_off_result; \
+    AssertEqA_off_expect = off_expect; \
+    AssertEqA_off_result = off_result; \
+    UFor( AssertEqA_i, N ) \
+    { \
+        AssertEq( (expect)[AssertEqA_i + AssertEqA_off_expect], \
+                  (result)[AssertEqA_i + AssertEqA_off_result] ); \
+    } \
+} while (0)
 
 #ifndef __OPENCL_VERSION__
 uint index_of (const void* e, const void* arr, size_t size);

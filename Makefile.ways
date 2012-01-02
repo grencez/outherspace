@@ -11,7 +11,7 @@ way-$(1)-:
 
 .PHONY: clean-way-$(1)-
 clean-way-$(1)-:
-	$(MAKE) Pfx="way-$(1)-" Flags="$(2)" clean
+	$(MAKE) Pfx="way-$(1)-" Flags="$(2)" cleanall
 
 endef
 

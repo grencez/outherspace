@@ -85,7 +85,11 @@ add_custom_command (OUTPUT phong.glsl.h
     COMMAND file2array phong.glsl.h phong.vert phong.frag
     DEPENDS phong.vert phong.frag)
 
-add_executable (verify verif/main.c verif/pack.c ${CSources})
+add_executable (verify
+    verif/main.c
+    verif/order.c
+    verif/pack.c
+    ${CSources})
 set_target_properties (verify PROPERTIES
     PREFIX "" OUTPUT_NAME verify)
 

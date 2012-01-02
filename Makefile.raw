@@ -19,7 +19,7 @@ CONFIG += image
 #CONFIG += c++
 CONFIG += ansi
 #CONFIG += c99
-CONFIG += fast
+#CONFIG += fast
 #CONFIG += snappy
 #CONFIG += debug
 #CONFIG += ultradebug  # -fast -snappy -debug
@@ -296,7 +296,7 @@ $(Pfx)phong.glsl.h: phong.vert phong.frag $(Pfx)file2array
 
 VerifyCFlags := $(filter-out -fwhole-program,$(CFLAGS))
 VerifyDFlags := $(filter-out -DINCLUDE_SOURCE,$(DFLAGS))
-VerifyCSources = verif/main.c verif/pack.c
+VerifyCSources = verif/main.c verif/order.c verif/pack.c
 
 $(Pfx)verify: $(VerifyCSources) $(CSources)
 	$(CC) $(VerifyCFlags) $(VerifyDFlags) -I . $^ -o $@ $(LFLAGS)
@@ -322,5 +322,9 @@ cleanways:
 
 .PHONY: clean
 clean:
+	rm -f $(default_exes)
+
+.PHONY: cleanall
+cleanall:
 	rm -f hello $(all_exes) $(Pfx)phong.glsl.h
 
