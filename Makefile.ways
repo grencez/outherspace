@@ -26,6 +26,7 @@ $(eval \
   $(call Rule,pack,$(strict) pack) \
   $(call Rule,trivialmpi,$(strict) trivialmpi) \
   $(call Rule,mpi,$(strict) mpi) \
+  $(call Rule,opencl,$(strict) opengl opencl,gui) \
  )
 
 all: $(Pfxs)

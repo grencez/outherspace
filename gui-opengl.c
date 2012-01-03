@@ -50,6 +50,10 @@ struct SceneGL
     GLuint texture_offset;
 };
 
+#ifdef SupportOpenCL
+#include "gui-opencl.c"
+#endif
+
 SceneGL* scenegls = 0;
 GLuint vert_shader;
 GLuint frag_shader;
@@ -205,12 +209,20 @@ init_ogl_ui_data ()
     }
 
     glUseProgram (shader_program);
+#ifdef SupportOpenCL
+    init_opencl_data ();
+#endif
 }
 
 static void
 cleanup_ogl_ui_data (const RaySpace* space)
 {
     uint scenei;
+
+#ifdef SupportOpenCL
+    cleanup_opencl_data ();
+#endif
+
     glUseProgram (0);
     glDeleteProgram (shader_program);
     glDeleteShader (vert_shader);
@@ -601,6 +613,9 @@ ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object,
         glBufferData (GL_ARRAY_BUFFER, scene->nverts * sizeof (Point),
                       scene->verts, GL_DYNAMIC_DRAW);
     }
+#ifdef SupportOpenCL
+    perturb_vertices (scene, scenegl);
+#endif
 #else  /* ^^^ NDimensions != 4 */
 # ifdef Match4dGeom
     map = &affine_map;

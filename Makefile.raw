@@ -3,6 +3,10 @@
 Flags=  # Override default CONFIG value (see below).
 Pfx= # Prefix all output files. May include directory path.
 
+# These are used when OpenCL is enabled.
+OpenCLPath = $(HOME)/ati-stream-sdk-v2.3-lnx64
+OpenCLLibPath = $(OpenCLPath)/lib/x86_64
+
 #CC = clang
 CC = gcc
 #CC = llvm-gcc
@@ -19,11 +23,12 @@ CONFIG += image
 #CONFIG += c++
 CONFIG += ansi
 #CONFIG += c99
-#CONFIG += fast
+CONFIG += fast
 #CONFIG += snappy
 #CONFIG += debug
 #CONFIG += ultradebug  # -fast -snappy -debug
 CONFIG += openmp
+#CONFIG += opencl
 #CONFIG += mpi  # -ansi
 #CONFIG += trivialmpi  # +mpi
 #CONFIG += profile
@@ -217,6 +222,11 @@ ifneq (,$(filter openmp,$(CONFIG)))
 		CFLAGS += -fopenmp
 	endif
 endif
+ifneq (,$(filter opencl,$(CONFIG)))
+	GuiCFlags += -I$(OpenCLPath)/include
+	GuiDFlags += -DSupportOpenCL
+	GuiLFlags += -L$(OpenCLLibPath) -lOpenCL
+endif
 ## When using OpenGL, make rendering match the ray tracer.
 ## This shows slices thru tetrahedra instead of a smooth
 ## interpolation between triangles.
@@ -272,8 +282,6 @@ all: $(all_exes)
 	# Finished: all
 
 # Note: OpenCL code does not function at this time, don't bother.
-OpenCLPath = /home/grencez/ati-stream-sdk-v2.3-lnx64
-OpenCLLibPath = $(OpenCLPath)/lib/x86_64
 hello: hello.c $(CSources)
 	$(CC) $(CFLAGS) $(DFLAGS) -I $(OpenCLPath)/include $< -o $@ \
 		-L $(OpenCLLibPath) -lOpenCL $(LFLAGS)
@@ -290,6 +298,9 @@ GuiDFlags += $(DFLAGS)
 GuiLFlags += $(LFLAGS)
 $(Pfx)gui: $(GuiMainCSources) compute.c motion.c $(CSources) $(Pfx)phong.glsl.h
 	$(CC) $(GuiCFlags) $(GuiDFlags) $< -o $@ $(GuiLFlags)
+
+run-$(Pfx)gui-opencl: $(Pfx)gui
+	LD_LIBRARY_PATH=$(OpenCLLibPath) ./$<
 
 $(Pfx)phong.glsl.h: phong.vert phong.frag $(Pfx)file2array
 	$(RunPfx)file2array $@ phong.vert phong.frag
