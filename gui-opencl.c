@@ -133,37 +133,21 @@ static
     void 
 load_program (cl_program* ret_program, cl_context context,
               uint ndevices, const cl_device_id* devices,
-              uint nfnames, const char* const* fnames)
+              uint nfiles,
+              const uint* files_nbytes,
+              const byte* const* files_bytes)
 {
     uint i;
     size_t* sizes;
-    char** bufs;
     cl_program program;
     cl_int err;
 
-    bufs = AllocT( char*, nfnames );
-    sizes = AllocT( size_t, nfnames );
+    sizes = AllocT( size_t, nfiles );
+    UFor( i, nfiles )
+        sizes[i] = files_nbytes[i];
 
-    UFor( i, nfnames )
-    {
-        long len;
-        FILE* in;
-        in = fopen (fnames[i], "rb");
-        assert (in);
-        fseek (in, 0, SEEK_END);
-        len = ftell (in);
-        fseek (in, 0, SEEK_SET);
-
-        bufs[i] = AllocT( char, (size_t) len );
-        assert (bufs[i]);
-
-        sizes[i] = fread (bufs[i], sizeof(char), (size_t)len, in);
-        fclose (in);
-        assert (sizeof(char) * (size_t)len == sizes[i]);
-    }
-
-    program = clCreateProgramWithSource (context, nfnames,
-                                         (const char**) bufs,
+    program = clCreateProgramWithSource (context, nfiles,
+                                         (const char**) files_bytes,
                                          sizes, &err);
     check_cl_status (err, "create program");
 
@@ -205,8 +189,6 @@ load_program (cl_program* ret_program, cl_context context,
     }
     check_cl_status (err, "build program");
 
-    UFor( i, nfnames )  free (bufs[i]);
-    if (bufs)  free (bufs);
     if (sizes)  free (sizes);
 
     *ret_program = program;
@@ -217,19 +199,34 @@ init_opencl_data ()
 {
     int err;
     SysOpenCL* cl = &opencl_state;
-    const char* fnames[] = { "perturb.cl" };
-    const uint nfnames = ArraySz( fnames );
+
+#ifdef EmbedFiles
+#include EmbedInclude(perturb.cl)
+#else  /* ^^^ defined(EmbedFiles) */
+    static const char* files[] = { "perturb.cl" };
+    static const uint nfiles = ArraySz( files );
+    uint files_nbytes[ArraySz( files )];
+    byte* files_bytes[ArraySz( files )];
+
+    readin_files (nfiles, files_nbytes, files_bytes, 0, files);
+#endif  /* !defined(EmbedFiles) */
     
     cl->ndevices = 0;
     compute_devices (&cl->ndevices, &cl->devices, &cl->context, &cl->comqs);
     printf ("I have %u devices!\n", cl->ndevices);
 
     load_program (&cl->program, cl->context, cl->ndevices, cl->devices,
-                  nfnames, fnames);
+                  nfiles, files_nbytes, (const byte* const*) files_bytes);
 
         /* Create the compute kernel in the program we wish to run.*/
     cl->kernel = clCreateKernel (cl->program, "perturb_kernel", &err);
     check_cl_status (err, "create compute kernel");
+
+#ifndef EmbedFiles
+    UFr(i, nfiles,
+        free (files_bytes[i]);
+       );
+#endif
 }
 
 static void

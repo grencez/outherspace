@@ -36,6 +36,7 @@ set (GuiName gui)
 list (APPEND GuiDFLAGS "NDimensions=3")
 list (APPEND GuiDFLAGS "SupportImage")
 list (APPEND GuiDFLAGS "SupportOpenGL")
+list (APPEND GuiDFLAGS "EmbedFiles")
 #list (APPEND GuiDFLAGS "INCLUDE_SOURCE")
 
 if (UNIX)
@@ -81,9 +82,16 @@ add_executable (file2array file2array.c util.c)
 set_target_properties (file2array PROPERTIES
     PREFIX "" OUTPUT_NAME file2array)
 
-add_custom_command (OUTPUT phong.glsl.h
-    COMMAND file2array phong.glsl.h phong.vert phong.frag
-    DEPENDS phong.vert phong.frag)
+
+set (EmbedSfx, ".embed.h")
+
+add_custom_command (OUTPUT "phong.glsl${EmbedSfx}"
+    COMMAND file2array "phong.glsl${EmbedSfx}" phong.vert phong.frag 4d.vert
+    DEPENDS phong.vert phong.frag 4d.vert)
+
+add_custom_command (OUTPUT "perturb.cl${EmbedSfx}"
+    COMMAND file2array "perturb.cl${EmbedSfx}" perturb.cl
+    DEPENDS perturb.cl)
 
 add_executable (verify
     verif/main.c
@@ -93,7 +101,10 @@ add_executable (verify
 set_target_properties (verify PROPERTIES
     PREFIX "" OUTPUT_NAME verify)
 
-add_executable (gui gui.c motion.c phong.glsl.h ${CSources})
+add_executable (gui gui.c motion.c
+    "phong.glsl${EmbedSfx}"
+    "perturb.cl${EmbedSfx}"
+    ${CSources})
 set_target_properties (gui PROPERTIES
     PREFIX "" OUTPUT_NAME "${GuiName}"
     COMPILE_DEFINITIONS "${GuiDFLAGS}"

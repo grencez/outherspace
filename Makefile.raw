@@ -1,11 +1,13 @@
 
-# Optional user-defined variables:
-Flags=  # Override default CONFIG value (see below).
-Pfx= # Prefix all output files. May include directory path.
+###### Optional user-defined variables ######
+# Override default CONFIG value (see below).
+Flags =
+# Prefix all output files. May include directory path.
+Pfx=
 
 # These are used when OpenCL is enabled.
-OpenCLPath = $(HOME)/ati-stream-sdk-v2.3-lnx64
-OpenCLLibPath = $(OpenCLPath)/lib/x86_64
+#OpenCLPath = $(HOME)/ati-stream-sdk-v2.3-lnx64
+OpenCLPath=
 
 #CC = clang
 CC = gcc
@@ -38,6 +40,7 @@ CONFIG += openmp
 #CONFIG += haptic
 #CONFIG += opengl match4dgeom
 CONFIG += opengl
+CONFIG += embed_files
 #CONFIG += local_sdl
 #CONFIG += sunstudio
 
@@ -60,6 +63,11 @@ endif
 
 #valgrind --num-callers=50 --db-attach=yes --db-command='cgdb -- %f %p'
 
+EmbedSfx=.embed.h
+OpenCLLibPath=
+ifneq (,$(OpenCLPath))
+	OpenCLLibPath=$(OpenCLPath)/lib/x86_64
+endif
 
 ifeq ($(CC),icc)
 	#CFLAGS += -Wremarks
@@ -85,7 +93,7 @@ ifneq (,$(filter 4d,$(CONFIG)))
 	DFLAGS += -DNDimensions=4
 endif
 
-GuiMainCSources = gui.c gui-indep.c gui-opengl.c
+GuiMainCSources = gui.c gui-indep.c
 ifneq (,$(filter macapp,$(CONFIG)))
 	# Everything on this OS X setup is 32 bit.
 	CFLAGS += -m32
@@ -122,7 +130,6 @@ else
 		GuiLFlags += -lSDL_mixer
 	endif
 	ifneq (,$(filter opengl,$(CONFIG)))
-		GuiDFlags += -DSupportOpenGL
 		GuiLFlags += -lGLU -lGL
 	endif
 endif
@@ -223,9 +230,26 @@ ifneq (,$(filter openmp,$(CONFIG)))
 	endif
 endif
 ifneq (,$(filter opencl,$(CONFIG)))
-	GuiCFlags += -I$(OpenCLPath)/include
+	GuiMainCSources += gui-opencl.c
+	ifneq (,$(OpenCLPath))
+		GuiCFlags += -I$(OpenCLPath)/include
+		GuiLFlags += -L$(OpenCLLibPath)
+	endif
 	GuiDFlags += -DSupportOpenCL
-	GuiLFlags += -L$(OpenCLLibPath) -lOpenCL
+	GuiLFlags += -lOpenCL
+	ifneq (,$(filter embed_files,$(CONFIG)))
+		GuiMainCSources += $(Pfx)perturb.cl$(EmbedSfx)
+	endif
+endif
+ifneq (,$(filter opengl,$(CONFIG)))
+	GuiMainCSources += gui-opengl.c
+	GuiDFlags += -DSupportOpenGL
+	ifneq (,$(filter embed_files,$(CONFIG)))
+		GuiMainCSources += $(Pfx)phong.glsl$(EmbedSfx)
+	endif
+endif
+ifneq (,$(filter embed_files,$(CONFIG)))
+	GuiDFlags += -DEmbedFiles
 endif
 ## When using OpenGL, make rendering match the ray tracer.
 ## This shows slices thru tetrahedra instead of a smooth
@@ -234,10 +258,12 @@ ifneq (,$(filter match4dgeom,$(CONFIG)))
 	GuiDFlags += -DMatch4dGeom
 endif
 
-ifneq (,$(Pfx))
-	DFLAGS += '-DShaderSourceInclude="$(Pfx)phong.glsl.h"'
+ifneq (,$(patsubst ./,,$(dir $(Pfx))))
+	GuiDFlags += '-DEmbedPathnamePfx=$(patsubst %/,%,$(dir $(Pfx)))'
 endif
-
+ifneq (,$(notdir $(Pfx)))
+	GuiDFlags += '-DEmbedFilenamePfx=$(notdir $(Pfx))'
+endif
 ifeq ($(Pfx),$(notdir $(Pfx)))
 	RunPfx = ./$(Pfx)
 else
@@ -296,14 +322,17 @@ $(Pfx)cli: cli.c compute.c $(CSources)
 GuiCFlags += $(CFLAGS)
 GuiDFlags += $(DFLAGS)
 GuiLFlags += $(LFLAGS)
-$(Pfx)gui: $(GuiMainCSources) compute.c motion.c $(CSources) $(Pfx)phong.glsl.h
+$(Pfx)gui: $(GuiMainCSources) compute.c motion.c $(CSources)
 	$(CC) $(GuiCFlags) $(GuiDFlags) $< -o $@ $(GuiLFlags)
 
 run-$(Pfx)gui-opencl: $(Pfx)gui
 	LD_LIBRARY_PATH=$(OpenCLLibPath) ./$<
 
-$(Pfx)phong.glsl.h: phong.vert phong.frag $(Pfx)file2array
-	$(RunPfx)file2array $@ phong.vert phong.frag
+$(Pfx)phong.glsl$(EmbedSfx): phong.vert phong.frag 4d.vert $(Pfx)file2array
+	$(RunPfx)file2array $@ phong.vert phong.frag 4d.vert
+
+$(Pfx)perturb.cl$(EmbedSfx): perturb.cl $(Pfx)file2array
+	$(RunPfx)file2array $@ perturb.cl
 
 VerifyCFlags := $(filter-out -fwhole-program,$(CFLAGS))
 VerifyDFlags := $(filter-out -DINCLUDE_SOURCE,$(DFLAGS))
@@ -337,5 +366,5 @@ clean:
 
 .PHONY: cleanall
 cleanall:
-	rm -f hello $(all_exes) $(Pfx)phong.glsl.h
+	rm -f hello $(all_exes) $(Pfx)phong.glsl$(EmbedSfx) $(Pfx)perturb.cl$(EmbedSfx)
 

@@ -27,6 +27,7 @@ $(eval \
   $(call Rule,trivialmpi,$(strict) trivialmpi) \
   $(call Rule,mpi,$(strict) mpi) \
   $(call Rule,opencl,$(strict) opengl opencl,gui) \
+  $(call Rule,/tmp/openclgl,$(strict) embed_files opengl opencl,gui) \
  )
 
 all: $(Pfxs)

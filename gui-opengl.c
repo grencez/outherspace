@@ -115,15 +115,26 @@ static
     void
 init_ogl_ui_data ()
 {
-#ifndef ShaderSourceInclude
-#define ShaderSourceInclude "phong.glsl.h"
-#endif
-#include ShaderSourceInclude
-
     GLint status = GL_NO_ERROR; 
     FILE* err = stderr;
-
+#ifdef EmbedFiles
+#include EmbedInclude(phong.glsl)
     (void) nfiles;
+#else  /* ^^^ defined(EmbedFiles) */
+    static const char* const files[] =
+    {   "phong.vert",
+        "phong.frag",
+        "4d.vert"
+    };
+    static const uint nfiles = ArraySz( files );
+    uint files_nbytes[ArraySz( files )];
+    byte* files_bytes[ArraySz( files )];
+    bool good = true;
+
+    good = readin_files (nfiles, files_nbytes, files_bytes, 0, files);
+
+    if (!good) { fputs ("Bad read!\n", err); exit (1); }
+#endif  /* !defined(EmbedFiles) */
 
 #ifndef GL_GLEXT_PROTOTYPES
     glUseProgram = (PFNGLUSEPROGRAMPROC) SDL_GL_GetProcAddress ("glUseProgram");
@@ -174,9 +185,15 @@ init_ogl_ui_data ()
     glAttachShader (shader_program, frag_shader);
 
         /* Fill program contents.*/
+#if NDimensions == 4
+    glShaderSource (vert_shader, 1,
+                    (const GLchar**) &files_bytes[2],
+                    (const GLint*) &files_nbytes[2]);
+#else
     glShaderSource (vert_shader, 1,
                     (const GLchar**) &files_bytes[0],
                     (const GLint*) &files_nbytes[0]);
+#endif
     glShaderSource (frag_shader, 1,
                     (const GLchar**) &files_bytes[1],
                     (const GLint*) &files_nbytes[1]);
@@ -211,6 +228,12 @@ init_ogl_ui_data ()
     glUseProgram (shader_program);
 #ifdef SupportOpenCL
     init_opencl_data ();
+#endif
+
+#ifndef EmbedFiles
+    UFr(i, nfiles,
+        free (files_bytes[i]);
+       );
 #endif
 }
 

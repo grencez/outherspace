@@ -155,12 +155,13 @@ cat_strings (uint n, const char* const* a)
     char* s;
 
     len = 0;
-    UFor( i, n )  len += strlen (a[i]);
+    UFor( i, n )  if (a[i])
+        len += strlen (a[i]);
 
     s = AllocT( char, len+1 );
 
     len = 0;
-    UFor( i, n )
+    UFor( i, n )  if (a[i])
     {
         uint count;
         count = strlen (a[i]);
@@ -182,13 +183,15 @@ strends_with (const char* str, const char* sfx)
     return (0 == strncmp (&str[a-b], sfx, b));
 }
 
-    /* Create a full filepath from a pathname and filename.*/
+    /** Create a full filepath from a pathname and filename.
+     * For no path prefix, make /pathname/ null.
+     **/
     char*
 cat_filepath (const char* pathname, const char* filename)
 {
     const char* parts[3];
     parts[0] = pathname;
-    parts[1] = "/";
+    parts[1] = pathname ? "/" : 0;
     parts[2] = filename;
     return cat_strings (3, parts);
 }
@@ -202,6 +205,67 @@ fopen_path (const char* pathname, const char* filename, const char* mode)
     f = fopen (path, mode);
     free (path);
     return f;
+}
+
+    /** Fully read a bunch of files.
+     * The members of /files_bytes/ will be null-terminated, just in case.
+     * Null terminators are not included in /files_nbytes/.
+     **/
+    bool
+readin_files (uint nfiles, uint* files_nbytes, byte** files_bytes,
+              const char* pathname,
+              const char* const* files)
+{
+    bool good = true;
+    uint i;
+
+    UFor( i, nfiles )
+    {
+        files_nbytes[i] = 0;
+        files_bytes[i] = 0;
+    }
+
+    for (i = 0; good && i < nfiles; ++i)
+    {
+        long ret;
+        FILE* in;
+
+        in = fopen_path (pathname, files[i], "rb");
+
+        if (good && (good = !!in))
+        {
+            ret = fseek (in, 0, SEEK_END);
+        }
+        if (good && (good = (ret == 0)))
+        {
+            ret = ftell (in);
+        }
+        if (good && (good = (ret >= 0)))
+        {
+            files_nbytes[i] = (uint) ret;
+            ret = fseek (in, 0, SEEK_SET);
+        }
+        if (good && (good = (ret == 0)))
+        {
+            files_bytes[i] = AllocT( byte, files_nbytes[i] + 1 );
+            ret = fread (files_bytes[i], 1, files_nbytes[i], in);
+        }
+        if (good)
+        {
+            good = (files_nbytes[i] == (uint) ret);
+            files_bytes[i][files_nbytes[i]] = 0;
+        }
+
+        if (in)  fclose (in);
+    }
+
+    if (!good) UFor( i, nfiles )
+    {
+        files_nbytes[i] = 0;
+        if (files_bytes[i])  free (files_bytes[i]);
+    }
+
+    return good;
 }
 
 real monotime ()

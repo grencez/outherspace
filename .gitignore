@@ -6,5 +6,5 @@ imgdiff
 verify
 
 tags
-phong.glsl.h
+*.embed.h
 

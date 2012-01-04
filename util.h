@@ -20,6 +20,22 @@
 # pragma warning (disable : 4305)
 #endif
 
+#define Stringify(a) #a
+#define Concatify(a,b) a ## b
+#define Concatify2(a,b)  Concatify(a,b)
+#define StringifyPath(a,b) Stringify(a/b)
+
+#ifndef EmbedPathnamePfx
+#define EmbedPathnamePfx .
+#endif
+#ifdef EmbedFilenamePfx
+#define EmbedInclude(s) \
+    StringifyPath(EmbedPathnamePfx,Concatify2(EmbedFilenamePfx,s.embed.h))
+#else  /* ^^^ defined(EmbedFilenamePfx) */
+#define EmbedInclude(s) \
+    StringifyPath(EmbedPathnamePfx,s.embed.h)
+#endif  /* !defined(EmbedFilenamePfx) */
+
 
 #define AllocT( Type, capacity ) \
     (((capacity) == 0) ? (Type*) 0 : \
@@ -85,6 +101,12 @@ typedef byte bool;
 
 
 #define UFor( i, bel )  for (i = 0; i < (bel); ++i)
+#define UFr(i, bel, body)  do \
+{ \
+    uint i; \
+    UFor( i, bel ) \
+    { body; } \
+} while (0)
 
     /* Does not scope /j/.*/
 #define UUFor( i, ibel, j, jbel )  UFor( i, ibel )  UFor( j, jbel )
@@ -222,6 +244,10 @@ bool
 strends_with (const char* str, const char* sfx);
 FILE*
 fopen_path (const char* pathname, const char* filename, const char* mode);
+bool
+readin_files (uint nfiles, uint* files_nbytes, byte** files_bytes,
+              const char* pathname,
+              const char* const* files);
 real monotime ();
 void assert_status (int stat, const char* msg, const char* file, int line);
 #ifdef INCLUDE_SOURCE

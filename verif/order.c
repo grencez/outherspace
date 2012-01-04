@@ -48,6 +48,8 @@ testfn_condense_lexi_reals ()
         ,1, 1
         ,0, 0
     };
+    const uint expect_indices[] =
+    { 0, 1, 2, 3, 5 };
     const uint expect_jumps[] =
     { 0, 1, 2, 3, 3, 4, 4, 1, 1, 1, 0 };
     uint jumps[N];
@@ -60,7 +62,11 @@ testfn_condense_lexi_reals ()
     i = condense_lexi_reals (jumps, indices, coords,
                              N, 2, lexis);
     AssertEq( 5, i );  /* This is 1 + max in expect_jumps.*/
+    AssertEq( i, ArraySz( expect_indices ) );
+    UFor( i, ArraySz( expect_indices ) )
+        AssertEq( expect_indices[i], indices[i] );
 
+    shuffle_jump_table (N, jumps, indices);
     UFor( i, N )
         AssertEq( expect_jumps[i], jumps[i] );
 #undef N
