@@ -58,10 +58,14 @@ SceneGL* scenegls = 0;
 GLuint vert_shader;
 GLuint frag_shader;
 GLuint shader_program;
+#if NDimensions == 4
+static GLuint hivert_attrib_loc;
+static GLuint hivnml_attrib_loc;
+#endif
 
 
 static void
-ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object,
+ogl_redraw_ObjectRaySpace (const RaySpace* space,
                            uint objidx,
                            const Point* view_origin,
                            const PointXfrm* view_basis);
@@ -226,6 +230,11 @@ init_ogl_ui_data ()
     }
 
     glUseProgram (shader_program);
+#if NDimensions == 4
+    hivert_attrib_loc = glGetAttribLocation (shader_program, "hivert");
+    hivnml_attrib_loc = glGetAttribLocation (shader_program, "hivnml");
+#endif
+
 #ifdef SupportOpenCL
     init_opencl_data ();
 #endif
@@ -240,6 +249,11 @@ init_ogl_ui_data ()
 static void
 cleanup_ogl_ui_data (const RaySpace* space)
 {
+#if NDimensions == 4 && !defined(Match4dGeom)
+    const uint nscenes = space->nobjects + track.nmorphs;
+#else
+    const uint nscenes = space->nobjects+1;
+#endif
     uint scenei;
 
 #ifdef SupportOpenCL
@@ -251,7 +265,7 @@ cleanup_ogl_ui_data (const RaySpace* space)
     glDeleteShader (vert_shader);
     glDeleteShader (frag_shader);
 
-    UFor( scenei, space->nobjects+1 )
+    UFor( scenei, nscenes )
     {
         GLuint vbos[4];
         SceneGL* scenegl;
@@ -261,7 +275,13 @@ cleanup_ogl_ui_data (const RaySpace* space)
         if (scenei < space->nobjects)
             scene = &space->objects[scenei].scene;
         else
-            scene = &space->main.scene;
+        {
+#if NDimensions == 4 && !defined(Match4dGeom)
+                scene = &track.morph_scenes[scenei - space->nobjects];
+#else
+                scene = &space->main.scene;
+#endif
+        }
 
         if (scene->ntxtrs > 0)
         {
@@ -302,8 +322,13 @@ ogl_setup (const RaySpace* space)
 
     if (!scenegls)
     {
-        scenegls = AllocT( SceneGL, space->nobjects+1 );
-        UFor( i, space->nobjects+1 )
+#if NDimensions == 4 && !defined(Match4dGeom)
+        const uint nscenes = space->nobjects + track.nmorphs;
+#else
+        const uint nscenes = space->nobjects+1;
+#endif
+        scenegls = AllocT( SceneGL, nscenes );
+        UFor( i, nscenes )
         {
             GLuint vbos[4];
             SceneGL* scenegl;
@@ -314,7 +339,13 @@ ogl_setup (const RaySpace* space)
             if (i < space->nobjects)
                 scene = &space->objects[i].scene;
             else
+            {
+#if NDimensions == 4 && !defined(Match4dGeom)
+                scene = &track.morph_scenes[i - space->nobjects];
+#else
                 scene = &space->main.scene;
+#endif
+            }
 
             glGenBuffers (ArraySz( vbos ), vbos);
             scenegl->vidcs_buffer = vbos[0];
@@ -518,17 +549,10 @@ ogl_redraw (const RaySpace* space, uint pilot_idx)
     glMatrixMode (GL_MODELVIEW);
     glLoadIdentity ();
 
-#ifndef Match4dGeom
-        /* Use this as a flag to say this is the main object (track).*/
-    ogl_redraw_ObjectRaySpace (&space->main, space->nobjects,
-                               &pilot->view_origin, 0);
-#else
-    ogl_redraw_ObjectRaySpace (&space->main, space->nobjects,
+    ogl_redraw_ObjectRaySpace (space, space->nobjects,
                                &pilot->view_origin, &pilot->view_basis);
-#endif
     UFor( i, space->nobjects )
-        ogl_redraw_ObjectRaySpace (&space->objects[i],
-                                   i,
+        ogl_redraw_ObjectRaySpace (space, i,
                                    &pilot->view_origin, &pilot->view_basis);
 }
 
@@ -600,46 +624,40 @@ ogl_set_ObjectSurface (const ObjectSurface* surf,
     }
 }
 
-    void
-ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object,
-                           uint objidx,
-                           const Point* view_origin,
-                           const PointXfrm* view_basis)
+static void
+ogl_immediate_redraw_ObjectRaySpace (const RaySpace* space,
+                                     uint objidx,
+                                     const Point* view_origin,
+                                     const PointXfrm* view_basis)
 {
     const Scene* scene;
     const SceneGL* scenegl;
+    const ObjectRaySpace* object;
     uint i;
-#if NDimensions == 4
     bool first_elem = true;
     uint material_idx = Max_uint;
+#if NDimensions == 4
 # ifdef Match4dGeom
     AffineMap affine_map;
     AffineMap* map;
-    (void) view_basis;
+    (void) view_basis;  /* TODO: Use this.*/
 # else
     Scene interp4d_scene;
+    (void) view_basis;
 # endif
 #else  /* ^^^ NDimensions == 4 */
     (void) view_origin;
     (void) view_basis;
 #endif  /* NDimensions != 4 */
 
-    if (!object->visible)  return;
+    if (objidx < space->nobjects)
+        object = &space->objects[objidx];
+    else
+        object = &space->main;
     scene = &object->scene;
     scenegl = &scenegls[objidx];
 
-#if NDimensions != 4
-        /* Single-element objects are the only ones that change.*/
-    if (scene->nelems == 1)
-    {
-        glBindBuffer (GL_ARRAY_BUFFER, scenegl->verts_buffer);
-        glBufferData (GL_ARRAY_BUFFER, scene->nverts * sizeof (Point),
-                      scene->verts, GL_DYNAMIC_DRAW);
-    }
-#ifdef SupportOpenCL
-    perturb_vertices (scene, scenegl);
-#endif
-#else  /* ^^^ NDimensions != 4 */
+#if NDimensions == 4
 # ifdef Match4dGeom
     map = &affine_map;
     identity_AffineMap (map);
@@ -647,7 +665,7 @@ ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object,
                                   - view_origin->coords[DriftDim]);
 # else
 
-    if (!view_basis)
+    if (objidx >= space->nobjects)
     {
         real alpha;
         alpha = ((view_origin->coords[DriftDim] - track.morph_dcoords[0]) /
@@ -664,7 +682,6 @@ ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object,
 
     map0_ogl_matrix (&object->centroid, &object->orientation);
 
-#if NDimensions == 4
         /* Send our triangle data to the pipeline. */
     UFor( i, scene->nelems )
     {
@@ -682,20 +699,24 @@ ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object,
         if (nelems == 0)  continue;
 #else  /* ^^^ defined(Match4dGeom) */
 
-        if (view_basis)
+#if NDimensions == 4
+        if (objidx < space->nobjects)
         {
             real d[4];
             UFor( j, 4 )
                 d[j] = scene->verts[elem->verts[j]].coords[DriftDim];
             if (d[0] < d[1] || d[1] != d[2] || d[2] != d[3])  continue;
         }
+#endif
 
         UFor( j, 3 )
         {
             uint idx;
 
             idx = j;
-            if (view_basis)  idx += 1;
+#if NDimensions == 4
+            if (objidx < space->nobjects)  idx += 1;
+#endif
 
             verts[j] = scene->verts[elem->verts[idx]];
 
@@ -743,7 +764,74 @@ ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object,
         }
     }
     if (scene->nelems > 0)  glEnd ();
+
+    glPopMatrix ();
+
+#if NDimensions == 4
+# ifndef Match4dGeom
+    if (objidx >= space->nobjects)  cleanup_Scene (&interp4d_scene);
+# endif
+#endif
+}
+
+    void
+ogl_redraw_ObjectRaySpace (const RaySpace* space,
+                           uint objidx,
+                           const Point* view_origin,
+                           const PointXfrm* view_basis)
+{
+    const Scene* scene;
+    const SceneGL* scenegl;
+    const ObjectRaySpace* object;
+    uint i;
+#if NDimensions == 4
+    real alpha;
+    GLint alpha_loc;
+#endif
+
+    if (objidx < space->nobjects)
+        object = &space->objects[objidx];
+    else
+        object = &space->main;
+    if (!object->visible)  return;
+
+#ifdef Match4dGeom
+    if (true)
+#else
+    if (NDimensions == 4 && objidx < space->nobjects)
+#endif
+    {
+        ogl_immediate_redraw_ObjectRaySpace (space, objidx,
+                                             view_origin, view_basis);
+        return;
+    }
+
+    glEnableClientState (GL_VERTEX_ARRAY);
+#if NDimensions == 4
+    glEnableVertexAttribArray (hivert_attrib_loc);
+    scene = &track.morph_scenes[0];
+    alpha = ((view_origin->coords[DriftDim] - track.morph_dcoords[0]) /
+             (track.morph_dcoords[1] - track.morph_dcoords[0]));
+    alpha = clamp_real (alpha, 0, 1);
+    alpha_loc = glGetUniformLocation (shader_program, "alpha");
+    glUniform1f (alpha_loc, alpha);
 #else  /* ^^^ NDimensions == 4 */
+    scene = &object->scene;
+#endif  /* NDimensions != 4 */
+    scenegl = &scenegls[objidx];
+    glPushMatrix ();
+    map0_ogl_matrix (&object->centroid, &object->orientation);
+
+        /* Single-element objects are the only ones that change.*/
+    if (scene->nelems == 1)
+    {
+        glBindBuffer (GL_ARRAY_BUFFER, scenegl->verts_buffer);
+        glBufferData (GL_ARRAY_BUFFER, scene->nverts * sizeof (Point),
+                      scene->verts, GL_DYNAMIC_DRAW);
+    }
+#ifdef SupportOpenCL
+    perturb_vertices (scene, scenegl);
+#endif
 
     UFor( i, scene->nsurfs )
     {
@@ -754,13 +842,25 @@ ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object,
         glBindBuffer (GL_ARRAY_BUFFER, scenegl->verts_buffer);
         glVertexPointer (3, GL_REAL, sizeof (Point),
                          surf->verts_offset + (Point*) 0);
-        glEnableClientState (GL_VERTEX_ARRAY);
+#if NDimensions == 4
+        glBindBuffer (GL_ARRAY_BUFFER, scenegls[objidx+1].verts_buffer);
+        glVertexAttribPointer (hivert_attrib_loc,
+                               3, GL_REAL, GL_FALSE, sizeof (Point),
+                               surf->verts_offset + (Point*) 0);
+#endif
         if (surf->vnmls_offset < Max_uint)
         {
             glBindBuffer (GL_ARRAY_BUFFER, scenegl->vnmls_buffer);
             glNormalPointer (GL_REAL, sizeof (Point),
                              surf->vnmls_offset + (Point*) 0);
             glEnableClientState (GL_NORMAL_ARRAY);
+#if NDimensions == 4
+            glBindBuffer (GL_ARRAY_BUFFER, scenegls[objidx+1].vnmls_buffer);
+            glVertexAttribPointer (hivnml_attrib_loc,
+                                   3, GL_REAL, GL_FALSE, sizeof (Point),
+                                   surf->vnmls_offset + (Point*) 0);
+            glEnableVertexAttribArray (hivnml_attrib_loc);
+#endif
         }
         if (surf->txpts_offset < Max_uint)
         {
@@ -784,24 +884,26 @@ ogl_redraw_ObjectRaySpace (const ObjectRaySpace* object,
             glDrawArrays (GL_TRIANGLES, 0, 3 * surf->nelems);
         }
 
-        glDisableClientState (GL_VERTEX_ARRAY);
         if (surf->vnmls_offset < Max_uint)
+        {
             glDisableClientState (GL_NORMAL_ARRAY);
+#if NDimensions == 4
+            glDisableVertexAttribArray (hivnml_attrib_loc);
+#endif
+        }
         if (surf->txpts_offset < Max_uint)
             glDisableClientState (GL_TEXTURE_COORD_ARRAY);
     }
 
     glBindBuffer (GL_ELEMENT_ARRAY_BUFFER, 0);
     glBindBuffer (GL_ARRAY_BUFFER, 0);
-#endif  /* NDimensions != 4 */
+    glDisableClientState (GL_VERTEX_ARRAY);
+#if NDimensions == 4
+    glUniform1f (alpha_loc, 0);
+    glDisableVertexAttribArray (hivert_attrib_loc);
+#endif
 
     glPopMatrix ();
-
-#if NDimensions == 4
-# ifndef Match4dGeom
-    if (!view_basis)  cleanup_Scene (&interp4d_scene);
-# endif
-#endif
 }
 
 #ifdef Match4dGeom
