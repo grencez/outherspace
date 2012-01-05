@@ -328,6 +328,7 @@ ogl_setup (const RaySpace* space)
         const uint nscenes = space->nobjects+1;
 #endif
         scenegls = AllocT( SceneGL, nscenes );
+        glActiveTexture (GL_TEXTURE0);
         UFor( i, nscenes )
         {
             GLuint vbos[4];
@@ -376,12 +377,13 @@ ogl_setup (const RaySpace* space)
             {
                 const Texture* txtr;
                 txtr = &scene->txtrs[texi];
-                glBindTexture (GL_TEXTURE_2D, texi);
+                glBindTexture (GL_TEXTURE_2D, scenegl->texture_offset + texi);
                 glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
                 glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
                 glTexImage2D (GL_TEXTURE_2D, 0, 3, txtr->ncols, txtr->nrows, 0,
                               GL_RGB, GL_UNSIGNED_BYTE, txtr->pixels);
             }
+            ntextures += scene->ntxtrs;
         }
     }
     glBindBuffer (GL_ARRAY_BUFFER, 0);
@@ -614,7 +616,7 @@ ogl_set_ObjectSurface (const ObjectSurface* surf,
         glEnable (GL_TEXTURE_2D);
         glActiveTexture (GL_TEXTURE1);
         glBindTexture (GL_TEXTURE_2D,
-                       scenegl->texture_offset + matl->diffuse_texture);
+                       scenegl->texture_offset + matl->bump_texture);
         loc = glGetUniformLocation (shader_program, "NormalTex");
         glUniform1i (loc, 1);
     }

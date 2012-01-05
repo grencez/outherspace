@@ -5,6 +5,7 @@ varying vec3 N;
 varying vec3 L;
 varying vec3 E;
 varying vec3 H; // normalize(L+E);
+varying vec2 txpt;
 uniform sampler2D DiffuseTex;
 uniform int HaveDiffuseTex;
 uniform sampler2D NormalTex;
@@ -13,9 +14,9 @@ uniform int HaveNormalTex;
 void main()
 {
         /* This part is always == N. Normal mapping doesn't work yet!*/
-    vec3 Normal = ((HaveNormalTex == 2)
+    vec3 Normal = ((HaveNormalTex == 1)
                     ? (gl_NormalMatrix *
-                       texture2D(NormalTex, gl_TexCoord[0].st).xyz)
+                       texture2D(NormalTex, txpt).xyz)
                     : N);
     Normal = normalize(Normal);
 
@@ -25,7 +26,7 @@ void main()
 
     vec4 ambient = gl_FrontMaterial.ambient;
     vec4 diffuse = ((HaveDiffuseTex == 1)
-                    ? texture2D(DiffuseTex, gl_TexCoord[0].st)
+                    ? texture2D(DiffuseTex, txpt)
                     : gl_FrontMaterial.diffuse);
     vec4 specular = gl_FrontMaterial.specular;
 
