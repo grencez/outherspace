@@ -297,18 +297,19 @@ view_4d_vertices (const Scene* scene,
                   const PointXfrm* xfrm,
                   const Point* xlat)
 {
-    cl_float3 discard_flag;
+    struct Arg_view_4d_kernel
+    {
+        PointXfrm xfrm;
+        Point xlat;
+        cl_float3 discard_flag;
+    } arg;
     const uint dev_idx = 0;
     SysOpenCL* cl = &opencl_state;
     int err;
     uint surfi;
     uint argi = 0;
     cl_mem ret_verts, ret_vnmls;
-    cl_mem vidcs, verts, vnmls;
-
-    memset (&discard_flag, 0, sizeof(discard_flag));
-        /* TODO */
-        /* discard_flag.s[ForwardDim] = -1; */
+    cl_mem vidcs, verts, vnmls, arg_mem;
 
     ret_verts = clCreateFromGLBuffer (cl->context, CL_MEM_WRITE_ONLY,
                                       scenegl->verts_buffer, &err);
@@ -338,6 +339,18 @@ view_4d_vertices (const Scene* scene,
                             scene->vnmls, &err);
     AssertStatus( err, "" );
 
+    arg.xfrm = *xfrm;
+    arg.xlat = *xlat;
+    memset (&arg.discard_flag, 0, sizeof(arg.discard_flag));
+        /* TODO */
+        /* arg.discard_flag.s[ForwardDim] = -1; */
+
+    arg_mem = clCreateBuffer (cl->context,
+                              CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                              sizeof(arg),
+                              &arg, &err);
+    AssertStatus( err, "" );
+
         /* Set the arguments to our compute kernel.*/
     err |= clSetKernelArg (cl->kernel, argi++, sizeof(ret_verts), &ret_verts);
     AssertStatus( err, "set kernel args" );
@@ -349,11 +362,7 @@ view_4d_vertices (const Scene* scene,
     AssertStatus( err, "set kernel args" );
     err |= clSetKernelArg (cl->kernel, argi++, sizeof(vnmls), &vnmls);
     AssertStatus( err, "set kernel args" );
-    err |= clSetKernelArg (cl->kernel, argi++, sizeof(*xfrm), xfrm);
-    AssertStatus( err, "set kernel args" );
-    err |= clSetKernelArg (cl->kernel, argi++, sizeof(*xlat), xlat);
-    AssertStatus( err, "set kernel args" );
-    err |= clSetKernelArg (cl->kernel, argi++, sizeof(discard_flag), &discard_flag);
+    err |= clSetKernelArg (cl->kernel, argi++, sizeof(arg_mem), &arg_mem);
     AssertStatus( err, "set kernel args" );
     check_cl_status (err, "set kernel arguments");
 
@@ -395,5 +404,6 @@ view_4d_vertices (const Scene* scene,
     clReleaseMemObject (vidcs);
     clReleaseMemObject (verts);
     clReleaseMemObject (vnmls);
+    clReleaseMemObject (arg_mem);
 }
 

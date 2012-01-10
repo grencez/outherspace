@@ -49,6 +49,14 @@ set_3_reals (__global real* dst, const Point p)
     dst[2] = p.coords[2];
 }
 
+typedef struct Arg_view_4d_kernel Arg_view_4d_kernel;
+struct Arg_view_4d_kernel
+{
+    PointXfrm xfrm;
+    Point xlat;
+    real3 discard_flag;
+};
+
 __kernel
     void
 view_4d_kernel (__write_only __global real* ret_verts,
@@ -56,9 +64,7 @@ view_4d_kernel (__write_only __global real* ret_verts,
                 __read_only __global uint* vidcs,
                 __read_only __global Point* verts,
                 __read_only __global Point* vnmls,
-                const PointXfrm xfrm,
-                const Point xlat,
-                const real3 discard_flag,
+                __constant Arg_view_4d_kernel* arg,
                 const uint elem_offset,
                 const uint verts_offset,
                 const uint vnmls_offset)
@@ -76,12 +82,8 @@ view_4d_kernel (__write_only __global real* ret_verts,
 
     UFor( i, NDimensions )
     {
-            /* TODO */
-        const Point p = xfrm_Point (xfrm, verts[vidcs[i]]);
-        tet.pts[i].m = p.m + xlat.m;
-        /* tet.pts[i].m = verts[vidcs[i]].m + xlat.m; */
-        tet.pts[i].m = verts[vidcs[i]].m;
-        tet.pts[i].coords[3] += xlat.coords[1];
+        const Point p = xfrm_Point (arg->xfrm, verts[vidcs[i]]);
+        tet.pts[i].m = p.m + arg->xlat.m;
     }
 
     UFor( i, NDimensions-1 )
@@ -105,7 +107,7 @@ view_4d_kernel (__write_only __global real* ret_verts,
         Point a, b;
         if (k < 3 || i >= k)
         {
-            a.m3 = discard_flag;
+            a.m3 = arg->discard_flag;
             b.m3 = (real3) (0.0, 0.0, 0.0);
         }
         else
@@ -120,8 +122,7 @@ view_4d_kernel (__write_only __global real* ret_verts,
             b.m = mix (vnmls[vidcs[inds[i][0]]].m,
                        vnmls[vidcs[inds[i][1]]].m,
                        alpha);
-                /* TODO */
-                /* b = xfrm_Point (xfrm, b); */
+            b = xfrm_Point (arg->xfrm, b);
             b.m3 = normalize (b.m3);
         }
 
@@ -132,7 +133,7 @@ view_4d_kernel (__write_only __global real* ret_verts,
         {
             if (k == 3)
             {
-                a.m3 = discard_flag;
+                a.m3 = arg->discard_flag;
                 b.m3 = (real3) (0.0, 0.0, 0.0);
             }
 
