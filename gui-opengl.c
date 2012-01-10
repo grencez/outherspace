@@ -189,7 +189,7 @@ init_ogl_ui_data ()
     glAttachShader (shader_program, frag_shader);
 
         /* Fill program contents.*/
-#if NDimensions == 4
+#if NDimensions == 4 && !defined(Match4dGeom)
     glShaderSource (vert_shader, 1,
                     (const GLchar**) &files_bytes[2],
                     (const GLint*) &files_nbytes[2]);
@@ -354,6 +354,14 @@ ogl_setup (const RaySpace* space)
             scenegl->vnmls_buffer = vbos[2];
             scenegl->txpts_buffer = vbos[3];
 
+#ifdef Match4dGeom
+            glBindBuffer (GL_ARRAY_BUFFER, scenegl->verts_buffer);
+            glBufferData (GL_ARRAY_BUFFER, scene->nelems * 3*6 * sizeof (real),
+                          0, GL_DYNAMIC_DRAW);
+            glBindBuffer (GL_ARRAY_BUFFER, scenegl->vnmls_buffer);
+            glBufferData (GL_ARRAY_BUFFER, scene->nelems * 3*6 * sizeof (real),
+                          0, GL_DYNAMIC_DRAW);
+#else  /* ^^^ defined(Match4dGeom) */
             glBindBuffer (GL_ARRAY_BUFFER, scenegl->verts_buffer);
             glBufferData (GL_ARRAY_BUFFER, scene->nverts * sizeof (Point),
                           scene->verts, GL_STATIC_DRAW);
@@ -371,6 +379,7 @@ ogl_setup (const RaySpace* space)
                               3 * scene->nelems * sizeof (uint),
                               scene->vidcs, GL_STATIC_DRAW);
             }
+#endif  /* !defined(Match4dGeom) */
 
             scenegl->texture_offset = ntextures;
             UFor( texi, scene->ntxtrs )
@@ -506,7 +515,7 @@ ogl_redraw (const RaySpace* space, uint pilot_idx)
         copy_Point (&ray.origin, &pilot->view_origin);
         copy_Point (&ray.direct, &pilot->view_basis.pts[ForwardDim]);
 
-        UFor( i, NDimensions )
+        UFor( i, 3 )
         {
             real m;
             m = (ray.direct.coords[i] > 0)
@@ -785,10 +794,14 @@ ogl_redraw_ObjectRaySpace (const RaySpace* space,
     const Scene* scene;
     const SceneGL* scenegl;
     const ObjectRaySpace* object;
-    uint i;
+    uint surfi;
 #if NDimensions == 4
+#ifdef Match4dGeom
+    uint elem_offset;
+#else
     real alpha;
     GLint alpha_loc;
+#endif
 #endif
 
     if (objidx < space->nobjects)
@@ -798,10 +811,14 @@ ogl_redraw_ObjectRaySpace (const RaySpace* space,
     if (!object->visible)  return;
 
 #ifdef Match4dGeom
-    if (true)
+#ifdef SupportOpenCL
+    if (object->nelems == 1)
 #else
-    if (NDimensions == 4 && objidx < space->nobjects)
+    if (true)
 #endif
+#else  /* ^^^ defined(Match4dGeom) */
+    if (NDimensions == 4 && objidx < space->nobjects)
+#endif  /* !defined(Match4dGeom) */
     {
         ogl_immediate_redraw_ObjectRaySpace (space, objidx,
                                              view_origin, view_basis);
@@ -809,21 +826,37 @@ ogl_redraw_ObjectRaySpace (const RaySpace* space,
     }
 
     glEnableClientState (GL_VERTEX_ARRAY);
+    scene = &object->scene;
 #if NDimensions == 4
-    glEnableVertexAttribArray (hivert_attrib_loc);
+#ifdef Match4dGeom
+    glEnableClientState (GL_NORMAL_ARRAY);
+#else
     scene = &track.morph_scenes[0];
+    glEnableVertexAttribArray (hivert_attrib_loc);
     alpha = ((view_origin->coords[DriftDim] - track.morph_dcoords[0]) /
              (track.morph_dcoords[1] - track.morph_dcoords[0]));
     alpha = clamp_real (alpha, 0, 1);
     alpha_loc = glGetUniformLocation (shader_program, "alpha");
     glUniform1f (alpha_loc, alpha);
-#else  /* ^^^ NDimensions == 4 */
-    scene = &object->scene;
-#endif  /* NDimensions != 4 */
+#endif
+#endif  /* NDimensions == 4 */
     scenegl = &scenegls[objidx];
     glPushMatrix ();
-    map0_ogl_matrix (&object->centroid, &object->orientation);
 
+    map0_ogl_matrix (&object->centroid, &object->orientation);
+#ifdef Match4dGeom
+#ifdef SupportOpenCL
+    {
+        AffineMap map;
+
+        identity_AffineMap (&map);
+        map.xlat.coords[DriftDim] = (+ object->centroid.coords[DriftDim]
+                                     - view_origin->coords[DriftDim]);
+
+        view_4d_vertices (scene, scenegl, &map.xfrm, &map.xlat);
+    }
+#endif
+#else
         /* Single-element objects are the only ones that change.*/
     if (scene->nelems == 1)
     {
@@ -834,13 +867,22 @@ ogl_redraw_ObjectRaySpace (const RaySpace* space,
 #ifdef SupportOpenCL
     perturb_vertices (scene, scenegl);
 #endif
+#endif
 
-    UFor( i, scene->nsurfs )
+    UFor( surfi, scene->nsurfs )
     {
         const ObjectSurface* surf;
-        surf = &scene->surfs[i];
+        surf = &scene->surfs[surfi];
         ogl_set_ObjectSurface (surf, scene, scenegl);
+#ifdef Match4dGeom
+        elem_offset = surf->vidcs_offset / 4;
+        glBindBuffer (GL_ARRAY_BUFFER, scenegl->verts_buffer);
+        glVertexPointer (3, GL_REAL, 0, elem_offset * 6 * 3 + (real*) 0);
+        glBindBuffer (GL_ARRAY_BUFFER, scenegl->vnmls_buffer);
+        glNormalPointer (GL_REAL, 0, elem_offset * 6 * 3 + (real*) 0);
+        glDrawArrays (GL_TRIANGLES, 0, 6 * surf->nelems);
 
+#else  /* ^^^ defined(Match4dGeom) */
         glBindBuffer (GL_ARRAY_BUFFER, scenegl->verts_buffer);
         glVertexPointer (3, GL_REAL, sizeof (Point),
                          surf->verts_offset + (Point*) 0);
@@ -895,12 +937,16 @@ ogl_redraw_ObjectRaySpace (const RaySpace* space,
         }
         if (surf->txpts_offset < Max_uint)
             glDisableClientState (GL_TEXTURE_COORD_ARRAY);
+#endif  /* !defined(Match4dGeom) */
     }
 
     glBindBuffer (GL_ELEMENT_ARRAY_BUFFER, 0);
     glBindBuffer (GL_ARRAY_BUFFER, 0);
     glDisableClientState (GL_VERTEX_ARRAY);
-#if NDimensions == 4
+#ifdef Match4dGeom
+    glDisableClientState (GL_NORMAL_ARRAY);
+#endif
+#if NDimensions == 4 && !defined(Match4dGeom)
     glUniform1f (alpha_loc, 0);
     glDisableVertexAttribArray (hivert_attrib_loc);
 #endif
@@ -909,37 +955,6 @@ ogl_redraw_ObjectRaySpace (const RaySpace* space,
 }
 
 #ifdef Match4dGeom
-static void
-view_element_helpfn (Point* ret_verts,
-                     Point* ret_vnmls,
-                     const real* alphas,
-                     uint (* inds)[2],
-                     const Point* verts,
-                     const Point* vnmls)
-{
-    uint i;
-    UFor( i, 3 )
-    {
-        real alpha;
-        Point v;
-
-        alpha = alphas[i];
-        zero_Point (&v);
-
-        Op_21010( real, 3, v.coords
-                  ,+, (    alpha)*, verts[inds[i][0]].coords
-                  ,   (1 - alpha)*, verts[inds[i][1]].coords );
-
-        ret_verts[i] = v;
-
-        Op_21010( real, 3, v.coords
-                  ,+, (    alpha)*, vnmls[inds[i][0]].coords
-                  ,   (1 - alpha)*, vnmls[inds[i][1]].coords );
-
-        normalize_Point (&ret_vnmls[i], &v);
-    }
-}
-
     uint
 view_element (Point* ret_verts,
               Point* ret_vnmls,
@@ -950,32 +965,27 @@ view_element (Point* ret_verts,
 {
     uint i, k = 0;
     uint nabove = 0;
-    Point verts[NDimensions];
-    Point vnmls[NDimensions];
-    real d[NDimensions];
-    bool positives[4];
-    real alphas[4];
     uint inds[4][2];
+    Simplex tet;
 
     UFor( i, NDimensions )
     {
-        copy_Point (&verts[i], &scene->verts[elem->verts[i]]);
-        map_Point (&verts[i], map, &verts[i]);
-        d[i] = verts[i].coords[DriftDim];
-        positives[i] = (d[i] > 0);
-        if (positives[i])  ++ nabove;
+        tet.pts[i] = scene->verts[elem->verts[i]];
+        map_Point (&tet.pts[i], map, &tet.pts[i]);
+        if (tet.pts[i].coords[DriftDim] > 0)  ++ nabove;
     }
     if (nabove == 0 || nabove == NDimensions)  return 0;
 
         /* Find all edges which cross the view plane (3 or 4).*/
     UFor( i, NDimensions-1 )
     {
+        const real x = tet.pts[i].coords[DriftDim];
         uint j;
         for (j = i+1; j < NDimensions; ++j)
         {
-            if (positives[i] != positives[j])
+            const real y = tet.pts[j].coords[DriftDim];
+            if ((y <= 0) == (0 < x))
             {
-                alphas[k] = fabs (d[j] / (d[j] - d[i]));
                 inds[k][0] = i;
                 inds[k][1] = j;
                 ++ k;
@@ -985,28 +995,45 @@ view_element (Point* ret_verts,
 
     assert (k >= 3);
     assert (k <= 4);
-    UFor( i, NDimensions )
+    UFor( i, k )
     {
+        Point a, b;
+        real alpha;
         uint j;
-        j = elem->vnmls[i];
 
-        if (j < scene->nvnmls)
-            copy_Point (&vnmls[i], &scene->vnmls[j]);
+        a = tet.pts[inds[i][0]];
+        b = tet.pts[inds[i][1]];
+        alpha = fabs (a.coords[3] / (a.coords[3] - b.coords[3]));
+
+            /* Mix.*/
+        UFor( j, 3 )
+            a.coords[j] += (b.coords[j] - a.coords[j]) * alpha;
+
+        if (scene->nvnmls > 0)
+        {
+            Point c;
+            b = scene->vnmls[elem->vnmls[inds[i][0]]];
+            c = scene->vnmls[elem->vnmls[inds[i][1]]];
+
+            UFor( j, NDimensions )
+                b.coords[j] += (c.coords[j] - b.coords[j]) * alpha;
+        }
         else
-            copy_Point (&vnmls[i], normal);
+            b = *normal;
 
-        mapo_Point (&vnmls[i], map, &vnmls[i]);
+        mapo_Point (&b, map, &b);
+        normalize_Point (&b, &b);
+
+        ret_verts[i] = a;
+        ret_vnmls[i] = b;
+
+        if (i < NDimensions -1 && k > 3)
+        {
+            ret_verts[i+3] = a;
+            ret_vnmls[i+3] = b;
+        }
     }
-
-    view_element_helpfn (&ret_verts[0], &ret_vnmls[0],
-                         alphas, inds, verts, vnmls);
-    if (k == 3)  return 1;
-
-    inds[0][0] = inds[3][0];
-    inds[0][1] = inds[3][1];
-    view_element_helpfn (&ret_verts[3], &ret_vnmls[3],
-                         alphas, inds, verts, vnmls);
-    return 2;
+    return (k == 3) ? 1 : 2;
 }
 #endif  /* defined(Match4dGeom) */
 

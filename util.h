@@ -90,6 +90,7 @@ typedef byte bool;
 #endif
 
 #if __STDC_VERSION__ < 199901L
+#define inline __inline
 #define restrict __restrict
 #endif
 

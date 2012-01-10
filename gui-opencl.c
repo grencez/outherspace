@@ -197,6 +197,11 @@ load_program (cl_program* ret_program, cl_context context,
 static void
 init_opencl_data ()
 {
+#ifdef Match4dGeom
+    static const char kernel_name[] = "view_4d_kernel";
+#else
+    static const char kernel_name[] = "perturb_kernel";
+#endif
     int err;
     SysOpenCL* cl = &opencl_state;
 
@@ -219,7 +224,7 @@ init_opencl_data ()
                   nfiles, files_nbytes, (const byte* const*) files_bytes);
 
         /* Create the compute kernel in the program we wish to run.*/
-    cl->kernel = clCreateKernel (cl->program, "perturb_kernel", &err);
+    cl->kernel = clCreateKernel (cl->program, kernel_name, &err);
     check_cl_status (err, "create compute kernel");
 
 #ifndef EmbedFiles
@@ -282,7 +287,113 @@ perturb_vertices (const Scene* scene, const SceneGL* scenegl)
     err = clEnqueueReleaseGLObjects (cl->comqs[dev_idx], 1, &verts, 0, 0, 0);
     check_cl_status (err, "release gl objects");
 
-        /* Wait for the command commands to get serviced before reading back results.*/
+        /* Wait for the commands to get serviced before reading back results.*/
     clFinish (cl->comqs[dev_idx]);
+}
+
+static void
+view_4d_vertices (const Scene* scene,
+                  const SceneGL* scenegl,
+                  const PointXfrm* xfrm,
+                  const Point* xlat)
+{
+    cl_float3 discard_flag;
+    const uint dev_idx = 0;
+    SysOpenCL* cl = &opencl_state;
+    int err;
+    uint surfi;
+    uint argi = 0;
+    cl_mem ret_verts, ret_vnmls;
+    cl_mem vidcs, verts, vnmls;
+
+    memset (&discard_flag, 0, sizeof(discard_flag));
+        /* TODO */
+        /* discard_flag.s[ForwardDim] = -1; */
+
+    ret_verts = clCreateFromGLBuffer (cl->context, CL_MEM_WRITE_ONLY,
+                                      scenegl->verts_buffer, &err);
+    check_cl_status (err, "create from gl verts buffer");
+
+    ret_vnmls = clCreateFromGLBuffer (cl->context, CL_MEM_WRITE_ONLY,
+                                      scenegl->vnmls_buffer, &err);
+    check_cl_status (err, "create from gl vnmls buffer");
+
+    err |= clEnqueueAcquireGLObjects (cl->comqs[dev_idx], 1, &ret_verts, 0, 0, 0);
+    err |= clEnqueueAcquireGLObjects (cl->comqs[dev_idx], 1, &ret_vnmls, 0, 0, 0);
+    check_cl_status (err, "acquire gl objects");
+
+    vidcs = clCreateBuffer (cl->context,
+                            CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                            scene->nelems * NDimensions * sizeof(uint),
+                            scene->vidcs, &err);
+    AssertStatus( err, "" );
+    verts = clCreateBuffer (cl->context,
+                            CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                            scene->nverts * sizeof(Point),
+                            scene->verts, &err);
+    AssertStatus( err, "" );
+    vnmls = clCreateBuffer (cl->context,
+                            CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                            scene->nvnmls * sizeof(Point),
+                            scene->vnmls, &err);
+    AssertStatus( err, "" );
+
+        /* Set the arguments to our compute kernel.*/
+    err |= clSetKernelArg (cl->kernel, argi++, sizeof(ret_verts), &ret_verts);
+    AssertStatus( err, "set kernel args" );
+    err |= clSetKernelArg (cl->kernel, argi++, sizeof(ret_vnmls), &ret_vnmls);
+    AssertStatus( err, "set kernel args" );
+    err |= clSetKernelArg (cl->kernel, argi++, sizeof(vidcs), &vidcs);
+    AssertStatus( err, "set kernel args" );
+    err |= clSetKernelArg (cl->kernel, argi++, sizeof(verts), &verts);
+    AssertStatus( err, "set kernel args" );
+    err |= clSetKernelArg (cl->kernel, argi++, sizeof(vnmls), &vnmls);
+    AssertStatus( err, "set kernel args" );
+    err |= clSetKernelArg (cl->kernel, argi++, sizeof(*xfrm), xfrm);
+    AssertStatus( err, "set kernel args" );
+    err |= clSetKernelArg (cl->kernel, argi++, sizeof(*xlat), xlat);
+    AssertStatus( err, "set kernel args" );
+    err |= clSetKernelArg (cl->kernel, argi++, sizeof(discard_flag), &discard_flag);
+    AssertStatus( err, "set kernel args" );
+    check_cl_status (err, "set kernel arguments");
+
+    UFor( surfi, scene->nsurfs )
+    {
+        size_t global, local;
+        const ObjectSurface* surf;
+        uint elem_offset;
+        uint i;
+
+        surf = &scene->surfs[surfi];
+        elem_offset = surf->vidcs_offset / NDimensions;
+
+        i = 0;
+        err |= clSetKernelArg (cl->kernel, argi + i++, sizeof(elem_offset), &elem_offset);
+        err |= clSetKernelArg (cl->kernel, argi + i++, sizeof(surf->verts_offset), &surf->verts_offset);
+        err |= clSetKernelArg (cl->kernel, argi + i++, sizeof(surf->vnmls_offset), &surf->vnmls_offset);
+        check_cl_status (err, "set kernel arguments in loop");
+
+            /* Get the maximum work group size for executing the kernel on the device.*/
+        err = clGetKernelWorkGroupInfo(cl->kernel, cl->devices[dev_idx],
+                                       CL_KERNEL_WORK_GROUP_SIZE,
+                                       sizeof(local), &local, 0);
+        check_cl_status (err, "retrieve kernel work group info");
+
+        global = surf->nelems;
+            /* err = clEnqueueNDRangeKernel(commands, kernel, 1, NULL, &global, &local, 0, NULL, NULL); */
+        err = clEnqueueNDRangeKernel (cl->comqs[dev_idx], cl->kernel, 1, 0, &global, 0, 0, 0, 0);
+        check_cl_status (err, "enqueue kernel");
+    }
+
+    err |= clEnqueueReleaseGLObjects (cl->comqs[dev_idx], 1, &ret_verts, 0, 0, 0);
+    err |= clEnqueueReleaseGLObjects (cl->comqs[dev_idx], 1, &ret_vnmls, 0, 0, 0);
+    check_cl_status (err, "release gl objects");
+
+        /* Wait for the commands to get serviced before reading back results.*/
+    clFinish (cl->comqs[dev_idx]);
+
+    clReleaseMemObject (vidcs);
+    clReleaseMemObject (verts);
+    clReleaseMemObject (vnmls);
 }
 

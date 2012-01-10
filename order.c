@@ -86,6 +86,26 @@ sort_few_reals (uint n, real* a)
     }
 }
 
+    /* Insertion sort.*/
+static inline
+    void
+sort_few_indexed_reals (uint n, uint* indices, const real* membs)
+{
+    uint j;
+    for (j = 1; j < n; ++j)
+    {
+        uint i = j;
+        const uint keyi = indices[j];
+        const real key = membs[keyi];
+        while (i > 0 && membs[indices[i-1]] > key)
+        {
+            indices[i] = indices[i-1];
+            i -= 1;
+        }
+        indices[i] = keyi;
+    }
+}
+
     /*
      * Here are the inputs and meanings by example:
      *
@@ -144,7 +164,16 @@ static
     void
 quicksort_indexed_reals (uint* indices, uint p, uint s, const real* membs)
 {
+#if 1
+        /* Using insertion sort for low counts is slightly faster.*/
+    if (p + 10 >= s)
+    {
+        sort_few_indexed_reals (s - p, &indices[p], membs);
+    }
+    else
+#else
     if (p + 1 < s)
+#endif
     {
         uint q, r;
         partition_indexed_reals (indices, &q, &r, membs,

@@ -280,7 +280,6 @@ partition_ObjectRaySpace (ObjectRaySpace* space)
     build_KDTree (&space->tree, &grid, 0);
 #endif
 #if 0
-        /* build_KDTree (&space->tree, &grid, 0); */
     printf ("nnodes:%u  nelemidcs:%u\n",
             space->tree.nnodes, space->tree.nelemidcs);
 #endif

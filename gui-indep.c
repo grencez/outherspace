@@ -615,7 +615,7 @@ update_pilot_images (RaySpace* space, real frame_t1)
             copy_Point (&space->lights[0].location, &origin);
             Op_s( real, NColors, space->lights[0].intensity , .5 );
         }
-        if (track.ncheckplanes > 0)
+        if (FollowRacer && track.ncheckplanes > 0)
         {
             set_checkpoint_light (&space->lights[space->nlights-1],
                                   &space->objects[checkplane_objidx],
@@ -650,7 +650,7 @@ init_ui_data (RaySpace* space, const char* inpathname)
             init_ObjectMotion (&racer_motions[i], &space->objects[i]);
     }
 
-    if (track.ncheckplanes > 0)
+    if (FollowRacer && track.ncheckplanes > 0)
     {
         Scene* scene;
         Material* matl;

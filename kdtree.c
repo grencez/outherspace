@@ -804,8 +804,10 @@ build_KDTree (KDTree* tree, KDTreeGrid* grid, const Simplex* elems)
 
     t0 = monotime ();
 
+#if MaxKDTreeDepth > 0
     UFor( i, NDimensions )
         sort_indexed_reals (grid->intls[i], 0, 2*grid->nelems, grid->coords[i]);
+#endif
 
     init_SList (&nodelist);
     init_SList (&elemidxlist);
