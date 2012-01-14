@@ -6,9 +6,13 @@ varying vec3 L;
 varying vec3 E;
 varying vec3 H; // normalize(L+E);
 varying vec2 txpt;
+uniform sampler2D AmbientTex;
 uniform sampler2D DiffuseTex;
-uniform int HaveDiffuseTex;
+uniform sampler2D SpecularTex;
 uniform sampler2D NormalTex;
+uniform int HaveAmbientTex;
+uniform int HaveDiffuseTex;
+uniform int HaveSpecularTex;
 uniform int HaveNormalTex;
 
 void main()
@@ -25,17 +29,31 @@ void main()
     vec3 Half   = normalize(H);
 
     vec4 ambient = gl_FrontMaterial.ambient;
-    vec4 diffuse = ((HaveDiffuseTex == 1)
-                    ? texture2D(DiffuseTex, txpt)
-                    : gl_FrontMaterial.diffuse);
+    vec4 diffuse = gl_FrontMaterial.diffuse;
     vec4 specular = gl_FrontMaterial.specular;
 
-    ambient *= gl_FrontLightProduct[0].ambient;
+    if (HaveAmbientTex)
+    {
+        vec4 tex = texture2D(AmbientTex, txpt);
+        ambient.rgb += (tex.rgb - ambient.rgb) * tex.a;
+    }
+    if (HaveDiffuseTex)
+    {
+        vec4 tex = texture2D(DiffuseTex, txpt);
+        diffuse.rgb += (tex.rgb - diffuse.rgb) * tex.a;
+    }
+    if (HaveSpecularTex)
+    {
+        vec4 tex = texture2D(SpecularTex, txpt);
+        specular.rgb += (tex.rgb - specular.rgb) * tex.a;
+    }
 
-    diffuse *= gl_FrontLightProduct[0].diffuse *
+    ambient *= gl_LightSource[0].ambient;
+
+    diffuse *= gl_LightSource[0].diffuse *
         max(dot(Normal, Light), 0.0);
 
-    specular *= gl_FrontLightProduct[0].specular *
+    specular *= gl_LightSource[0].specular *
         pow(max(dot(Half, Normal), 0.0), gl_FrontMaterial.shininess);
 
     gl_FragColor = ambient + diffuse + specular;

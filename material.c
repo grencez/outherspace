@@ -22,9 +22,10 @@ void init_Material (Material* mat)
     mat->opacity = 1;
     mat->shininess = 0;
     mat->optical_density = 1;
-    mat->illumination = 1;
+    mat->reflective = false;
     mat->ambient_texture = Max_uint;
     mat->diffuse_texture = Max_uint;
+    mat->specular_texture = Max_uint;
     mat->bump_texture = Max_uint;
 }
 
@@ -52,7 +53,7 @@ map_coords_Texture (uint* coords, const Texture* texture, const BaryPoint* p)
     coords[1] = col;
 }
 
-    void
+    real
 map_Texture (real* colors, const Texture* texture, const BaryPoint* p)
 {
     uint i;
@@ -61,10 +62,11 @@ map_Texture (real* colors, const Texture* texture, const BaryPoint* p)
 
     map_coords_Texture (coords, texture, p);
     i = coords[1] + coords[0] * texture->ncols;
-    pixels = &texture->pixels[NColors * i];
+    pixels = &texture->pixels[texture->pixelsz * i];
 
     UFor( i, NColors )
-        colors[i] = (real) pixels[i] / 255;
+        colors[i] = pixels[i] / 255;
+    return (texture->alpha ? (real) pixels[3] / 255 : 1);
 }
 
     void
@@ -76,7 +78,7 @@ map_bump_Texture (Point* normal, const Texture* texture, const BaryPoint* p)
 
     map_coords_Texture (coords, texture, p);
     i = coords[1] + coords[0] * texture->ncols;
-    pixels = (signed char*) &texture->pixels[NColors * i];
+    pixels = (signed char*) &texture->pixels[texture->pixelsz * i];
 
     zero_Point (normal);
     UFor( i, 3 )
@@ -143,7 +145,7 @@ map_sky_Texture (real* colors, const Texture* texture, const Point* p)
     if (row >= texture->nrows)  row = texture->nrows - 1;
     if (col >= texture->ncols)  col = texture->ncols - 1;
 
-    pixels = &texture->pixels[NColors * (col + row * texture->ncols)];
+    pixels = &texture->pixels[texture->pixelsz * (col + row * texture->ncols)];
     UFor( i, NColors )
         colors[i] = (real) pixels[i] / 255;
 }
@@ -167,7 +169,9 @@ readin_SDL_Image (Texture* texture,
 
     texture->nrows = nrows = surface->h;
     texture->ncols = ncols = surface->w;
-    texture->pixels = AllocT( byte, 3 * nrows * ncols );
+    texture->pixelsz = fmt->BytesPerPixel;
+    texture->alpha = (texture->pixelsz == 4);
+    texture->pixels = AllocT( byte, texture->pixelsz * nrows * ncols );
 
     UFor( row, nrows )
     {
@@ -180,7 +184,7 @@ readin_SDL_Image (Texture* texture,
         UFor( col, ncols )
         {
             uint idx;
-            Uint8 r, g, b;
+            Uint8 r, g, b, a;
             union LocalUnion
             {
                 Uint32 u;
@@ -191,8 +195,16 @@ readin_SDL_Image (Texture* texture,
             UFor( idx, fmt->BytesPerPixel )
                 pixel.bytes[idx] = scanline[idx + col*fmt->BytesPerPixel];
 
-            SDL_GetRGB (pixel.u, fmt, &r, &g, &b);
-            idx = 3 * (row * ncols + col);
+            idx = texture->pixelsz * (row * ncols + col);
+            if (texture->alpha)
+            {
+                SDL_GetRGBA (pixel.u, fmt, &r, &g, &b, &a);
+                texture->pixels[idx+3] = a;
+            }
+            else
+            {
+                SDL_GetRGB (pixel.u, fmt, &r, &g, &b);
+            }
             texture->pixels[idx+0] = r;
             texture->pixels[idx+1] = g;
             texture->pixels[idx+2] = b;
@@ -208,6 +220,8 @@ readin_Texture (Texture* texture, const char* pathname, const char* filename)
 {
     if (strends_with (filename, ".ppm"))
     {
+        texture->alpha = false;
+        texture->pixelsz = 3;
         texture->pixels = readin_PPM_image (&texture->nrows, &texture->ncols,
                                             pathname, filename);
         return (texture->pixels != 0);

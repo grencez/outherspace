@@ -757,6 +757,70 @@ splitting_plane_count (const Point* origin, const Point* direct, real mag,
     return count;
 }
 
+    /** Get the ambient, diffuse, and specular components
+     * of a pixel without considering illumination.
+     **/
+static void
+pixel_from_Material (real* ambient, real* diffuse, real* specular,
+                     const Material* matl,
+                     const BaryPoint* texpoint,
+                     const Scene* scene)
+{
+    uint i;
+    if (!matl)
+    {
+            /* If the cosine between light and normal is 1,
+             * and the light intensity is 1,
+             * then the resulting color value should be exactly 1.
+             * Thus, diffuse + ambient = 1 by default.
+             */
+        UFor( i, NColors )
+        {
+            ambient[i] = .2;
+            diffuse[i] = .8;
+            specular[i] = 0;
+        }
+        return;
+    }
+
+    UFor( i, NColors )
+    {
+        ambient[i] = matl->ambient[i];
+        diffuse[i] = matl->diffuse[i];
+        specular[i] = matl->specular[i];
+    }
+
+        /* Texture mapping.*/
+    if (texpoint)
+    {
+        const Texture* tex;
+        real color[NColors];
+        real alpha;
+        if (matl->ambient_texture != Max_uint)
+        {
+            tex = &scene->txtrs[matl->ambient_texture];
+            alpha = map_Texture (color, tex, texpoint);
+            UFor( i, NColors )
+                ambient[i] += (color[i] - ambient[i]) * alpha;
+        }
+        if (matl->diffuse_texture != Max_uint)
+        {
+            tex = &scene->txtrs[matl->diffuse_texture];
+            alpha = map_Texture (color, tex, texpoint);
+            UFor( i, NColors )
+                diffuse[i] += (color[i] - diffuse[i]) * alpha;
+        }
+        if (matl->specular_texture != Max_uint)
+        {
+            tex = &scene->txtrs[matl->specular_texture];
+            alpha = map_Texture (color, tex, texpoint);
+            UFor( i, NColors )
+                specular[i] += (color[i] - specular[i]) * alpha;
+        }
+    }
+}
+
+
     void
 fill_pixel (real* ret_colors,
             uint hitidx, real mag, uint objidx,
@@ -966,14 +1030,6 @@ fill_pixel (real* ret_colors,
         colors[1] *= (real) ((y & 0x00FF00) >>  8) / (nincs-1);
         colors[2] *= (real) ((y & 0x0000FF) >>  0) / (nincs-1);
     }
-    else if (compute_bary_coords &&
-             material && material->ambient_texture != Max_uint)
-    {
-            /* Texture mapping.*/
-        const Texture* ambient_texture;
-        ambient_texture = &scene->txtrs[material->ambient_texture];
-        map_Texture (colors, ambient_texture, &texpoint);
-    }
 
     if (shade_by_element)
     {
@@ -984,10 +1040,12 @@ fill_pixel (real* ret_colors,
     }
     else if (image->shading_on)
     {
-        bool transparent = false;
-        bool reflective = false;
         Point isect, refldir;
         real dscale[NColors], sscale[NColors];
+        real ambient[NColors], diffuse[NColors], specular[NColors];
+        pixel_from_Material (ambient, diffuse, specular, material,
+                             (compute_bary_coords ? &texpoint : 0),
+                             scene);
 
         UFor( i, NColors )
             dscale[i] = sscale[i] = 0;
@@ -1056,47 +1114,19 @@ fill_pixel (real* ret_colors,
         }
 
         UFor( i, NColors )
-        {
-            real ambient, diffuse, specular;
-            real tscale;
+            colors[i] *=
+                ambient[i] + diffuse[i] * dscale[i] + specular[i] * sscale[i];
 
-                /* If the cosine above (/diffuse_scale/) is 1,
-                 * and the light intensity is 1 (assumed),
-                 * and the material's diffuse portion is 1,
-                 * then the resulting color value should be exactly 1.
-                 * Thus, diffuse + ambient = 1
-                 * before factoring in the cosine or material spec.
-                 */
-            ambient = image->ambient[i];
-            diffuse = 1 - ambient;
-            specular = 0;
-
-            if (material)
-            {
-                ambient = material->ambient[i];
-                diffuse = material->diffuse[i];
-                specular = material->specular[i];
-                if (specular > 0)  reflective = true;
-            }
-
-            tscale = ambient + diffuse * dscale[i] + specular * sscale[i];
-            if (material && material->opacity < 1)
-            {
-                transparent = true;
-                tscale *= material->opacity;
-            }
-            tscale = clamp_real (tscale, 0, 1);
-
-            colors[i] *= tscale;
-        }
-
-        if (transparent)
+        if (material && material->opacity < 1)
         {
             Point tmp_origin, tmp_dir;
             real factors[NColors];
             UFor( i, NColors )
+            {
+                colors[i] *= material->opacity;
                 factors[i] = ((1-material->opacity)
                               * material->transmission[i]);
+            }
             refraction_ray (&tmp_dir, dir, &normal,
                             material->optical_density, hit_front, cos_normal);
 
@@ -1104,7 +1134,7 @@ fill_pixel (real* ret_colors,
             cast_colors (colors, space, image, &tmp_origin, &tmp_dir,
                          factors, nbounces);
         }
-        if (reflective)
+        if (material && material->reflective)
         {
             Point tmp_origin;
             real factors[NColors];

@@ -14,6 +14,8 @@ struct Texture
     uint nrows;
     uint ncols;
     byte* pixels;
+    bool alpha;
+    byte pixelsz;
 };
 
 struct Material
@@ -25,14 +27,15 @@ struct Material
     real opacity; /* d */
     real shininess; /* Ns */
     real optical_density; /* Ni */
-    bool illumination;
+    bool reflective;
     uint ambient_texture;
     uint diffuse_texture;
+    uint specular_texture;
     uint bump_texture;
 };
     
 void init_Material (Material* mat);
-void
+real
 map_Texture (real* colors, const Texture* texture, const BaryPoint* p);
 void
 map_bump_Texture (Point* normal, const Texture* texture, const BaryPoint* p);

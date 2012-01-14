@@ -62,6 +62,10 @@ GLuint shader_program;
 static GLuint hivert_attrib_loc;
 static GLuint hivnml_attrib_loc;
 #endif
+static GLuint ambient_texflag_loc;
+static GLuint diffuse_texflag_loc;
+static GLuint specular_texflag_loc;
+static GLuint normal_texflag_loc;
 
 
 static void
@@ -121,6 +125,7 @@ init_ogl_ui_data ()
 {
     GLint status = GL_NO_ERROR; 
     FILE* err = stderr;
+    GLint loc;
 #ifdef EmbedFiles
 #include EmbedInclude(phong.glsl)
     (void) nfiles;
@@ -234,6 +239,20 @@ init_ogl_ui_data ()
     hivert_attrib_loc = glGetAttribLocation (shader_program, "hivert");
     hivnml_attrib_loc = glGetAttribLocation (shader_program, "hivnml");
 #endif
+
+        /* These are hard-coded texture numbers!*/
+    loc = glGetUniformLocation (shader_program, "AmbientTex");
+    glUniform1i (loc, 0);
+    loc = glGetUniformLocation (shader_program, "DiffuseTex");
+    glUniform1i (loc, 1);
+    loc = glGetUniformLocation (shader_program, "SpecularTex");
+    glUniform1i (loc, 2);
+    loc = glGetUniformLocation (shader_program, "NormalTex");
+    glUniform1i (loc, 3);
+    ambient_texflag_loc = glGetUniformLocation (shader_program, "HaveAmbientTex");
+    diffuse_texflag_loc = glGetUniformLocation (shader_program, "HaveDiffuseTex");
+    specular_texflag_loc = glGetUniformLocation (shader_program, "HaveSpecularTex");
+    normal_texflag_loc = glGetUniformLocation (shader_program, "HaveNormalTex");
 
 #ifdef SupportOpenCL
     init_opencl_data ();
@@ -389,8 +408,10 @@ ogl_setup (const RaySpace* space)
                 glBindTexture (GL_TEXTURE_2D, scenegl->texture_offset + texi);
                 glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
                 glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-                glTexImage2D (GL_TEXTURE_2D, 0, 3, txtr->ncols, txtr->nrows, 0,
-                              GL_RGB, GL_UNSIGNED_BYTE, txtr->pixels);
+                glTexImage2D (GL_TEXTURE_2D, 0, txtr->pixelsz,
+                              txtr->ncols, txtr->nrows, 0,
+                              (txtr->alpha ? GL_RGBA : GL_RGB),
+                              GL_UNSIGNED_BYTE, txtr->pixels);
             }
             ntextures += scene->ntxtrs;
         }
@@ -560,11 +581,15 @@ ogl_redraw (const RaySpace* space, uint pilot_idx)
     glMatrixMode (GL_MODELVIEW);
     glLoadIdentity ();
 
+    glEnable (GL_TEXTURE_2D);
+
     ogl_redraw_ObjectRaySpace (space, space->nobjects,
                                &pilot->view_origin, &pilot->view_basis);
     UFor( i, space->nobjects )
         ogl_redraw_ObjectRaySpace (space, i,
                                    &pilot->view_origin, &pilot->view_basis);
+
+    glDisable (GL_TEXTURE_2D);
 }
 
 static void
@@ -574,7 +599,7 @@ ogl_set_ObjectSurface (const ObjectSurface* surf,
     Material default_material;
     const Material* matl;
     GLfloat color[4];
-    GLint loc;
+    bool flag;
     uint j;
 
     if (surf->material < scene->nmatls)
@@ -600,38 +625,47 @@ ogl_set_ObjectSurface (const ObjectSurface* surf,
     glMaterialf (GL_FRONT_AND_BACK, GL_SHININESS,
                  matl->optical_density);
 
-    glDisable (GL_TEXTURE_2D);
-
-    loc = glGetUniformLocation (shader_program, "HaveDiffuseTex");
-    if (matl->diffuse_texture < Max_uint)
+        /* These are hard-coded texture numbers set in init_ogl_ui_data()!*/
+    flag = (matl->ambient_texture < Max_uint);
+    glUniform1i (ambient_texflag_loc, flag ? 1 : 0);
+    if (flag)
     {
-        glUniform1i (loc, 1);
-        glEnable (GL_TEXTURE_2D);
         glActiveTexture (GL_TEXTURE0);
         glBindTexture (GL_TEXTURE_2D,
-                       scenegl->texture_offset + matl->diffuse_texture);
-        loc = glGetUniformLocation (shader_program, "DiffuseTex");
-        glUniform1i (loc, 0);
-    }
-    else
-    {
-        glUniform1i (loc, 0);
+                       ((matl->ambient_texture < Max_uint)
+                        ? scenegl->texture_offset + matl->ambient_texture
+                        : 0));
     }
 
-    loc = glGetUniformLocation (shader_program, "HaveNormalTex");
-    if (matl->bump_texture < Max_uint)
+    flag = (matl->diffuse_texture < Max_uint);
+    glUniform1i (diffuse_texflag_loc, flag ? 1 : 0);
+    if (flag)
     {
-        glUniform1i (loc, 1);
-        glEnable (GL_TEXTURE_2D);
         glActiveTexture (GL_TEXTURE1);
         glBindTexture (GL_TEXTURE_2D,
-                       scenegl->texture_offset + matl->bump_texture);
-        loc = glGetUniformLocation (shader_program, "NormalTex");
-        glUniform1i (loc, 1);
+                       ((matl->diffuse_texture < Max_uint)
+                        ? scenegl->texture_offset + matl->diffuse_texture
+                        : 0));
     }
-    else
+
+    flag = (matl->specular_texture < Max_uint);
+    glUniform1i (specular_texflag_loc, flag ? 1 : 0);
+    if (flag)
     {
-        glUniform1i (loc, 0);
+        glActiveTexture (GL_TEXTURE2);
+        glBindTexture (GL_TEXTURE_2D,
+                       ((matl->specular_texture < Max_uint)
+                        ? scenegl->texture_offset + matl->specular_texture
+                        : 0));
+    }
+
+    flag = (matl->bump_texture < Max_uint);
+    glUniform1i (normal_texflag_loc, flag ? 1 : 0);
+    if (flag)
+    {
+        glActiveTexture (GL_TEXTURE3);
+        glBindTexture (GL_TEXTURE_2D,
+                       scenegl->texture_offset + matl->bump_texture);
     }
 }
 

@@ -372,6 +372,23 @@ strto_real_colors (real* a, const char* line)
 }
 
 
+static void
+apply_illum_Material (Material* matl, uint illum)
+{
+    uint i;
+    matl->reflective = true;
+    
+    if (illum == 0)
+        UFor( i, NColors )  matl->ambient[i] = 0;
+
+    if (illum < 2)
+        UFor( i, NColors )  matl->specular[i] = 0;
+
+    matl->reflective = (illum >= 3);
+
+    if (illum < 4)  matl->opacity = 1;
+}
+
     bool
 readin_materials (SList* matlist, SList* namelist,
                   SList* texlist, SList* texnamelist,
@@ -464,6 +481,14 @@ readin_materials (SList* matlist, SList* namelist,
             if (material->diffuse_texture == Max_uint)
                 good = false;
         }
+        else if (AccepTok( line, "map_Ks" ))
+        {
+            material->specular_texture =
+                parse_texture (texlist, texnamelist,
+                               pathname, strskip_ws (line));
+            if (material->specular_texture == Max_uint)
+                good = false;
+        }
         else if (AccepTok( line, "map_Bump" ))
         {
             material->bump_texture =
@@ -471,6 +496,13 @@ readin_materials (SList* matlist, SList* namelist,
                                pathname, strskip_ws (line));
             if (material->bump_texture == Max_uint)
                 good = false;
+        }
+        else if (AccepTok( line, "illum" ))
+        {
+            uint illum;
+            line = strto_uint (&illum, line);
+            good = !!line;
+            if (good)  apply_illum_Material (material, illum);
         }
     }
 
