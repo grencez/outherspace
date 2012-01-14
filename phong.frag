@@ -32,17 +32,17 @@ void main()
     vec4 diffuse = gl_FrontMaterial.diffuse;
     vec4 specular = gl_FrontMaterial.specular;
 
-    if (HaveAmbientTex)
+    if (HaveAmbientTex == 1)
     {
         vec4 tex = texture2D(AmbientTex, txpt);
         ambient.rgb += (tex.rgb - ambient.rgb) * tex.a;
     }
-    if (HaveDiffuseTex)
+    if (HaveDiffuseTex == 1)
     {
         vec4 tex = texture2D(DiffuseTex, txpt);
         diffuse.rgb += (tex.rgb - diffuse.rgb) * tex.a;
     }
-    if (HaveSpecularTex)
+    if (HaveSpecularTex == 1)
     {
         vec4 tex = texture2D(SpecularTex, txpt);
         specular.rgb += (tex.rgb - specular.rgb) * tex.a;
