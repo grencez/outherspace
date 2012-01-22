@@ -29,6 +29,10 @@ struct ObjectMotion
     uint laps;
     uint checkpoint_idx;
     bool lock_drift;
+
+        /* Points for collision.*/
+    uint npts;
+    Point* pts;
 };
 
 void

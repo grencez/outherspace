@@ -35,6 +35,8 @@ struct Material
 };
     
 void init_Material (Material* mat);
+void
+copy_Texture (Texture* dst, const Texture* src);
 real
 map_Texture (real* colors, const Texture* texture, const BaryPoint* p);
 void

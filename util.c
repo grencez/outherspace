@@ -295,6 +295,11 @@ real monotime ()
 
 void assert_status (int stat, const char* msg, const char* file, int line)
 {
+#if 0
+    fflush (stdout);
+    fprintf (stderr, "%s:%d - TRACE\n", file, line);
+    fflush (stderr);
+#endif
     if (stat != 0)
     {
 #ifdef DistribCompute
@@ -304,8 +309,8 @@ void assert_status (int stat, const char* msg, const char* file, int line)
 #endif
         fprintf (stderr, "%s:%d - Bad status: %d - %s\n",
                  file, line, stat, msg);
+        exit (1);
     }
-    assert (stat == 0);
 }
 #endif  /* #ifndef __OPENCL_VERSION__ */
 

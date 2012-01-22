@@ -54,29 +54,28 @@ struct Arg_view_4d_kernel
 {
     PointXfrm xfrm;
     Point xlat;
-    real3 discard_flag;
 };
 
 __kernel
     void
-view_4d_kernel (__write_only __global real* ret_verts,
-                __write_only __global real* ret_vnmls,
-                __read_only __global uint* vidcs,
-                __read_only __global Point* verts,
-                __read_only __global Point* vnmls,
+view_4d_kernel (__global __write_only real* ret_verts,
+                __global __write_only real* ret_vnmls,
+                __global __read_only uint* vidcs,
+                __global __read_only Point* verts,
+                __global __read_only Point* vnmls,
                 __constant Arg_view_4d_kernel* arg,
                 const uint elem_offset,
                 const uint verts_offset,
                 const uint vnmls_offset)
 {
+    const uint PcIdx = get_global_id(0);
     uint i, k = 0;
     uchar inds[4][2];
     Simplex tet;
 
-    i = get_global_id(0);
-    ret_verts = &ret_verts[(i + elem_offset) * 6 * 3];
-    ret_vnmls = &ret_vnmls[(i + elem_offset) * 6 * 3];
-    vidcs = &vidcs[(i + elem_offset) * NDimensions];
+    ret_verts = &ret_verts[(PcIdx + elem_offset) * 6 * 3];
+    ret_vnmls = &ret_vnmls[(PcIdx + elem_offset) * 6 * 3];
+    vidcs = &vidcs[(PcIdx + elem_offset) * NDimensions];
     verts = &verts[verts_offset];
     vnmls = &vnmls[vnmls_offset];
 
@@ -107,8 +106,8 @@ view_4d_kernel (__write_only __global real* ret_verts,
         Point a, b;
         if (k < 3 || i >= k)
         {
-            a.m3 = arg->discard_flag;
-            b.m3 = (real3) (0.0, 0.0, 0.0);
+            a.m3 = (real3) (0.0, 0.0, 0.0);
+            b.m3 = (real3) (1.0, 0.0, 0.0);
         }
         else
         {
@@ -133,8 +132,8 @@ view_4d_kernel (__write_only __global real* ret_verts,
         {
             if (k == 3)
             {
-                a.m3 = arg->discard_flag;
-                b.m3 = (real3) (0.0, 0.0, 0.0);
+                a.m3 = (real3) (0.0, 0.0, 0.0);
+                b.m3 = (real3) (1.0, 0.0, 0.0);
             }
 
             set_3_reals (&ret_verts[3*(i+3)], a);

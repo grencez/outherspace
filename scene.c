@@ -115,12 +115,7 @@ copy_Scene (Scene* dst, const Scene* src)
     dst->txtrs = DuplicaT( Texture, dst->txtrs, dst->ntxtrs );
 
     UFor( i, dst->ntxtrs )
-    {
-        Texture* txtr;
-        txtr = &dst->txtrs[i];
-        txtr->pixels = DuplicaT( byte, txtr->pixels,
-                                 3 * txtr->nrows * txtr->ncols );
-    }
+        copy_Texture (&dst->txtrs[i], &dst->txtrs[i]);
 }
 
     void

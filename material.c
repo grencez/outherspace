@@ -29,6 +29,19 @@ void init_Material (Material* mat)
     mat->bump_texture = Max_uint;
 }
 
+    void
+copy_Texture (Texture* dst, const Texture* src)
+{
+    const uint npixels = src->nrows * src->ncols;
+    byte* pixels;
+
+    pixels = AllocT( byte, (npixels) * src->pixelsz );
+    CopyT( byte, pixels, src->pixels, 0, npixels * src->pixelsz );
+
+    *dst = *src;
+    dst->pixels = pixels;
+}
+
     /** Coords are row/col.**/
 static void
 map_coords_Texture (uint* coords, const Texture* texture, const BaryPoint* p)

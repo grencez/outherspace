@@ -56,6 +56,9 @@
 #define CopyT( Type, dst, src, lo, count ) \
     (array_cpy (dst, src, lo, count, sizeof (Type)))
 
+#define ZeroT( Type, a, count ) \
+    (memset (a, 0, (count) * sizeof (Type)))
+
 #define DuplicaT( Type, src, count ) \
     ((Type*) array_dup (src, count, sizeof (Type)))
 

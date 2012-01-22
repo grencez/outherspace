@@ -31,20 +31,6 @@ SysOpenCL opencl_state;
 
 static
     void
-check_cl_status (cl_int err, const char* str)
-{
-    FILE* out;
-    out = stderr;
-
-    if (err != CL_SUCCESS)
-    {
-        fprintf (out, "Error %d at %s.\n", err, str);
-        exit (1);
-    }
-}
-
-static
-    void
 compute_devices (uint* ret_ndevices,
                  cl_device_id** ret_devices,
                  cl_context* ret_context,
@@ -70,19 +56,19 @@ compute_devices (uint* ret_ndevices,
     context_props[i++] = 0;
 
     err = clGetPlatformIDs (0, 0, &nplatforms);
-    check_cl_status (err, "query platform count");
+    AssertStatus( err, "query platform count" );
 
     platforms = AllocT( cl_platform_id, nplatforms );
 
     err = clGetPlatformIDs (nplatforms, platforms, 0);
-    check_cl_status (err, "fetch platforms");
+    AssertStatus( err, "fetch platforms" );
 
     UFor( i, nplatforms )
     {
         cl_uint n;
         err = clGetDeviceIDs (platforms[i], CL_DEVICE_TYPE_ALL,
                                  0, 0, &n);
-        check_cl_status (err, "query device count");
+        AssertStatus( err, "query device count" );
         ndevices += n;
     }
 
@@ -96,7 +82,7 @@ compute_devices (uint* ret_ndevices,
                               ndevices - device_offset,
                               &devices[device_offset],
                               &n);
-        check_cl_status (err, "fetch devices");
+        AssertStatus( err, "fetch devices" );
         device_offset += n;
     }
 
@@ -104,7 +90,7 @@ compute_devices (uint* ret_ndevices,
 
         /* Create a compute context.*/
     context = clCreateContext (context_props, ndevices, devices, NULL, NULL, &err);
-    check_cl_status (err, "create context");
+    AssertStatus( err, "create context" );
 
     comqs = AllocT( cl_command_queue, ndevices );
     UFor( i, ndevices )
@@ -116,10 +102,10 @@ compute_devices (uint* ret_ndevices,
         fputs ("OpenCL Version: ", out);
         fputs (buf, out);
         fputc ('\n', out);
-        check_cl_status (err, "platform");
+        AssertStatus( err, "platform" );
             /* Create a command queue.*/
         comqs[i] = clCreateCommandQueue (context, devices[i], 0, &err);
-        check_cl_status (err, "create command queue");
+        AssertStatus( err, "create command queue" );
     }
 
     *ret_ndevices = ndevices;
@@ -141,6 +127,7 @@ load_program (cl_program* ret_program, cl_context context,
     size_t* sizes;
     cl_program program;
     cl_int err;
+    const bool show_warnings = false;
 
     sizes = AllocT( size_t, nfiles );
     UFor( i, nfiles )
@@ -149,10 +136,10 @@ load_program (cl_program* ret_program, cl_context context,
     program = clCreateProgramWithSource (context, nfiles,
                                          (const char**) files_bytes,
                                          sizes, &err);
-    check_cl_status (err, "create program");
+    AssertStatus( err, "create program" );
 
-    err = clBuildProgram (program, ndevices, devices, 0, 0, 0);
-    if (err != CL_SUCCESS)
+    err = clBuildProgram (program, ndevices, devices, "", 0, 0);
+    if (err != CL_SUCCESS || show_warnings)
     {
         cl_build_status build_stat;
         UFor( i, ndevices )
@@ -163,8 +150,8 @@ load_program (cl_program* ret_program, cl_context context,
                                         sizeof (cl_build_status),
                                         &build_stat,
                                         0);
-            check_cl_status (be, "build info");
-            if (build_stat != CL_BUILD_SUCCESS) {
+            AssertStatus( be, "build info" );
+            if (build_stat != CL_BUILD_SUCCESS || show_warnings) {
                 char* log;
                 size_t size;
                 FILE* out;
@@ -172,14 +159,14 @@ load_program (cl_program* ret_program, cl_context context,
                 be = clGetProgramBuildInfo (program, devices[i],
                                             CL_PROGRAM_BUILD_LOG,
                                             0, 0, &size);
-                check_cl_status (be, "build log size");
+                AssertStatus( be, "build log size" );
                 log = AllocT( char, 1+size/sizeof(char) );
                 log[size/sizeof(char)] = 0;
 
                 be = clGetProgramBuildInfo (program, devices[i],
                                             CL_PROGRAM_BUILD_LOG,
                                             size, log, &size);
-                check_cl_status (be, "build log");
+                AssertStatus( be, "build log" );
                 fputs ("Failure building for device.\n", out);
                 fputs (log, out);
                 fputs ("\n", out);
@@ -187,7 +174,7 @@ load_program (cl_program* ret_program, cl_context context,
             }
         }
     }
-    check_cl_status (err, "build program");
+    AssertStatus( err, "build program" );
 
     if (sizes)  free (sizes);
 
@@ -225,7 +212,7 @@ init_opencl_data ()
 
         /* Create the compute kernel in the program we wish to run.*/
     cl->kernel = clCreateKernel (cl->program, kernel_name, &err);
-    check_cl_status (err, "create compute kernel");
+    AssertStatus( err, "create compute kernel" );
 
 #ifndef EmbedFiles
     UFr(i, nfiles,
@@ -263,29 +250,29 @@ perturb_vertices (const Scene* scene, const SceneGL* scenegl)
 
     verts = clCreateFromGLBuffer (cl->context, CL_MEM_READ_WRITE,
                                   scenegl->verts_buffer, &err);
-    check_cl_status (err, "create from gl buffer");
+    AssertStatus( err, "create from gl buffer" );
 
     err = clEnqueueAcquireGLObjects (cl->comqs[dev_idx], 1, &verts, 0, 0, 0);
-    check_cl_status (err, "acquire gl objects");
+    AssertStatus( err, "acquire gl objects" );
 
         /* Set the arguments to our compute kernel.*/
     err  = clSetKernelArg(cl->kernel, 0, sizeof(cl_mem), &verts);
     err |= clSetKernelArg(cl->kernel, 1, sizeof(uint), &count);
-    check_cl_status (err, "set kernel arguments");
+    AssertStatus( err, "set kernel arguments" );
 
         /* Get the maximum work group size for executing the kernel on the device.*/
     err = clGetKernelWorkGroupInfo(cl->kernel, cl->devices[dev_idx],
                                    CL_KERNEL_WORK_GROUP_SIZE,
                                    sizeof(local), &local, 0);
-    check_cl_status (err, "retrieve kernel work group info");
+    AssertStatus( err, "retrieve kernel work group info" );
 
     global = scene->nverts;
         /* err = clEnqueueNDRangeKernel(commands, kernel, 1, NULL, &global, &local, 0, NULL, NULL); */
     err = clEnqueueNDRangeKernel (cl->comqs[dev_idx], cl->kernel, 1, 0, &global, 0, 0, 0, 0);
-    check_cl_status (err, "enqueue kernel");
+    AssertStatus( err, "enqueue kernel" );
 
     err = clEnqueueReleaseGLObjects (cl->comqs[dev_idx], 1, &verts, 0, 0, 0);
-    check_cl_status (err, "release gl objects");
+    AssertStatus( err, "release gl objects" );
 
         /* Wait for the commands to get serviced before reading back results.*/
     clFinish (cl->comqs[dev_idx]);
@@ -301,27 +288,31 @@ view_4d_vertices (const Scene* scene,
     {
         PointXfrm xfrm;
         Point xlat;
-        cl_float3 discard_flag;
     } arg;
     const uint dev_idx = 0;
     SysOpenCL* cl = &opencl_state;
-    int err;
+    int err = 0;
     uint surfi;
     uint argi = 0;
     cl_mem ret_verts, ret_vnmls;
+    cl_mem gl_objects[2];
     cl_mem vidcs, verts, vnmls, arg_mem;
 
     ret_verts = clCreateFromGLBuffer (cl->context, CL_MEM_WRITE_ONLY,
                                       scenegl->verts_buffer, &err);
-    check_cl_status (err, "create from gl verts buffer");
+    AssertStatus( err, "create from gl verts buffer" );
 
     ret_vnmls = clCreateFromGLBuffer (cl->context, CL_MEM_WRITE_ONLY,
                                       scenegl->vnmls_buffer, &err);
-    check_cl_status (err, "create from gl vnmls buffer");
+    AssertStatus( err, "create from gl vnmls buffer" );
 
-    err |= clEnqueueAcquireGLObjects (cl->comqs[dev_idx], 1, &ret_verts, 0, 0, 0);
-    err |= clEnqueueAcquireGLObjects (cl->comqs[dev_idx], 1, &ret_vnmls, 0, 0, 0);
-    check_cl_status (err, "acquire gl objects");
+    gl_objects[0] = ret_verts;
+    gl_objects[1] = ret_vnmls;
+
+    err |= clEnqueueAcquireGLObjects (cl->comqs[dev_idx],
+                                      ArraySz( gl_objects ), gl_objects,
+                                      0, 0, 0);
+    AssertStatus( err, "acquire gl objects" );
 
     vidcs = clCreateBuffer (cl->context,
                             CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
@@ -341,9 +332,6 @@ view_4d_vertices (const Scene* scene,
 
     arg.xfrm = *xfrm;
     arg.xlat = *xlat;
-    memset (&arg.discard_flag, 0, sizeof(arg.discard_flag));
-        /* TODO */
-        /* arg.discard_flag.s[ForwardDim] = -1; */
 
     arg_mem = clCreateBuffer (cl->context,
                               CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
@@ -353,18 +341,12 @@ view_4d_vertices (const Scene* scene,
 
         /* Set the arguments to our compute kernel.*/
     err |= clSetKernelArg (cl->kernel, argi++, sizeof(ret_verts), &ret_verts);
-    AssertStatus( err, "set kernel args" );
     err |= clSetKernelArg (cl->kernel, argi++, sizeof(ret_vnmls), &ret_vnmls);
-    AssertStatus( err, "set kernel args" );
     err |= clSetKernelArg (cl->kernel, argi++, sizeof(vidcs), &vidcs);
-    AssertStatus( err, "set kernel args" );
     err |= clSetKernelArg (cl->kernel, argi++, sizeof(verts), &verts);
-    AssertStatus( err, "set kernel args" );
     err |= clSetKernelArg (cl->kernel, argi++, sizeof(vnmls), &vnmls);
-    AssertStatus( err, "set kernel args" );
     err |= clSetKernelArg (cl->kernel, argi++, sizeof(arg_mem), &arg_mem);
     AssertStatus( err, "set kernel args" );
-    check_cl_status (err, "set kernel arguments");
 
     UFor( surfi, scene->nsurfs )
     {
@@ -380,23 +362,24 @@ view_4d_vertices (const Scene* scene,
         err |= clSetKernelArg (cl->kernel, argi + i++, sizeof(elem_offset), &elem_offset);
         err |= clSetKernelArg (cl->kernel, argi + i++, sizeof(surf->verts_offset), &surf->verts_offset);
         err |= clSetKernelArg (cl->kernel, argi + i++, sizeof(surf->vnmls_offset), &surf->vnmls_offset);
-        check_cl_status (err, "set kernel arguments in loop");
+        AssertStatus( err, "set kernel args in loop" );
 
             /* Get the maximum work group size for executing the kernel on the device.*/
         err = clGetKernelWorkGroupInfo(cl->kernel, cl->devices[dev_idx],
                                        CL_KERNEL_WORK_GROUP_SIZE,
                                        sizeof(local), &local, 0);
-        check_cl_status (err, "retrieve kernel work group info");
+        AssertStatus( err, "retrieve kernel work group info" );
 
         global = surf->nelems;
             /* err = clEnqueueNDRangeKernel(commands, kernel, 1, NULL, &global, &local, 0, NULL, NULL); */
         err = clEnqueueNDRangeKernel (cl->comqs[dev_idx], cl->kernel, 1, 0, &global, 0, 0, 0, 0);
-        check_cl_status (err, "enqueue kernel");
+        AssertStatus( err, "enqueue kernel" );
     }
 
-    err |= clEnqueueReleaseGLObjects (cl->comqs[dev_idx], 1, &ret_verts, 0, 0, 0);
-    err |= clEnqueueReleaseGLObjects (cl->comqs[dev_idx], 1, &ret_vnmls, 0, 0, 0);
-    check_cl_status (err, "release gl objects");
+    err |= clEnqueueReleaseGLObjects (cl->comqs[dev_idx],
+                                      ArraySz( gl_objects ), gl_objects,
+                                      0, 0, 0);
+    AssertStatus( err, "release gl objects" );
 
         /* Wait for the commands to get serviced before reading back results.*/
     clFinish (cl->comqs[dev_idx]);

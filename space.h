@@ -12,13 +12,18 @@
 #define NDimensions 3
 #endif
 
+#ifdef NDims
+#undef NDims
+#endif
+#define NDims NDimensions
+
 typedef struct Point Point;
 typedef struct Ray Ray;
 typedef struct BoundingBox BoundingBox;
 
 struct Point
 {
-    real coords[NDimensions];
+    real coords[NDims];
 };
 
 struct Ray

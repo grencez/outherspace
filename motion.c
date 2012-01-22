@@ -43,10 +43,47 @@ detect_collision (ObjectMotion* motions,
                   const Point* new_centroid,
                   const PointXfrm* new_orientation,
                   const Point* displacement,
-                  const PointXfrm* rotation,
                   real dt);
 static void
 remove_4d_rotation (PointXfrm* basis);
+
+static void
+set_pts_ObjectMotion (ObjectMotion* motion, const Scene* scene)
+{
+    uint i;
+    uint n = scene->nverts;
+    uint* jumps = AllocT( uint, n );
+    uint* indices = AllocT( uint, n );
+    real* coords = AllocT( real, n );
+    real* lexis = AllocT( real, n * NDims );
+
+    if (n == 0)  return;
+
+    UFor( i, n )
+    {
+        uint j;
+        const Point* p = &scene->verts[i];
+        UFor( j, NDims )
+            lexis[j + i * NDims] = p->coords[j];
+    }
+
+    motion->npts =
+        condense_lexi_reals (jumps, indices, coords, n, NDims, lexis);
+    motion->pts = AllocT( Point, motion->npts );
+
+    UFor( i, motion->npts )
+    {
+        uint j;
+        Point* p = &motion->pts[i];
+        UFor( j, NDims )
+            p->coords[j] = lexis[j + i * NDims];
+    }
+
+    free (jumps);
+    free (indices);
+    free (coords);
+    free (lexis);
+}
 
     void
 init_ObjectMotion (ObjectMotion* motion, const ObjectRaySpace* object)
@@ -78,6 +115,14 @@ init_ObjectMotion (ObjectMotion* motion, const ObjectRaySpace* object)
     motion->laps = 0;
     motion->checkpoint_idx = 0;
     motion->lock_drift = false;
+
+    set_pts_ObjectMotion (motion, &object->scene);
+}
+
+    void
+lose_ObjectMotion (ObjectMotion* motion)
+{
+    if (motion->npts > 0)  free (motion->pts);
 }
 
     /** Rotate the (/xdim/,/ydim/)-plane by /angle/ counterclockwise,
@@ -222,11 +267,6 @@ move_object (RaySpace* space, ObjectMotion* motions,
     trxfrm_PointXfrm (&new_orientation, &rotation, &object->orientation);
     apply_thrust (&veloc, &new_orientation, &drift, motion, dt);
 
-        /* TODO: This applies the rotation early!
-         * If this choice is kept, some simplification can
-         * happen down in detect_collision().
-         */
-    identity_PointXfrm (&rotation);
     copy_PointXfrm (&object->orientation, &new_orientation);
     mark_colliding (collisions, refldirs, motions, objidx, space);
 
@@ -268,7 +308,6 @@ move_object (RaySpace* space, ObjectMotion* motions,
                                 &new_centroid,
                                 &new_orientation,
                                 &veloc,
-                                &rotation,
                                 dt);
         if (hit)
         {
@@ -554,14 +593,14 @@ mark_colliding (BitString* collisions,
                 uint objidx, const RaySpace* space)
 {
     uint i, off, tmp_off, n;
-    const Scene* scene;
     const ObjectRaySpace* object;
+    const ObjectMotion* motion;
     FILE* out = stderr;
 
     if (!UseNNCollision)  return;
 
     object = &space->objects[objidx];
-    scene = &object->scene;
+    motion = &motions[objidx];
 
     n = space->nobjects+1;
     off = n * objidx;
@@ -575,7 +614,7 @@ mark_colliding (BitString* collisions,
         zero_Point (&refldirs[idx]);
     }
 
-    UFor( i, scene->nverts )
+    UFor( i, motion->npts )
     {
         bool inside_box;
         uint hit_idx = Max_uint;
@@ -583,7 +622,7 @@ mark_colliding (BitString* collisions,
         uint hit_objidx = Max_uint;
         Point origin, direct;
 
-        copy_Point (&origin, &scene->verts[i]);
+        copy_Point (&origin, &motion->pts[i]);
         hit_mag = magnitude_Point (&origin);
         scale_Point (&direct, &origin, - 1 / hit_mag);
 
@@ -611,7 +650,7 @@ mark_colliding (BitString* collisions,
                 Point veloc, normal;
 
                 Op_Point_1200( &veloc
-                               ,-, +, &motions[objidx].veloc
+                               ,-, +, &motion->veloc
                                ,      &direct );
 
                 Op_Point_202100( &normal
@@ -680,7 +719,6 @@ detect_collision (ObjectMotion* motions,
                   const Point* new_centroid,
                   const PointXfrm* new_orientation,
                   const Point* displacement,
-                  const PointXfrm* rotation,
                   real dt)
 {
     uint i;
@@ -691,13 +729,13 @@ detect_collision (ObjectMotion* motions,
     real hit_dx = 0;
     Point hit_dir, reflveloc;
     const ObjectRaySpace* object;
-    const Scene* scene;
+    ObjectMotion* motion;
     bool colliding;
 
 
     assert (objidx < space->nobjects);
     object = &space->objects[objidx];
-    scene = &object->scene;
+    motion = &motions[objidx];
     zero_Point (&hit_dir);
 
     bs_offset = objidx * (space->nobjects+1);
@@ -769,11 +807,8 @@ detect_collision (ObjectMotion* motions,
 
             diff_Point (&p0, &p0, displacement);
             
-            xfrm_Point (&tmp, rotation, &p0);
-            if (eff_objidx == space->nobjects)
-                copy_Point (&p0, &tmp);
-            else
-                summ_Point (&p0, &tmp, &object->centroid);
+            if (eff_objidx < space->nobjects)
+                summ_Point (&p0, &p0, &object->centroid);
                 /* /p1/ and /p0/ are now in global coordinates.*/
             
             diff_Point (&tmp, &p1, &object->centroid);
@@ -833,7 +868,7 @@ detect_collision (ObjectMotion* motions,
     }
 
     if (true)
-    UFor( i, scene->nverts )
+    UFor( i, motion->npts )
     {
         Point diff, origin, destin;
         real distance;
@@ -842,8 +877,8 @@ detect_collision (ObjectMotion* motions,
         uint tmp_hit = Max_uint, tmp_objidx = Max_uint;
         bool inside_box;
 
-        trxfrm_Point (&origin, &object->orientation, &scene->verts[i]);
-        trxfrm_Point (&destin, new_orientation, &scene->verts[i]);
+        trxfrm_Point (&origin, &object->orientation, &motion->pts[i]);
+        trxfrm_Point (&destin, new_orientation, &motion->pts[i]);
 
         summ_Point (&origin, &origin, &object->centroid);
         summ_Point (&destin, &destin, new_centroid);
@@ -938,7 +973,7 @@ detect_collision (ObjectMotion* motions,
             Point v;  /* Average velocity.*/
 
 
-            m1 = motions[objidx].mass;
+            m1 = motion->mass;
             m2 = motions[hit_objidx].mass;
             invavg = 2 / (m1+m2);
             scale_Point (&u1, &normal, - cos_normal * hit_speed);
@@ -978,7 +1013,7 @@ detect_collision (ObjectMotion* motions,
             summ_Point (&reflveloc, &hit_dir, &reflveloc);
             scale_Point (&reflveloc, &reflveloc, hit_speed);
         }
-        scale_Point (&motions[objidx].veloc, &reflveloc, 1);
+        scale_Point (&motion->veloc, &reflveloc, 1);
     }
 
     return colliding;
