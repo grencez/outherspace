@@ -506,6 +506,8 @@ ogl_redraw (const RaySpace* space, uint pilot_idx)
     uint i;
     uint height, width;
     const Pilot* pilot;
+    real near_mag = 0.1, far_mag = 0;
+    Ray ray;
 
     pilot = &pilots[pilot_idx];
 
@@ -524,32 +526,45 @@ ogl_redraw (const RaySpace* space, uint pilot_idx)
         /* Clear the depth buffer. */
     glClear (GL_DEPTH_BUFFER_BIT);
 
+    copy_Point (&ray.origin, &pilot->view_origin);
+    copy_Point (&ray.direct, &pilot->view_basis.pts[ForwardDim]);
+
+    UFor( i, 3 )
+    {
+        const BoundingBox* box = &space->main.box;
+        real m =
+            (ray.direct.coords[i] > 0)
+            ? box->max.coords[i] - ray.origin.coords[i]
+            : ray.origin.coords[i] - box->min.coords[i];
+
+        if (m > 0)  far_mag += m;
+    }
+
+
     if (pilot->ray_image.perspective)
     {
-        Point p;
-        real near_mag = 0.1;
-        real far_mag = 0;
-        Ray ray;
-        const BoundingBox* box;
-        box = &space->main.box;
-
-        copy_Point (&ray.origin, &pilot->view_origin);
-        copy_Point (&ray.direct, &pilot->view_basis.pts[ForwardDim]);
-
-        UFor( i, 3 )
-        {
-            real m;
-            m = (ray.direct.coords[i] > 0)
-                ? box->max.coords[i] - ray.origin.coords[i]
-                : ray.origin.coords[i] - box->min.coords[i];
-
-            if (m > 0)  far_mag += m;
-        }
 
         gluPerspective (180 / M_PI * pilot->ray_image.hifov,
                         width / (real) height,
                         near_mag, far_mag);
 
+    }
+    else
+    {
+        uint max_n;
+        real horz, vert;
+        if (width >= height)  max_n = width;
+        else                  max_n = height;
+        horz = .5 * pilot->ray_image.hifov * (width / (real) max_n);
+        vert = .5 * pilot->ray_image.hifov * (height / (real) max_n);
+
+        glOrtho (-horz, horz, -vert, vert,
+                 near_mag, far_mag);
+    }
+
+    if (true)
+    {
+        Point p;
         summ_Point (&p, &ray.origin, &ray.direct);
 
         gluLookAt (pilot->view_origin.coords[RightDim],
@@ -561,20 +576,6 @@ ogl_redraw (const RaySpace* space, uint pilot_idx)
                    pilot->view_basis.pts[UpDim].coords[RightDim],
                    pilot->view_basis.pts[UpDim].coords[UpDim],
                    - pilot->view_basis.pts[UpDim].coords[ForwardDim]);
-    }
-    else
-    {
-            /* TODO: Orthographic mode doesn't work!*/
-        uint max_n;
-        real horz, vert;
-        if (width >= height)  max_n = width;
-        else                  max_n = height;
-        horz = .5 * pilot->ray_image.hifov * (width / (real) max_n);
-        vert = .5 * pilot->ray_image.hifov * (height / (real) max_n);
-
-        glOrtho (-horz, horz, -vert, vert,
-                 1, 3 * magnitude_Point (&space->main.box.max));
-        map0_ogl_matrix (&pilot->view_origin, &pilot->view_basis);
     }
 
         /* We don't want to modify the projection matrix. */
