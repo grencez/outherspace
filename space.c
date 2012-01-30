@@ -52,6 +52,18 @@ void summ_Point (Point* dst, const Point* a, const Point* b)
     Op_Point_200( dst ,+, a , b );
 }
 
+    void
+prod_Point (Point* dst, const Point* a, const Point* b)
+{
+    Op_Point_200( dst ,*, a , b );
+}
+
+    void
+quot_Point (Point* dst, const Point* a, const Point* b)
+{
+    Op_Point_200( dst ,/, a , b );
+}
+
 void scale_Point (Point* dst, const Point* a, real k)
 {
     Op_Point_10( dst ,k*, a );
@@ -69,9 +81,18 @@ reci_Point (Point* dst, const Point* src)
 }
 
     void
-quot_Point (Point* dst, const Point* src, real x)
+quot1_Point (Point* dst, const Point* src, real x)
 {
     Op_20s( real, NDimensions, dst->coords ,/, src->coords , x );
+}
+
+    void
+follow_Ray (Point* isect, const Ray* ray, real mag)
+{
+    Op_2020s( real, NDims, isect->coords
+              ,+, ray->origin.coords
+              ,   *, ray->direct.coords
+              ,      mag );
 }
 
 void zero_Point (Point* a)

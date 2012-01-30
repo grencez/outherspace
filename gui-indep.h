@@ -41,6 +41,7 @@ struct MotionInput
     bool use_roll;
     bool firing[2];
     bool lock_drift;
+    real orbit[2];
 };
 
 struct RaceCraft
@@ -68,9 +69,9 @@ struct Pilot
     real up_offset;
     real forward_offset;
 
-        /* Not sure if these will be used evar.*/
-    uint mouse_coords[2];
-    uint mouse_diff[2];
+    Point orbit_focus;
+    bool mouse_down;
+    int mouse_coords[2];
 };
 
     /* Global state changes.*/
@@ -80,7 +81,6 @@ static uint npilots = 1;
 static uint kbd_pilot_idx = 0;
 static ObjectMotion racer_motions[NRacersMax];  /* Reset every frame.*/
 static RaceCraft crafts[NRacersMax];
-static Pilot pilots[NRacersMax];
 static uint view_nrows = 200;
 static uint view_ncols = 200;
 static uint npixelzoom = 2;
@@ -100,6 +100,8 @@ static void
 init_Pilot (Pilot* p);
 static void
 cleanup_Pilot (Pilot* p);
+static void
+sync_Pilot (Pilot* gui, Pilot* bkg);
 static void
 resize_pilot_viewports (uint nrows, uint ncols);
 static void
@@ -137,7 +139,9 @@ render_pilot_images (byte* data, uint nrows, uint ncols, uint stride,
 static void
 update_pilot_images (RaySpace* space, real frame_t1);
 static void
-init_ui_data (RaySpace* space, const char* inpathname);
+init_ui_data (RaySpace* space,
+             const Pilot* input_pilots,
+             const char* inpathname);
 static void
 cleanup_ui_data ();
 

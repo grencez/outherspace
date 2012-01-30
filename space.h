@@ -41,11 +41,17 @@ struct BoundingBox
 void diff_Point (Point* dst, const Point* a, const Point* b);
 real dot_Point (const Point* a, const Point* b);
 void summ_Point (Point* dst, const Point* a, const Point* b);
+void
+prod_Point (Point* dst, const Point* a, const Point* b);
+void
+quot_Point (Point* dst, const Point* a, const Point* b);
 void scale_Point (Point* dst, const Point* a, real k);
 void
 reci_Point (Point* dst, const Point* src);
 void
-quot_Point (Point* dst, const Point* src, real x);
+quot1_Point (Point* dst, const Point* src, real x);
+void
+follow_Ray (Point* isect, const Ray* ray, real mag);
 void zero_Point (Point* a);
 bool
 equal_Point (const Point* a, const Point* b);

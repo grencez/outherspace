@@ -42,14 +42,15 @@ static bool needs_recast = true;
 static uint resize_nrows = 0;
 static uint resize_ncols = 0;
 
-struct redraw_loop_param_struct
+typedef struct RedrawLoopParam RedrawLoopParam;
+struct RedrawLoopParam
 {
     RaySpace* space;
+    Pilot pilots[NRacersMax];
     SDL_sem* sig;
     bool continue_running;
     bool resize;
 };
-typedef struct redraw_loop_param_struct RedrawLoopParam;
 
 
 static
@@ -218,6 +219,7 @@ key_press_fn (Pilot* pilot, const SDL_keysym* event)
     }
     else if (stride != 0 && !FollowRacer)
     {
+            /* TODO - move to gui-indep.c, should not modify view_origin */
         Point diff;
         scale_Point (&diff, &view_basis->pts[dim], stride_magnitude * stride);
         summ_Point (view_origin, view_origin, &diff);
@@ -236,6 +238,7 @@ key_press_fn (Pilot* pilot, const SDL_keysym* event)
     }
     else if (roll != 0)
     {
+            /* TODO - move to gui-indep.c, should not modify view_basis */
         PointXfrm tmp_basis;
         copy_PointXfrm (&tmp_basis, view_basis);
         rotate_PointXfrm (&tmp_basis, UpDim, RightDim, roll * M_PI / 8);
@@ -247,6 +250,7 @@ key_press_fn (Pilot* pilot, const SDL_keysym* event)
     }
     else if (turn != 0)
     {
+            /* TODO - move to gui-indep.c, should not modify view_basis */
         uint negdim;
         if (turn < 0)  negdim = dim;
         else           negdim = ForwardDim;
@@ -483,98 +487,112 @@ joystick_axis_event (MotionInput* mot, uint axisidx, int value)
 }
 
 
-static
-    void
-grab_mouse_fn (const SDL_MouseButtonEvent* event, const RaySpace* space)
+static void
+sane_mouse_coords (int* coords, const Pilot* pilot)
 {
-    uint row, col;
-    FILE* out = stdout;
-    bool do_rotate = false;
-    bool do_raycast = false;
-    RayCastAPriori priori;
-    Point origin, dir;
-    Pilot* pilot;
+    coords[0] = coords[0] / (int) npixelzoom;
+    coords[1] = coords[1] / (int) npixelzoom;
 
-    pilot = &pilots[kbd_pilot_idx];
-
-    row = event->y / npixelzoom;
-    col = event->x / npixelzoom;
-    if (event->y < (int)pilot->image_start_row ||
-        event->x < (int)pilot->image_start_col)
-    {
-        fputs ("Stay in the box hoser!\n", out);
-    }
-
-    row -= pilot->image_start_row;
-    col -= pilot->image_start_col;
-    if (pilot->ray_image.nrows <= row ||
-        pilot->ray_image.ncols <= col)
-    {
-        fputs ("Stay in the box hoser!\n", out);
-    }
+    coords[0] -= pilot->image_start_row;
+    coords[1] -= pilot->image_start_col;
 
         /* Row numbering becomes bottom-to-top.*/
-    row = pilot->ray_image.nrows - row - 1;
+    coords[0] = pilot->ray_image.nrows - coords[0] - 1;
+}
 
-
-    printf ("row:%u col:%u\n", row, col);
+static
+    void
+mouse_down_fn (Pilot* pilot,
+               const SDL_MouseButtonEvent* event,
+               const RaySpace* space)
+{
+    int row, col;
+    FILE* out = stdout;
+    bool do_rotate = false;
+    bool do_orbit = false;
+    bool do_raycast = false;
+    RayCastAPriori priori;
+    Ray ray;
 
     if      (event->button == 1)  do_rotate = true;
+    else if (event->button == 2)  do_orbit = true;
     else if (event->button == 3)  do_raycast = true;
+    else                          return;
 
-    if (do_rotate || do_raycast)
+    pilot->mouse_down = true;
+    pilot->mouse_coords[0] = event->y;
+    pilot->mouse_coords[1] = event->x;
+    sane_mouse_coords (pilot->mouse_coords, pilot);
+    row = pilot->mouse_coords[0];
+    col = pilot->mouse_coords[1];
+
+    printf ("row:%d col:%d\n", row, col);
+    if (row < 0 || col < 0 ||
+        row >= (int) pilot->ray_image.nrows ||
+        col >= (int) pilot->ray_image.ncols)
     {
-        setup_RayCastAPriori (&priori,
-                              &pilot->ray_image,
-                              &pilot->view_origin,
-                              &pilot->view_basis,
-                              &space->main.box);
-
-        ray_from_RayCastAPriori (&origin, &dir,
-                                 &priori, row, col,
-                                 &pilot->ray_image);
+        fputs ("Stay in the box hoser!\n", out);
+        return;
     }
+
+    setup_RayCastAPriori (&priori,
+                          &pilot->ray_image,
+                          &pilot->view_origin,
+                          &pilot->view_basis,
+                          &space->main.box);
+
+    ray_from_RayCastAPriori (&ray,
+                             &priori, row, col,
+                             &pilot->ray_image);
 
     if (do_rotate)
     {
-        copy_Point (&pilot->view_origin, &origin);
+        copy_Point (&pilot->view_origin, &ray.origin);
 
         orthorotate_PointXfrm (&pilot->view_basis, &pilot->view_basis,
-                               &dir, ForwardDim);
+                               &ray.direct, ForwardDim);
 
         fputs ("basis:", out);
         output_PointXfrm (out, &pilot->view_basis);
         fputc ('\n', out);
         needs_recast = true;
-
-        pilot->mouse_coords[0] = event->x;
-        pilot->mouse_coords[1] = event->y;
-        pilot->mouse_diff[0] = 0;
-        pilot->mouse_diff[1] = 0;
     }
-    else if (do_raycast)
+    else if (do_raycast || do_orbit)
     {
         uint hit_idx = Max_uint;
         real hit_mag = Max_real;
         uint hit_objidx = Max_uint;
+        Point isect;
+        bool didhit;
 
             /* Use /cast_partitioned/ here and
              * set /SeparateRenderThread/ to false
              * to cast rays matching exactly what you see.
              */
         cast_nopartition (&hit_idx, &hit_mag, &hit_objidx,
-                          space, &origin, &dir,
+                          space, &ray.origin, &ray.direct,
                           priori.inside_box,
                           Max_uint);
-        if (hit_objidx <= space->nobjects)
+
+        didhit = hit_objidx <= space->nobjects;
+
+        if (didhit)
+            follow_Ray (&isect, &ray, hit_mag);
+
+        if (do_orbit)
+        {
+            if (!didhit)
+            {
+                summ_Point (&isect, &pilot->orbit_focus, &pilot->view_origin);
+                hit_mag = dot_Point (&isect, &ray.direct);
+                follow_Ray (&isect, &ray, hit_mag);
+            }
+            pilot->orbit_focus = isect;
+        }
+        else if (do_raycast && didhit)
         {
             const ObjectRaySpace* object;
-            Point isect;
             uint nodeidx, parent_nodeidx;
-            Op_Point_2010( &isect
-                           ,+, &origin
-                           ,   hit_mag*, &dir );
-
             nodeidx = find_KDTreeNode (&parent_nodeidx, &isect,
                                        space->main.tree.nodes);
 
@@ -591,10 +609,33 @@ grab_mouse_fn (const SDL_MouseButtonEvent* event, const RaySpace* space)
             output_Point (out, &object->simplices[hit_idx].plane.normal);
             fputc ('\n', out);
         }
-        else
+        else if (do_raycast)
         {
             fputs ("No hit!\n", out);
         }
+    }
+}
+
+static void
+mouse_move_fn (Pilot* pilot, const SDL_MouseMotionEvent* event)
+{
+    uint i;
+    int coords[2];
+    uint npix = 0;
+    if (!pilot->mouse_down)  return;
+
+    npix = min_uint (pilot->ray_image.nrows,
+                     pilot->ray_image.ncols);
+    
+    coords[0] = event->y;
+    coords[1] = event->x;
+    sane_mouse_coords (coords, pilot);
+
+    UFor( i, 2 )
+    {
+        real diff = coords[i] - pilot->mouse_coords[i];
+        pilot->mouse_coords[i] = coords[i];
+        pilot->input.orbit[i] += diff / npix;
     }
 }
 
@@ -634,6 +675,10 @@ render_loop_fn (void* data)
 
     while (param->continue_running)
     {
+        uint i;
+        UFor( i, npilots )
+            sync_Pilot (&param->pilots[i], &pilots[i]);
+
         param->resize = (resize_nrows > 0);
         if (param->resize)
         {
@@ -654,6 +699,9 @@ render_loop_fn (void* data)
 #endif
         }
 
+        UFor( i, npilots )
+            param->pilots[i] = pilots[i];
+
         SDL_PushEvent (&draw_event);
         if (SeparateRenderThread)
             SDL_SemWait (param->sig);
@@ -666,7 +714,7 @@ render_loop_fn (void* data)
 
 static
     void
-sdl_main (RaySpace* space, const char* pathname)
+sdl_main (RaySpace* space, const char* pathname, Pilot* pilots)
 {
     RedrawLoopParam redraw_loop_param;
     SDL_Event event;
@@ -733,7 +781,7 @@ sdl_main (RaySpace* space, const char* pathname)
     }
 
     if (njoysticks > 0)  npilots = njoysticks;
-    init_ui_data (space, pathname);
+    init_ui_data (space, pilots, pathname);
         /* Assure pilot views will be initialized (trigger a resize).*/
     resize_nrows = npilots * view_nrows;
     resize_ncols = view_ncols;
@@ -741,6 +789,9 @@ sdl_main (RaySpace* space, const char* pathname)
         /* Allow the render thread to begin.*/
     param->space = space;
     param->continue_running = true;
+    UFor( i, NRacersMax )
+        param->pilots[i] = pilots[i];
+
     needs_recast = false;
     if (SeparateRenderThread)
     {
@@ -836,7 +887,15 @@ sdl_main (RaySpace* space, const char* pathname)
                                 &event.key.keysym);
                 break;
             case SDL_MOUSEBUTTONDOWN:
-                grab_mouse_fn (&event.button, space);
+                mouse_down_fn (&pilots[kbd_pilot_idx],
+                               &event.button, space);
+                break;
+            case SDL_MOUSEBUTTONUP:
+                pilots[kbd_pilot_idx].mouse_down = false;
+                break;
+            case SDL_MOUSEMOTION:
+                mouse_move_fn (&pilots[kbd_pilot_idx],
+                               &event.motion);
                 break;
             case SDL_JOYAXISMOTION:
                 {
@@ -899,6 +958,9 @@ sdl_main (RaySpace* space, const char* pathname)
                         /* SDL_HapticRunEffect (haptics[i], haptic_id, 1); */
 #endif
                 }
+
+                UFor( i, npilots )
+                    sync_Pilot (&pilots[i], &param->pilots[i]);
 
 #ifdef SupportOpenGL
                     /* When OpenGL is being used,
@@ -1050,6 +1112,7 @@ int wrapped_main_fn (int argc, char* argv[])
 
     if (call_gui)
     {
+        Pilot pilots[NRacersMax];
         UFor( i, NRacersMax )
         {
             Pilot* pilot;
@@ -1061,7 +1124,7 @@ int wrapped_main_fn (int argc, char* argv[])
             init_RaceCraft (&crafts[pilot->craft_idx]);
         }
 
-        sdl_main (space, inpathname);
+        sdl_main (space, inpathname, pilots);
 
         cleanup_ui_data ();
 #ifdef DistribCompute

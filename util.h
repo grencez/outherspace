@@ -179,6 +179,8 @@ swap_real (real* x, real* y);
 tristate compare_real (real a, real b);
 uint
 max_uint (uint a, uint b);
+uint
+min_uint (uint a, uint b);
 real match_real (real a, real b);
 real
 clamp_real (real x, real lo, real hi);

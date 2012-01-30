@@ -124,7 +124,7 @@ setup_RayCastAPriori (RayCastAPriori* dst,
                       const PointXfrm* view_basis,
                       const BoundingBox* box);
 void
-ray_from_RayCastAPriori (Point* origin, Point* dir,
+ray_from_RayCastAPriori (Ray* ray,
                          const RayCastAPriori* known,
                          uint row, uint col,
                          const RayImage* image);

@@ -6,6 +6,8 @@
 
 #include <assert.h>
 
+static Pilot pilots[NRacersMax];
+
     void
 init_MotionInput (MotionInput* mot)
 {
@@ -22,6 +24,7 @@ init_MotionInput (MotionInput* mot)
     mot->use_roll = false;
     UFor( i, 2 )  mot->firing[i] = false;
     mot->lock_drift = false;
+    UFor( i, 2 )  mot->orbit[i] = 0;
 }
 
     void
@@ -45,12 +48,50 @@ init_Pilot (Pilot* p)
     p->view_width = 100;
     p->up_offset = 90;
     p->forward_offset = -380;
+    zero_Point (&p->orbit_focus);
+    p->mouse_down = false;
 }
 
     void
 cleanup_Pilot (Pilot* p)
 {
     cleanup_RayImage (&p->ray_image);
+}
+
+    void
+sync_Pilot (Pilot* gui, Pilot* bkg)
+{
+    bkg->craft_idx = gui->craft_idx;
+
+    if (FollowRacer ||
+        bkg->input.orbit[0] != 0 ||
+        bkg->input.orbit[1] != 0)
+    {
+        gui->view_origin = bkg->view_origin;
+        gui->view_basis = bkg->view_basis;
+    }
+    else
+    {
+        bkg->view_origin = gui->view_origin;
+        bkg->view_basis = gui->view_basis;
+    }
+
+    bkg->input = gui->input;
+    gui->input.orbit[0] = 0;
+    gui->input.orbit[1] = 0;
+
+    gui->image_start_row = bkg->image_start_row;
+    gui->image_start_col = bkg->image_start_col;
+    gui->ray_image = bkg->ray_image;
+
+    bkg->stride_magnitude = gui->stride_magnitude;
+    bkg->view_angle = gui->view_angle;
+    bkg->view_width = gui->view_width;
+
+    bkg->up_offset = gui->up_offset;
+    bkg->forward_offset = gui->forward_offset;
+
+    bkg->orbit_focus = gui->orbit_focus;
 }
 
     void
@@ -115,6 +156,9 @@ update_object_motion (ObjectMotion* motion, const MotionInput* input)
     motion->lock_drift = input->lock_drift;
 }
 
+    /** When not following the racer,
+     * this updates camera location and basis.
+     **/
     void
 update_camera_location (Pilot* pilot, const MotionInput* input, real dt)
 {
@@ -150,6 +194,46 @@ update_camera_location (Pilot* pilot, const MotionInput* input, real dt)
         summ_Point (view_origin, view_origin, &diff);
     }
 
+        /* TODO: Orbit is hard.*/
+#if 0
+    if (input->orbit[0] != 0 || input->orbit[1] != 0)
+    {
+        PointXfrm xfrm;
+        Point tmp;
+
+        spherical3_PointXfrm (&xfrm,
+                              2 * M_PI * (.25 - input->orbit[0]),
+                              2 * M_PI *        input->orbit[1]);
+        zero_Point (&tmp);
+        tmp.coords[ForwardDim] = 1;
+        xfrm_Point (&tmp, &xfrm, &tmp);
+
+        output_Point (stderr, &tmp);
+        fputc ('\n', stderr);
+
+        identity_PointXfrm (&xfrm);
+        stable_orthorotate_PointXfrm (&xfrm, &xfrm,
+                                      &tmp, ForwardDim);
+            /* I think it's good up till here.*/
+
+        xfrmtr_PointXfrm (&tmp_basis, &xfrm, view_basis);
+        trxfrm_PointXfrm (&xfrm, &tmp_basis, &xfrm);
+
+        diff_Point (&tmp, &pilot->orbit_focus, view_origin);
+        xfrm_Point (&tmp, &xfrm, &tmp);
+        summ_Point (view_origin, &tmp, &pilot->orbit_focus);
+
+
+        /*
+        fprintf (stderr, "orbit: %f %f\n",
+                 input->orbit[0], input->orbit[1]);
+                 */
+            /* output_Point (stderr, &pilot->orbit_focus); */
+            /* fputc ('\n', stderr); */
+    }
+#endif
+    
+        /* TODO: This is never true because of /FollowRacer/.*/
     if (NDimensions == 4 && FollowRacer)
     {
         x = (1 + input->drift) / 2;
@@ -637,9 +721,15 @@ update_pilot_images (RaySpace* space, real frame_t1)
 }
 
     void
-init_ui_data (RaySpace* space, const char* inpathname)
+init_ui_data (RaySpace* space,
+              const Pilot* input_pilots,
+              const char* inpathname)
 {
     uint i;
+
+    UFor( i, NRacersMax )
+        pilots[i] = input_pilots[i];
+
     if (FollowRacer)
     {
         assert (space->nobjects == 0 && "All objects must be racers.");

@@ -65,7 +65,7 @@ interpolate_by_file (Scene* dst,
 
 static
     void
-interpolate_Track (Track* track, real map_scale)
+interpolate_Track (Track* track, const Point* map_scale)
 {
     const real max_drift = 1000;
     real scale;
@@ -85,7 +85,7 @@ interpolate_Track (Track* track, real map_scale)
         scene = &track->morph_scenes[i];
 
         track->morph_dcoords[i] *= scale;
-        dcoord = track->morph_dcoords[i] / map_scale;
+        dcoord = track->morph_dcoords[i] / map_scale->coords[i];
 
         UFor( j, scene->nverts )
             scene->verts[j].coords[NDimensions-1] = dcoord;
@@ -170,11 +170,12 @@ readin_Track (Track* track, RaySpace* space,
     AffineMap model_map;  /* Use to save model transformation.*/
     AffineMap affine_map;
     AffineMap* map;
-    real scale = 1;
+    Point scale;
     Point location;
     SList startloclist, startdirlist;
     Scene* scene = 0;
     Texture* skytex = 0;
+    uint i;
 
     in = fopen_path (pathname, filename, "rb");
     if (!in)  return false;
@@ -184,6 +185,7 @@ readin_Track (Track* track, RaySpace* space,
     identity_AffineMap (map);
     model_map = *map;
     zero_Point (&location);
+    UFor( i, NDims )  scale.coords[i] = 1;
 
     init_SList (&startloclist);
     init_SList (&startdirlist);
@@ -202,7 +204,6 @@ readin_Track (Track* track, RaySpace* space,
          good && line;
          line = fgets (buf, len, in))
     {
-        uint i;
         bool recalc_map = false;
         line_no += 1;
 
@@ -213,12 +214,28 @@ readin_Track (Track* track, RaySpace* space,
         {
             if (line[0] == ':')  line = &line[1];
 
-            line = strto_real (&scale, line);
-            good = !!(line);
+            UFor( i, NDims )  scale.coords[i] = 1;
+            for (i = 0; i < 3; ++i)
+            {
+                if (line)
+                    line = strto_real (&scale.coords[i], line);
+                if (!line)
+                {
+                    good = (i > 0);
+                    if (!good)  break;
+                    scale.coords[i] = scale.coords[i-1];
+                }
+            }
+
             if (good)
+            {
+                xfrm_Point (&scale, &coord_system, &scale);
                 recalc_map = true;
+            }
             else
+            {
                 fprintf (out, "Line:%u  Need scale value!\n", line_no);
+            }
         }
         else if (AccepTok( line, "loc" ))
         {
@@ -348,7 +365,7 @@ readin_Track (Track* track, RaySpace* space,
             identity_AffineMap (map);
             xlat0_AffineMap (map, &location);
             xfrm0_AffineMap (map, &coord_system);
-            scale0_AffineMap (map, scale);
+            prod0_AffineMap (map, &scale);
         }
     }
 
@@ -370,7 +387,7 @@ readin_Track (Track* track, RaySpace* space,
         if (track->nmorphs > 0)
         {
             uint i;
-            interpolate_Track (track, model_map.scale);
+            interpolate_Track (track, &model_map.scale);
             scene = &track->scene;
             UFor( i, track->nmorphs )
                 map_Scene (&track->morph_scenes[i], &model_map);

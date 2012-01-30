@@ -404,6 +404,12 @@ max_uint (uint a, uint b)
     return (a >= b) ? a : b;
 }
 
+    uint
+min_uint (uint a, uint b)
+{
+    return (a <= b) ? a : b;
+}
+
     /** Find the highest magnitude number, change the sign to that of /a/.**/
     real
 match_real (real a, real b)

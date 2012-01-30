@@ -2001,32 +2001,29 @@ setup_RayCastAPriori (RayCastAPriori* dst,
 }
 
 
-    /* Expect /origin/ and /dir/ to already
-     * represent the middle line of sight.
-     */
     void
-ray_from_RayCastAPriori (Point* origin, Point* dir,
+ray_from_RayCastAPriori (Ray* ray,
                          const RayCastAPriori* known,
                          uint row, uint col,
                          const RayImage* image)
 {
     if (!image->perspective)
     {
-        copy_Point (dir, &known->origin);
-        Op_Point_2021010( origin
+        copy_Point (&ray->direct, &known->origin);
+        Op_Point_2021010( &ray->origin
                           ,+, &known->dir_start
                           ,   +, row*, &known->row_delta
                           ,      col*, &known->col_delta );
     }
     else
     {
-        copy_Point (origin, &known->origin);
+        copy_Point (&ray->origin, &known->origin);
 
-        Op_Point_2021010( dir
+        Op_Point_2021010( &ray->direct
                           ,+, &known->dir_start
                           ,   +, row*, &known->row_delta
                           ,      col*, &known->col_delta );
-        normalize_Point (dir, dir);
+        normalize_Point (&ray->direct, &ray->direct);
     }
 }
 

@@ -6,7 +6,7 @@ identity_AffineMap (AffineMap* map)
 {
     identity_PointXfrm (&map->xfrm);
     zero_Point (&map->xlat);
-    map->scale = 1;
+    Op_s( real, NDims, map->scale.coords , 1 );
 }
 
     /** Map a vector x without scaling: xfrm x **/
@@ -21,8 +21,8 @@ mapo_Point (Point* dst, const AffineMap* map, const Point* src)
 mapvec_Point (Point* dst, const AffineMap* map, const Point* src)
 {
     Point u;
-    mapo_Point (&u, map, src);
-    scale_Point (dst, &u, map->scale);
+    prod_Point (&u, src, &map->scale);
+    mapo_Point (dst, map, &u);
 }
 
     /** Map a vector x: xlat + scale xfrm x **/
@@ -52,7 +52,7 @@ invmapvec_Point (Point* dst, const AffineMap* map, const Point* src)
 {
     Point u;
     invmapo_Point (&u, map, src);
-    quot_Point (dst, &u, map->scale);
+    quot_Point (dst, &u, &map->scale);
 }
 
     void
@@ -74,7 +74,14 @@ invmap_Ray (Ray* dst, const AffineMap* map, const Ray* src)
     void
 scale0_AffineMap (AffineMap* map, real x)
 {
-    map->scale *= x;
+    scale_Point (&map->scale, &map->scale, x);
+}
+
+    /** Post-multiply by an element-wise product.**/
+    void
+prod0_AffineMap (AffineMap* map, const Point* a)
+{
+    prod_Point (&map->scale, &map->scale, a);
 }
 
     /** Post-multiply by a translate operation.**/
@@ -88,6 +95,10 @@ xlat0_AffineMap (AffineMap* map, const Point* a)
     void
 xfrm0_AffineMap (AffineMap* map, const PointXfrm* a)
 {
-    xfrm_PointXfrm (&map->xfrm, &map->xfrm, a);
+    PointXfrm tmp;
+    uint i;
+    UFor( i, NDims )
+        prod_Point (&tmp.pts[i], &map->scale, &a->pts[i]);
+    xfrm_PointXfrm (&map->xfrm, &map->xfrm, &tmp);
 }
 
