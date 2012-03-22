@@ -66,11 +66,6 @@ void row_minors_PointXfrm (Point* dst, const PointXfrm* xfrm, uint row);
 void
 spherical3_PointXfrm (PointXfrm* dst, real zenith, real azimuthcc);
 void
-trxfrm_BoundingBox (BoundingBox* dst,
-                    const PointXfrm* basis,
-                    const BoundingBox* box,
-                    const Point* new_centroid);
-void
 ray_to_basis (Point* ret_origin, Point* ret_dir,
               const PointXfrm* basis,
               const Point* origin,

@@ -13,6 +13,7 @@ project (OutherSpace)
 
 set (CSources
     affine.c
+    bbox.c
     bitstring.c
     dynamic-setup.c
     kdtree.c

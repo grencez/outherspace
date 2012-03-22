@@ -432,69 +432,6 @@ spherical3_PointXfrm (PointXfrm* dst, real zenith, real azimuthcc)
     rotate_PointXfrm (dst, UpDim,    ForwardDim, M_PI / 2 - zenith);
 }
 
-    /** Take a bounding box, rotate it from a basis,
-     * and reposition it around a new centroid.
-     * The bounding box volume will grow in most cases,
-     * as it is axis aligned and the axes have changed!
-     * Note: View /new_centroid/ as a displacement.
-     **/
-    void
-trxfrm_BoundingBox (BoundingBox* dst,
-                    const PointXfrm* basis,
-                    const BoundingBox* box,
-                    const Point* new_centroid)
-{
-    uint i;
-    Point diff;
-    PointXfrm bbox, robox;
-
-    Op_Point_1200( &diff ,.5*, -, &box->max , &box->min );
-
-        /* Fill rows in /bbox/ matrix with components of /diff/,
-         * flipping signs of the components based on the signs
-         * of the basis matrix's corresponding columns.
-         */
-    UFor( i, NDimensions )
-    {
-        uint j;
-        UFor( j, NDimensions )
-        {
-            if (basis->pts[j].coords[i] >= 0)
-                bbox.pts[i].coords[j] = + diff.coords[j];
-            else
-                bbox.pts[i].coords[j] = - diff.coords[j];
-        }
-    }
-
-        /*    T   T T
-         *  (B * A )  = A * B
-         */
-    xfrm_PointXfrm (&robox, &bbox, basis);
-
-        /* Set /diff/ to be the displacement,
-         * taking into account the original bbox centroid.
-         */
-    centroid_BoundingBox (&diff, box);
-    trxfrm_Point (&diff, basis, &diff);
-    summ_Point (&diff, &diff, new_centroid);
-
-    UFor( i, NDimensions )
-    {
-        uint j;
-        real a, b;
-        a = robox.pts[i].coords[i];
-        b = diff.coords[i];
-        dst->min.coords[i] = - a + b;
-        dst->max.coords[i] = + a + b;
-
-        UFor( j, NDimensions )
-                /* assert (a >= robox.pts[j].coords[i]); */
-            assert (relative_error (a, robox.pts[j].coords[i], 1)
-                    <= 2*Epsilon_real);
-    }
-}
-
-
     void
 ray_to_basis (Point* ret_origin, Point* ret_dir,
               const PointXfrm* basis,

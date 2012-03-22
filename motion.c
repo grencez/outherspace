@@ -2,6 +2,7 @@
 #ifndef __OPENCL_VERSION__
 #include "motion.h"
 
+#include "bbox.h"
 #include "bitstring.h"
 
 #include <assert.h>

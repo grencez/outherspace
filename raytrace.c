@@ -1,6 +1,7 @@
 
 #ifndef __OPENCL_VERSION__
 
+#include "bbox.h"
 #include "bitstring.h"
 #include "order.h"
 #include "raytrace.h"

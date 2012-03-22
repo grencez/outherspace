@@ -4,6 +4,7 @@
 #define SCENE_H_
 
 #include "affine.h"
+#include "bbox.h"
 #include "simplex.h"
 #include "material.h"
 #endif  /* #ifndef __OPENCL_VERSION__ */

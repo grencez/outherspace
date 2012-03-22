@@ -272,6 +272,7 @@ endif
 
 
 CSources = affine.c \
+		   bbox.c \
 		   bitstring.c \
 		   dynamic-setup.c \
 		   kdtree.c \
