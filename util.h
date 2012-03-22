@@ -190,7 +190,7 @@ real
 atan2_real (real y, real x);
 real absolute_error (real expect, real result);
 real relative_error (real expect, real result, real large);
-real
+bool
 approx_eql (real expect, real result, real large, real mul);
 tristate signum_real (real a);
 tristate mul_signum (tristate a, tristate b);

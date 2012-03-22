@@ -478,7 +478,7 @@ real relative_error (real expect, real result, real large)
     return err / match_real (expect, large);
 }
 
-    real
+    bool
 approx_eql (real expect, real result, real large, real mul)
 {
     return mul*Epsilon_real >= fabs (relative_error (expect, result, large));

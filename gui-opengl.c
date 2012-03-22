@@ -327,15 +327,6 @@ ogl_setup (const RaySpace* space)
 {
     const SDL_VideoInfo* info;
     int bpp = 0;
-    const GLfloat light_ambient[] = {0.2, 0.2, 0.2, 1.0};
-        /* GLfloat light_ambient[] = {0, 0, 0, 1}; */
-    const GLfloat light_diffuse[] = {1.0, 1.0, 1.0, 1.0};
-        /* GLfloat light_diffuse[] = {1.0, 0.0, 0.0, 1.0}; */
-    const GLfloat light_specular[] = {1.0, 1.0, 1.0, 1.0};
-    const GLenum light_idcs[8] =
-    {   GL_LIGHT0, GL_LIGHT1, GL_LIGHT2, GL_LIGHT3,
-        GL_LIGHT4, GL_LIGHT5, GL_LIGHT6, GL_LIGHT7
-    };
     uint i;
     uint ntextures = 0;
 
@@ -432,50 +423,8 @@ ogl_setup (const RaySpace* space)
     SDL_GL_SetAttribute (SDL_GL_DEPTH_SIZE, 16);
 
     assert (space->nlights < 8);
-    if (space->nlights > 0)
-    {
-        glMatrixMode (GL_MODELVIEW);
-        glLoadIdentity ();
-        map0_ogl_matrix (0, 0);
-
-            /* for (i = 0; i < 8; ++i) */
-        for (i = 0; i < 1; ++i)
-        {
-            uint j;
-            GLfloat v[4];
-            const PointLightSource* light = 0;
-
-            if (i < space->nlights)  light = &space->lights[i];
-            if (!light || !light->on)
-            {
-                glDisable (light_idcs[i]);
-                continue;
-            }
-
-            UFor( j, 3 )  v[j] = light->location.coords[j];
-            v[3] = 1;
-
-                /* Position.*/
-            glLightfv (light_idcs[i], GL_POSITION, v);
-                /* Ambient.*/
-            UFor( j, 3 )  v[j] = light_ambient[j] * light->intensity[j];
-            glLightfv (light_idcs[i], GL_AMBIENT, v);
-                /* Diffuse.*/
-            UFor( j, 3 )  v[j] = light_diffuse[j] * light->intensity[j];
-            glLightfv (light_idcs[i], GL_DIFFUSE, v);
-                /* Specular.*/
-            UFor( j, 3 )  v[j] = light_specular[j] * light->intensity[j];
-            if (light->diffuse)  UFor( j, 3 )  v[j] = 0;
-            glLightfv (light_idcs[i], GL_SPECULAR, v);
-
-            glEnable (light_idcs[i]);
-        }
-        glEnable (GL_LIGHTING);
-    }
-    else
-    {
-        glDisable (GL_LIGHTING);
-    }
+    if (space->nlights > 0)  glEnable (GL_LIGHTING);
+    else                     glDisable (GL_LIGHTING);
 
     glDepthFunc (GL_LESS);
     glEnable (GL_DEPTH_TEST);
@@ -513,9 +462,6 @@ ogl_redraw (const RaySpace* space, uint pilot_idx)
 
     glClearColor (0, 0, 0, 0);
 
-    glMatrixMode (GL_PROJECTION);
-    glLoadIdentity ();
-
     height = npixelzoom * pilot->ray_image.nrows;
     width = npixelzoom * pilot->ray_image.ncols;
 
@@ -541,6 +487,8 @@ ogl_redraw (const RaySpace* space, uint pilot_idx)
     }
 
 
+    glMatrixMode (GL_PROJECTION);
+    glLoadIdentity ();
     if (pilot->ray_image.perspective)
     {
 
@@ -562,6 +510,10 @@ ogl_redraw (const RaySpace* space, uint pilot_idx)
                  near_mag, far_mag);
     }
 
+        /* We don't want to modify the projection matrix. */
+    glMatrixMode (GL_MODELVIEW);
+    glLoadIdentity ();
+
     if (true)
     {
         Point p;
@@ -578,9 +530,54 @@ ogl_redraw (const RaySpace* space, uint pilot_idx)
                    - pilot->view_basis.pts[UpDim].coords[ForwardDim]);
     }
 
-        /* We don't want to modify the projection matrix. */
-    glMatrixMode (GL_MODELVIEW);
-    glLoadIdentity ();
+    if (space->nlights > 0)
+    {
+        const GLfloat light_ambient[] = {0.2, 0.2, 0.2, 1.0};
+            /* GLfloat light_ambient[] = {0, 0, 0, 1}; */
+        const GLfloat light_diffuse[] = {1.0, 1.0, 1.0, 1.0};
+            /* GLfloat light_diffuse[] = {1.0, 0.0, 0.0, 1.0}; */
+        const GLfloat light_specular[] = {1.0, 1.0, 1.0, 1.0};
+        const GLenum light_idcs[8] =
+        {   GL_LIGHT0, GL_LIGHT1, GL_LIGHT2, GL_LIGHT3,
+            GL_LIGHT4, GL_LIGHT5, GL_LIGHT6, GL_LIGHT7
+        };
+        glPushMatrix();
+        map0_ogl_matrix (0, 0);
+
+            /* for (i = 0; i < 8; ++i) */
+        for (i = 0; i < 1; ++i)
+        {
+            uint j;
+            GLfloat v[4];
+            const PointLightSource* light = 0;
+
+            if (i < space->nlights)  light = &space->lights[i];
+            if (!light || !light->on)
+            {
+                glDisable (light_idcs[i]);
+                continue;
+            }
+
+            UFor( j, 3 )  v[j] = light->location.coords[j];
+            v[3] = 1;
+
+                /* Position.*/
+            glLightfv (light_idcs[i], GL_POSITION, v);
+                /* Ambient.*/
+            UFor( j, 3 )  v[j] = light_ambient[j] * light->intensity[j];
+            glLightfv (light_idcs[i], GL_AMBIENT, v);
+                /* Diffuse.*/
+            UFor( j, 3 )  v[j] = light_diffuse[j] * light->intensity[j];
+            glLightfv (light_idcs[i], GL_DIFFUSE, v);
+                /* Specular.*/
+            UFor( j, 3 )  v[j] = light_specular[j] * light->intensity[j];
+            if (light->diffuse)  UFor( j, 3 )  v[j] = 0;
+            glLightfv (light_idcs[i], GL_SPECULAR, v);
+
+            glEnable (light_idcs[i]);
+        }
+        glPopMatrix();
+    }
 
     glEnable (GL_TEXTURE_2D);
 
