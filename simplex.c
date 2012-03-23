@@ -401,7 +401,9 @@ void init_Plane (Plane* plane, const Point* normal, const Point* point)
 }
 
 
-real distance_Plane (const Plane* plane, const Point* point)
+    /** Distance from the plane to a point.**/
+    real
+dist_Plane (const Plane* plane, const Point* point)
 {
     return dot_Point (&plane->normal, point) + plane->offset;
 }
@@ -442,7 +444,7 @@ barycentric_Point (Point* bpoint, const Point* isect,
     UFor( i, NDimensions-1 )
     {
         bpoint->coords[i+1] =
-            distance_Plane (&simplex->barys[i], isect);
+            dist_Plane (&simplex->barys[i], isect);
         bpoint->coords[0] -= bpoint->coords[i+1];
     }
 }
@@ -483,7 +485,7 @@ init_BarySimplex (BarySimplex* elem, const Simplex* raw)
         init_Plane (plane, &plane->normal, &raw->pts[0]);
         barycentric_Plane (plane, plane, &surf.pts[1+i]);
 
-        if (!approx_eql (1, distance_Plane (plane, &raw->pts[1+i]),
+        if (!approx_eql (1, dist_Plane (plane, &raw->pts[1+i]),
                          plane->offset, 5e2))
             good = false;
     }
@@ -498,7 +500,7 @@ hit_Plane (real* restrict ret_dist,
 {
     real dist, dot;
 
-    dist = distance_Plane (plane, origin);
+    dist = dist_Plane (plane, origin);
     dot = dot_Point (&plane->normal, direct);
 
     if (dot < 0)
@@ -531,7 +533,7 @@ hit_BarySimplex (real* restrict ret_dist,
     BaryPoint bpoint;
     Point isect;
 
-    dist = distance_Plane (&elem->plane, &ray->origin);
+    dist = dist_Plane (&elem->plane, &ray->origin);
     dot = dot_Point (&elem->plane.normal, &ray->direct);
 
     if (dot < 0)
@@ -556,7 +558,7 @@ hit_BarySimplex (real* restrict ret_dist,
     bcoord_sum = 0;
     UFor( i, NDimensions-1 )
     {
-        bpoint.coords[i] = distance_Plane (&elem->barys[i], &isect);
+        bpoint.coords[i] = dist_Plane (&elem->barys[i], &isect);
         if (bpoint.coords[i] < 0)  return false;
         bcoord_sum += bpoint.coords[i];
         if (bcoord_sum > 1)  return false;
@@ -593,7 +595,7 @@ hit_BarySimplex (real* restrict ret_dist,
     Point isect;
 
     bcoord_sum = fuzz;
-    dist = distance_Plane (&elem->plane, &ray->origin);
+    dist = dist_Plane (&elem->plane, &ray->origin);
     dot = - dot_Point (&elem->plane.normal, &ray->direct);
     if (dot > 0)
     {

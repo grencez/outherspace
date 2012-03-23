@@ -589,9 +589,32 @@ mouse_down_fn (Pilot* pilot,
         {
             if (!didhit)
             {
-                summ_Point (&isect, &pilot->orbit_focus, &pilot->view_origin);
-                hit_mag = dot_Point (&isect, &ray.direct);
-                follow_Ray (&isect, &ray, hit_mag);
+                Plane plane;
+                Point p;
+                real d, mag;
+                real diff[2];
+                uint i;
+
+                init_Plane (&plane,
+                            &pilot->view_basis.pts[FwdDim],
+                            &pilot->view_origin);
+                d = dist_Plane (&plane, &pilot->orbit_focus);
+                mag = screen_mag (pilot, d);
+
+                UFor( i, 2 )
+                {
+                    real c = pilot->mouse_coords[i];
+                    c /= pilot->ray_image.nrows;
+                    diff[i] = mag * (c - .5);
+                }
+
+                isect = pilot->view_origin;
+                scale_Point (&p, &pilot->view_basis.pts[FwdDim], d);
+                summ_Point (&isect, &isect, &p);
+                scale_Point (&p, &pilot->view_basis.pts[UpDim], diff[0]);
+                summ_Point (&isect, &isect, &p);
+                scale_Point (&p, &pilot->view_basis.pts[RightDim], diff[1]);
+                summ_Point (&isect, &isect, &p);
             }
             pilot->orbit_focus = isect;
         }
@@ -643,14 +666,14 @@ mouse_move_fn (Pilot* pilot, const SDL_MouseMotionEvent* event)
 
     UFor( i, 2 )
     {
-        real diff = coords[i] - pilot->mouse_coords[i];
+        real diff = (real) (coords[i] - pilot->mouse_coords[i]) / npix;
         pilot->mouse_coords[i] = coords[i];
         if (pilot->input.mouse_pan)
-            pilot->input.pan[i] += diff / npix;
+            pilot->input.pan[i] += diff;
         if (pilot->input.mouse_zoom && i == 0)
-            pilot->input.zoom += diff / npix;
+            pilot->input.zoom += diff;
         if (pilot->input.mouse_orbit)
-            pilot->input.orbit[i] += diff / npix;
+            pilot->input.orbit[i] += diff;
     }
 }
 

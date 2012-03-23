@@ -60,7 +60,8 @@ rotn_PointXfrm (PointXfrm* xfrm, uint xdim, uint ydim, real t)
     rotation_PointXfrm (xfrm, xdim, ydim, 2 * M_PI * t);
 }
 
-void rotation_PointXfrm (PointXfrm* xfrm, uint xdim, uint ydim, real angle)
+    void
+rotation_PointXfrm (PointXfrm* xfrm, uint xdim, uint ydim, real angle)
 {
     real tcos, tsin;
     identity_PointXfrm (xfrm);

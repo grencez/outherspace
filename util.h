@@ -103,6 +103,8 @@ typedef byte bool;
 #define static
 #endif  /* defined(__OPENCL_VERSION__) */
 
+#define BLoop( i, bel )  uint i; for (i = 0; i < (bel); ++i) {
+#define BLose() }
 
 #define UFor( i, bel )  for (i = 0; i < (bel); ++i)
 #define UFr(i, bel, body)  do \

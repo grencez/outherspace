@@ -70,6 +70,9 @@ sync_Pilot (Pilot* gui, Pilot* bkg)
     bkg->craft_idx = gui->craft_idx;
 
     if (FollowRacer ||
+        bkg->input.pan[0] != 0 ||
+        bkg->input.pan[1] != 0 ||
+        bkg->input.zoom != 0 ||
         bkg->input.orbit[0] != 0 ||
         bkg->input.orbit[1] != 0)
     {
@@ -83,8 +86,12 @@ sync_Pilot (Pilot* gui, Pilot* bkg)
     }
 
     bkg->input = gui->input;
-    gui->input.orbit[0] = 0;
-    gui->input.orbit[1] = 0;
+
+    { BLoop( i, 2 )
+        gui->input.orbit[i] = 0;
+        gui->input.pan[i] = 0;
+    } BLose()
+    gui->input.zoom = 0;
 
     gui->image_start_row = bkg->image_start_row;
     gui->image_start_col = bkg->image_start_col;
@@ -214,8 +221,11 @@ update_camera_location (Pilot* pilot, const MotionInput* input, real dt)
         Point p;
         real d, h;
         real diff[2];
+        Plane w;
 
-        d = dist_Point (&pilot->view_origin, &pilot->orbit_focus);
+        init_Plane (&w, &view_basis->pts[FwdDim], view_origin);
+        d = dist_Plane (&w, &pilot->orbit_focus);
+
         h = screen_mag (pilot, d);
 
         UFor( i, 2 )  diff[i] = input->pan[i] * (- h);
@@ -227,25 +237,29 @@ update_camera_location (Pilot* pilot, const MotionInput* input, real dt)
     }
     if (input->zoom != 0)
     {
-        const real d = dist_Point (&pilot->view_origin, &pilot->orbit_focus);
-        const real m = d * (- 4 * input->zoom);
+        real d, m;
+        Plane w;
+
+        init_Plane (&w, &view_basis->pts[FwdDim], view_origin);
+        d = dist_Plane (&w, &pilot->orbit_focus);
+        m = d * (- 4 * input->zoom);
         Op_Point_2010( view_origin
                        ,+, view_origin
                        ,   m*, &view_basis->pts[FwdDim] );
     }
     if (input->orbit[0] != 0 || input->orbit[1] != 0)
     {
-        real rev = sqrt (+ input->orbit[0] * input->orbit[0]
-                         + input->orbit[1] * input->orbit[1]);
-        
+        real rev;
         PointXfrm rot, tilt, B;
         AffineMap map;
         PointXfrm xfrm;
         Point p;
 
+        rev = sqrt (+ input->orbit[0] * input->orbit[0]
+                    + input->orbit[1] * input->orbit[1]);
         rotn_PointXfrm (&rot, UpDim, FwdDim, -rev);
-        rotn_PointXfrm (&tilt, UpDim, RightDim,
-                        - atan2_real (input->orbit[1], input->orbit[0]));
+        rotation_PointXfrm (&tilt, UpDim, RightDim,
+                            - atan2_real (input->orbit[1], input->orbit[0]));
 
         identity_AffineMap (&map);
         transpose_PointXfrm (&map.xfrm, view_basis);

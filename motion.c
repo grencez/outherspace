@@ -197,8 +197,8 @@ move_objects (RaySpace* space, ObjectMotion* motions, real dt,
             idx = mot->checkpoint_idx;
 
                 /* See which checkplanes are passed.*/
-            while ((0 > distance_Plane (&checkplanes[idx], prev_centroid)) ==
-                   (0 < distance_Plane (&checkplanes[idx], centroid)))
+            while ((0 > dist_Plane (&checkplanes[idx], prev_centroid)) ==
+                   (0 < dist_Plane (&checkplanes[idx], centroid)))
             {
                 FILE* out = stderr;
                 fprintf (out, "Racer:%u passed checkplane:%u.\n", i, idx);
