@@ -31,32 +31,44 @@ struct Ray
     Point direct;
 };
 
-void copy_Point (Point* dst, const Point* src);
-void diff_Point (Point* dst, const Point* a, const Point* b);
-real dot_Point (const Point* a, const Point* b);
-void summ_Point (Point* dst, const Point* a, const Point* b);
+void
+copy_Point (Point* dst, const Point* src);
+void
+diff_Point (Point* dst, const Point* a, const Point* b);
+real
+dot_Point (const Point* a, const Point* b);
+void
+summ_Point (Point* dst, const Point* a, const Point* b);
 void
 prod_Point (Point* dst, const Point* a, const Point* b);
 void
 quot_Point (Point* dst, const Point* a, const Point* b);
-void scale_Point (Point* dst, const Point* a, real k);
+void
+scale_Point (Point* dst, const Point* a, real k);
 void
 reci_Point (Point* dst, const Point* src);
 void
 quot1_Point (Point* dst, const Point* src, real x);
 void
 follow_Ray (Point* isect, const Ray* ray, real mag);
-void zero_Point (Point* a);
+void
+zero_Point (Point* a);
 bool
 equal_Point (const Point* a, const Point* b);
 bool
 ordered_Point (const Point* a, const Point* b);
 void
 checker_negate_Point (Point* p);
-real magnitude_Point (const Point* a);
-void normalize_Point (Point* dst, const Point* a);
-void proj_Point (Point* dst, const Point* a, const Point* b);
-void orth_Point (Point* dst, const Point* a, const Point* b);
+real
+magnitude_Point (const Point* a);
+real
+dist_Point (const Point* a, const Point* b);
+void
+normalize_Point (Point* dst, const Point* a);
+void
+proj_Point (Point* dst, const Point* a, const Point* b);
+void
+orth_Point (Point* dst, const Point* a, const Point* b);
 void
 proj_unit_Point (Point* dst, const Point* a, const Point* b);
 void

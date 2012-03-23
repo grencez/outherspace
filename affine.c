@@ -102,3 +102,18 @@ xfrm0_AffineMap (AffineMap* map, const PointXfrm* a)
     xfrm_PointXfrm (&map->xfrm, &map->xfrm, &tmp);
 }
 
+    void
+xlat_AffineMap (AffineMap* B, const Point* x, const AffineMap* A)
+{
+    *B = *A;
+    summ_Point (&B->xlat, &B->xlat, x);
+}
+
+    void
+xfrm_AffineMap (AffineMap* C, const PointXfrm* A, const AffineMap* B)
+{
+    C->scale = B->scale;
+    xfrm_Point (&C->xlat, A, &B->xlat);
+    xfrm_PointXfrm (&C->xfrm, A, &B->xfrm);
+}
+

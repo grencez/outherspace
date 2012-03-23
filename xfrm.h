@@ -9,6 +9,7 @@
 #define UpDim 0
 #define RightDim 1
 #define ForwardDim 2
+#define FwdDim ForwardDim
 
 typedef struct PointXfrm PointXfrm;
 
@@ -22,6 +23,8 @@ void copy_PointXfrm (PointXfrm* dst, const PointXfrm* src);
 void identity_PointXfrm (PointXfrm* xfrm);
 void
 scale_PointXfrm (PointXfrm* dst, const PointXfrm* src, real a);
+void
+rotn_PointXfrm (PointXfrm* xfrm, uint xdim, uint ydim, real t);
 void rotation_PointXfrm (PointXfrm* xfrm, uint xdim, uint ydim, real angle);
 void
 rotate_PointXfrm (PointXfrm* xfrm, uint xdim, uint ydim, real angle);

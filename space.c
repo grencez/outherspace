@@ -135,9 +135,18 @@ checker_negate_Point (Point* p)
         p->coords[2*i+1] = - p->coords[2*i+1];
 }
 
-real magnitude_Point (const Point* a)
+    real
+magnitude_Point (const Point* a)
 {
     return sqrt (dot_Point (a, a));
+}
+
+    real
+dist_Point (const Point* a, const Point* b)
+{
+    Point c;
+    diff_Point (&c, a, b);
+    return magnitude_Point (&c);
 }
 
 void normalize_Point (Point* dst, const Point* a)

@@ -53,6 +53,13 @@ scale_PointXfrm (PointXfrm* dst, const PointXfrm* src, real a)
         scale_Point (&dst->pts[i], &src->pts[i], a);
 }
 
+    /** Get a rotation matrix for /t/ revolutions.**/
+    void
+rotn_PointXfrm (PointXfrm* xfrm, uint xdim, uint ydim, real t)
+{
+    rotation_PointXfrm (xfrm, xdim, ydim, 2 * M_PI * t);
+}
+
 void rotation_PointXfrm (PointXfrm* xfrm, uint xdim, uint ydim, real angle)
 {
     real tcos, tsin;
@@ -134,7 +141,7 @@ xfrm_Point (Point* dst, const PointXfrm* xfrm, const Point* src)
     uint i;
     UFor( i, NDimensions )
         u.coords[i] = dot_Point (src, &xfrm->pts[i]);
-    copy_Point (dst, &u);
+    *dst = u;
 }
 
     void
@@ -149,7 +156,7 @@ trxfrm_Point (Point* dst, const PointXfrm* xfrm, const Point* src)
         UFor( j, NDimensions )
             u.coords[i] += src->coords[j] * xfrm->pts[j].coords[i];
     }
-    copy_Point (dst, &u);
+    *dst = u;
 }
 
     void
@@ -218,8 +225,8 @@ void reflect_PointXfrm (PointXfrm* xfrm, uint j, uint k)
     Point rows[2];
     uint i;
 
-    copy_Point (&rows[0], &xfrm->pts[j]);
-    copy_Point (&rows[1], &xfrm->pts[k]);
+    rows[0] = xfrm->pts[j];
+    rows[1] = xfrm->pts[k];
 
         /* Swap indices /j/ and /k/.*/
     UFor( i, 2 )
@@ -230,16 +237,16 @@ void reflect_PointXfrm (PointXfrm* xfrm, uint j, uint k)
         rows[i].coords[k] = tmp;
     }
 
-    copy_Point (&xfrm->pts[j], &rows[1]);
-    copy_Point (&xfrm->pts[k], &rows[0]);
+    xfrm->pts[j] = rows[1];
+    xfrm->pts[k] = rows[0];
 }
 
 void swaprows_PointXfrm (PointXfrm* xfrm, uint j, uint k)
 {
     Point tmp;
-    copy_Point (&tmp, &xfrm->pts[j]);
-    copy_Point (&xfrm->pts[j], &xfrm->pts[k]);
-    copy_Point (&xfrm->pts[k], &tmp);
+    tmp = xfrm->pts[j];
+    xfrm->pts[j] = xfrm->pts[k];
+    xfrm->pts[k] = tmp;
 }
 
 void to_basis_PointXfrm (PointXfrm* dst, const PointXfrm* xfrm,
@@ -285,8 +292,7 @@ void orthonormalize_PointXfrm (PointXfrm* dst, const PointXfrm* A)
     UFor( i, NDimensions )
     {
         uint j;
-        Point tmp;
-        copy_Point (&tmp, &A->pts[i]);
+        Point tmp = A->pts[i];
         UFor( j, i )
         {
             Point proj;
@@ -313,7 +319,7 @@ orthorotate_PointXfrm (PointXfrm* dst, const PointXfrm* A,
     real d;
 
     normalize_Point (&v, v_in);
-    copy_Point (&u, &A->pts[dim]);
+    u = A->pts[dim];
     d = 1 + dot_Point (&u, &v);
     summ_Point (&w, &u, &v);
 
@@ -322,13 +328,13 @@ orthorotate_PointXfrm (PointXfrm* dst, const PointXfrm* A,
         Point x;
         real c;
 
-        copy_Point (&x, &A->pts[i]);
+        x = A->pts[i];
         c = dot_Point (&v, &x) / d;
 
         Op_Point_2010( &dst->pts[i] ,-, &x ,c*, &w );
     }
 
-    copy_Point (&dst->pts[dim], &v);
+    dst->pts[dim] = v;
 }
 
     /** Much like orthorotate_PointXfrm() but
@@ -352,8 +358,8 @@ stable_orthorotate_PointXfrm (PointXfrm* dst, const PointXfrm* A,
     orth_unit_Point (&v, v_in, &A->pts[dim]);
     if (Epsilon_real >= dot_Point (&v, &v))
     {
-        if (dim == 0)  copy_Point (&v, &A->pts[1]);
-        else           copy_Point (&v, &A->pts[0]);
+        if (dim == 0)  v = A->pts[1];
+        else           v = A->pts[0];
     }
 
     orthorotate_PointXfrm (dst, A, &v, dim);
@@ -444,7 +450,7 @@ ray_to_basis (Point* ret_origin, Point* ret_dir,
     diff_Point (&diff, origin, old_centroid);
     xfrm_Point (ret_origin, basis, &diff);
 
-    copy_Point (&diff, dir);
+    diff = *dir;
     xfrm_Point (ret_dir, basis, &diff);
 }
 
@@ -469,7 +475,7 @@ ray_from_basis (Point* ret_origin, Point* ret_dir,
     Point diff;
     point_from_basis (ret_origin, basis, origin, new_centroid);
 
-    copy_Point (&diff, dir);
+    diff = *dir;
     trxfrm_Point (ret_dir, basis, &diff);
 }
 

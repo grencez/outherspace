@@ -509,14 +509,20 @@ mouse_down_fn (Pilot* pilot,
     int row, col;
     FILE* out = stdout;
     bool do_rotate = false;
-    bool do_orbit = false;
     bool do_raycast = false;
+    MotionInput* input = &pilot->input;
     RayCastAPriori priori;
     Ray ray;
 
     if      (event->button == 1)  do_rotate = true;
-    else if (event->button == 2)  do_orbit = true;
     else if (event->button == 3)  do_raycast = true;
+    else if (event->button == 2)
+    {
+        SDLMod mod = SDL_GetModState ();
+        if (mod & KMOD_CTRL)        input->mouse_zoom = true;
+        else if (mod & KMOD_SHIFT)  input->mouse_pan = true;
+        else                        input->mouse_orbit = true;
+    }
     else                          return;
 
     pilot->mouse_down = true;
@@ -557,7 +563,7 @@ mouse_down_fn (Pilot* pilot,
         fputc ('\n', out);
         needs_recast = true;
     }
-    else if (do_raycast || do_orbit)
+    else if (do_raycast || pilot->input.mouse_orbit)
     {
         uint hit_idx = Max_uint;
         real hit_mag = Max_real;
@@ -579,7 +585,7 @@ mouse_down_fn (Pilot* pilot,
         if (didhit)
             follow_Ray (&isect, &ray, hit_mag);
 
-        if (do_orbit)
+        if (pilot->input.mouse_orbit)
         {
             if (!didhit)
             {
@@ -624,8 +630,12 @@ mouse_move_fn (Pilot* pilot, const SDL_MouseMotionEvent* event)
     uint npix = 0;
     if (!pilot->mouse_down)  return;
 
+#if 1
+    npix = pilot->ray_image.nrows;
+#else
     npix = min_uint (pilot->ray_image.nrows,
                      pilot->ray_image.ncols);
+#endif
     
     coords[0] = event->y;
     coords[1] = event->x;
@@ -635,7 +645,12 @@ mouse_move_fn (Pilot* pilot, const SDL_MouseMotionEvent* event)
     {
         real diff = coords[i] - pilot->mouse_coords[i];
         pilot->mouse_coords[i] = coords[i];
-        pilot->input.orbit[i] += diff / npix;
+        if (pilot->input.mouse_pan)
+            pilot->input.pan[i] += diff / npix;
+        if (pilot->input.mouse_zoom && i == 0)
+            pilot->input.zoom += diff / npix;
+        if (pilot->input.mouse_orbit)
+            pilot->input.orbit[i] += diff / npix;
     }
 }
 
@@ -892,7 +907,12 @@ sdl_main (RaySpace* space, const char* pathname, Pilot* pilots)
                 break;
             case SDL_MOUSEBUTTONUP:
                 pilots[kbd_pilot_idx].mouse_down = false;
-                break;
+                {
+                    MotionInput* input = &pilots[kbd_pilot_idx].input;
+                    input->mouse_orbit = false;
+                    input->mouse_zoom = false;
+                    input->mouse_pan = false;
+                } break;
             case SDL_MOUSEMOTION:
                 mouse_move_fn (&pilots[kbd_pilot_idx],
                                &event.motion);

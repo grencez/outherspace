@@ -24,7 +24,13 @@ init_MotionInput (MotionInput* mot)
     mot->use_roll = false;
     UFor( i, 2 )  mot->firing[i] = false;
     mot->lock_drift = false;
-    UFor( i, 2 )  mot->orbit[i] = 0;
+    mot->mouse_orbit = mot->mouse_zoom = mot->mouse_pan = false;
+    mot->zoom = 0;
+    UFor( i, 2 )
+    {
+        mot->pan[i] = 0;
+        mot->orbit[i] = 0;
+    }
 }
 
     void
@@ -156,6 +162,15 @@ update_object_motion (ObjectMotion* motion, const MotionInput* input)
     motion->lock_drift = input->lock_drift;
 }
 
+    /** Width (and height) one screen unit represents
+     * at a certain distance /d/ away.
+     **/
+static real
+screen_mag(const Pilot* p, real d)
+{
+    return 2 * d * tan(.5 * p->view_angle);
+}
+
     /** When not following the racer,
      * this updates camera location and basis.
      **/
@@ -194,35 +209,62 @@ update_camera_location (Pilot* pilot, const MotionInput* input, real dt)
         summ_Point (view_origin, view_origin, &diff);
     }
 
-        /* TODO: Orbit is hard.*/
-#if 0
+    if (input->pan[0] != 0 || input->pan[1] != 0)
+    {
+        Point p;
+        real d, h;
+        real diff[2];
+
+        d = dist_Point (&pilot->view_origin, &pilot->orbit_focus);
+        h = screen_mag (pilot, d);
+
+        UFor( i, 2 )  diff[i] = input->pan[i] * (- h);
+
+        Op_Point_21010( &p
+                        ,+, diff[0]*, &view_basis->pts[UpDim]
+                        ,   diff[1]*, &view_basis->pts[RightDim] );
+        summ_Point (view_origin, view_origin, &p);
+    }
+    if (input->zoom != 0)
+    {
+        const real d = dist_Point (&pilot->view_origin, &pilot->orbit_focus);
+        const real m = d * (- 4 * input->zoom);
+        Op_Point_2010( view_origin
+                       ,+, view_origin
+                       ,   m*, &view_basis->pts[FwdDim] );
+    }
     if (input->orbit[0] != 0 || input->orbit[1] != 0)
     {
+        real rev = sqrt (+ input->orbit[0] * input->orbit[0]
+                         + input->orbit[1] * input->orbit[1]);
+        
+        PointXfrm rot, tilt, B;
+        AffineMap map;
         PointXfrm xfrm;
-        Point tmp;
+        Point p;
 
-        spherical3_PointXfrm (&xfrm,
-                              2 * M_PI * (.25 - input->orbit[0]),
-                              2 * M_PI *        input->orbit[1]);
-        zero_Point (&tmp);
-        tmp.coords[ForwardDim] = 1;
-        xfrm_Point (&tmp, &xfrm, &tmp);
+        rotn_PointXfrm (&rot, UpDim, FwdDim, -rev);
+        rotn_PointXfrm (&tilt, UpDim, RightDim,
+                        - atan2_real (input->orbit[1], input->orbit[0]));
 
-        output_Point (stderr, &tmp);
-        fputc ('\n', stderr);
+        identity_AffineMap (&map);
+        transpose_PointXfrm (&map.xfrm, view_basis);
+        map.xlat = *view_origin;
 
-        identity_PointXfrm (&xfrm);
-        stable_orthorotate_PointXfrm (&xfrm, &xfrm,
-                                      &tmp, ForwardDim);
-            /* I think it's good up till here.*/
+        xfrmtr_PointXfrm (&B, &tilt, &map.xfrm);
 
-        xfrmtr_PointXfrm (&tmp_basis, &xfrm, view_basis);
-        trxfrm_PointXfrm (&xfrm, &tmp_basis, &xfrm);
+        negate_Point (&p, &pilot->orbit_focus);
+        xlat_AffineMap (&map, &p, &map);
 
-        diff_Point (&tmp, &pilot->orbit_focus, view_origin);
-        xfrm_Point (&tmp, &xfrm, &tmp);
-        summ_Point (view_origin, &tmp, &pilot->orbit_focus);
+        trxfrm_PointXfrm (&xfrm, &B, &rot);
+        xfrm_PointXfrm (&xfrm, &xfrm, &B);
+        xfrm_AffineMap (&map, &xfrm, &map);
 
+        xlat_AffineMap (&map, &pilot->orbit_focus, &map);
+
+        orthonormalize_PointXfrm (&xfrm, &map.xfrm);
+        transpose_PointXfrm (view_basis, &xfrm);
+        *view_origin = map.xlat;
 
         /*
         fprintf (stderr, "orbit: %f %f\n",
@@ -231,7 +273,6 @@ update_camera_location (Pilot* pilot, const MotionInput* input, real dt)
             /* output_Point (stderr, &pilot->orbit_focus); */
             /* fputc ('\n', stderr); */
     }
-#endif
     
         /* TODO: This is never true because of /FollowRacer/.*/
     if (NDimensions == 4 && FollowRacer)

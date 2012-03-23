@@ -41,7 +41,12 @@ struct MotionInput
     bool use_roll;
     bool firing[2];
     bool lock_drift;
+    bool mouse_orbit;
+    bool mouse_zoom;
+    bool mouse_pan;
     real orbit[2];
+    real zoom;
+    real pan[2];
 };
 
 struct RaceCraft
