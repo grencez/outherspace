@@ -2,23 +2,10 @@
 #ifndef UTIL_H_
 #ifndef __OPENCL_VERSION__
 #define UTIL_H_
+#include "cx/def.h"
 
-#include <float.h>
-#include <limits.h>
 #include <stdlib.h>
 #include <stdio.h>
-
-#ifdef _WIN32
-    /* Disable warning: 'fopen' unsafe, use fopen_s instead */
-    /* REF CMakeLists.txt: Define _CRT_SECURE_NO_WARNINGS */
-
-    /* Disable: conditional expression is constant */
-# pragma warning (disable : 4127)
-    /* Disable: conversion from 'uint' to 'real' */
-# pragma warning (disable : 4244)
-    /* Disable: conversion from 'double' to 'float' */
-# pragma warning (disable : 4305)
-#endif
 
 #define Stringify(a) #a
 #define Concatify(a,b) a ## b
@@ -73,10 +60,7 @@
 #define Ceil_uint( a, b ) \
     (((a) + (b) - 1) / (b))
 
-#define ArraySz( a )  sizeof(a) / sizeof(*a)
 
-typedef unsigned int uint;
-typedef unsigned char byte;
 
 typedef unsigned long srand_t;
 
@@ -84,18 +68,6 @@ typedef unsigned long srand_t;
 #define uint32 uint
 #endif
 
-#define NBitsInByte 8
-
-#ifndef COMPILER_HAS_BOOL
-typedef byte bool;
-#define true 1
-#define false 0
-#endif
-
-#if __STDC_VERSION__ < 199901L
-#define inline __inline
-#define restrict __restrict
-#endif
 
 #define __global
 #else  /* ^^^ !defined(__OPENCL_VERSION__) */
@@ -103,10 +75,6 @@ typedef byte bool;
 #define static
 #endif  /* defined(__OPENCL_VERSION__) */
 
-#define BLoop( i, bel )  uint i; for (i = 0; i < (bel); ++i) {
-#define BLose() }
-
-#define UFor( i, bel )  for (i = 0; i < (bel); ++i)
 #define UFr(i, bel, body)  do \
 { \
     uint i; \
@@ -118,45 +86,8 @@ typedef byte bool;
 #define UUFor( i, ibel, j, jbel )  UFor( i, ibel )  UFor( j, jbel )
 
 
-#if 0
-typedef double real;
-#define Max_real DBL_MAX
-#define Min_real (-DBL_MAX)
-#define Small_real DBL_MIN
-#define Epsilon_real DBL_EPSILON
-#define realPackSz 2
-#define GL_REAL GL_DOUBLE
-
-#ifndef M_PI
-#define M_PI 3.14159265358979323846
-#endif
-
-#ifdef DistribCompute
-#define MPI_real MPI_DOUBLE
-#endif
-
-#else
-typedef float real;
-#define Max_real FLT_MAX
-#define Min_real (-FLT_MAX)
-#define Small_real FLT_MIN
-#define Epsilon_real FLT_EPSILON
-#define realPackSz 4
-#define GL_REAL GL_FLOAT
-
-#ifndef M_PI
-#define M_PI 3.14159265358979323846f
-#endif
-
-#ifdef DistribCompute
-#define MPI_real MPI_FLOAT
-#endif
-
-#endif
-
 #define NColors 3
 
-#define Max_uint UINT_MAX
 
 typedef int tristate;
 

@@ -181,7 +181,6 @@ endif
 ifneq (,$(filter c++,$(CONFIG)))
 	CC = $(CXX)
 	#CFLAGS += -fno-rtti
-	CFLAGS += -DCOMPILER_HAS_BOOL
 endif
 ## Allow distributed parallelism.
 ifneq (,$(filter mpi trivialmpi,$(CONFIG)))
