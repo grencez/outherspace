@@ -84,7 +84,7 @@ set_target_properties (file2array PROPERTIES
     PREFIX "" OUTPUT_NAME file2array)
 
 
-set (EmbedSfx, ".embed.h")
+set (EmbedSfx ".embed.h")
 
 add_custom_command (OUTPUT "phong.glsl${EmbedSfx}"
     COMMAND file2array "phong.glsl${EmbedSfx}" phong.vert phong.frag 4d.vert

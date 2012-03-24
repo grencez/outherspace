@@ -4,6 +4,7 @@
 
 #include "bbox.h"
 #include "bitstring.h"
+#include "order.h"
 
 #include <assert.h>
 #include <math.h>
