@@ -498,29 +498,3 @@ tristate mul_signum (tristate a, tristate b)
     return -1;
 }
 
-    /** Really stupid random function... does the trick though.**/
-    real
-random_real (srand_t* seed)
-{
-        /* RAND_MAX assumed to be 32767 */
-    const uint max = 32767;
-    real v;
-    *seed = *seed * 1103515245 + 12345;
-    v = (real) ((*seed/65536) % (max+1)) / (max+1);
-    assert (v >= 0);
-    assert (v < 1);
-    return v;
-}
-
-    uint
-random_uint (srand_t* seed, uint n)
-{
-    return (uint) (n * random_real (seed));
-}
-
-    bool
-random_bool (srand_t* seed)
-{
-    return random_real (seed) < .5;
-}
-

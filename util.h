@@ -28,17 +28,10 @@
     (((capacity) == 0) ? (Type*) 0 : \
      (Type*) malloc ((capacity) * sizeof (Type)))
 
-#if 0
-#define ResizeT( Type, arr, old_capacity, new_capacity )  do \
-{ \
-    if (old_capacity == 0)  (arr) = AllocT( Type, new_capacity ); \
-    else if (new_capacity == 0)  free (arr); \
-    else  (arr) = (Type*) realloc (arr, (new_capacity) * sizeof (Type)); \
-} while (0)
-#else
 #define ResizeT( Type, arr, capacity ) \
-    ((arr) = (Type*) realloc (arr, (capacity) * sizeof (Type)))
-#endif
+    ((arr) = (Type*) ((arr) \
+                      ? realloc (arr, (capacity) * sizeof (Type)) \
+                      : AllocT( Type, capacity )))
 
 #define CopyT( Type, dst, src, lo, count ) \
     (array_cpy (dst, src, lo, count, sizeof (Type)))
@@ -61,9 +54,6 @@
     (((a) + (b) - 1) / (b))
 
 
-
-typedef unsigned long srand_t;
-
 #ifndef uint32
 #define uint32 uint
 #endif
@@ -74,13 +64,6 @@ typedef unsigned long srand_t;
 #define assert (void)
 #define static
 #endif  /* defined(__OPENCL_VERSION__) */
-
-#define UFr(i, bel, body)  do \
-{ \
-    uint i; \
-    UFor( i, bel ) \
-    { body; } \
-} while (0)
 
     /* Does not scope /j/.*/
 #define UUFor( i, ibel, j, jbel )  UFor( i, ibel )  UFor( j, jbel )
@@ -127,12 +110,6 @@ bool
 approx_eql (real expect, real result, real large, real mul);
 tristate signum_real (real a);
 tristate mul_signum (tristate a, tristate b);
-real
-random_real (srand_t* seed);
-uint
-random_uint (srand_t* seed, uint n);
-bool
-random_bool (srand_t* seed);
 
 #ifdef NDEBUG
 #define AssertApprox( expect, result, large, mul )

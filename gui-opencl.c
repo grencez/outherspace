@@ -215,9 +215,9 @@ init_opencl_data ()
     AssertStatus( err, "create compute kernel" );
 
 #ifndef EmbedFiles
-    UFr(i, nfiles,
+    { BLoop( i, nfiles )
         free (files_bytes[i]);
-       );
+    } BLose()
 #endif
 }
 

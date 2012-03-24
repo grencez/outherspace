@@ -4,6 +4,7 @@
 #include "kdtree.h"
 #include "kptree.h"
 #include "order.h"
+#include "random.h"
 #include "scene.h"
 #include "slist.h"
 #include "util.h"
@@ -278,30 +279,34 @@ static
     void
 verifn_orthorotate_PointXfrm (uint npids, uint pidx)
 {
+    GMRand gmrand;
     uint i, n;
     n = 1 << 20;
+
+    init_GMRand (&gmrand);
+    step_GMRand (&gmrand, pidx);
 
     for (i = pidx; i < n; i += npids)
     {
         PointXfrm A;
         Point v;
-        srand_t seed;
         uint j;
         real det;
-        seed = i;
 
-        random_bool (&seed);
         identity_PointXfrm (&A);
 
         UFor( j, NDimensions )
         {
-            v.coords[j] = random_real (&seed);
-            if (random_bool (&seed))
+            v.coords[j] = real_GMRand (&gmrand);
+            step_GMRand (&gmrand, npids-1);
+            if (bool_GMRand (&gmrand))
                 v.coords[j] = - v.coords[j];
+            step_GMRand (&gmrand, npids-1);
         }
 
         stable_orthorotate_PointXfrm (&A, &A, &v,
-                                      random_uint (&seed, NDimensions));
+                                      uint_GMRand (&gmrand, NDimensions));
+        step_GMRand (&gmrand, npids-1);
         det = det_PointXfrm (&A);
             /* fprintf (stderr, "det:%.32f\n", det); */
         AssertApprox( 1, det, NDimensions, 2e0 );

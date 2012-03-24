@@ -259,9 +259,9 @@ init_ogl_ui_data ()
 #endif
 
 #ifndef EmbedFiles
-    UFr(i, nfiles,
+    { BLoop( i, nfiles )
         free (files_bytes[i]);
-       );
+    } BLose()
 #endif
 }
 
