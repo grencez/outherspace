@@ -28,7 +28,7 @@ setup_box_lights (RaySpace* space,
                   const PointLightSource* light,
                   const BoundingBox* box);
 
-#ifdef INCLUDE_SOURCE
+#ifdef IncludeC
 #include "dynamic-setup.c"
 #endif
 #endif

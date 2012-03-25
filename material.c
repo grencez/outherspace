@@ -16,6 +16,7 @@ void init_Material (Material* mat)
         mat->ambient[i] = 0.2;
         mat->diffuse[i] = 0.8;
         mat->specular[i] = 1;
+        mat->emissive[i] = 0;
         mat->transmission[i] = 1;
     }
 
@@ -26,6 +27,7 @@ void init_Material (Material* mat)
     mat->ambient_texture = Max_uint;
     mat->diffuse_texture = Max_uint;
     mat->specular_texture = Max_uint;
+    mat->emissive_texture = Max_uint;
     mat->bump_texture = Max_uint;
 }
 

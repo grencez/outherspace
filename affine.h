@@ -47,7 +47,7 @@ xlat_AffineMap (AffineMap* B, const Point* x, const AffineMap* A);
 void
 xfrm_AffineMap (AffineMap* C, const PointXfrm* A, const AffineMap* B);
 
-#ifdef INCLUDE_SOURCE
+#ifdef IncludeC
 #include "affine.c"
 #endif
 #endif

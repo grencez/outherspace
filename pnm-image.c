@@ -1,4 +1,5 @@
 
+#include "cx/fileb.h"
 #include "pnm-image.h"
 
 #include <string.h>
@@ -118,19 +119,17 @@ readin_PPM_image (uint* ret_nrows, uint* ret_ncols,
     uint row, nrows = 0, ncols = 0;
     bool good = true;
     byte* pixels;
-    const uint capacity = BUFSIZ;
-    char buf[BUFSIZ];
-    uint len;
     const char* line;
-    FILE* in;
+    FileB st_in;  FileB* const in = &st_in;
     uint max_color_value = 255;
     uint header_stage;
     real t0;
 
     t0 = monotime ();
 
-    in = fopen_path (pathname, filename, "rb");
-    if (!in)
+    init_FileB (in);
+    in->f = fopen_path (pathname, filename, "rb");
+    if (!in->f)
     {
         fprintf (stderr, "Cannot open file for reading:%s/%s\n",
                  pathname, filename);
@@ -139,11 +138,12 @@ readin_PPM_image (uint* ret_nrows, uint* ret_ncols,
 
 
     header_stage = 0;
-    while (good && header_stage < 3)
+    while (good && header_stage < 3 && getline_FileB (in))
     {
-        line = fgets (buf, capacity, in);
-        strstrip_eol (buf);
-        line = strskip_ws (line);
+        FileB st_olay;  FileB* const olay = &st_olay;
+        olay_FileB (olay, in);
+        skipds_FileB (olay, 0);
+        line = olay->buf.s;
 
         if (line[0] == '#')
         {
@@ -174,14 +174,12 @@ readin_PPM_image (uint* ret_nrows, uint* ret_ncols,
 
     if (!good)
     {
-        fclose (in);
+        close_FileB (in);
         return 0;
     }
 
     pixels = AllocT( byte, nrows * ncols * NColors );
     
-    len = capacity - 1;
-    line = buf + len;
     UFor( row, nrows )
     {
         uint col;
@@ -195,27 +193,21 @@ readin_PPM_image (uint* ret_nrows, uint* ret_ncols,
             UFor( i, NColors )
             {
                 uint x;
-                if (line == buf + len)
-                {
-                    len = readin_whitesep (buf, in, capacity, len);
-                    line = buf;
-                }
-
-                line = strto_uint (&x, line);
-                if (line)
+                line = nextok_FileB (in, 0, 0);
+                if (line && strto_uint (&x, line))
                 {
                     pixcell[i] = (byte) (256 * x / (max_color_value+1));
                 }
                 else
                 {
-                    fclose (in);
+                    close_FileB (in);
                     return 0;
                 }
             }
         }
     }
 
-    fclose (in);
+    close_FileB (in);
 
     if (good)
     {

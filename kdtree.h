@@ -100,7 +100,7 @@ build_trivial_KDTree (KDTree* tree, uint nelems, const BoundingBox* box);
 void
 build_KDTree (KDTree* tree, KDTreeGrid* grid, const Simplex* elems);
 
-#ifdef INCLUDE_SOURCE
+#ifdef IncludeC
 #include "kdtree.c"
 #endif
 #endif  /* #ifndef __OPENCL_VERSION__ */

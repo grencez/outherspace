@@ -72,7 +72,7 @@ hit_BarySimplex (real* restrict ret_dist,
 
 #ifndef __OPENCL_VERSION__
 void output_Simplex (FILE* out, const Simplex* elem);
-#ifdef INCLUDE_SOURCE
+#ifdef IncludeC
 #include "simplex.c"
 #endif
 #endif  /* #ifndef __OPENCL_VERSION__ */

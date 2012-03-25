@@ -1,10 +1,10 @@
 
 #include "affine.h"
 #include "bitstring.h"
+#include "gmrand.h"
 #include "kdtree.h"
 #include "kptree.h"
 #include "order.h"
-#include "random.h"
 #include "scene.h"
 #include "slist.h"
 #include "util.h"

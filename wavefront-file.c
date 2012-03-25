@@ -465,6 +465,10 @@ readin_materials (SList* matlist, SList* namelist,
         {
             good = strto_real_colors (material->specular, line);
         }
+        else if (AccepTok( line, "Ke" ))
+        {
+            good = strto_real_colors (material->emissive, line);
+        }
         else if (AccepTok( line, "map_Ka" ))
         {
             material->ambient_texture =
@@ -487,6 +491,14 @@ readin_materials (SList* matlist, SList* namelist,
                 parse_texture (texlist, texnamelist,
                                pathname, strskip_ws (line));
             if (material->specular_texture == Max_uint)
+                good = false;
+        }
+        else if (AccepTok( line, "map_Ke" ))
+        {
+            material->bump_texture =
+                parse_texture (texlist, texnamelist,
+                               pathname, strskip_ws (line));
+            if (material->emissive_texture == Max_uint)
                 good = false;
         }
         else if (AccepTok( line, "map_Bump" ))

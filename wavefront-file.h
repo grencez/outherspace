@@ -11,7 +11,7 @@ output_wavefront (const Scene* scene,
 bool
 readin_wavefront (Scene* scene, const char* pathname, const char* filename);
 
-#ifdef INCLUDE_SOURCE
+#ifdef IncludeC
 #include "wavefront-file.c"
 #endif
 #endif

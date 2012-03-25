@@ -45,11 +45,6 @@
 #define ConcaT( Type, dst, src, end, count ) \
     ((dst) = (Type*) array_cat (dst, src, &end, count, sizeof (Type)))
         
-#define AccepTok( line, tok ) \
-    ((0 == strncmp ((line), (tok), strlen(tok))) \
-     ? ((line) = &(line)[strlen(tok)]) \
-     : 0)
-
 #define Ceil_uint( a, b ) \
     (((a) + (b) - 1) / (b))
 
@@ -121,7 +116,7 @@ tristate mul_signum (tristate a, tristate b);
     assert_status (stat, msg, __FILE__, __LINE__)
 #endif
 
-#define AssertEq( expect, result )  assert ((expect) == (result))
+#define AssertEq( a, b )  Claim2( a ,==, b )
 #define AssertEqA( N, expect, result, off_expect, off_result )  do \
 { \
     uint AssertEqA_i; \
@@ -166,7 +161,7 @@ readin_files (uint nfiles, uint* files_nbytes, byte** files_bytes,
               const char* const* files);
 real monotime ();
 void assert_status (int stat, const char* msg, const char* file, int line);
-#ifdef INCLUDE_SOURCE
+#ifdef IncludeC
 #include "util.c"
 #endif
 #endif  /* #ifndef __OPENCL_VERSION__ */

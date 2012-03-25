@@ -79,7 +79,7 @@ reflect_Point (Point* refl, const Point* p,
 
 #ifndef __OPENCL_VERSION__
 void output_Point (FILE* out, const Point* point);
-#ifdef INCLUDE_SOURCE
+#ifdef IncludeC
 #include "space.c"
 #endif
 #endif  /* #ifndef __OPENCL_VERSION__ */

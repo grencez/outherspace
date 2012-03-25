@@ -455,7 +455,7 @@ ogl_redraw (const RaySpace* space, uint pilot_idx)
     uint i;
     uint height, width;
     const Pilot* pilot;
-    real near_mag = 0.1, far_mag = 0;
+    real near_mag = 0.01, far_mag = 0;
     Ray ray;
 
     pilot = &pilots[pilot_idx];

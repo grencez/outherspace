@@ -31,6 +31,7 @@ set (CSources
     util.c
     wavefront-file.c
     xfrm.c
+    cx/fileb.c
     )
 
 set (GuiName gui)

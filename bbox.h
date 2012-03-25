@@ -67,7 +67,7 @@ trxfrm_BoundingBox (BoundingBox* dst,
 
 #ifndef __OPENCL_VERSION__
 void output_BoundingBox (FILE* out, const BoundingBox* box);
-#ifdef INCLUDE_SOURCE
+#ifdef IncludeC
 #include "bbox.c"
 #endif
 #endif  /* #ifndef __OPENCL_VERSION__ */

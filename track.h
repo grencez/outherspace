@@ -27,7 +27,7 @@ init_Track (Track* track);
 void
 cleanup_Track (Track* track);
 
-#ifdef INCLUDE_SOURCE
+#ifdef IncludeC
 #include "track.c"
 #endif
 #endif

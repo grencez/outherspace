@@ -33,7 +33,7 @@ condense_lexi_reals (uint* jumps, uint* indices, real* coords,
                      uint n, uint ndims, const real* lexis);
 void
 shuffle_jump_table (uint n, uint* jumps, uint* indices);
-#ifdef INCLUDE_SOURCE
+#ifdef IncludeC
 #include "order.c"
 #endif
 #endif

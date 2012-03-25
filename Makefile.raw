@@ -80,7 +80,7 @@ else
 	CFLAGS += -Wall -Wextra
 endif
 
-DFLAGS += -DINCLUDE_SOURCE
+DFLAGS += -DIncludeC
 
 ifneq (,$(filter image,$(CONFIG)))
 	GuiDFlags += -DSupportImage
@@ -288,7 +288,8 @@ CSources = affine.c \
 		   track.c \
 		   util.c \
 		   wavefront-file.c \
-		   xfrm.c
+		   xfrm.c \
+		   cx/fileb.c
 
 ifneq (,$(filter sse,$(CONFIG)))
 	CFLAGS += -msse -msse2
@@ -335,13 +336,13 @@ $(Pfx)perturb.cl$(EmbedSfx): perturb.cl $(Pfx)file2array
 	$(RunPfx)file2array $@ perturb.cl
 
 VerifyCFlags := $(filter-out -fwhole-program,$(CFLAGS))
-VerifyDFlags := $(filter-out -DINCLUDE_SOURCE,$(DFLAGS))
+VerifyDFlags := $(filter-out -DIncludeC,$(DFLAGS))
 VerifyCSources = verif/main.c verif/order.c verif/pack.c
 
 $(Pfx)verify: $(VerifyCSources) $(CSources)
 	$(CC) $(VerifyCFlags) $(VerifyDFlags) -I . $^ -o $@ $(LFLAGS)
 
-$(Pfx)imgdiff: imgdiff.c pnm-image.c
+$(Pfx)imgdiff: imgdiff.c pnm-image.c cx/fileb.c
 	$(CC) $(CFLAGS) $(DFLAGS) -I . $< -o $@ $(LFLAGS)
 
 $(Pfx)file2array: file2array.c util.c

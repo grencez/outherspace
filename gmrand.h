@@ -1,10 +1,13 @@
 
     /** George Marsaglia's fast + simple random number generator.**/
-#ifndef GMRand
-#define GMRand GMRand
+#ifndef GMRand_H_
+#define GMRand_H_
 #include "util.h"
 
+#ifndef GMRand
+#define GMRand GMRand
 typedef struct GMRand GMRand;
+#endif
 struct GMRand {
     uint32 z;
     uint32 w;

@@ -23,6 +23,7 @@ struct Material
     real ambient[NColors]; /* Ka */
     real diffuse[NColors]; /* Kd */
     real specular[NColors]; /* Ks */
+    real emissive[NColors]; /* Ke */
     real transmission[NColors]; /* Tf */
     real opacity; /* d */
     real shininess; /* Ns */
@@ -31,6 +32,7 @@ struct Material
     uint ambient_texture;
     uint diffuse_texture;
     uint specular_texture;
+    uint emissive_texture;
     uint bump_texture;
 };
     
@@ -50,7 +52,7 @@ readin_Texture (Texture* texture, const char* pathname, const char* filename);
 void
 remap_bumps_Texture (Texture* texture, const AffineMap* map);
 
-#ifdef INCLUDE_SOURCE
+#ifdef IncludeC
 #include "material.c"
 #endif
 #endif

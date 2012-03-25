@@ -44,7 +44,7 @@ move_objects (RaySpace* space, ObjectMotion* motions, real dt,
               uint ncheckplanes, const Plane* checkplanes);
 
 #ifndef __OPENCL_VERSION__
-#ifdef INCLUDE_SOURCE
+#ifdef IncludeC
 #include "motion.c"
 #endif
 #endif  /* #ifndef __OPENCL_VERSION__ */

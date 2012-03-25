@@ -16,7 +16,7 @@ mid5_reals (const real a[5])
         if (a[i] == b[2])
             return i;
 
-    assert (0);
+    Claim( 0 );
     return 0;
 }
 
@@ -38,7 +38,7 @@ minimal_unique (uint n, const uint* a)
 
     UFor( i, n )
     {
-        assert (a[i] < n);
+        Claim( a[i] < n );
         if (set1_BitString (hits, a[i]))
             pred = false;
     }
@@ -126,7 +126,7 @@ partition_indexed_reals (uint* indices, uint* ret_q, uint* ret_r,
     uint i, r, n;
     real x;
         /* /q/ must be valid, so the array cannot be empty.*/
-    assert (p < s);
+    Claim( p < s );
     r = s-1;
     swap_uint (&indices[r], &indices[q]);
     x = membs[indices[r]];
@@ -152,7 +152,7 @@ partition_indexed_reals (uint* indices, uint* ret_q, uint* ret_r,
             swap_uint (&indices[r], &indices[i]);
         }
     }
-    assert (p <= q && q <= r && r < s);
+    Claim( p <= q && q <= r && r < s );
     n = s - r;
     UFor( i, n )
         swap_uint (&indices[q+i], &indices[r+i]);
@@ -205,7 +205,7 @@ bubblesort_indexed_reals (uint* indices, uint p, uint s, const real* membs)
                 indices[i] = tj;
                 indices[j] = ti;
                 ti = tj;
-                assert (indices[i] != indices[j]);
+                Claim( indices[i] != indices[j] );
             }
         }
     }
@@ -216,7 +216,7 @@ sort_indexed_reals (uint* indices, uint p, uint s, const real* membs)
 {
     const bool use_quicksort = true;
     uint i;
-    assert (p <= s);
+    Claim( p <= s );
     if (use_quicksort)
         quicksort_indexed_reals (indices, p, s, membs);
     else
@@ -227,7 +227,7 @@ sort_indexed_reals (uint* indices, uint p, uint s, const real* membs)
         uint ti, tj;
         ti = indices[i-1];
         tj = indices[i];
-        assert (membs[ti] <= membs[tj]);
+        Claim( membs[ti] <= membs[tj] );
     }
 }
 
@@ -246,7 +246,7 @@ median5_indexed_reals (uint* indices, const real* membs, uint p, uint s)
         UFor( i, n )
             if (a[n/2] == membs[indices[p+i]])
                 return p+i;
-        assert (0);
+        Claim( 0 );
         return 0;
     }
 
@@ -270,7 +270,7 @@ median5_indexed_reals (uint* indices, const real* membs, uint p, uint s)
 select_indexed_reals (uint* indices, const real* membs,
                       uint p, uint i, uint s)
 {
-    assert (p <= i && i < s);
+    Claim( p <= i && i < s );
     while (p < s)
     {
         uint q, r;
@@ -319,7 +319,7 @@ verify_select_indexed_reals (uint p, uint i, uint s,
         ++ p;
     }
 
-    assert (n == nlo + neq + nhi);
+    Claim( n == nlo + neq + nhi );
     return (nlo <= ith && nhi <= (n - ith - 1));
 }
 
@@ -349,7 +349,7 @@ invert_jump_table (uint n, uint* jumps)
         while (jumps[sweepi] < n)
         {
             uint i0;
-            assert (j < n);
+            Claim( j < n );
 
             i0 = i;
             i = j;
@@ -380,7 +380,7 @@ sort_indexed_lexi_reals (uint* jumps, uint* indices, real* coords,
 {
     uint dim;
 
-    assert (minimal_unique (nmembs, indices));
+    Claim( minimal_unique (nmembs, indices) );
 
     jumps[0] = nmembs;
 
@@ -403,11 +403,11 @@ sort_indexed_lexi_reals (uint* jumps, uint* indices, real* coords,
                 jumps[q] = r;
                 q = r;
             }
-            assert (q == s);
+            Claim( q == s );
         }
     }
 
-    assert (minimal_unique (nmembs, indices));
+    Claim( minimal_unique (nmembs, indices) );
 
     if (nmembs > 0)
     {
@@ -440,7 +440,7 @@ condense_lexi_reals (uint* jumps, uint* indices, real* coords,
     {
         uint r;
         r = jumps[i];
-        assert (i < r);
+        Claim( i < r );
 
         jumps[i] = jumps[q];
         jumps[q] = q;
@@ -477,7 +477,7 @@ condense_lexi_reals (uint* jumps, uint* indices, real* coords,
 
     invert_jump_table (q, jumps);
 
-    assert (minimal_unique (q, jumps));
+    Claim( minimal_unique (q, jumps) );
 
     for (i = q; i < n; ++i)
         AssertEqA( ndims, lexis, lexis,
@@ -498,7 +498,7 @@ condense_lexi_reals (uint* jumps, uint* indices, real* coords,
                    ndims * indices[i],
                    ndims * indices[jumps[i]] );
 
-    assert (minimal_unique (n, indices));
+    Claim( minimal_unique (n, indices) );
 
     return q;
 }
@@ -519,7 +519,7 @@ shuffle_jump_table (uint n, uint* jumps, uint* indices)
         indices[i] = n;  /* Never get info from this location again!*/
         while (pi != i)
         {
-            assert (i < pi);
+            Claim( i < pi );
             swap_uint (&jumps[i], &jumps[pi]);
             swap_uint (&pi, &indices[pi]);
         }

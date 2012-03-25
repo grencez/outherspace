@@ -52,7 +52,7 @@ cleanup_KPTreeGrid (KPTreeGrid* grid);
 void
 build_KPTree (KPTree* tree, KPTreeGrid* grid);
 
-#ifdef INCLUDE_SOURCE
+#ifdef IncludeC
 #include "kptree.c"
 #endif
 #endif  /* #ifndef __OPENCL_VERSION__ */

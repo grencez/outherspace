@@ -88,7 +88,7 @@ ray_from_basis (Point* ret_origin, Point* ret_dir,
 
 #ifndef __OPENCL_VERSION__
 void output_PointXfrm (FILE* out, const PointXfrm* xfrm);
-#ifdef INCLUDE_SOURCE
+#ifdef IncludeC
 #include "xfrm.c"
 #endif
 #endif  /* #ifndef __OPENCL_VERSION__ */

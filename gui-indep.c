@@ -76,16 +76,16 @@ sync_Pilot (Pilot* gui, Pilot* bkg)
         bkg->input.orbit[0] != 0 ||
         bkg->input.orbit[1] != 0)
     {
-        gui->view_origin = bkg->view_origin;
-        gui->view_basis = bkg->view_basis;
+        BSfx( gui,=,bkg, ->view_origin );
+        BSfx( gui,=,bkg, ->view_basis );
     }
     else
     {
-        bkg->view_origin = gui->view_origin;
-        bkg->view_basis = gui->view_basis;
+        BSfx( bkg,=,gui, ->view_origin );
+        BSfx( bkg,=,gui, ->view_basis );
     }
 
-    bkg->input = gui->input;
+    BSfx( bkg,=,gui, ->input );
 
     { BLoop( i, 2 )
         gui->input.orbit[i] = 0;
@@ -93,18 +93,25 @@ sync_Pilot (Pilot* gui, Pilot* bkg)
     } BLose()
     gui->input.zoom = 0;
 
-    gui->image_start_row = bkg->image_start_row;
-    gui->image_start_col = bkg->image_start_col;
-    gui->ray_image = bkg->ray_image;
+    BSfx( gui,=,bkg, ->image_start_row );
+    BSfx( gui,=,bkg, ->image_start_col );
 
-    bkg->stride_magnitude = gui->stride_magnitude;
-    bkg->view_angle = gui->view_angle;
-    bkg->view_width = gui->view_width;
+    {
+        RayImage* g = &gui->ray_image;
+        RayImage* b = &bkg->ray_image;
+        BSfx( b,=,g, ->perspective );
+        BSfx( b,=,g, ->view_light );
+        *g = *b;
+    }
 
-    bkg->up_offset = gui->up_offset;
-    bkg->forward_offset = gui->forward_offset;
+    BSfx( bkg,=,gui, ->stride_magnitude );
+    BSfx( bkg,=,gui, ->view_angle );
+    BSfx( bkg,=,gui, ->view_width );
 
-    bkg->orbit_focus = gui->orbit_focus;
+    BSfx( bkg,=,gui, ->up_offset );
+    BSfx( bkg,=,gui, ->forward_offset );
+
+    BSfx( bkg,=,gui, ->orbit_focus );
 }
 
     void

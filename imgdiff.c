@@ -1,6 +1,6 @@
 
+#include "cx/def.h"
 #include "pnm-image.h"
-#include "util.h"
 
 #include <stdio.h>
 

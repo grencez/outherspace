@@ -2,6 +2,8 @@
 #ifndef __OPENCL_VERSION__
 #include "util.h"
 
+#include "cx/fileb.h"
+
 #include <assert.h>
 #include <ctype.h>
 #include <math.h>
@@ -18,8 +20,6 @@
 #else
 #include <time.h>
 #endif
-
-static const char WhiteSpaceChars[] = " \t\v\r\n";
 
 uint index_of (const void* e, const void* arr, size_t size)
 {
