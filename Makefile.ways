@@ -26,8 +26,8 @@ $(eval \
   $(call Rule,pack,$(strict) pack) \
   $(call Rule,trivialmpi,$(strict) trivialmpi) \
   $(call Rule,mpi,$(strict) mpi) \
-  $(call Rule,opencl,$(strict) opengl opencl,gui) \
-  $(call Rule,/tmp/openclgl,$(strict) embed_files opengl opencl,gui) \
+  $(call Rule,opencl,$(strict) opengl opencl,way-opencl-gui) \
+  $(call Rule,openclgl,$(strict) embed_files opengl opencl,way-openclgl-gui) \
  )
 
 all: $(Pfxs)
