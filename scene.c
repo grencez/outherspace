@@ -2,6 +2,9 @@
 #include "scene.h"
 
 #include "order.h"
+#include "point.h"
+#include "serial.h"
+#include "xfrm.h"
 
 #include <assert.h>
 #include <string.h>

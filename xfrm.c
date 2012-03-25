@@ -2,23 +2,12 @@
 #ifndef __OPENCL_VERSION__
 #include "xfrm.h"
 
+#include "point.h"
+#include "util.h"
+
 #include <assert.h>
 #include <math.h>
 #include <string.h>
-
-void output_PointXfrm (FILE* out, const PointXfrm* xfrm)
-{
-    uint pi;
-    const char* delim = "";
-    fputc ('[', out);
-    UFor( pi, NDimensions )
-    {
-        fputs (delim, out);
-        output_Point (out, &xfrm->pts[pi]);
-        delim = " ";
-    }
-    fputc (']', out);
-}
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
 void zero_PointXfrm (PointXfrm* xfrm)

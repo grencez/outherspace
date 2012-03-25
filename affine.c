@@ -1,6 +1,9 @@
 
 #include "affine.h"
 
+#include "point.h"
+#include "xfrm.h"
+
     void
 identity_AffineMap (AffineMap* map)
 {

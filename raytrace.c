@@ -5,6 +5,8 @@
 #include "bitstring.h"
 #include "order.h"
 #include "raytrace.h"
+#include "point.h"
+#include "xfrm.h"
 
 #include <assert.h>
 #include <math.h>

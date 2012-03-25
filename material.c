@@ -1,7 +1,9 @@
 
 #include "material.h"
 
+#include "point.h"
 #include "pnm-image.h"
+#include "xfrm.h"
 
 #include <math.h>
 #ifdef SupportImage

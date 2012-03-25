@@ -1,26 +1,10 @@
 
 #ifndef __OPENCL_VERSION__
-#include "space.h"
+#include "point.h"
 
 #include <assert.h>
 #include <math.h>
 #include <string.h>
-
-void output_Point (FILE* out, const Point* point)
-{
-    uint ci;
-    const char* delim = "";
-    fputc ('(', out);
-    UFor( ci, NDimensions )
-    {
-            /* fprintf (out, "%s%4.1f", delim, point->coords[ci]); */
-        fprintf (out, "%s%.2f", delim, point->coords[ci]);
-            /* delim = ", "; */
-        delim = " ";
-    }
-    fputc (')', out);
-}
-
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
 

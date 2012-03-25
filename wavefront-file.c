@@ -2,6 +2,7 @@
 #include "wavefront-file.h"
 
 #include "pnm-image.h"
+#include "point.h"
 #include "slist.h"
 
 #include <assert.h>

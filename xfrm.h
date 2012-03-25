@@ -1,22 +1,9 @@
 
-#ifndef XFRM_H_
+#ifndef PointXfrm_H_
 #ifndef __OPENCL_VERSION__
-#define XFRM_H_
+#define PointXfrm_H_
 #include "space.h"
 #endif  /* #ifndef __OPENCL_VERSION__ */
-
-    /* #define ForwardDim (NDimensions - 1) */
-#define UpDim 0
-#define RightDim 1
-#define ForwardDim 2
-#define FwdDim ForwardDim
-
-typedef struct PointXfrm PointXfrm;
-
-struct PointXfrm
-{
-    Point pts[NDimensions];
-};
 
 void zero_PointXfrm (PointXfrm* xfrm);
 void copy_PointXfrm (PointXfrm* dst, const PointXfrm* src);
@@ -86,12 +73,9 @@ ray_from_basis (Point* ret_origin, Point* ret_dir,
                 const Point* dir,
                 const Point* new_centroid);
 
-#ifndef __OPENCL_VERSION__
-void output_PointXfrm (FILE* out, const PointXfrm* xfrm);
 #ifdef IncludeC
 #include "xfrm.c"
 #endif
-#endif  /* #ifndef __OPENCL_VERSION__ */
 
 #endif
 

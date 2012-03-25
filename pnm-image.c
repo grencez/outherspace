@@ -174,7 +174,7 @@ readin_PPM_image (uint* ret_nrows, uint* ret_ncols,
 
     if (!good)
     {
-        close_FileB (in);
+        lose_FileB (in);
         return 0;
     }
 
@@ -200,14 +200,14 @@ readin_PPM_image (uint* ret_nrows, uint* ret_ncols,
                 }
                 else
                 {
-                    close_FileB (in);
+                    lose_FileB (in);
                     return 0;
                 }
             }
         }
     }
 
-    close_FileB (in);
+    lose_FileB (in);
 
     if (good)
     {

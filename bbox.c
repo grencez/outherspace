@@ -2,17 +2,12 @@
 #ifndef __OPENCL_VERSION__
 #include "bbox.h"
 
+#include "point.h"
+#include "xfrm.h"
+
 #include <assert.h>
 #include <math.h>
 #include <string.h>
-
-void output_BoundingBox (FILE* out, const BoundingBox* box)
-{
-    fputs ("BoundingBox: ", out);
-    output_Point (out, &box->min);
-    fputs (" to ", out);
-    output_Point (out, &box->max);
-}
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
     void

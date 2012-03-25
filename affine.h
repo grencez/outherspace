@@ -1,7 +1,7 @@
 
-#ifndef AFFINE_H_
-#define AFFINE_H_
-#include "xfrm.h"
+#ifndef AffineMap_H_
+#define AffineMap_H_
+#include "space.h"
 
 typedef struct AffineMap AffineMap;
 

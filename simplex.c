@@ -2,22 +2,12 @@
 #ifndef __OPENCL_VERSION__
 #include "simplex.h"
 
+#include "point.h"
+#include "util.h"
+#include "xfrm.h"
+
 #include <assert.h>
 #include <math.h>
-
-void output_Simplex (FILE* out, const Simplex* elem)
-{
-    uint pi;
-    const char* delim = "";
-    fputc ('[', out);
-    UFor( pi, NDimensions )
-    {
-        fputs (delim, out);
-        output_Point (out, &elem->pts[pi]);
-        delim = " ";
-    }
-    fputc (']', out);
-}
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
 #if NDimensions != 4

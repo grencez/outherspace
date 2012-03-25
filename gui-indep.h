@@ -8,7 +8,10 @@
 #include "dynamic-setup.h"
 #include "motion.h"
 #include "pnm-image.h"
+#include "point.h"
+#include "serial.h"
 #include "testcase.h"
+#include "xfrm.h"
 
 #include <math.h>
 

@@ -1,37 +1,9 @@
 
-#ifndef SIMPLEX_H_
+#ifndef Simplex_H_
 #ifndef __OPENCL_VERSION__
-#define SIMPLEX_H_
-#include "xfrm.h"
+#define Simplex_H_
+#include "space.h"
 #endif  /* #ifndef __OPENCL_VERSION__ */
-
-typedef struct Simplex Simplex;
-typedef struct Plane Plane;
-typedef struct BaryPoint BaryPoint;
-typedef struct BarySimplex BarySimplex;
-
-struct Simplex
-{
-    Point pts[NDimensions];
-};
-
-struct Plane
-{
-    real offset;
-    Point normal;
-};
-
-struct BaryPoint
-{
-    real coords[NDimensions-1];
-};
-
-struct BarySimplex
-{
-    Plane plane;
-    Plane barys[NDimensions-1];
-};
-
 
 bool
 hit_Simplex (real* restrict ret_dist,
@@ -70,12 +42,9 @@ hit_BarySimplex (real* restrict ret_dist,
                  const Ray* restrict ray,
                  const BarySimplex* restrict elem);
 
-#ifndef __OPENCL_VERSION__
-void output_Simplex (FILE* out, const Simplex* elem);
 #ifdef IncludeC
 #include "simplex.c"
 #endif
-#endif  /* #ifndef __OPENCL_VERSION__ */
 
 #endif
 

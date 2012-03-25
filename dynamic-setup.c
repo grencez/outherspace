@@ -1,6 +1,7 @@
 
 #include "dynamic-setup.h"
 
+#include "point.h"
 #include "slist.h"
 #include "wavefront-file.h"
 

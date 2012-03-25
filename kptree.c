@@ -2,6 +2,7 @@
 #ifndef __OPENCL_VERSION__
 #include "kptree.h"
 #include "order.h"
+#include "point.h"
 #include "slist.h"
 
 #include <assert.h>

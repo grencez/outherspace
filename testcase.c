@@ -3,7 +3,10 @@
 
 #include "dynamic-setup.h"
 #include "motion.h"
+#include "point.h"
+#include "serial.h"
 #include "wavefront-file.h"
+#include "xfrm.h"
 
 #include <assert.h>
 

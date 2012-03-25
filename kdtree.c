@@ -4,6 +4,8 @@
 
 #include "bitstring.h"
 #include "order.h"
+#include "point.h"
+#include "serial.h"
 #include "slist.h"
 
 #include <assert.h>

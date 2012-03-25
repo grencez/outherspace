@@ -2,16 +2,9 @@
 #ifndef BBOX_H_
 #ifndef __OPENCL_VERSION__
 #define BBOX_H_
-#include "xfrm.h"
+#include "space.h"
+#include "util.h"
 #endif  /* #ifndef __OPENCL_VERSION__ */
-
-typedef struct BoundingBox BoundingBox;
-
-struct BoundingBox
-{
-    Point min;
-    Point max;
-};
 
 void
 zero_BoundingBox (BoundingBox* box);
@@ -65,12 +58,9 @@ trxfrm_BoundingBox (BoundingBox* dst,
                     const BoundingBox* box,
                     const Point* new_centroid);
 
-#ifndef __OPENCL_VERSION__
-void output_BoundingBox (FILE* out, const BoundingBox* box);
 #ifdef IncludeC
 #include "bbox.c"
 #endif
-#endif  /* #ifndef __OPENCL_VERSION__ */
 
 #endif
 

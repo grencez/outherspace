@@ -5,6 +5,8 @@
 #include "bbox.h"
 #include "bitstring.h"
 #include "order.h"
+#include "point.h"
+#include "serial.h"
 
 #include <assert.h>
 #include <math.h>
