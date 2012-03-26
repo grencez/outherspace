@@ -230,7 +230,7 @@ update_camera_location (Pilot* pilot, const MotionInput* input, real dt)
         real diff[2];
         Plane w;
 
-        init_Plane (&w, &view_basis->pts[FwdDim], view_origin);
+        init_Plane (&w, &view_basis->pts[FoDim], view_origin);
         d = dist_Plane (&w, &pilot->orbit_focus);
 
         h = screen_mag (pilot, d);
@@ -247,12 +247,12 @@ update_camera_location (Pilot* pilot, const MotionInput* input, real dt)
         real d, m;
         Plane w;
 
-        init_Plane (&w, &view_basis->pts[FwdDim], view_origin);
+        init_Plane (&w, &view_basis->pts[FoDim], view_origin);
         d = dist_Plane (&w, &pilot->orbit_focus);
         m = d * (- 4 * input->zoom);
         Op_Point_2010( view_origin
                        ,+, view_origin
-                       ,   m*, &view_basis->pts[FwdDim] );
+                       ,   m*, &view_basis->pts[FoDim] );
     }
     if (input->orbit[0] != 0 || input->orbit[1] != 0)
     {
@@ -264,7 +264,7 @@ update_camera_location (Pilot* pilot, const MotionInput* input, real dt)
 
         rev = sqrt (+ input->orbit[0] * input->orbit[0]
                     + input->orbit[1] * input->orbit[1]);
-        rotn_PointXfrm (&rot, UpDim, FwdDim, -rev);
+        rotn_PointXfrm (&rot, UpDim, FoDim, -rev);
         rotation_PointXfrm (&tilt, UpDim, RightDim,
                             - atan2_real (input->orbit[1], input->orbit[0]));
 

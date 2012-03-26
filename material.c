@@ -82,7 +82,7 @@ map_Texture (real* colors, const Texture* texture, const BaryPoint* p)
     pixels = &texture->pixels[texture->pixelsz * i];
 
     UFor( i, NColors )
-        colors[i] = pixels[i] / 255;
+        colors[i] = pixels[i] * (1.0 / 255);
     return (texture->alpha ? (real) pixels[3] / 255 : 1);
 }
 

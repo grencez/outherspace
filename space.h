@@ -26,11 +26,17 @@ struct Ray
     Point direct;
 };
 
-    /* #define ForwardDim (NDims - 1) */
+#if 0
+#define FoDim 0
+#define UpDim 1
+#define RiDim 2
+#else
 #define UpDim 0
-#define RightDim 1
-#define ForwardDim 2
-#define FwdDim ForwardDim
+#define RiDim 1
+#define FoDim 2
+#endif
+#define ForwardDim FoDim
+#define RightDim RiDim
 
 typedef struct PointXfrm PointXfrm;
 

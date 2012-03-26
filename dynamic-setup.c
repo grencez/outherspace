@@ -516,10 +516,10 @@ parse_coord_system (PointXfrm* a, const char* line)
 
         if      (AccepTok( line, "up" ))     d = 2 * UpDim;
         else if (AccepTok( line, "down" ))   d = 2 * UpDim + 1;
-        else if (AccepTok( line, "right" ))  d = 2 * RightDim;
-        else if (AccepTok( line, "left" ))   d = 2 * RightDim + 1;
-        else if (AccepTok( line, "for" ))    d = 2 * ForwardDim;
-        else if (AccepTok( line, "back" ))   d = 2 * ForwardDim + 1;
+        else if (AccepTok( line, "right" ))  d = 2 * RiDim;
+        else if (AccepTok( line, "left" ))   d = 2 * RiDim + 1;
+        else if (AccepTok( line, "for" ))    d = 2 * FoDim;
+        else if (AccepTok( line, "back" ))   d = 2 * FoDim + 1;
 
         good = (d < Max_uint);
         if (good)
@@ -532,8 +532,8 @@ parse_coord_system (PointXfrm* a, const char* line)
     if (good)
     {
         assert (cover[UpDim]);
-        assert (cover[RightDim]);
-        assert (cover[ForwardDim]);
+        assert (cover[RiDim]);
+        assert (cover[FoDim]);
         permutation_PointXfrm (a, perms);
     }
 

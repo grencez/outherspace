@@ -496,7 +496,7 @@ readin_materials (SList* matlist, SList* namelist,
         }
         else if (AccepTok( line, "map_Ke" ))
         {
-            material->bump_texture =
+            material->emissive_texture =
                 parse_texture (texlist, texnamelist,
                                pathname, strskip_ws (line));
             if (material->emissive_texture == Max_uint)

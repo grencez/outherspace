@@ -596,7 +596,7 @@ mouse_down_fn (Pilot* pilot,
                 uint i;
 
                 init_Plane (&plane,
-                            &pilot->view_basis.pts[FwdDim],
+                            &pilot->view_basis.pts[FoDim],
                             &pilot->view_origin);
                 d = dist_Plane (&plane, &pilot->orbit_focus);
                 mag = screen_mag (pilot, d);
@@ -609,11 +609,11 @@ mouse_down_fn (Pilot* pilot,
                 }
 
                 isect = pilot->view_origin;
-                scale_Point (&p, &pilot->view_basis.pts[FwdDim], d);
+                scale_Point (&p, &pilot->view_basis.pts[FoDim], d);
                 summ_Point (&isect, &isect, &p);
                 scale_Point (&p, &pilot->view_basis.pts[UpDim], diff[0]);
                 summ_Point (&isect, &isect, &p);
-                scale_Point (&p, &pilot->view_basis.pts[RightDim], diff[1]);
+                scale_Point (&p, &pilot->view_basis.pts[RiDim], diff[1]);
                 summ_Point (&isect, &isect, &p);
             }
             pilot->orbit_focus = isect;

@@ -455,7 +455,7 @@ ogl_redraw (const RaySpace* space, uint pilot_idx)
     uint i;
     uint height, width;
     const Pilot* pilot;
-    real near_mag = 0.01, far_mag = 0;
+    real near_mag = 0, far_mag = 0;
     Ray ray;
 
     pilot = &pilots[pilot_idx];
@@ -470,10 +470,10 @@ ogl_redraw (const RaySpace* space, uint pilot_idx)
                 width, height);
 
         /* Clear the depth buffer. */
-    glClear (GL_DEPTH_BUFFER_BIT);
+    glClear (GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 
-    copy_Point (&ray.origin, &pilot->view_origin);
-    copy_Point (&ray.direct, &pilot->view_basis.pts[ForwardDim]);
+    ray.origin = pilot->view_origin;
+    ray.direct = pilot->view_basis.pts[FoDim];
 
     UFor( i, 3 )
     {
@@ -485,6 +485,7 @@ ogl_redraw (const RaySpace* space, uint pilot_idx)
 
         if (m > 0)  far_mag += m;
     }
+    near_mag = far_mag / 1000;
 
 
     glMatrixMode (GL_PROJECTION);
