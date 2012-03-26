@@ -2,9 +2,7 @@
 #ifndef __OPENCL_VERSION__
 #include "point.h"
 
-#include <assert.h>
 #include <math.h>
-#include <string.h>
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
 
@@ -63,13 +61,20 @@ quot1_Point (Point* dst, const Point* src, real x)
     Op_20s( real, NDimensions, dst->coords ,/, src->coords , x );
 }
 
+    /** /dst = origin + direct * mag/ **/
+    void
+follow_Point (Point* dst, const Point* origin, const Point* direct, real mag)
+{
+    Op_2020s( real, NDims, dst->coords
+              ,+, origin->coords
+              ,   *, direct->coords
+              ,      mag );
+}
+
     void
 follow_Ray (Point* isect, const Ray* ray, real mag)
 {
-    Op_2020s( real, NDims, isect->coords
-              ,+, ray->origin.coords
-              ,   *, ray->direct.coords
-              ,      mag );
+    follow_Point (isect, &ray->origin, &ray->direct, mag);
 }
 
 void zero_Point (Point* a)
@@ -123,6 +128,16 @@ checker_negate_Point (Point* p)
 magnitude_Point (const Point* a)
 {
     return sqrt (dot_Point (a, a));
+}
+
+    real
+taximag_Point (const Point* a)
+{
+    real sum = 0;
+    { BLoop( i, NDims )
+        sum += fabs (a->coords[i]);
+    } BLose()
+    return sum;
 }
 
     real

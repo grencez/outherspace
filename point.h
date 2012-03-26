@@ -25,6 +25,8 @@ reci_Point (Point* dst, const Point* src);
 void
 quot1_Point (Point* dst, const Point* src, real x);
 void
+follow_Point (Point* dst, const Point* origin, const Point* direct, real mag);
+void
 follow_Ray (Point* isect, const Ray* ray, real mag);
 void
 zero_Point (Point* a);
@@ -36,6 +38,8 @@ void
 checker_negate_Point (Point* p);
 real
 magnitude_Point (const Point* a);
+real
+taximag_Point (const Point* a);
 real
 dist_Point (const Point* a, const Point* b);
 void

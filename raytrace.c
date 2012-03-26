@@ -619,37 +619,9 @@ map_vertex_normal (Point* normal,
     UFor( i, NDimensions )
     {
         assert (elem->vnmls[i] != Max_uint);
-        Op_Point_2010( normal
-                       ,+, normal
-                       ,   bpoint->coords[i]*, &vnmls[elem->vnmls[i]] );
+        follow_Point (normal, normal, &vnmls[elem->vnmls[i]],
+                      bpoint->coords[i]);
     }
-}
-
-    /* TODO: Make this function useful.*/
-    void
-map_isect_height (Point* ret_isect,
-                  const Point* isect,
-                  const Point* bpoint,
-                  const SceneElement* elem,
-                  const Point* verts,
-                  const Point* vnmls)
-{
-    uint i;
-    Point tmp_isect;
-    zero_Point (&tmp_isect);
-    UFor( i, NDimensions )
-    {
-        Point tmp;
-        Plane plane;
-        assert (elem->vnmls[i] != Max_uint);
-        copy_Point (&plane.normal, &vnmls[elem->vnmls[i]]);
-        plane.offset = - dot_Point (&plane.normal, &verts[elem->verts[i]]);
-        proj_Plane (&tmp, isect, &plane);
-        Op_Point_2010( &tmp_isect
-                       ,+, &tmp_isect
-                       ,   bpoint->coords[i]*, &tmp);
-    }
-    copy_Point (ret_isect, &tmp_isect);
 }
 
 static
@@ -662,7 +634,7 @@ ray_to_ObjectRaySpace (Point* ret_origin,
                        uint objidx)
 {
     const ObjectRaySpace* object;
-    assert (objidx <= space->nobjects);
+    Claim2( objidx ,<=, space->nobjects );
     if (objidx < space->nobjects)
     {
         object = &space->objects[objidx];
@@ -674,8 +646,8 @@ ray_to_ObjectRaySpace (Point* ret_origin,
     else
     {
         object = &space->main;
-        copy_Point (ret_origin, origin);
-        copy_Point (ret_dir, dir);
+        *ret_origin = *origin;
+        *ret_dir = *dir;
     }
     return object;
 }
@@ -920,13 +892,7 @@ fill_pixel (real* ret_colors,
          * In the end, a very small factor relating to floating point precision
          * is multiplied on, so we should get a small offset magnitude.
          */
-    offset = 1;
-    UFor( i, NDimensions )
-    {
-        if (origin->coords[i] < 0)  offset -= origin->coords[i];
-        else                        offset += origin->coords[i];
-    }
-    offset *= offset_factor;
+    offset = (1 + taximag_Point (origin)) * offset_factor;
 
     object = ray_to_ObjectRaySpace (&rel_origin, &rel_dir,
                                     origin, dir, space, objidx);
@@ -971,7 +937,7 @@ fill_pixel (real* ret_colors,
     if (compute_bary_coords)
     {
         Point rel_isect;
-        Op_Point_2010( &rel_isect ,+, &rel_origin ,mag*, &rel_dir );
+        follow_Point (&rel_isect, &rel_origin, &rel_dir, mag);
         barycentric_Point (&bpoint, &rel_isect, simplex);
 
         if (elem->txpts[0] < Max_uint)
@@ -1053,21 +1019,9 @@ fill_pixel (real* ret_colors,
         UFor( i, NColors )
             dscale[i] = sscale[i] = 0;
 
-        scale_Point (&refldir, &normal, 2 * cos_normal);
-        summ_Point (&refldir, dir, &refldir);
+        follow_Point (&refldir, dir, &normal, 2 * cos_normal);
 
-        Op_Point_2010( &isect ,+, origin ,mag*, dir );
-        if (false && compute_bary_coords && 0 < scene->nvnmls)
-        {
-            real tmag;
-                /* TODO: Will proper bump mapping ever happen?*/
-            map_isect_height (&isect, &isect, &bpoint,
-                              elem, scene->verts, scene->vnmls);
-            if (hit_Plane (&tmag, &isect, &refldir, &simplex->plane))
-                Op_Point_2010( &isect
-                               ,+, &isect
-                               ,   tmag*, &refldir );
-        }
+        follow_Point (&isect, origin, dir, mag);
 
         UFor( i, space->nlights )
         {
@@ -1089,7 +1043,7 @@ fill_pixel (real* ret_colors,
                 Point tmp_origin;
 
                 offset_magtolight = magtolight - offset;
-                Op_Point_2010( &tmp_origin ,-, &isect ,offset*, dir );
+                follow_Point (&tmp_origin, &isect, dir, - offset);
 
                 if (cast_to_light (space, &tmp_origin, &tolight,
                                    offset_magtolight))
@@ -1133,7 +1087,7 @@ fill_pixel (real* ret_colors,
             refraction_ray (&tmp_dir, dir, &normal,
                             material->optical_density, hit_front, cos_normal);
 
-            Op_Point_2010( &tmp_origin ,+, &isect ,offset*, &tmp_dir );
+            follow_Point (&tmp_origin, &isect, &tmp_dir, offset);
             cast_colors (colors, space, image, &tmp_origin, &tmp_dir,
                          factors, nbounces);
         }
@@ -1144,7 +1098,7 @@ fill_pixel (real* ret_colors,
             UFor( i, NColors )
                 factors[i] = (material->opacity * material->specular[i]);
 
-            Op_Point_2010( &tmp_origin ,-, &isect ,offset*, dir );
+            follow_Point (&tmp_origin, &isect, dir, - offset);
             cast_colors (colors, space, image, &tmp_origin, &refldir,
                          factors, nbounces);
         }
