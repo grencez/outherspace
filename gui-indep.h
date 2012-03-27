@@ -134,13 +134,13 @@ static void
 update_health (const RaySpace* space, real dt);
 static void
 render_pattern (byte* data, uint nrows, uint ncols, uint stride,
-                bool argb_order);
+                uint32 argb_map);
 static void
 render_RayImage (byte* data, uint nrows, uint ncols, uint stride,
                  const RayImage* ray_image,
                  uint image_start_row,
                  uint image_start_col,
-                 bool argb_order);
+                 uint32 argb_map);
 static void
 render_pilot_images (byte* data, uint nrows, uint ncols, uint stride,
                      bool argb_order);

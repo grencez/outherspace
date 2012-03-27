@@ -74,6 +74,7 @@ key_press_fn (Pilot* pilot, const SDL_keysym* event)
     bool change_cast_method = false;
     bool print_view_code = false;
     bool print_plane_line = false;
+    bool toggle_opengl = false;
     bool quit_app = false;
     bool recast = true;
     FILE* out = stdout;
@@ -162,6 +163,9 @@ key_press_fn (Pilot* pilot, const SDL_keysym* event)
             break;
         case SDLK_g:
             racer_motion->gravity = !racer_motion->gravity;
+            break;
+        case SDLK_h:
+            toggle_opengl = true;
             break;
         case SDLK_l:
             if (shift_mod)  view_light_change =  1;
@@ -298,6 +302,18 @@ key_press_fn (Pilot* pilot, const SDL_keysym* event)
             pilot->view_width = view_width;
             fprintf (out, "view_width:%f\n", view_width);
         }
+    }
+    else if (toggle_opengl)
+    {
+#ifdef SupportOpenGL
+        DisplayRayImage = !DisplayRayImage;
+            /* Do a refresh, just because.*/
+        if (resize_nrows == 0)
+        {
+            resize_nrows = view_nrows;
+            resize_ncols = view_ncols;
+        }
+#endif
     }
     else if (resize != 0)
     {
@@ -681,18 +697,51 @@ static
     void
 sdl_redraw (SDL_Surface* screen)
 {
-    const bool argb_order = !RunFromMyMac;
+    byte* pixels;
+    uint stride;
+    uint nrows = screen->h, ncols = screen->w;
+#ifdef SupportOpenGL
+    const uint32  argb_order = 0x3012; /* RGBA */
+    pixels = AllocT( byte, ncols * nrows * 4 );
+    stride = ncols * 4;
+#else
+    const uint32  argb_order = RunFromMyMac ? 0x0123 : 0x3210;
+    pixels = (byte*) screen->pixels;
+    stride = screen->pitch;
     if (SDL_MUSTLOCK (screen) && SDL_LockSurface (screen) < 0)  return;
+#endif
 
     if (RenderDrawsPattern)
-        render_pattern ((byte*)screen->pixels,
-                        screen->h, screen->w, screen->pitch, argb_order);
+        render_pattern (pixels, nrows, ncols,
+                        stride, argb_order);
     else
-        render_pilot_images ((byte*)screen->pixels,
-                             screen->h, screen->w, screen->pitch, argb_order);
+        render_pilot_images (pixels, nrows, ncols,
+                             stride, argb_order);
 
+#ifdef SupportOpenGL
+    glViewport (0, 0, ncols, nrows);
+    glMatrixMode (GL_PROJECTION);  glLoadIdentity ();
+    glMatrixMode (GL_MODELVIEW);  glLoadIdentity ();
+    glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexImage2D (GL_TEXTURE_2D, 0, 4, ncols, nrows, 0,
+                  GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+
+    glBegin (GL_QUADS);
+    glTexCoord2f (0, 1);  glVertex2f (-1, -1);
+    glTexCoord2f (1, 1);  glVertex2f ( 1, -1);
+    glTexCoord2f (1, 0);  glVertex2f ( 1,  1);
+    glTexCoord2f (0, 0);  glVertex2f (-1,  1);
+    glEnd ();
+
+    glFlush ();
+    SDL_GL_SwapBuffers ();
+    free (pixels);
+#else
     if (SDL_MUSTLOCK (screen))  SDL_UnlockSurface (screen);
     SDL_Flip (screen);
+#endif
 }
 
 static
@@ -730,10 +779,12 @@ render_loop_fn (void* data)
             needs_recast = false;
             update_pilot_images (space, (real) SDL_GetTicks () / 1000);
 #ifdef SupportOpenGL
-            SDL_GL_SwapBuffers ();
-            glFlush ();
-                /* glFinish (); */
-            glClear (GL_COLOR_BUFFER_BIT);
+            if (!DisplayRayImage)
+            {
+                glFlush ();
+                    /* glFinish (); */
+                SDL_GL_SwapBuffers ();
+            }
 #endif
         }
 
@@ -1005,14 +1056,11 @@ sdl_main (RaySpace* space, const char* pathname, Pilot* pilots)
                 UFor( i, npilots )
                     sync_Pilot (&pilots[i], &param->pilots[i]);
 
-#ifdef SupportOpenGL
                     /* When OpenGL is being used,
                      * render_loop_fn() actually does the drawing also.
                      */
-                (void) sdl_redraw;
-#else
-                sdl_redraw (screen);
-#endif
+                if (DisplayRayImage)
+                    sdl_redraw (screen);
 
                 needs_recast = true;
                     /* When there is a separate render thread,

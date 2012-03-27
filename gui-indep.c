@@ -8,6 +8,12 @@
 
 static Pilot pilots[NRacersMax];
 
+#ifdef SupportOpenGL
+static bool DisplayRayImage = false;
+#else
+static const bool DisplayRayImage = true;
+#endif
+
     void
 init_MotionInput (MotionInput* mot)
 {
@@ -561,49 +567,54 @@ update_health (const RaySpace* space, real dt)
     }
 }
 
-static
-    void
-set_argb_shifts (byte* shifts, bool argb_order)
+static inline
+    uint
+argb_nbytes (uint32 argb_map)
 {
-    if (argb_order)
-    { shifts[0] = 24;  shifts[1] = 16;  shifts[2] =  8;  shifts[3] =  0; }
-    else
-    { shifts[0] =  0;  shifts[1] =  8;  shifts[2] = 16;  shifts[3] = 24; }
+    uint npp = 0;
+        /* Count the number of bytes we should use! */
+    { BLoop( i, 4 )
+        npp += ((0xF & (argb_map >> (4 * i))) < 4) ? 1 : 0;
+    } BLose()
+    return npp;
+}
+
+static inline
+    void
+set_argb_pixel (byte* dst, uint nbytes, uint32 argb_map,
+                byte a, byte r, byte g, byte b)
+{
+    byte tmp[16];
+    tmp[(0xF000 & argb_map) >> 12] = a;
+    tmp[(0x0F00 & argb_map) >>  8] = r;
+    tmp[(0x00F0 & argb_map) >>  4] = g;
+    tmp[(0x000F & argb_map) >>  0] = b;
+    { BLoop( i, nbytes )
+        dst[i] = tmp[i];
+    } BLose()
 }
 
     void
 render_pattern (byte* data, uint nrows, uint ncols, uint stride,
-                bool argb_order)
+                uint32 argb_map)
 {
-    uint row;
-    byte shifts[4];
+    uint npp = argb_nbytes (argb_map);
 
-    set_argb_shifts (shifts, argb_order);
-
-    UFor( row, nrows )
-    {
-        uint col;
-        uint32* line;
-        line = (uint32*) &(data)[row * stride];
-        UFor( col, ncols )
-        {
-            uint32 v;
+    { BLoop( row, nrows )
+        byte* line;
+        line = &(data)[row * stride];
+        { BLoop( col, ncols )
             byte r, g, b;
             r = (byte) ((~col |  row) / 2);
             g = (byte) (( col | ~row) / 2);
             b = (byte) ((~col | ~row) / 2);
 
-            v = ((uint32) 0xFF << shifts[0]) |
-                ((uint32) r    << shifts[1]) |
-                ((uint32) g    << shifts[2]) |
-                ((uint32) b    << shifts[3]);
+            set_argb_pixel (&line[npp * col], npp, argb_map, 0xFF, r, g, b);
 
                 /* v  = (uint32)(0x7FFFFF*(1+sin(~(x^y) % ~(x|y)))); */
                 /* v |= 0xFF000000; */
-
-            line[col] = v;
-        }
-    }
+        } BLose()
+    } BLose()
 }
 
     void
@@ -611,51 +622,45 @@ render_RayImage (byte* data, uint nrows, uint ncols, uint stride,
                  const RayImage* ray_image,
                  uint image_start_row,
                  uint image_start_col,
-                 bool argb_order)
+                 uint32 argb_map)
 {
-    uint ray_row, start_row, start_col;
-    byte shifts[4];
-
-    set_argb_shifts (shifts, argb_order);
+    uint start_row, start_col;
+    uint npp = argb_nbytes (argb_map);
 
     assert (ray_image->pixels);
     if (ray_image->nrows == 0)  return;
     start_row = image_start_row + npixelzoom * ray_image->nrows - 1;
     start_col = image_start_col;
 
-    UFor( ray_row, npixelzoom * ray_image->nrows )
-    {
-        uint image_row, ray_col;
+    { BLoop( ray_row, npixelzoom * ray_image->nrows )
+        uint image_row;
         const byte* pixline;
-        uint32* outline;
+        byte* outline;
 
         image_row = start_row - ray_row;
         if (image_row >= nrows)  continue;
         pixline = &ray_image->pixels[((ray_row / npixelzoom) *
                                       3 * ray_image->stride)];
-        outline = (uint32*) &data[image_row * stride];
+        outline = &data[image_row * stride];
 
-        UFor( ray_col, npixelzoom * ray_image->ncols )
-        {
+        { BLoop( ray_col, npixelzoom * ray_image->ncols )
             uint image_col;
             image_col = start_col + ray_col;
             if (image_col >= ncols)  break;
-            outline[image_col] =
-                ((uint32) 0xFF                                << shifts[0]) |
-                ((uint32) pixline[3*(image_col/npixelzoom)+0] << shifts[1]) |
-                ((uint32) pixline[3*(image_col/npixelzoom)+1] << shifts[2]) |
-                ((uint32) pixline[3*(image_col/npixelzoom)+2] << shifts[3]);
-        }
-    }
+            set_argb_pixel (&outline[npp * image_col], npp, argb_map,
+                            0xFF,
+                            pixline[3*(image_col/npixelzoom)+0],
+                            pixline[3*(image_col/npixelzoom)+1],
+                            pixline[3*(image_col/npixelzoom)+2]);
+        } BLose()
+    } BLose()
 }
 
     void
 render_pilot_images (byte* data, uint nrows, uint ncols, uint stride,
                      bool argb_order)
 {
-    uint pilot_idx;
-    UFor( pilot_idx, npilots )
-    {
+    { BLoop( pilot_idx, npilots )
         Pilot* pilot;
         pilot = &pilots[pilot_idx];
 
@@ -664,7 +669,7 @@ render_pilot_images (byte* data, uint nrows, uint ncols, uint stride,
                          pilot->image_start_row * npixelzoom,
                          pilot->image_start_col * npixelzoom,
                          argb_order);
-    }
+    } BLose()
 }
 
     void
@@ -768,15 +773,20 @@ update_pilot_images (RaySpace* space, real frame_t1)
                                   &racer_motions[pilot->craft_idx],
                                   &pilot->view_origin);
         }
+        if (DisplayRayImage)
+        {
+            update_dynamic_RaySpace (space);
+            if (ForceFauxFishEye)
+                rays_to_hits_fish (ray_image, space,
+                                   &origin, &basis, pilot->view_angle);
+            else
+                cast_RayImage (ray_image, space, &origin, &basis);
+        }
 #ifdef SupportOpenGL
-        ogl_redraw (space, pilot_idx);
-#else
-        update_dynamic_RaySpace (space);
-        if (ForceFauxFishEye)
-            rays_to_hits_fish (ray_image, space,
-                               &origin, &basis, pilot->view_angle);
         else
-            cast_RayImage (ray_image, space, &origin, &basis);
+        {
+            ogl_redraw (space, pilot_idx);
+        }
 #endif
 #endif
     }

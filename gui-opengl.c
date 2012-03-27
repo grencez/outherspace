@@ -234,7 +234,6 @@ init_ogl_ui_data ()
         exit (1);
     }
 
-    glUseProgram (shader_program);
 #if NDimensions == 4
     hivert_attrib_loc = glGetAttribLocation (shader_program, "hivert");
     hivnml_attrib_loc = glGetAttribLocation (shader_program, "hivnml");
@@ -445,6 +444,17 @@ ogl_setup (const RaySpace* space)
         /* glFrontFace (GL_CCW); */
         /* glEnable (GL_CULL_FACE); */
 
+    if (DisplayRayImage)
+    {
+        glUseProgram (0);
+        glDisable (GL_LIGHTING); 
+        glEnable (GL_TEXTURE_2D);
+        glActiveTexture (GL_TEXTURE0);
+    }
+    else
+    {
+        glUseProgram (shader_program);
+    }
 }
 
     /** Render using OpenGL.**/

@@ -32,8 +32,7 @@ hit_Simplex (real* restrict ret_dist,
              const Ray ray,
              const Simplex elem)
 {
-        /* const real epsilon = (real) 0.000001; */
-    const real epsilon = 0;
+    const real epsilon = 16 * Epsilon_real;
     Point edge1, edge2, tvec, pvec, qvec;
     real det, inv_det;
     real u, v;
@@ -512,13 +511,14 @@ hit_Plane (real* restrict ret_dist,
     return true;
 }
 
+    /** This is the simplest BarySimplex intersection test to read.**/
+static inline
     bool
-hit_BarySimplex (real* restrict ret_dist,
-                 const Ray* restrict ray,
-                 const BarySimplex* restrict elem)
+isect_BarySimplex (real* restrict ret_dist,
+                   const Ray* restrict ray,
+                   const BarySimplex* restrict elem)
 {
-#if 0
-    uint i;
+    const real fuzz = -16 * Epsilon_real;
     real dist, dot, bcoord_sum;
     BaryPoint bpoint;
     Point isect;
@@ -541,45 +541,75 @@ hit_BarySimplex (real* restrict ret_dist,
         return false;
     }
 
-# if 0
     dist *= 1 / dot;
-    Op_Point_2010 ( &isect ,+, &ray->origin ,dist*, &ray->direct );
+    follow_Ray (&isect, ray, dist);
     
-    bcoord_sum = 0;
-    UFor( i, NDimensions-1 )
-    {
+    bcoord_sum = fuzz;
+    { BLoop( i, NDims-1 )
         bpoint.coords[i] = dist_Plane (&elem->barys[i], &isect);
-        if (bpoint.coords[i] < 0)  return false;
+        if (bpoint.coords[i] < fuzz)  return false;
         bcoord_sum += bpoint.coords[i];
         if (bcoord_sum > 1)  return false;
-    }
+    } BLose()
     *ret_dist = dist;
-# else
+    return true;
+}
 
-    
+static inline
+    bool
+delayed_div_isect_BarySimplex (real* restrict ret_dist,
+                               const Ray* restrict ray,
+                               const BarySimplex* restrict elem)
+{
+    const real fuzz = -16 * Epsilon_real;
+    real dist, dot, bcoord_sum;
+    BaryPoint bpoint;
+    Point isect;
+
+    dist = dist_Plane (&elem->plane, &ray->origin);
+    dot = dot_Point (&elem->plane.normal, &ray->direct);
+
+    if (dot < 0)
+    {
+        if (dist < 0)  return false;
+        dot = - dot;
+    }
+    else if (dot > 0)
+    {
+        if (dist > 0)  return false;
+        dist = - dist;
+    }
+    else
+    {
+        return false;
+    }
+
     Op_Point_21010( &isect
                     ,+, dist*, &ray->direct
                     ,   dot*, &ray->origin );
     
-    bcoord_sum = 0;
-    UFor( i, NDimensions-1 )
-    {
+    bcoord_sum = fuzz;
+    { BLoop( i, NDims-1 )
         bpoint.coords[i] =
             dot_Point (&elem->barys[i].normal, &isect)
             + elem->barys[i].offset * dot;
-        if (bpoint.coords[i] < 0)  return false;
+        if (bpoint.coords[i] < fuzz)  return false;
         bcoord_sum += bpoint.coords[i];
         if (bcoord_sum > dot)  return false;
-    }
+    } BLose()
 
     dot = 1 / dot;
     *ret_dist = dist * dot;
-# endif
-
     return true;
-#else
+}
+
+static inline
+    bool
+superfast_isect_BarySimplex (real* restrict ret_dist,
+                             const Ray* restrict ray,
+                             const BarySimplex* restrict elem)
+{
     const real fuzz = -16 * Epsilon_real;
-    uint i;
     real dist, dot, bcoord_sum;
     BaryPoint bpoint;
     Point isect;
@@ -595,16 +625,16 @@ hit_BarySimplex (real* restrict ret_dist,
                         ,+, dist*, &ray->direct
                         ,   dot*, &ray->origin );
 
-        UFor( i, NDimensions-1 )
-        {
+        { BLoop( i, NDims-1 )
             bpoint.coords[i] =
                 dot_Point (&elem->barys[i].normal, &isect)
                 + elem->barys[i].offset * dot;
             if (bpoint.coords[i] < fuzz)  return false;
-        }
+        } BLose()
 
-        UFor( i, NDimensions-1 )
+        { BLoop( i, NDims-1 )
             bcoord_sum += bpoint.coords[i];
+        } BLose()
 
         if (bcoord_sum > dot)  return false;
     }
@@ -616,16 +646,16 @@ hit_BarySimplex (real* restrict ret_dist,
                         ,+, dist*, &ray->direct
                         ,   dot*, &ray->origin );
 
-        UFor( i, NDimensions-1 )
-        {
+        { BLoop( i, NDims-1 )
             bpoint.coords[i] =
                 dot_Point (&elem->barys[i].normal, &isect)
                 + elem->barys[i].offset * dot;
             if (bpoint.coords[i] > - fuzz)  return false;
-        }
+        } BLose()
 
-        UFor( i, NDimensions-1 )
+        { BLoop( i, NDims-1 )
             bcoord_sum += bpoint.coords[i];
+        } BLose()
 
         if (bcoord_sum < dot)  return false;
     }
@@ -639,6 +669,21 @@ hit_BarySimplex (real* restrict ret_dist,
     dot = 1 / dot;
     *ret_dist = dist * dot;
     return true;
+}
+
+    bool
+hit_BarySimplex (real* restrict ret_dist,
+                 const Ray* restrict ray,
+                 const BarySimplex* restrict elem)
+{
+    return
+#if 0
+        isect_BarySimplex
+#elif 0
+        delayed_div_isect_BarySimplex
+#else
+        superfast_isect_BarySimplex
 #endif
+        (ret_dist, ray, elem);
 }
 
