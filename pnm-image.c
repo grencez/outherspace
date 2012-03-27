@@ -120,7 +120,7 @@ readin_PPM_image (uint* ret_nrows, uint* ret_ncols,
     bool good = true;
     byte* pixels;
     const char* line;
-    FileB st_in;  FileB* const in = &st_in;
+    DecloStack( FileB, in );
     uint max_color_value = 255;
     uint header_stage;
     real t0;
@@ -140,7 +140,7 @@ readin_PPM_image (uint* ret_nrows, uint* ret_ncols,
     header_stage = 0;
     while (good && header_stage < 3 && getline_FileB (in))
     {
-        FileB st_olay;  FileB* const olay = &st_olay;
+        DecloStack( FileB, olay );
         olay_FileB (olay, in);
         skipds_FileB (olay, 0);
         line = olay->buf.s;
