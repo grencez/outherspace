@@ -112,11 +112,11 @@ readin_wavefront (Scene* scene, const char* pathname, const char* filename)
           vertlist, vnmllist, txptlist,
           matlist, matnamelist,
           texlist, texnamelist;
-    ObjectSurface object_surface;
-    ObjectSurface* surf;
+    GeomSurf object_surface;
+    GeomSurf* surf;
 
     surf = &object_surface;
-    init_ObjectSurface (surf);
+    init_GeomSurf (surf);
 
     buf[len-1] = 0;
 
@@ -242,7 +242,7 @@ readin_wavefront (Scene* scene, const char* pathname, const char* filename)
             line = strskip_ws (line);
             if (surf->nelems > 0)
             {
-                app_SList (&surflist, DuplicaT( ObjectSurface, surf, 1 ));
+                app_SList (&surflist, DuplicaT( GeomSurf, surf, 1 ));
                 surf->nelems = 0;
             }
 
@@ -269,7 +269,7 @@ readin_wavefront (Scene* scene, const char* pathname, const char* filename)
         uint ei;
 
         if (surf->nelems > 0)
-            app_SList (&surflist, DuplicaT( ObjectSurface, surf, 1 ));
+            app_SList (&surflist, DuplicaT( GeomSurf, surf, 1 ));
 
         init_Scene (scene);
         scene->ndims = ndims;
@@ -281,14 +281,14 @@ readin_wavefront (Scene* scene, const char* pathname, const char* filename)
         scene->nmatls = matlist.nmembs;
         scene->ntxtrs = texlist.nmembs;
         scene->elems = AllocT( SceneElement, elemlist.nmembs );
-        scene->surfs = AllocT( ObjectSurface, surflist.nmembs );
+        scene->surfs = AllocT( GeomSurf, surflist.nmembs );
         scene->verts = AllocT( Point, vertlist.nmembs );
         scene->vnmls = AllocT( Point, vnmllist.nmembs );
         scene->txpts = AllocT( BaryPoint, txptlist.nmembs );
         scene->matls = AllocT( Material, matlist.nmembs );
         scene->txtrs = AllocT( Texture, texlist.nmembs );
         unroll_SList (scene->elems, &elemlist, sizeof (SceneElement));
-        unroll_SList (scene->surfs, &surflist, sizeof (ObjectSurface));
+        unroll_SList (scene->surfs, &surflist, sizeof (GeomSurf));
         unroll_SList (scene->verts, &vertlist, sizeof (Point));
         unroll_SList (scene->vnmls, &vnmllist, sizeof (Point));
         unroll_SList (scene->txpts, &txptlist, sizeof (BaryPoint));

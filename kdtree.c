@@ -33,7 +33,7 @@ output_KDTreeGrid (FILE* out, const KDTreeGrid* grid)
                      grid->coords[dim][ti]);
         }
     }
-    output_BoundingBox (out, &grid->box);
+    output_BBox (out, &grid->box);
     fputc ('\n', out);
 }
 
@@ -51,7 +51,7 @@ output_KDTreeNode (FILE* out, uint node_idx,
     {
         uint ei;
         const KDTreeLeaf* leaf = &node->as.leaf;
-        output_BoundingBox (out, &leaf->box);
+        output_BBox (out, &leaf->box);
         fprintf (out, "\n %*selems:", 2*depth+2, "");
         UFor( ei, leaf->nelems )
         {
@@ -199,11 +199,11 @@ shrink_KDTreeGrid (KDTreeGrid* grid, uint nelems)
 
 static
     void
-splitclip_Simplex_BoundingBox (BoundingBox* restrict lobox,
-                               BoundingBox* restrict hibox,
-                               const BoundingBox* restrict box,
-                               const Simplex* restrict elem,
-                               uint split_dim, real split_pos)
+splitclip_Simplex_BBox (BBox* restrict lobox,
+                        BBox* restrict hibox,
+                        const BBox* restrict box,
+                        const Simplex* restrict elem,
+                        uint split_dim, real split_pos)
 {
     bool in_lo = false, in_hi = false;
     uint pi;
@@ -218,7 +218,7 @@ splitclip_Simplex_BoundingBox (BoundingBox* restrict lobox,
         {
             if (in_lo)
             {
-                adjust_BoundingBox (lobox, &elem->pts[pi]);
+                adjust_BBox (lobox, &elem->pts[pi]);
             }
             else
             {
@@ -232,7 +232,7 @@ splitclip_Simplex_BoundingBox (BoundingBox* restrict lobox,
         {
             if (in_hi)
             {
-                adjust_BoundingBox (hibox, &elem->pts[pi]);
+                adjust_BBox (hibox, &elem->pts[pi]);
             }
             else
             {
@@ -272,14 +272,14 @@ splitclip_Simplex_BoundingBox (BoundingBox* restrict lobox,
                 Op_Point_201200( &isect ,+, a ,m*, -, b , a );
                 isect.coords[split_dim] = split_pos;
 
-                adjust_BoundingBox (lobox, &isect);
-                adjust_BoundingBox (hibox, &isect);
+                adjust_BBox (lobox, &isect);
+                adjust_BBox (hibox, &isect);
             }
         }
     }
 
-    clip_BoundingBox (lobox, lobox, box);
-    clip_BoundingBox (hibox, hibox, box);
+    clip_BBox (lobox, lobox, box);
+    clip_BBox (hibox, hibox, box);
 }
 
 
@@ -310,7 +310,7 @@ split_KDTreeGrid (KDTreeGrid* logrid, KDTreeGrid* higrid,
     {
         bool in_lo, in_hi;
         uint loti, hiti, elemidx;
-        BoundingBox lobox, hibox;
+        BBox lobox, hibox;
         loti = 2*i;
         hiti = 2*i+1;
 
@@ -321,7 +321,7 @@ split_KDTreeGrid (KDTreeGrid* logrid, KDTreeGrid* higrid,
             lobox.min.coords[dim] = grid->coords[dim][loti];
             lobox.max.coords[dim] = grid->coords[dim][hiti];
         }
-        copy_BoundingBox (&hibox, &lobox);
+        hibox = lobox;
 
         if (bounds[loti] == split_pos && bounds[hiti] == split_pos)
         {
@@ -335,11 +335,10 @@ split_KDTreeGrid (KDTreeGrid* logrid, KDTreeGrid* higrid,
 
             if (in_lo && in_hi && elems)
             {
-                BoundingBox box;
-                copy_BoundingBox (&box, &lobox);
-                splitclip_Simplex_BoundingBox (&lobox, &hibox, &box,
-                                               &elems[elemidx],
-                                               split_dim, split_pos);
+                BBox box = lobox;
+                splitclip_Simplex_BBox (&lobox, &hibox, &box,
+                                        &elems[elemidx],
+                                        split_dim, split_pos);
             }
         }
 
@@ -407,7 +406,7 @@ split_KDTreeGrid (KDTreeGrid* logrid, KDTreeGrid* higrid,
     assert (split_pos < grid->box.max.coords[split_dim]);
     assert (split_pos > grid->box.min.coords[split_dim]);
 
-    split_BoundingBox (&logrid->box, &higrid->box, &grid->box,
+    split_BBox (&logrid->box, &higrid->box, &grid->box,
                        split_dim, split_pos);
 
     free (lojumps);
@@ -418,24 +417,24 @@ static
     real
 kdtree_cost_fn (uint split_dim, real split_pos,
                 uint nlo, uint nhi,
-                const BoundingBox* box)
+                const BBox* box)
 {
     const real cost_it = 1;  /* Cost of intersection test.*/
     const real cost_tr = 2;  /* Cost of traversal.*/
     const real empty_bonus = .8;  /* Bonus for empty node!*/
     real cost;
-    BoundingBox lo_box, hi_box;
+    BBox lo_box, hi_box;
     real area;
 
-    split_BoundingBox (&lo_box, &hi_box, box, split_dim, split_pos);
+    split_BBox (&lo_box, &hi_box, box, split_dim, split_pos);
 
-    area = surface_area_BoundingBox (box);
+    area = surface_area_BBox (box);
     if (area < Epsilon_real)  return Max_real;
 
     cost = (cost_tr
             + cost_it
-            * (nlo * surface_area_BoundingBox (&lo_box) +
-               nhi * surface_area_BoundingBox (&hi_box))
+            * (nlo * surface_area_BBox (&lo_box) +
+               nhi * surface_area_BBox (&hi_box))
             / area);
 
     if (nlo == 0 || nhi == 0)
@@ -593,7 +592,7 @@ build_KDTreeNode (KDTreeGrid* grid,
     {
         KDTreeLeaf* leaf;
         leaf = &node->as.leaf;
-        copy_BoundingBox (&leaf->box, &grid->box);
+        leaf->box = grid->box;
 
         leaf->nelems = grid->nelems;
 
@@ -619,7 +618,7 @@ build_KDTreeNode (KDTreeGrid* grid,
                      node->split_dim, inner->split_pos,
                      logrid->nintls/2, higrid->nintls/2);
             fprintf (out, "%*s", 2*depth+1, "");
-            output_BoundingBox (out, box);
+            output_BBox (out, box);
             UFor( i, nelems )
             {
                 fprintf (out, "\n%*s", 2*depth+1, "");
@@ -777,7 +776,7 @@ static int uintcmp (const void* a, const void* b)
 
     /* Build a tree of depth zero - everything in the root node.*/
     void
-build_trivial_KDTree (KDTree* tree, uint nelems, const BoundingBox* box)
+build_trivial_KDTree (KDTree* tree, uint nelems, const BBox* box)
 {
     KDTreeLeaf* leaf;
 
@@ -787,7 +786,7 @@ build_trivial_KDTree (KDTree* tree, uint nelems, const BoundingBox* box)
         /* Set the single leaf node to hold everything.*/
     tree->nodes[0].split_dim = NDimensions;
     leaf = &tree->nodes[0].as.leaf;
-    copy_BoundingBox (&leaf->box, box);
+    leaf->box = *box;
     leaf->nelems = nelems;
     leaf->elemidcs = 0;
 
@@ -865,13 +864,13 @@ upnext_KDTreeNode (Point* entrance,
 
     {
         __global const KDTreeNode* node;
-        __global const BoundingBox* box;
+        __global const BBox* box;
         real mag;
         node = &nodes[node_idx];
         assert (leaf_KDTreeNode (node));
         box = &node->as.leaf.box;
-        mag = hit_inner_BoundingBox (entrance, &split_dim, box,
-                                     ray, invdirect);
+        mag = hit_inner_BBox (entrance, &split_dim, box,
+                              ray, invdirect);
         if (hit_mag < mag)
             return Max_uint;
     }
@@ -959,7 +958,7 @@ find_KDTreeNode (uint* ret_parent,
 first_KDTreeNode (uint* ret_parent,
                   const Ray* restrict ray,
                   __global const KDTreeNode* restrict nodes,
-                  const BoundingBox* restrict box,
+                  const BBox* restrict box,
                   bool inside_box)
 {
     uint node_idx = 0, parent = 0;
@@ -969,13 +968,13 @@ first_KDTreeNode (uint* ret_parent,
             /* Find the initial node.*/
         node_idx = find_KDTreeNode (&parent, &ray->origin, nodes);
         box = &nodes[node_idx].as.leaf.box;
-        assert (inside_BoundingBox (box, &ray->origin));
+        assert (inside_BBox (box, &ray->origin));
     }
     else
     {
         Point entrance;
-        if (hit_outer_BoundingBox (&entrance, box,
-                                   &ray->origin, &ray->direct))
+        if (hit_outer_BBox (&entrance, box,
+                            &ray->origin, &ray->direct))
             node_idx = descend_KDTreeNode (&parent, &entrance, 0, nodes);
         else
             node_idx = parent = Max_uint;

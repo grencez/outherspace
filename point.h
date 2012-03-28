@@ -9,6 +9,8 @@
 void
 copy_Point (Point* dst, const Point* src);
 void
+negate_Point (Point* dst, const Point* src);
+void
 diff_Point (Point* dst, const Point* a, const Point* b);
 real
 dot_Point (const Point* a, const Point* b);

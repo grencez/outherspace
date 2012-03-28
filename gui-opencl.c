@@ -351,7 +351,7 @@ view_4d_vertices (const Scene* scene,
     UFor( surfi, scene->nsurfs )
     {
         size_t global, local;
-        const ObjectSurface* surf;
+        const GeomSurf* surf;
         uint elem_offset;
         uint i;
 

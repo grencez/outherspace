@@ -101,7 +101,7 @@ magnitude_PointPack (const PointPack* a);
 void
 normalize_PointPack (PointPack* dst, const PointPack* src);
 boolPack
-inside_pack_BoundingBox (const BoundingBox* box, const PointPack* point);
+inside_pack_BBox (const BBox* box, const PointPack* point);
 boolPack
 hit_pack_BarySimplex (realPack* restrict ret_dist,
                       const PointPack* restrict origin,

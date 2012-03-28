@@ -26,7 +26,7 @@ parse_coord_system (PointXfrm* a, const char* line);
 void
 setup_box_lights (RaySpace* space,
                   const PointLightSource* light,
-                  const BoundingBox* box);
+                  const BBox* box);
 
 #ifdef IncludeC
 #include "dynamic-setup.c"

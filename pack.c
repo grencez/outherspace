@@ -254,7 +254,7 @@ normalize_PointPack (PointPack* dst, const PointPack* src)
 }
 
     boolPack
-inside_pack_BoundingBox (const BoundingBox* box, const PointPack* point)
+inside_pack_BBox (const BBox* box, const PointPack* point)
 {
     boolPack inside;
     uint i;

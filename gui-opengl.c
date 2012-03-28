@@ -487,7 +487,7 @@ ogl_redraw (const RaySpace* space, uint pilot_idx)
 
     UFor( i, 3 )
     {
-        const BoundingBox* box = &space->main.box;
+        const BBox* box = &space->main.box;
         real m =
             (ray.direct.coords[i] > 0)
             ? box->max.coords[i] - ray.origin.coords[i]
@@ -602,8 +602,8 @@ ogl_redraw (const RaySpace* space, uint pilot_idx)
 }
 
 static void
-ogl_set_ObjectSurface (const ObjectSurface* surf,
-                       const Scene* scene, const SceneGL* scenegl)
+ogl_set_GeomSurf (const GeomSurf* surf,
+                  const Scene* scene, const SceneGL* scenegl)
 {
     Material default_material;
     const Material* matl;
@@ -788,8 +788,8 @@ ogl_immediate_redraw_ObjectRaySpace (const RaySpace* space,
             else              first_elem = false;
 
             material_idx = elem->material;
-            ogl_set_ObjectSurface (&scene->surfs[elem->surface],
-                                   scene, scenegl);
+            ogl_set_GeomSurf (&scene->surfs[elem->surface],
+                              scene, scenegl);
 
             glBegin (GL_TRIANGLES);
         }
@@ -914,9 +914,9 @@ ogl_redraw_ObjectRaySpace (const RaySpace* space,
 
     UFor( surfi, scene->nsurfs )
     {
-        const ObjectSurface* surf;
+        const GeomSurf* surf;
         surf = &scene->surfs[surfi];
-        ogl_set_ObjectSurface (surf, scene, scenegl);
+        ogl_set_GeomSurf (surf, scene, scenegl);
 #ifdef Match4dGeom
         elem_offset = surf->vidcs_offset / 4;
         glBindBuffer (GL_ARRAY_BUFFER, scenegl->verts_buffer);

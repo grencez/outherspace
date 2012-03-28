@@ -17,7 +17,7 @@ typedef struct KDTreeGrid KDTreeGrid;
 struct KDTreeLeaf
 {
     uint nelems;
-    BoundingBox box;
+    BBox box;
     uint elemidcs;
 };
 struct KDTreeInner
@@ -51,7 +51,7 @@ struct KDTreeGrid
         /* /intls[dim]/ and /coords[dim]/ are sized to 2*nelems.*/
     uint* intls[NDimensions];
     real* coords[NDimensions];
-    BoundingBox box;
+    BBox box;
 };
 
 
@@ -65,7 +65,7 @@ uint
 first_KDTreeNode (uint* ret_parent,
                   const Ray* restrict ray,
                   __global const KDTreeNode* restrict nodes,
-                  const BoundingBox* restrict box,
+                  const BBox* restrict box,
                   bool inside_box);
 uint
 next_KDTreeNode (uint* ret_parent,
@@ -96,7 +96,7 @@ cleanup_KDTreeGrid (KDTreeGrid* grid);
 void
 shrink_KDTreeGrid (KDTreeGrid* grid, uint nelems);
 void
-build_trivial_KDTree (KDTree* tree, uint nelems, const BoundingBox* box);
+build_trivial_KDTree (KDTree* tree, uint nelems, const BBox* box);
 void
 build_KDTree (KDTree* tree, KDTreeGrid* grid, const Simplex* elems);
 

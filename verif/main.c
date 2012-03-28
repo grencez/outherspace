@@ -115,7 +115,7 @@ testfn_KPTree ()
     uint i;
     KPTree tree;
     KPTreeGrid grid;
-    BoundingBox box;
+    BBox box;
     uint indices[6] = { 0, 1, 2, 3, 4, 5 };
     real coords[3][6] =
     {
@@ -170,20 +170,20 @@ testfn_KPTree ()
     assert (i == 4);
 
 
-    zero_BoundingBox (&box);
+    zero_BBox (&box);
     UFor( i, 2 )
     {
         box.min.coords[i] = 1.5;
         box.max.coords[i] = 4.1;
     }
 
-    i = inside_BoundingBox_KPTree (&tree, &box, Max_uint);
+    i = inside_BBox_KPTree (&tree, &box, Max_uint);
     while (i != Max_uint)
     {
         FILE* out = stderr;
         output_Point (out, &tree.nodes[i].loc);
         fputc ('\n', out);
-        i = inside_BoundingBox_KPTree (&tree, &box, i);
+        i = inside_BBox_KPTree (&tree, &box, i);
     }
 
     cleanup_KPTree (&tree);
@@ -251,13 +251,13 @@ testfn_PointXfrm ()
 
 static
     void
-testfn_trxfrm_BoundingBox ()
+testfn_trxfrm_BBox ()
 {
-    BoundingBox box;
+    BBox box;
     Point centroid;
     PointXfrm basis;
 
-    zero_BoundingBox (&box);
+    zero_BBox (&box);
     box.min.coords[0] = 2;
     box.max.coords[0] = 5;
 
@@ -266,7 +266,7 @@ testfn_trxfrm_BoundingBox ()
     rotation_PointXfrm (&basis, 0, 1,  M_PI / 2);
     transpose_PointXfrm (&basis, &basis);
 
-    trxfrm_BoundingBox (&box, &basis, &box, &centroid);
+    trxfrm_BBox (&box, &basis, &box, &centroid);
     AssertApprox( 0, box.min.coords[0], 2, 1e0 );
     AssertApprox( 2, box.min.coords[1], 2, 1e0 );
     AssertApprox( 0, box.max.coords[0], 5, 1e0 );
@@ -391,7 +391,7 @@ int main (int argc, char** argv)
     testfn_BitString_cache ();
     testfn_KPTree ();
     testfn_PointXfrm ();
-    testfn_trxfrm_BoundingBox ();
+    testfn_trxfrm_BBox ();
     testfn_SList ();
     testfn_order ();
     testfn_pack ();

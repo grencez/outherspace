@@ -11,11 +11,11 @@
 #include <assert.h>
 
 static void
-random_Point (Point* p, const BoundingBox* box);
+random_Point (Point* p, const BBox* box);
 static Point*
-random_Points (uint npts, const BoundingBox* box);
+random_Points (uint npts, const BBox* box);
 static void
-random_Scene (Scene* scene, uint nelems, const BoundingBox* box);
+random_Scene (Scene* scene, uint nelems, const BBox* box);
 static void
 setup_camera_light (RaySpace* space, const Point* origin);
 static bool
@@ -213,7 +213,7 @@ setup_testcase_track (RaySpace* space,
 #elif 1
     {
         Point loc;
-        centroid_BoundingBox (&loc, &space->main.box);
+        centroid_BBox (&loc, &space->main.box);
         loc.coords[UpDim] += 5000;
         setup_camera_light (space, &loc);
     }
@@ -451,7 +451,7 @@ setup_testcase_manual_interp (RaySpace* space,
 }
 
     void
-random_Point (Point* p, const BoundingBox* box)
+random_Point (Point* p, const BBox* box)
 {
     uint ci;
 #if 0
@@ -475,7 +475,7 @@ random_Point (Point* p, const BoundingBox* box)
 
 
     Point*
-random_Points (uint npts, const BoundingBox* box)
+random_Points (uint npts, const BBox* box)
 {
     uint i;
     Point* pts;
@@ -488,7 +488,7 @@ random_Points (uint npts, const BoundingBox* box)
 
 
     void
-random_Scene (Scene* scene, uint nelems, const BoundingBox* box)
+random_Scene (Scene* scene, uint nelems, const BBox* box)
 {
     uint i;
     uint seed = 1294785237;

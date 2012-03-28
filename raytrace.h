@@ -24,7 +24,7 @@ struct ObjectRaySpace
     Simplex* elems;
     BarySimplex* simplices;
     Scene scene;
-    BoundingBox box;
+    BBox box;
     KDTree tree;
     KPTree verttree;
     bool visible;
@@ -49,7 +49,7 @@ struct RaySpace
 
     bool partition;  /* When false, the below two are unused.*/
     KDTree object_tree;
-    BoundingBox box;
+    BBox box;
 };
 
 struct RayImage
@@ -122,7 +122,7 @@ setup_RayCastAPriori (RayCastAPriori* dst,
                       const RayImage* image,
                       const Point* origin,
                       const PointXfrm* view_basis,
-                      const BoundingBox* box);
+                      const BBox* box);
 void
 ray_from_RayCastAPriori (Ray* ray,
                          const RayCastAPriori* known,
@@ -163,7 +163,7 @@ void
 update_dynamic_RaySpace (RaySpace* space);
 void
 init_Scene_KDTreeGrid (KDTreeGrid* grid, const Scene* scene,
-                       const BoundingBox* box);
+                       const BBox* box);
 void init_RayImage (RayImage* image);
 void resize_RayImage (RayImage* image);
 void restride_RayImage (RayImage* image);

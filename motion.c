@@ -351,7 +351,7 @@ apply_track_gravity (ObjectMotion* motion, const RaySpace* space,
     else
         negate_Point (&direct, &motion->track_normal);
     copy_Point (&origin, centroid);
-    inside_box = inside_BoundingBox (&space->main.box, &origin);
+    inside_box = inside_BBox (&space->main.box, &origin);
 
     hit_idx = Max_uint;
     hit_mag = motion->escape_height;
@@ -633,7 +633,7 @@ mark_colliding (BitString* collisions,
         ray_from_basis (&origin, &direct, &object->orientation,
                         &origin, &direct, &object->centroid);
 
-        inside_box = inside_BoundingBox (&space->main.box, &origin);
+        inside_box = inside_BBox (&space->main.box, &origin);
         cast_nopartition (&hit_idx, &hit_mag, &hit_objidx,
                           space, &origin, &direct,
                           inside_box, objidx);
@@ -750,7 +750,7 @@ detect_collision (ObjectMotion* motions,
     {
         uint j;
         uint eff_objidx;
-        BoundingBox box, tmpbox;
+        BBox box, tmpbox;
         PointXfrm basis;
         Point cent, centoff;
         const ObjectRaySpace* query_object;
@@ -774,18 +774,17 @@ detect_collision (ObjectMotion* motions,
         xfrm_PointXfrm (&basis, &query_object->orientation,
                         &object->orientation);
         summ_Point (&cent, &centoff, &object->centroid);
-        trxfrm_BoundingBox (&box, &basis, &object->box, &cent);
+        trxfrm_BBox (&box, &basis, &object->box, &cent);
 
 
         xfrm_PointXfrm (&basis, &query_object->orientation,
                         new_orientation);
         summ_Point (&cent, &centoff, new_centroid);
-        trxfrm_BoundingBox (&tmpbox, &basis, &object->box, &cent);
+        trxfrm_BBox (&tmpbox, &basis, &object->box, &cent);
 
-        merge_BoundingBox (&box, &box, &tmpbox);
+        merge_BBox (&box, &box, &tmpbox);
 
-        j = inside_BoundingBox_KPTree (&query_object->verttree,
-                                       &box, Max_uint);
+        j = inside_BBox_KPTree (&query_object->verttree, &box, Max_uint);
         while (j != Max_uint)
         {
             bool inside_box;
@@ -831,7 +830,7 @@ detect_collision (ObjectMotion* motions,
             }
 
 
-            inside_box = inside_BoundingBox (&object->box, &p0);
+            inside_box = inside_BBox (&object->box, &p0);
             if (inside_box)
             {
                 tmp_hit = Max_uint;
@@ -852,7 +851,7 @@ detect_collision (ObjectMotion* motions,
             {
                 diff_Point (&direct, &p0, &p1);
                 normalize_Point (&direct, &direct);
-                inside_box = inside_BoundingBox (&object->box, &p1);
+                inside_box = inside_BBox (&object->box, &p1);
                 tmp_hit = Max_uint;
                 tmp_mag = Max_real;
                 cast1_ObjectRaySpace (&tmp_hit, &tmp_mag, &p1, &direct,
@@ -866,7 +865,7 @@ detect_collision (ObjectMotion* motions,
                 }
 
             }
-            j = inside_BoundingBox_KPTree (&query_object->verttree,
+            j = inside_BBox_KPTree (&query_object->verttree,
                                            &box, j);
         }
     }
@@ -887,7 +886,7 @@ detect_collision (ObjectMotion* motions,
         summ_Point (&origin, &origin, &object->centroid);
         summ_Point (&destin, &destin, new_centroid);
 
-        inside_box = inside_BoundingBox (&space->main.box, &origin);
+        inside_box = inside_BBox (&space->main.box, &origin);
 
         diff_Point (&unit_dir, &object->centroid, &origin);
         distance = magnitude_Point (&unit_dir);

@@ -71,7 +71,7 @@ int main (int argc, char** argv)
 
     resize_RayImage (&image);
 
-        /* output_BoundingBox (out, &space.box);  fputc ('\n', out); */
+        /* output_BBox (out, &space.box);  fputc ('\n', out); */
         /* output_KDTree (out, &space.tree, space.nelems, space.elems); */
         /* output_gv_KDTree (out, &space.tree); */
 

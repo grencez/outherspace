@@ -45,9 +45,9 @@ struct PointXfrm
     Point pts[NDims];
 };
 
-typedef struct BoundingBox BoundingBox;
+typedef struct BBox BBox;
 
-struct BoundingBox
+struct BBox
 {
     Point min;
     Point max;

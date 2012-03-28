@@ -69,9 +69,9 @@ void output_Simplex (FILE* out, const Simplex* elem)
     fputc (']', out);
 }
 
-void output_BoundingBox (FILE* out, const BoundingBox* box)
+void output_BBox (FILE* out, const BBox* box)
 {
-    fputs ("BoundingBox: ", out);
+    fputs ("BBox: ", out);
     output_Point (out, &box->min);
     fputs (" to ", out);
     output_Point (out, &box->max);

@@ -44,7 +44,7 @@ static void
 partition_verts_ObjectRaySpace (ObjectRaySpace* space);
 static void
 init_Scene_KPTreeGrid (KPTreeGrid* grid, const Scene* scene,
-                       const BoundingBox* box);
+                       const BBox* box);
 static void
 init_RaySpace_KDTreeGrid (KDTreeGrid* grid, const RaySpace* space);
 
@@ -160,7 +160,7 @@ update_internal_transformed_ObjectRaySpace (ObjectRaySpace* space)
     uint ei;
     const Scene* scene;
     scene = &space->scene;
-    init_BoundingBox (&space->box, scene->nverts, scene->verts);
+    init_BBox (&space->box, scene->nverts, scene->verts);
 
     UFor( ei, space->nelems )
     {
@@ -220,7 +220,7 @@ init_trivial_ObjectRaySpace (ObjectRaySpace* object)
 update_trivial_ObjectRaySpace (ObjectRaySpace* object)
 {
     update_internal_transformed_ObjectRaySpace (object);
-    copy_BoundingBox (&object->tree.nodes[0].as.leaf.box, &object->box);
+    object->tree.nodes[0].as.leaf.box = object->box;
 }
 
     void
@@ -256,7 +256,7 @@ update_dynamic_RaySpace (RaySpace* space)
     {
         KDTreeGrid grid;
         init_RaySpace_KDTreeGrid (&grid, space);
-        copy_BoundingBox (&space->box, &grid.box);
+        space->box = grid.box;
             /* Since it's a regeneration, clean up the previous version.*/
         cleanup_KDTree (&space->object_tree);
         build_KDTree (&space->object_tree, &grid, 0);
@@ -267,7 +267,7 @@ update_dynamic_RaySpace (RaySpace* space)
     else
     {
         space->partition = false;
-        copy_BoundingBox (&space->box, &space->main.box);
+        space->box = space->main.box;
     }
 }
 
@@ -300,7 +300,7 @@ partition_verts_ObjectRaySpace (ObjectRaySpace* space)
 
     void
 init_Scene_KDTreeGrid (KDTreeGrid* grid, const Scene* scene,
-                       const BoundingBox* box)
+                       const BBox* box)
 {
     uint i, nelems;
 
@@ -332,7 +332,7 @@ init_Scene_KDTreeGrid (KDTreeGrid* grid, const Scene* scene,
             p = &scene->verts[elem->verts[pi]];
             UFor( dim, NDimensions )
             {
-                assert (inside_BoundingBox (box, p));
+                assert (inside_BBox (box, p));
                 if (p->coords[dim] < coords[dim][0])
                     coords[dim][0] = p->coords[dim];
                 if (p->coords[dim] > coords[dim][1])
@@ -347,19 +347,19 @@ init_Scene_KDTreeGrid (KDTreeGrid* grid, const Scene* scene,
             grid->coords[dim][ti+1] = coords[dim][1];
         }
     }
-    copy_BoundingBox (&grid->box, box);
+    grid->box = *box;
 }
 
     void
 init_Scene_KPTreeGrid (KPTreeGrid* grid, const Scene* scene,
-                       const BoundingBox* box)
+                       const BBox* box)
 {
     uint i;
 
     grid->npts = scene->nverts;
     grid->indices = AllocT( uint, grid->npts );
     grid->coords[0] = AllocT( real, NDimensions * grid->npts );
-    copy_BoundingBox (&grid->box, box);
+    grid->box = *box;
 
     UFor( i, NDimensions-1 )
         grid->coords[i+1] = &grid->coords[i][grid->npts];
@@ -396,7 +396,7 @@ init_RaySpace_KDTreeGrid (KDTreeGrid* grid, const RaySpace* space)
     {
         uint dim, ti;
         const ObjectRaySpace* object;
-        BoundingBox box;
+        BBox box;
 
         if (i < space->nobjects)  object = &space->objects[i];
         else                      object = &space->main;
@@ -406,14 +406,14 @@ init_RaySpace_KDTreeGrid (KDTreeGrid* grid, const RaySpace* space)
         ti = 2 * nvisible;
         
         if (i < space->nobjects)
-            trxfrm_BoundingBox (&box,
-                                &object->orientation,
-                                &object->box,
-                                &object->centroid);
+            trxfrm_BBox (&box,
+                         &object->orientation,
+                         &object->box,
+                         &object->centroid);
         else
-            copy_BoundingBox (&box, &object->box);
+            box = object->box;
 
-        include_BoundingBox (&grid->box, &grid->box, &box);
+        include_BBox (&grid->box, &grid->box, &box);
 
         grid->elemidcs[nvisible] = i;
         UFor( dim, NDimensions )
@@ -687,7 +687,7 @@ refraction_ray (Point* dst, const Point* dir, const Point* normal,
 static
     uint
 splitting_plane_count (const Point* origin, const Point* direct, real mag,
-                       const KDTree* tree, const BoundingBox* box)
+                       const KDTree* tree, const BBox* box)
 {
     uint count = 0;
     uint node_idx, parent, destin_nodeidx;
@@ -700,7 +700,7 @@ splitting_plane_count (const Point* origin, const Point* direct, real mag,
     copy_Point (&ray.direct, direct);
 
     Op_Point_2010( &destin ,+, origin ,mag*, direct );
-    if (inside_BoundingBox (box, &destin))
+    if (inside_BBox (box, &destin))
         destin_nodeidx = find_KDTreeNode (&parent, &destin,
                                           tree->nodes);
     else
@@ -712,7 +712,7 @@ splitting_plane_count (const Point* origin, const Point* direct, real mag,
             tree->nodes[destin_nodeidx].as.leaf.nelems);
 #endif
 
-    inside_box = inside_BoundingBox (box, origin);
+    inside_box = inside_BBox (box, origin);
 
     reci_Point (&invdirect, direct);
     node_idx = first_KDTreeNode (&parent, &ray,
@@ -1164,7 +1164,7 @@ cast_Ray (uint* restrict ret_hit, real* restrict ret_mag,
           __global const KDTreeNode* restrict nodes,
           __global const BarySimplex* restrict simplices,
           __global const Simplex* restrict tris,
-          __global const BoundingBox* restrict box,
+          __global const BBox* restrict box,
           bool inside_box)
 {
     Point invdirect;
@@ -1267,7 +1267,7 @@ cast_nopartition (uint* ret_hit,
                                         origin, dir, space, i);
 
         rel_inside_box =
-            inside_BoundingBox (&object->box, &rel_origin);
+            inside_BBox (&object->box, &rel_origin);
 
         tmp_hit = Max_uint;
         tmp_mag = *ret_mag;
@@ -1319,7 +1319,7 @@ test_object_intersections (uint* ret_hit,
                                         space, objidx);
 
         rel_inside_box =
-            inside_BoundingBox (&object->box, &rel_origin);
+            inside_BBox (&object->box, &rel_origin);
 
         tmp_hit = Max_uint;
         tmp_mag = *ret_mag;
@@ -1418,14 +1418,14 @@ cast_colors (real* ret_colors,
 
     if (space->partition)
     {
-        inside_box = inside_BoundingBox (&space->box, origin);
+        inside_box = inside_BBox (&space->box, origin);
         cast_partitioned (&hit_idx, &hit_mag, &hit_object,
                           space, origin, dir, inside_box,
                           Max_uint);
     }
     else
     {
-        inside_box = inside_BoundingBox (&space->main.box, origin);
+        inside_box = inside_BBox (&space->main.box, origin);
         cast_nopartition (&hit_idx, &hit_mag, &hit_object,
                           space, origin, dir, inside_box,
                           Max_uint);
@@ -1451,14 +1451,14 @@ cast_to_light (const RaySpace* restrict space,
 
     if (space->partition)
     {
-        inside_box = inside_BoundingBox (&space->box, origin);
+        inside_box = inside_BBox (&space->box, origin);
         cast_partitioned (&hit_idx, &hit_mag, &hit_object,
                           space, origin, dir, inside_box,
                           Max_uint);
     }
     else
     {
-        inside_box = inside_BoundingBox (&space->main.box, origin);
+        inside_box = inside_BBox (&space->main.box, origin);
         cast_nopartition (&hit_idx, &hit_mag, &hit_object,
                           space, origin, dir, inside_box,
                           Max_uint);
@@ -1542,7 +1542,7 @@ rays_to_hits_fish (RayImage* restrict image,
     col_delta = view_angle / ncols;
     col_start += col_delta / 2;
 
-    inside_box = inside_BoundingBox (&space->box, origin);
+    inside_box = inside_BBox (&space->box, origin);
 
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic)
@@ -1614,7 +1614,7 @@ rays_to_hits_fixed_plane (uint* hits, real* mags,
     Point origin;
     real col_start, row_start;
     real col_delta, row_delta;
-    const BoundingBox* box;
+    const BBox* box;
     const ObjectRaySpace* object;
 
     object = &space->main;
@@ -1635,7 +1635,7 @@ rays_to_hits_fixed_plane (uint* hits, real* mags,
     origin.coords[row_dim] = 50;
     origin.coords[col_dim] = 50;
 
-    inside_box = inside_BoundingBox (box, &origin);
+    inside_box = inside_BBox (box, &origin);
 
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic)
@@ -1723,7 +1723,7 @@ cast_row_orthographic (RayImage* restrict image,
                        const RayCastAPriori* restrict known)
 {
     uint col, ncols;
-    const BoundingBox* box;
+    const BBox* box;
     const Point* dir;
     Point partial_ray_origin;
     uint* hitline = 0;
@@ -1749,7 +1749,7 @@ cast_row_orthographic (RayImage* restrict image,
 
         scale_Point (&ray_origin, &known->col_delta, col);
         summ_Point (&ray_origin, &ray_origin, &partial_ray_origin);
-        inside_box = inside_BoundingBox (box, &ray_origin);
+        inside_box = inside_BBox (box, &ray_origin);
 
         cast_record (hitline, magline, pixline, col,
                      space, image,
@@ -1931,7 +1931,7 @@ setup_RayCastAPriori (RayCastAPriori* dst,
                       const RayImage* image,
                       const Point* origin,
                       const PointXfrm* view_basis,
-                      const BoundingBox* box)
+                      const BBox* box)
 {
     if (image->perspective)
     {
@@ -1942,7 +1942,7 @@ setup_RayCastAPriori (RayCastAPriori* dst,
                                             image->nrows, image->ncols,
                                             view_basis,
                                             image->hifov);
-        dst->inside_box = inside_BoundingBox (box, origin);
+        dst->inside_box = inside_BBox (box, origin);
     }
     else
     {

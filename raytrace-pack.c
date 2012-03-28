@@ -27,7 +27,7 @@ first_pack_KDTreeNode (uintPack* ret_nodes,
                        const PointPack* origins,
                        const PointPack* directs,
                        const KDTreeNode* nodes,
-                       const BoundingBox* box,
+                       const BBox* box,
                        const boolPack* inside_box_flags)
 {
     uint i;
@@ -329,7 +329,7 @@ cast_packet_nopartition (RayHitPacket* hit,
         UFor( i, RayPacketDimSz )
         {
             rel_inside_box[i] =
-                inside_pack_BoundingBox (&object->box, &rel_pkt.origins[i]);
+                inside_pack_BBox (&object->box, &rel_pkt.origins[i]);
         }
 
         cast_RayPacket (hit, &rel_pkt, object, rel_inside_box);
@@ -405,10 +405,10 @@ cast_packet_RayImage (RayImage* image, uint row_off, uint col_off,
         inside_box[i] =
             (image->perspective
              ? inside_box[i] = fill_boolPack (known->inside_box)
-             : inside_pack_BoundingBox (&space->main.box, &pkt.origins[i]));
+             : inside_pack_BBox (&space->main.box, &pkt.origins[i]));
 #else
-        inside_box[i] = inside_pack_BoundingBox (&space->main.box,
-                                                 &pkt.origins[i]);
+        inside_box[i] = inside_pack_BBox (&space->main.box,
+                                          &pkt.origins[i]);
 #endif
 
     }

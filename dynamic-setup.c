@@ -566,12 +566,12 @@ read_racer (Scene* scene, uint idx, const char* pathname)
 
     {
         AffineMap map;
-        BoundingBox box;
+        BBox box;
         Point meas;
         real vol, a;
 
-        init_BoundingBox (&box, scene->nverts, scene->verts);
-        measure_BoundingBox (&meas, &box);
+        init_BBox (&box, scene->nverts, scene->verts);
+        measure_BBox (&meas, &box);
         vol = (meas.coords[UpDim] *
                meas.coords[RightDim] *
                meas.coords[ForwardDim]);
@@ -594,10 +594,10 @@ read_racer (Scene* scene, uint idx, const char* pathname)
     void
 setup_box_lights (RaySpace* space,
                   const PointLightSource* light,
-                  const BoundingBox* box)
+                  const BBox* box)
 {
     PointLightSource dflt_light;
-    BoundingBox dflt_box;
+    BBox dflt_box;
     uint i, ndims = 0;
     uint dims[NDimensions];
 
@@ -613,7 +613,7 @@ setup_box_lights (RaySpace* space,
 
     if (!box)
     {
-        copy_BoundingBox (&dflt_box, &space->main.box);
+        dflt_box = space->main.box;
         dflt_box.min.coords[UpDim] = dflt_box.max.coords[UpDim];
         dflt_box.min.coords[UpDim] += 1000;
         dflt_box.max.coords[UpDim] += 2000;

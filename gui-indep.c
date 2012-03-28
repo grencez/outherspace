@@ -433,7 +433,7 @@ set_checkpoint_light (PointLightSource* light,
 relative_laser_origin (Point* origin, uint side,
                        const ObjectRaySpace* object)
 {
-    centroid_BoundingBox (origin, &object->box);
+    centroid_BBox (origin, &object->box);
     origin->coords[ForwardDim] = object->box.max.coords[ForwardDim];
     if (side == 0)
         origin->coords[RightDim] = object->box.min.coords[RightDim];
@@ -545,7 +545,7 @@ update_health (const RaySpace* space, real dt)
                               &origin, &object->centroid);
 
 
-            inside_box = inside_BoundingBox (&space->main.box, &origin);
+            inside_box = inside_BBox (&space->main.box, &origin);
             cast_nopartition (&hit_idx, &hit_mag, &hit_objidx,
                               space, &origin, &direct,
                               inside_box, pilot->craft_idx);

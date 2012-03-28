@@ -30,7 +30,7 @@ struct KPTreeGrid
     uint npts;
     uint* indices;
     real* coords[NDimensions];
-    BoundingBox box;
+    BBox box;
 };
 
 
@@ -39,9 +39,7 @@ descend_KPTree (const KPTree* tree, const Point* loc, uint i);
 uint
 nearest_neighbor_KPTree (const KPTree* tree, const Point* loc);
 uint
-inside_BoundingBox_KPTree (const KPTree* tree,
-                           const BoundingBox* box,
-                           uint i);
+inside_BBox_KPTree (const KPTree* tree, const BBox* box, uint i);
 #ifndef __OPENCL_VERSION__
 void
 init_KPTree (KPTree* tree);

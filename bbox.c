@@ -11,15 +11,10 @@
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
     void
-zero_BoundingBox (BoundingBox* box)
+zero_BBox (BBox* box)
 {
     zero_Point (&box->min);
     zero_Point (&box->max);
-}
-
-void copy_BoundingBox (BoundingBox* dst, const BoundingBox* src)
-{
-    *dst = *src;
 }
 
 tristate facing_BoundingPlane (uint dim, real plane,
@@ -30,11 +25,11 @@ tristate facing_BoundingPlane (uint dim, real plane,
     return mul_signum (sign, signum_real (dir->coords[dim]));
 }
 
-    /* Assume ray is coming from inside BoundingBox.*/
+    /* Assume ray is coming from inside BBox.*/
     bool
 hit_inner_BoundingPlane (Point* entrance,
                          uint dim, real plane,
-                         __global const BoundingBox* box,
+                         __global const BBox* box,
                          const Point* origin,
                          const Point* dir)
 {
@@ -75,7 +70,7 @@ hit_inner_BoundingPlane (Point* entrance,
     }
 
     coeff = (plane - origin->coords[dim]) / dir->coords[dim];
-    
+
     UFor( i, NDimensions )
     {
         real x;
@@ -103,11 +98,11 @@ hit_inner_BoundingPlane (Point* entrance,
 }
 
     real
-hit_inner_BoundingBox (Point* isect,
-                       uint* ret_dim,
-                       const BoundingBox* box,
-                       const Ray* ray,
-                       const Point* invdirect)
+hit_inner_BBox (Point* isect,
+                uint* ret_dim,
+                const BBox* box,
+                const Ray* ray,
+                const Point* invdirect)
 {
     uint dim, hit_dim;
     real planes[NDimensions];
@@ -153,10 +148,10 @@ hit_inner_BoundingBox (Point* isect,
     return mags[hit_dim];
 }
 
-    /* Assume ray is coming from outside BoundingBox.*/
-bool hit_outer_BoundingBox (Point* entrance,
-                            __global const BoundingBox* box,
-                            const Point* origin, const Point* dir)
+    /* Assume ray is coming from outside BBox.*/
+bool hit_outer_BBox (Point* entrance,
+                     __global const BBox* box,
+                     const Point* origin, const Point* dir)
 {
     uint dim;
     Point cost;
@@ -234,9 +229,9 @@ bool hit_outer_BoundingBox (Point* entrance,
     return true;
 }
 
-bool hit_BoundingBox (Point* entrance,
-                      const BoundingBox* box,
-                      const Point* origin, const Point* dir)
+bool hit_BBox (Point* entrance,
+               const BBox* box,
+               const Point* origin, const Point* dir)
 {
     uint dim;
     Point cost;
@@ -288,7 +283,7 @@ bool hit_BoundingBox (Point* entrance,
     return true;
 }
 
-void init_BoundingBox (BoundingBox* box, uint npoints, const Point* points)
+void init_BBox (BBox* box, uint npoints, const Point* points)
 {
     uint i;
 
@@ -304,10 +299,10 @@ void init_BoundingBox (BoundingBox* box, uint npoints, const Point* points)
     }
 
     UFor( i, npoints )
-        adjust_BoundingBox (box, &points[i]);
+        adjust_BBox (box, &points[i]);
 }
 
-void adjust_BoundingBox (BoundingBox* box, const Point* point)
+void adjust_BBox (BBox* box, const Point* point)
 {
     uint i;
     UFor( i, NDimensions )
@@ -320,8 +315,7 @@ void adjust_BoundingBox (BoundingBox* box, const Point* point)
 }
 
     void
-include_BoundingBox (BoundingBox* dst,
-                     const BoundingBox* a, const BoundingBox* b)
+include_BBox (BBox* dst, const BBox* a, const BBox* b)
 {
     uint i;
     UFor( i, NDimensions )
@@ -334,19 +328,19 @@ include_BoundingBox (BoundingBox* dst,
 }
 
     void
-centroid_BoundingBox (Point* dst, const BoundingBox* box)
+centroid_BBox (Point* dst, const BBox* box)
 {
     summ_Point (dst, &box->min, &box->max);
     scale_Point (dst, dst, .5);
 }
 
     void
-measure_BoundingBox (Point* dst, const BoundingBox* box)
+measure_BBox (Point* dst, const BBox* box)
 {
     diff_Point (dst, &box->max, &box->min);
 }
 
-bool inside_BoundingBox (__global const BoundingBox* box, const Point* point)
+bool inside_BBox (__global const BBox* box, const Point* point)
 {
     bool inside = true;
     uint i;
@@ -359,7 +353,7 @@ bool inside_BoundingBox (__global const BoundingBox* box, const Point* point)
     return inside;
 }
 
-real surface_area_BoundingBox (const BoundingBox* box)
+real surface_area_BBox (const BBox* box)
 {
     Point delta;
     real sum = 0;
@@ -383,24 +377,22 @@ real surface_area_BoundingBox (const BoundingBox* box)
     return 2 * sum;
 }
 
-void split_BoundingBox (BoundingBox* lo_box, BoundingBox* hi_box,
-                        const BoundingBox* box,
-                        uint split_dim, real split_pos)
+void split_BBox (BBox* lo_box, BBox* hi_box,
+                 const BBox* box,
+                 uint split_dim, real split_pos)
 {
     assert (split_pos <= box->max.coords[split_dim]);
     assert (split_pos >= box->min.coords[split_dim]);
 
-    copy_BoundingBox (lo_box, box);
-    copy_BoundingBox (hi_box, box);
+    *lo_box = *box;
+    *hi_box = *box;
 
     lo_box->max.coords[split_dim] = split_pos;
     hi_box->min.coords[split_dim] = split_pos;
 }
 
     void
-merge_BoundingBox (BoundingBox* dst,
-                   const BoundingBox* a,
-                   const BoundingBox* b)
+merge_BBox (BBox* dst, const BBox* a, const BBox* b)
 {
     uint i;
     UFor( i, NDimensions )
@@ -418,9 +410,7 @@ merge_BoundingBox (BoundingBox* dst,
 }
 
     void
-clip_BoundingBox (BoundingBox* dst,
-                  const BoundingBox* a,
-                  const BoundingBox* b)
+clip_BBox (BBox* dst, const BBox* a, const BBox* b)
 {
     uint i;
     UFor( i, NDimensions )
@@ -461,10 +451,10 @@ clip_BoundingBox (BoundingBox* dst,
      * Note: View /new_centroid/ as a displacement.
      **/
     void
-trxfrm_BoundingBox (BoundingBox* dst,
-                    const PointXfrm* basis,
-                    const BoundingBox* box,
-                    const Point* new_centroid)
+trxfrm_BBox (BBox* dst,
+             const PointXfrm* basis,
+             const BBox* box,
+             const Point* new_centroid)
 {
     uint i;
     Point diff;
@@ -496,7 +486,7 @@ trxfrm_BoundingBox (BoundingBox* dst,
         /* Set /diff/ to be the displacement,
          * taking into account the original bbox centroid.
          */
-    centroid_BoundingBox (&diff, box);
+    centroid_BBox (&diff, box);
     trxfrm_Point (&diff, basis, &diff);
     summ_Point (&diff, &diff, new_centroid);
 

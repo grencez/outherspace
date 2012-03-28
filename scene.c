@@ -73,7 +73,7 @@ void copy_SceneElement (SceneElement* dst, const SceneElement* src)
 }
 
     void
-init_ObjectSurface (ObjectSurface* surf)
+init_GeomSurf (GeomSurf* surf)
 {
     surf->nelems = 0;
     surf->vidcs_offset = Max_uint;
@@ -108,7 +108,7 @@ copy_Scene (Scene* dst, const Scene* src)
     uint i;
     CopyT( Scene, dst, src, 0, 1 );
     dst->elems = DuplicaT( SceneElement, dst->elems, dst->nelems );
-    dst->surfs = DuplicaT( ObjectSurface, dst->surfs, dst->nsurfs );
+    dst->surfs = DuplicaT( GeomSurf, dst->surfs, dst->nsurfs );
     if (dst->vidcs)
         dst->vidcs = DuplicaT( uint, dst->vidcs, dst->ndims * dst->nelems );
     dst->verts = DuplicaT( Point, dst->verts, dst->nverts );
@@ -132,7 +132,7 @@ concat0_Scene (Scene* scene, Scene* src)
 
     ConcaT( SceneElement, scene->elems, src->elems,
             scene->nelems, src->nelems );
-    ConcaT( ObjectSurface, scene->surfs, src->surfs,
+    ConcaT( GeomSurf, scene->surfs, src->surfs,
             scene->nsurfs, src->nsurfs );
     ConcaT( Point, scene->verts, src->verts, scene->nverts, src->nverts );
     ConcaT( Point, scene->vnmls, src->vnmls, scene->nvnmls, src->nvnmls );
@@ -160,7 +160,7 @@ concat0_Scene (Scene* scene, Scene* src)
 
     UFor( i, src->nsurfs )
     {
-        ObjectSurface* surf;
+        GeomSurf* surf;
         surf = &scene->surfs[i + orig.nsurfs];
         if (surf->vidcs_offset < Max_uint)
             surf->vidcs_offset += orig.ndims * orig.nelems;
@@ -226,10 +226,10 @@ setup_1elem_Scene (Scene* scene)
     scene->nsurfs = 1;
     scene->nverts = NDimensions;
     scene->elems = AllocT( SceneElement, scene->nelems );
-    scene->surfs = AllocT( ObjectSurface, scene->nsurfs );
+    scene->surfs = AllocT( GeomSurf, scene->nsurfs );
     scene->verts = AllocT( Point, scene->nverts );
 
-    init_ObjectSurface (&scene->surfs[0]);
+    init_GeomSurf (&scene->surfs[0]);
     scene->surfs[0].nelems = 1;
     scene->surfs[0].verts_offset = 0;
 
@@ -608,7 +608,7 @@ interpolate_Scene (Scene* dst, uint k, uint nscenes, const Scene* scenes)
     dst->elems = AllocT( SceneElement, dst->nelems );
 
     dst->nsurfs = nsurfs;
-    dst->surfs = DuplicaT( ObjectSurface, scenes[0].surfs, dst->nsurfs );
+    dst->surfs = DuplicaT( GeomSurf, scenes[0].surfs, dst->nsurfs );
 
     vcount = nscenes * nverts;
     dst->nverts = vcount + dst->nelems;
@@ -750,11 +750,11 @@ map_Scene (Scene* scene, const AffineMap* map)
 recenter_Scene (AffineMap* map, const Scene* scene,
                 const Point* new_centroid)
 {
-    BoundingBox box;
+    BBox box;
     Point centroid, displacement;
 
-    init_BoundingBox (&box, scene->nverts, scene->verts);
-    centroid_BoundingBox (&centroid, &box);
+    init_BBox (&box, scene->nverts, scene->verts);
+    centroid_BBox (&centroid, &box);
     map_Point (&centroid, map, &centroid);
 
     if (new_centroid)
@@ -771,7 +771,7 @@ reshuffle_for_surfaces_Scene (Scene* scene)
     uint surfi;
     uint elems_offset = 0;
     const uint ndims = scene->ndims;
-    ObjectSurface pos;
+    GeomSurf pos;
 
     pos.verts_offset = 0;
     pos.vnmls_offset = 0;
@@ -789,7 +789,7 @@ reshuffle_for_surfaces_Scene (Scene* scene)
 
     UFor( surfi, scene->nsurfs )
     {
-        ObjectSurface* surf;
+        GeomSurf* surf;
         SceneElement* elem;
         uint ei;
 
@@ -882,17 +882,17 @@ setup_surfaces_Scene (Scene* scene)
 
 #if 0
     scene->nsurfs = nsurfs;
-    ResizeT( ObjectSurface, scene->surfs, scene->nsurfs );
+    ResizeT( GeomSurf, scene->surfs, scene->nsurfs );
 #else
     assert (scene->nsurfs == nsurfs);
 #endif
     UFor( i, scene->nsurfs )
     {
-        ObjectSurface* surf;
+        GeomSurf* surf;
         uint material;
         surf = &scene->surfs[i];
         material = surf->material;
-        init_ObjectSurface (surf);
+        init_GeomSurf (surf);
         surf->material = material;
     }
 
@@ -923,7 +923,7 @@ setup_surfaces_Scene (Scene* scene)
 }
 
 static uint
-condense_lexi_surf (real* lexis, const ObjectSurface* surf,
+condense_lexi_surf (real* lexis, const GeomSurf* surf,
                     const Scene* scene)
 {
     const uint ndims = scene->ndims;
@@ -973,8 +973,8 @@ condense_lexi_surf (real* lexis, const ObjectSurface* surf,
 
 static void
 apply_jumps_surf (Scene* scene,
-                  const ObjectSurface* surf,
-                  const ObjectSurface* old_surf,
+                  const GeomSurf* surf,
+                  const GeomSurf* old_surf,
                   uint elems_offset,
                   uint n, uint* jumps, uint* indices)
 {
@@ -1024,7 +1024,7 @@ condense_Scene (Scene* scene)
     uint max_n = 0;
     uint* jumps;   uint* indices;
     real* coords;  real* lexis;
-    ObjectSurface pos;
+    GeomSurf pos;
 
     pos.nelems = 0;
     pos.vidcs_offset = 0;
@@ -1048,8 +1048,8 @@ condense_Scene (Scene* scene)
 
     UFor( surfi, scene->nsurfs )
     {
-        ObjectSurface old_surf;
-        ObjectSurface* surf;
+        GeomSurf old_surf;
+        GeomSurf* surf;
         uint stride, n;
 
         surf = &scene->surfs[surfi];

@@ -10,7 +10,8 @@
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
 typedef struct SceneElement SceneElement;
-typedef struct ObjectSurface ObjectSurface;
+typedef struct GeomSurf GeomSurf;
+typedef struct SceneObj SceneObj;
 typedef struct Scene Scene;
 
 struct SceneElement
@@ -22,7 +23,7 @@ struct SceneElement
     uint surface;
 };
 
-struct ObjectSurface
+struct GeomSurf
 {
     uint nelems;
     uint vidcs_offset;
@@ -30,6 +31,11 @@ struct ObjectSurface
     uint vnmls_offset;
     uint txpts_offset;
     uint material;
+};
+
+struct SceneObj
+{
+    BBox box;
 };
 
 struct Scene
@@ -43,7 +49,7 @@ struct Scene
     uint nmatls;
     uint ntxtrs;
     SceneElement* elems; /* Elements.*/
-    ObjectSurface* surfs; /* Surfaces.*/
+    GeomSurf* surfs; /* Surfaces.*/
     uint* vidcs; /* Vertex indices.*/
     Point* verts; /* Vertices.*/
     Point* vnmls; /* Vertex normals.*/
@@ -62,7 +68,7 @@ recenter_Scene (AffineMap* map, const Scene* scene,
 void init_Scene (Scene* scene);
 void init_SceneElement (SceneElement* elem);
 void
-init_ObjectSurface (ObjectSurface* surf);
+init_GeomSurf (GeomSurf* surf);
 void copy_SceneElement (SceneElement* dst, const SceneElement* src);
 void cleanup_Scene (Scene* scene);
 void

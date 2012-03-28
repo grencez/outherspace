@@ -14,7 +14,7 @@ dumpp_PointXfrm (FileB* f, const PointXfrm* A);
 void output_Point (FILE* out, const Point* point);
 void output_PointXfrm (FILE* out, const PointXfrm* xfrm);
 void output_Simplex (FILE* out, const Simplex* elem);
-void output_BoundingBox (FILE* out, const BoundingBox* box);
+void output_BBox (FILE* out, const BBox* box);
 
 #ifdef IncludeC
 #include "serial.c"

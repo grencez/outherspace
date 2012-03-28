@@ -127,8 +127,8 @@ build_KPTreeNode (KPTree* tree, KPTreeGrid* grid,
     }
         /* Only bother splitting the box if the lower nodes are not leaves.*/
     if (n > 3)
-        split_BoundingBox (&logrid.box, &higrid.box, &grid->box,
-                           split_dim, node->loc.coords[split_dim]);
+        split_BBox (&logrid.box, &higrid.box, &grid->box,
+                    split_dim, node->loc.coords[split_dim]);
 
         /* Recurse for lo and hi sides of the split.*/
     build_KPTreeNode (tree, &logrid, 2*nodeidx+1, p, mididx);
@@ -220,7 +220,7 @@ nearest_neighbor_KPTree (const KPTree* tree, const Point* loc)
      * Terminate when the return value is /Max_uint/.
      */
     uint
-inside_BoundingBox_KPTree (const KPTree* tree, const BoundingBox* box, uint i)
+inside_BBox_KPTree (const KPTree* tree, const BBox* box, uint i)
 {
     if (i < tree->nnodes)  i = 2 * i + 2;
     else                   i = 0;
@@ -246,7 +246,7 @@ inside_BoundingBox_KPTree (const KPTree* tree, const BoundingBox* box, uint i)
             if (box->min.coords[split_dim] <= split_loc &&
                 box->max.coords[split_dim] >= split_loc)
             {
-                if (inside_BoundingBox (box, &node->loc))  return i;
+                if (inside_BBox (box, &node->loc))  return i;
 
                 i = 2 * i + 2;
                 i = descend_KPTree (tree, &box->min, i);
