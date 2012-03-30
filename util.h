@@ -8,8 +8,6 @@
 #include <stdio.h>
 
 #define Stringify(a) #a
-#define Concatify(a,b) a ## b
-#define Concatify2(a,b)  Concatify(a,b)
 #define StringifyPath(a,b) Stringify(a/b)
 
 #ifndef EmbedPathnamePfx
@@ -17,7 +15,7 @@
 #endif
 #ifdef EmbedFilenamePfx
 #define EmbedInclude(s) \
-    StringifyPath(EmbedPathnamePfx,Concatify2(EmbedFilenamePfx,s.embed.h))
+    StringifyPath(EmbedPathnamePfx,ConcatifyDef(EmbedFilenamePfx,s.embed.h))
 #else  /* ^^^ defined(EmbedFilenamePfx) */
 #define EmbedInclude(s) \
     StringifyPath(EmbedPathnamePfx,s.embed.h)
