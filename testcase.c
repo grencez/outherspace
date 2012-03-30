@@ -2,6 +2,7 @@
 #include "testcase.h"
 
 #include "bbox.h"
+#include "color.h"
 #include "dynamic-setup.h"
 #include "motion.h"
 #include "point.h"
@@ -218,7 +219,7 @@ setup_testcase_track (RaySpace* space,
         loc.coords[UpDim] += 5000;
         setup_camera_light (space, &loc);
     }
-    Op_s( real, NColors, space->lights[0].intensity , .5 );
+    set_Color (&space->lights[0].intensity, .5);
         /* space->lights[0].intensity = 1e6; */
 #else
     space->nlights = 2;
@@ -323,17 +324,13 @@ setup_testcase_4d_normals (RaySpace* space,
         init_Material (&scene->matls[i]);
 
     scene->elems[0].material = 0;
-    UFor( i, NColors )
-        scene->matls[0].specular[i] = 1;
-    scene->matls[0].diffuse[0] = .2;
-    scene->matls[0].diffuse[1] = .2;
-    scene->matls[0].diffuse[2] = .2;
+    set_Color (&scene->matls[0].specular, 1);
+    set_Color (&scene->matls[0].diffuse, .2);
     scene->matls[0].shininess = 15;
 
     scene->elems[1].material = 1;
-    scene->matls[1].diffuse[0] = 1;
-    scene->matls[1].diffuse[1] = .0;
-    scene->matls[1].diffuse[2] = .0;
+    zero_Color (&scene->matls[1].diffuse);
+    scene->matls[1].diffuse.coords[0] = 1;
 
     setup_camera_light (space, view_origin);
         /* space->lights[0].intensity = 2; */

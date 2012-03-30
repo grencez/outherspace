@@ -1,6 +1,7 @@
 
 #include "material.h"
 
+#include "color.h"
 #include "point.h"
 #include "pnm-image.h"
 #include "xfrm.h"
@@ -12,15 +13,11 @@
 
 void init_Material (Material* mat)
 {
-    uint i;
-    UFor( i, NColors )
-    {
-        mat->ambient[i] = 0.2;
-        mat->diffuse[i] = 0.8;
-        mat->specular[i] = 1;
-        mat->emissive[i] = 0;
-        mat->transmission[i] = 1;
-    }
+    set_Color (&mat->ambient, 0.2);
+    set_Color (&mat->diffuse, 0.8);
+    set_Color (&mat->specular, 1);
+    set_Color (&mat->emissive, 0);
+    set_Color (&mat->transmission, 1);
 
     mat->opacity = 1;
     mat->shininess = 0;
@@ -71,7 +68,7 @@ map_coords_Texture (uint* coords, const Texture* texture, const BaryPoint* p)
 }
 
     real
-map_Texture (real* colors, const Texture* texture, const BaryPoint* p)
+map_Texture (Color* color, const Texture* texture, const BaryPoint* p)
 {
     uint i;
     uint coords[2];
@@ -82,7 +79,7 @@ map_Texture (real* colors, const Texture* texture, const BaryPoint* p)
     pixels = &texture->pixels[texture->pixelsz * i];
 
     UFor( i, NColors )
-        colors[i] = pixels[i] * (1.0 / 255);
+        color->coords[i] = pixels[i] * (1.0 / 255);
     return (texture->alpha ? (real) pixels[3] / 255 : 1);
 }
 
@@ -103,7 +100,7 @@ map_bump_Texture (Point* normal, const Texture* texture, const BaryPoint* p)
 }
 
     void
-map_sky_Texture (real* colors, const Texture* texture, const Point* p)
+map_sky_Texture (Color* color, const Texture* texture, const Point* p)
 {
     uint i, row, col;
     real x, y, z;
@@ -164,7 +161,7 @@ map_sky_Texture (real* colors, const Texture* texture, const Point* p)
 
     pixels = &texture->pixels[texture->pixelsz * (col + row * texture->ncols)];
     UFor( i, NColors )
-        colors[i] = (real) pixels[i] / 255;
+        color->coords[i] = (real) pixels[i] / 255;
 }
 
 #ifdef SupportImage

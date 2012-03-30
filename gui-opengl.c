@@ -575,13 +575,13 @@ ogl_redraw (const RaySpace* space, uint pilot_idx)
                 /* Position.*/
             glLightfv (light_idcs[i], GL_POSITION, v);
                 /* Ambient.*/
-            UFor( j, 3 )  v[j] = light_ambient[j] * light->intensity[j];
+            UFor( j, 3 )  v[j] = light_ambient[j] * light->intensity.coords[j];
             glLightfv (light_idcs[i], GL_AMBIENT, v);
                 /* Diffuse.*/
-            UFor( j, 3 )  v[j] = light_diffuse[j] * light->intensity[j];
+            UFor( j, 3 )  v[j] = light_diffuse[j] * light->intensity.coords[j];
             glLightfv (light_idcs[i], GL_DIFFUSE, v);
                 /* Specular.*/
-            UFor( j, 3 )  v[j] = light_specular[j] * light->intensity[j];
+            UFor( j, 3 )  v[j] = light_specular[j] * light->intensity.coords[j];
             if (light->diffuse)  UFor( j, 3 )  v[j] = 0;
             glLightfv (light_idcs[i], GL_SPECULAR, v);
 
@@ -622,13 +622,13 @@ ogl_set_GeomSurf (const GeomSurf* surf,
     }
 
     color[3] = matl->opacity;
-    UFor( j, 3 )  color[j] = matl->ambient[j];
+    UFor( j, 3 )  color[j] = matl->ambient.coords[j];
     glMaterialfv (GL_FRONT_AND_BACK, GL_AMBIENT, color);
 
-    UFor( j, 3 )  color[j] = matl->diffuse[j];
+    UFor( j, 3 )  color[j] = matl->diffuse.coords[j];
     glMaterialfv (GL_FRONT_AND_BACK, GL_DIFFUSE, color);
 
-    UFor( j, 3 )  color[j] = matl->specular[j];
+    UFor( j, 3 )  color[j] = matl->specular.coords[j];
     glMaterialfv (GL_FRONT_AND_BACK, GL_SPECULAR, color);
 
     glMaterialf (GL_FRONT_AND_BACK, GL_SHININESS,

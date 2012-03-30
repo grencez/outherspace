@@ -389,12 +389,9 @@ set_checkpoint_light (PointLightSource* light,
 
     scale = mag/2;
 
-    Op_s( real, NColors, light->intensity , 0 );
-    light->intensity[1] = 1;
-    Op_Point_2010( &light->location
-                   ,-, checkpoint
-                   ,   scale*, &direct );
-
+    zero_Color (&light->intensity);
+    light->intensity.coords[1] = 1;
+    follow_Point (&light->location, checkpoint, &direct, -scale);
 
     assert (object->scene.nverts == NDimensions);
 
@@ -463,13 +460,10 @@ setup_laser_scenes (RaySpace* space)
 
             mat = AllocT( Material, 1 );
             init_Material (mat);
-            UFor( j, NColors )
-            {
-                mat->ambient[j] = 0;
-                mat->diffuse[j] = 0;
-                mat->specular[j] = 0;
-            }
-            mat->ambient[0] = .7;
+            zero_Color (&mat->ambient);
+            zero_Color (&mat->diffuse);
+            zero_Color (&mat->specular);
+            mat->ambient.coords[0] = .7;
             object->scene.nmatls = 1;
             object->scene.matls = mat;
             object->scene.elems[0].material = 0;
@@ -763,8 +757,8 @@ update_pilot_images (RaySpace* space, real frame_t1)
         if (LightAtCamera)
         {
             assert (space->nlights > 0);
-            copy_Point (&space->lights[0].location, &origin);
-            Op_s( real, NColors, space->lights[0].intensity , .5 );
+            space->lights[0].location = origin;
+            set_Color (&space->lights[0].intensity, .5);
         }
         if (FollowRacer && track.ncheckplanes > 0)
         {
@@ -827,14 +821,11 @@ init_ui_data (RaySpace* space,
         scene->surfs[0].material = 0;
 
         init_Material (matl);
-        matl->diffuse[0] = .8824;
-        matl->diffuse[1] = .4824;
-        matl->diffuse[2] = .0510;
-        UFor( i, NColors )
-        {
-            matl->ambient[i] = matl->diffuse[i];
-            matl->specular[i] = 0;
-        }
+        matl->diffuse.coords[0] = .8824;
+        matl->diffuse.coords[1] = .4824;
+        matl->diffuse.coords[2] = .0510;
+        matl->ambient = matl->diffuse;
+        zero_Color (&matl->specular);
     }
 
     setup_laser_scenes (space);

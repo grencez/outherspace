@@ -18,11 +18,11 @@ struct Texture
 
 struct Material
 {
-    real ambient[NColors]; /* Ka */
-    real diffuse[NColors]; /* Kd */
-    real specular[NColors]; /* Ks */
-    real emissive[NColors]; /* Ke */
-    real transmission[NColors]; /* Tf */
+    Color ambient; /* Ka */
+    Color diffuse; /* Kd */
+    Color specular; /* Ks */
+    Color emissive; /* Ke */
+    Color transmission; /* Tf */
     real opacity; /* d */
     real shininess; /* Ns */
     real optical_density; /* Ni */
@@ -38,11 +38,11 @@ void init_Material (Material* mat);
 void
 copy_Texture (Texture* dst, const Texture* src);
 real
-map_Texture (real* colors, const Texture* texture, const BaryPoint* p);
+map_Texture (Color* color, const Texture* texture, const BaryPoint* p);
 void
 map_bump_Texture (Point* normal, const Texture* texture, const BaryPoint* p);
 void
-map_sky_Texture (real* colors, const Texture* texture, const Point* p);
+map_sky_Texture (Color* color, const Texture* texture, const Point* p);
 
 bool
 readin_Texture (Texture* texture, const char* pathname, const char* filename);

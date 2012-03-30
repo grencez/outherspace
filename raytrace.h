@@ -32,7 +32,7 @@ struct ObjectRaySpace
 struct PointLightSource
 {
     Point location;
-    real intensity[NColors];
+    Color intensity;
     bool diffuse;
     bool on;
 };

@@ -11,12 +11,6 @@
 #include <math.h>
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
-    void
-follow_Ray (Point* isect, const Ray* ray, real mag)
-{
-    follow_Point (isect, &ray->origin, &ray->direct, mag);
-}
-
 #if NDimensions != 4
     /* But really only works for 3D!*/
 

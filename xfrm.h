@@ -5,6 +5,9 @@
 #include "space.h"
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
+void
+follow_Ray (Point* isect, const Ray* ray, real mag);
+
 void zero_PointXfrm (PointXfrm* xfrm);
 void copy_PointXfrm (PointXfrm* dst, const PointXfrm* src);
 void identity_PointXfrm (PointXfrm* xfrm);

@@ -1,6 +1,7 @@
 
 #include "wavefront-file.h"
 
+#include "color.h"
 #include "pnm-image.h"
 #include "point.h"
 #include "slist.h"
@@ -11,7 +12,7 @@
 static bool
 streql (const void* a, const void* b);
 static bool
-strto_real_colors (real* a, const char* line);
+strto_Color (Color* a, const char* line);
 static bool
 readin_materials (SList* matlist, SList* namelist,
                   SList* texlist, SList* texnamelist,
@@ -357,16 +358,16 @@ parse_face_field (uint* v, uint* vt, uint* vn, const char* line)
 
 
     bool
-strto_real_colors (real* a, const char* line)
+strto_Color (Color* a, const char* line)
 {
     uint i;
     UFor( i, NColors )
     {
-        if (line)  line = strto_real (&a[i], line);
+        if (line)  line = strto_real (&a->coords[i], line);
         if (!line)
         {
             if (i == 0)  return false;
-            a[i] = a[i-1]; 
+            a->coords[i] = a->coords[i-1]; 
         }
     }
     return true;
@@ -376,14 +377,13 @@ strto_real_colors (real* a, const char* line)
 static void
 apply_illum_Material (Material* matl, uint illum)
 {
-    uint i;
     matl->reflective = true;
     
     if (illum == 0)
-        UFor( i, NColors )  matl->ambient[i] = 0;
+        zero_Color (&matl->ambient);
 
     if (illum < 2)
-        UFor( i, NColors )  matl->specular[i] = 0;
+        zero_Color (&matl->specular);
 
     matl->reflective = (illum >= 3);
 
@@ -452,23 +452,23 @@ readin_materials (SList* matlist, SList* namelist,
         }
         else if (AccepTok( line, "Tf" ))
         {
-            good = strto_real_colors (material->transmission, line);
+            good = strto_Color (&material->transmission, line);
         }
         else if (AccepTok( line, "Ka" ))
         {
-            good = strto_real_colors (material->ambient, line);
+            good = strto_Color (&material->ambient, line);
         }
         else if (AccepTok( line, "Kd" ))
         {
-            good = strto_real_colors (material->diffuse, line);
+            good = strto_Color (&material->diffuse, line);
         }
         else if (AccepTok( line, "Ks" ))
         {
-            good = strto_real_colors (material->specular, line);
+            good = strto_Color (&material->specular, line);
         }
         else if (AccepTok( line, "Ke" ))
         {
-            good = strto_real_colors (material->emissive, line);
+            good = strto_Color (&material->emissive, line);
         }
         else if (AccepTok( line, "map_Ka" ))
         {

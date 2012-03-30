@@ -4,6 +4,7 @@
 
 #include "bbox.h"
 #include "bitstring.h"
+#include "color.h"
 #include "order.h"
 #include "point.h"
 #include "simplex.h"
@@ -51,7 +52,7 @@ static void
 init_RaySpace_KDTreeGrid (KDTreeGrid* grid, const RaySpace* space);
 
 static void
-fill_pixel (real* ret_colors,
+fill_pixel (Color* ret_color,
             uint hitidx, real mag, uint objidx,
             const RayImage* image,
             const Point* origin,
@@ -59,12 +60,12 @@ fill_pixel (real* ret_colors,
             const RaySpace* space,
             uint nbounces);
 static void
-cast_colors (real* ret_colors,
+cast_colors (Color* ret_color,
              const RaySpace* restrict space,
              const RayImage* restrict image,
              const Point* restrict origin,
              const Point* restrict dir,
-             const real* factors,
+             const Color* factor,
              uint nbounces);
 static bool
 cast_to_light (const RaySpace* restrict space,
@@ -135,7 +136,7 @@ init_ObjectRaySpace (ObjectRaySpace* space)
 init_PointLightSource (PointLightSource* light)
 {
     zero_Point (&light->location);
-    Op_s( real, NColors, light->intensity , 1 );
+    set_Color (&light->intensity, 1);
     light->diffuse = false;
     light->on = true;
 }
@@ -698,10 +699,10 @@ splitting_plane_count (const Point* origin, const Point* direct, real mag,
     Ray ray;
     bool inside_box;
 
-    copy_Point (&ray.origin, origin);
-    copy_Point (&ray.direct, direct);
+    ray.origin = *origin;
+    ray.direct = *direct;
 
-    Op_Point_2010( &destin ,+, origin ,mag*, direct );
+    follow_Ray (&destin, &ray, mag);
     if (inside_BBox (box, &destin))
         destin_nodeidx = find_KDTreeNode (&parent, &destin,
                                           tree->nodes);
@@ -738,12 +739,11 @@ splitting_plane_count (const Point* origin, const Point* direct, real mag,
      * of a pixel without considering illumination.
      **/
 static void
-pixel_from_Material (real* ambient, real* diffuse, real* specular,
+pixel_from_Material (Color* ambient, Color* diffuse, Color* specular,
                      const Material* matl,
                      const BaryPoint* texpoint,
                      const Scene* scene)
 {
-    uint i;
     if (!matl)
     {
             /* If the cosine between light and normal is 1,
@@ -751,55 +751,46 @@ pixel_from_Material (real* ambient, real* diffuse, real* specular,
              * then the resulting color value should be exactly 1.
              * Thus, diffuse + ambient = 1 by default.
              */
-        UFor( i, NColors )
-        {
-            ambient[i] = .2;
-            diffuse[i] = .8;
-            specular[i] = 0;
-        }
+        set_Color (ambient, .2);
+        set_Color (diffuse, .8);
+        set_Color (specular, 0);
         return;
     }
 
-    UFor( i, NColors )
-    {
-        ambient[i] = matl->ambient[i];
-        diffuse[i] = matl->diffuse[i];
-        specular[i] = matl->specular[i];
-    }
+    *ambient = matl->ambient;
+    *diffuse = matl->diffuse;
+    *specular = matl->specular;
 
         /* Texture mapping.*/
     if (texpoint)
     {
         const Texture* tex;
-        real color[NColors];
+        Color color;
         real alpha;
         if (matl->ambient_texture != Max_uint)
         {
             tex = &scene->txtrs[matl->ambient_texture];
-            alpha = map_Texture (color, tex, texpoint);
-            UFor( i, NColors )
-                ambient[i] += (color[i] - ambient[i]) * alpha;
+            alpha = map_Texture (&color, tex, texpoint);
+            mix_Color (ambient, ambient, &color, alpha);
         }
         if (matl->diffuse_texture != Max_uint)
         {
             tex = &scene->txtrs[matl->diffuse_texture];
-            alpha = map_Texture (color, tex, texpoint);
-            UFor( i, NColors )
-                diffuse[i] += (color[i] - diffuse[i]) * alpha;
+            alpha = map_Texture (&color, tex, texpoint);
+            mix_Color (diffuse, diffuse, &color, alpha);
         }
         if (matl->specular_texture != Max_uint)
         {
             tex = &scene->txtrs[matl->specular_texture];
-            alpha = map_Texture (color, tex, texpoint);
-            UFor( i, NColors )
-                specular[i] += (color[i] - specular[i]) * alpha;
+            alpha = map_Texture (&color, tex, texpoint);
+            mix_Color (specular, specular, &color, alpha);
         }
     }
 }
 
 
     void
-fill_pixel (real* ret_colors,
+fill_pixel (Color* ret_color,
             uint hitidx, real mag, uint objidx,
             const RayImage* image,
             const Point* origin,
@@ -814,7 +805,7 @@ fill_pixel (real* ret_colors,
     const bool compute_bary_coords = true;
     const bool show_splitting_planes = false;
     bool miss_effects = false;
-    real colors[NColors];
+    Color color;
     const BarySimplex* simplex;
     const ObjectRaySpace* object;
     Point rel_origin, rel_dir;
@@ -834,21 +825,21 @@ fill_pixel (real* ret_colors,
     {
         if (space->skytxtr < space->main.scene.ntxtrs)
         {
-            map_sky_Texture (ret_colors,
+            map_sky_Texture (ret_color,
                              &space->main.scene.txtrs[space->skytxtr],
                              dir);
         }
         else
         {
-            UFor( i, NColors )  ret_colors[i] = 0;
+            zero_Color (ret_color);
         }
 
         if (!miss_effects)  return;
-        UFor( i, NColors )  colors[i] = ret_colors[i];
+        color = *ret_color;
     }
     else
     {
-        UFor( i, NColors )  colors[i] = 1;
+        set_Color (&color, 1);
     }
 
     if (show_splitting_planes)
@@ -874,15 +865,15 @@ fill_pixel (real* ret_colors,
         UFor( i, NColors )
         {
             if (i == 0)
-                colors[i] = clamp_real (1 - red * (1 - colors[i]), 0, 1);
+                color.coords[i] = clamp_real (1 - red * (1 - color.coords[i]), 0, 1);
             else
-                colors[i] = clamp_real (red * colors[i], 0, 1);
+                color.coords[i] = clamp_real (red * color.coords[i], 0, 1);
         }
     }
 
     if (objidx > space->nobjects)
     {
-        UFor( i, NColors )  ret_colors[i] += colors[i];
+        summ_Color (ret_color, ret_color, &color);
         return;
     }
 
@@ -912,7 +903,7 @@ fill_pixel (real* ret_colors,
     {
         real val;
             /* Distance color scale.*/
-        UFor( i, NColors )  colors[i] = 0;
+        zero_Color (&color);
         val = 2 * NColors * mag / image->view_light;
         UFor( i, 2*NColors )
         {
@@ -923,13 +914,13 @@ fill_pixel (real* ret_colors,
                 idx2 = (idx1 + 1) % NColors;
                 if (even_uint (i))
                 {
-                    colors[idx1] = 1;
-                    colors[idx2] = val - i;
+                    color.coords[idx1] = 1;
+                    color.coords[idx2] = val - i;
                 }
                 else
                 {
-                    colors[idx1] = i+1 - val;
-                    colors[idx2] = 1;
+                    color.coords[idx1] = i+1 - val;
+                    color.coords[idx2] = 1;
                 }
                 break;
             }
@@ -997,29 +988,28 @@ fill_pixel (real* ret_colors,
                     y |= (1 << (8*i + j));
             }
         }
-        colors[0] *= (real) ((y & 0xFF0000) >> 16) / (nincs-1);
-        colors[1] *= (real) ((y & 0x00FF00) >>  8) / (nincs-1);
-        colors[2] *= (real) ((y & 0x0000FF) >>  0) / (nincs-1);
+        color.coords[0] *= (real) ((y & 0xFF0000) >> 16) / (nincs-1);
+        color.coords[1] *= (real) ((y & 0x00FF00) >>  8) / (nincs-1);
+        color.coords[2] *= (real) ((y & 0x0000FF) >>  0) / (nincs-1);
     }
 
     if (shade_by_element)
     {
         real scale = 0;
         scale = 1 - (real) hitidx / scene->nelems;
-        UFor( i, NColors )
-            colors[i] *= scale;
+        scale_Color (&color, &color, scale);
     }
     else if (image->shading_on)
     {
         Point isect, refldir;
-        real dscale[NColors], sscale[NColors];
-        real ambient[NColors], diffuse[NColors], specular[NColors];
-        pixel_from_Material (ambient, diffuse, specular, material,
+        Color dscale, sscale;
+        Color ambient, diffuse, specular;
+        pixel_from_Material (&ambient, &diffuse, &specular, material,
                              (compute_bary_coords ? &texpoint : 0),
                              scene);
 
-        UFor( i, NColors )
-            dscale[i] = sscale[i] = 0;
+        zero_Color (&dscale);
+        zero_Color (&sscale);
 
         follow_Point (&refldir, dir, &normal, 2 * cos_normal);
 
@@ -1053,9 +1043,8 @@ fill_pixel (real* ret_colors,
                         /* real dist_factor *= 1 / (magtolight * magtolight); */
 
                         /* Add diffuse portion.*/
-                    Op_2010( real, NColors, dscale
-                             ,+, dscale
-                             ,   tscale*, light->intensity );
+                    follow_Color (&dscale, &dscale,
+                                  &light->intensity, tscale);
 
                         /* Specular */
                     if (!light->diffuse && material)
@@ -1065,7 +1054,8 @@ fill_pixel (real* ret_colors,
                         if (dot > 0)
                         {
                             tscale = pow (dot, material->shininess);
-                            Op_10( real, NColors, sscale ,tscale+, sscale );
+                            Op_20s( real, NColors, sscale.coords
+                                   ,+, sscale.coords , tscale );
                         }
                     }
                 }
@@ -1073,40 +1063,39 @@ fill_pixel (real* ret_colors,
         }
 
         UFor( i, NColors )
-            colors[i] *=
-                ambient[i] + diffuse[i] * dscale[i] + specular[i] * sscale[i];
+            color.coords[i] *=
+                ambient.coords[i]
+                + diffuse.coords[i] * dscale.coords[i]
+                + specular.coords[i] * sscale.coords[i];
 
         if (material && material->opacity < 1)
         {
             Point tmp_origin, tmp_dir;
-            real factors[NColors];
-            UFor( i, NColors )
-            {
-                colors[i] *= material->opacity;
-                factors[i] = ((1-material->opacity)
-                              * material->transmission[i]);
-            }
+            Color factor;
+
+            scale_Color (&color, &color, material->opacity);
+            scale_Color (&factor, &material->transmission,
+                         1 - material->opacity);
             refraction_ray (&tmp_dir, dir, &normal,
                             material->optical_density, hit_front, cos_normal);
 
             follow_Point (&tmp_origin, &isect, &tmp_dir, offset);
-            cast_colors (colors, space, image, &tmp_origin, &tmp_dir,
-                         factors, nbounces);
+            cast_colors (&color, space, image, &tmp_origin, &tmp_dir,
+                         &factor, nbounces);
         }
         if (material && material->reflective)
         {
             Point tmp_origin;
-            real factors[NColors];
-            UFor( i, NColors )
-                factors[i] = (material->opacity * material->specular[i]);
+            Color factor;
+            scale_Color (&factor, &material->specular, material->opacity);
 
             follow_Point (&tmp_origin, &isect, dir, - offset);
-            cast_colors (colors, space, image, &tmp_origin, &refldir,
-                         factors, nbounces);
+            cast_colors (&color, space, image, &tmp_origin, &refldir,
+                         &factor, nbounces);
         }
     }
 
-    UFor( i, NColors )  ret_colors[i] += colors[i];
+    summ_Color (ret_color, ret_color, &color);
 }
 
 
@@ -1401,16 +1390,15 @@ cast_partitioned (uint* ret_hit,
 }
 
     void
-cast_colors (real* ret_colors,
+cast_colors (Color* ret_color,
              const RaySpace* restrict space,
              const RayImage* restrict image,
              const Point* restrict origin,
              const Point* restrict dir,
-             const real* factors,
+             const Color* factor,
              uint nbounces)
 {
-    uint i;
-    real colors[NColors];
+    Color color;
     uint hit_idx = Max_uint;
     real hit_mag = Max_real;
     uint hit_object = Max_uint;
@@ -1433,10 +1421,10 @@ cast_colors (real* ret_colors,
                           Max_uint);
     }
 
-    UFor( i, NColors )  colors[i] = 0;
-    fill_pixel (colors, hit_idx, hit_mag, hit_object,
+    zero_Color (&color);
+    fill_pixel (&color, hit_idx, hit_mag, hit_object,
                 image, origin, dir, space, nbounces+1);
-    UFor( i, NColors )  ret_colors[i] += factors[i] * colors[i];
+    prod_Color (ret_color, &color, factor);
 }
 
     bool
@@ -1498,16 +1486,14 @@ cast_record (uint* hitline,
     if (magline)  magline[col] = hit_mag;
     if (pixline)
     {
-        uint i;
-        real colors[NColors];
-        UFor( i, NColors )  colors[i] = 0;
-        fill_pixel (colors, hit_idx, hit_mag, hit_object,
+        Color color;
+        zero_Color (&color);
+        fill_pixel (&color, hit_idx, hit_mag, hit_object,
                     image, origin, dir, space, 0);
-        UFor( i, NColors )
-        {
+        { BLoop( i, NColors )
             pixline[3*col+i] = (byte)
-                clamp_real (255.5 * colors[i], 0, 255.5);
-        }
+                clamp_real (255.5 * color.coords[i], 0, 255.5);
+        } BLose()
     }
 }
 
@@ -1830,9 +1816,7 @@ cast_row_perspective (RayImage* image, uint row,
     if (image->pixels)  pixline = &image->pixels[row * 3 * image->stride];
 
     origin = &known->origin;
-    Op_Point_2010( &partial_dir
-                   ,+, &known->dir_start
-                   ,   row*, &known->row_delta );
+    follow_Point (&partial_dir, &known->dir_start, &known->row_delta, row);
 
     UFor( col, ncols )
     {
@@ -1846,9 +1830,7 @@ cast_row_perspective (RayImage* image, uint row,
         }
 #endif
 
-        Op_Point_2010( &dir
-                       ,+, &partial_dir
-                       ,   col*, &known->col_delta );
+        follow_Point (&dir, &partial_dir, &known->col_delta, col);
         normalize_Point (&dir, &dir);
 
         cast_record (hitline, magline, pixline, col,

@@ -2,6 +2,7 @@
 #include "dynamic-setup.h"
 
 #include "bbox.h"
+#include "color.h"
 #include "point.h"
 #include "slist.h"
 #include "wavefront-file.h"
@@ -606,9 +607,8 @@ setup_box_lights (RaySpace* space,
     if (!light)
     {
         init_PointLightSource (&dflt_light);
-        Op_20s( real, NColors, dflt_light.intensity
-                ,/, dflt_light.intensity
-                ,   exp2_uint (NDimensions-1) );
+        quot1_Color (&dflt_light.intensity, &dflt_light.intensity,
+                     exp2_uint (NDimensions-1));
         dflt_light.diffuse = true;
         light = &dflt_light;
     }
