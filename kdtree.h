@@ -3,9 +3,8 @@
 #ifndef __OPENCL_VERSION__
 #define KDTREE_H_
 
-#include "bbox.h"
-#include "simplex.h"
 #include "space.h"
+#include "util.h"
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
 typedef struct KDTreeLeaf  KDTreeLeaf;

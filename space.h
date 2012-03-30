@@ -13,12 +13,21 @@
 #define NDims NDimensions
 
 typedef struct Point Point;
+typedef struct Point2 Point2;
+typedef struct Point3 Point3;
+typedef struct Color Color;
 typedef struct Ray Ray;
 
 struct Point
 {
     real coords[NDims];
 };
+
+struct Point2 { real coords[2]; };
+struct Point3 { real coords[3]; };
+
+#define NColors 3
+struct Color { real coords[3]; };
 
 struct Ray
 {
@@ -53,15 +62,10 @@ struct BBox
     Point max;
 };
 
-typedef struct Simplex Simplex;
+typedef PointXfrm Simplex;
 typedef struct Plane Plane;
 typedef struct BaryPoint BaryPoint;
 typedef struct BarySimplex BarySimplex;
-
-struct Simplex
-{
-    Point pts[NDims];
-};
 
 struct Plane
 {

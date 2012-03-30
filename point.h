@@ -1,66 +1,251 @@
 
+#ifndef Point
 #ifndef Point_H_
-#ifndef __OPENCL_VERSION__
 #define Point_H_
-#include "space.h"
-#include "space-junk.h"
-#endif  /* #ifndef __OPENCL_VERSION__ */
-
-void
-copy_Point (Point* dst, const Point* src);
-void
-negate_Point (Point* dst, const Point* src);
-void
-diff_Point (Point* dst, const Point* a, const Point* b);
-real
-dot_Point (const Point* a, const Point* b);
-void
-summ_Point (Point* dst, const Point* a, const Point* b);
-void
-prod_Point (Point* dst, const Point* a, const Point* b);
-void
-quot_Point (Point* dst, const Point* a, const Point* b);
-void
-scale_Point (Point* dst, const Point* a, real k);
-void
-reci_Point (Point* dst, const Point* src);
-void
-quot1_Point (Point* dst, const Point* src, real x);
-void
-follow_Point (Point* dst, const Point* origin, const Point* direct, real mag);
-void
-follow_Ray (Point* isect, const Ray* ray, real mag);
-void
-zero_Point (Point* a);
-bool
-equal_Point (const Point* a, const Point* b);
-bool
-ordered_Point (const Point* a, const Point* b);
-void
-checker_negate_Point (Point* p);
-real
-magnitude_Point (const Point* a);
-real
-taximag_Point (const Point* a);
-real
-dist_Point (const Point* a, const Point* b);
-void
-normalize_Point (Point* dst, const Point* a);
-void
-proj_Point (Point* dst, const Point* a, const Point* b);
-void
-orth_Point (Point* dst, const Point* a, const Point* b);
-void
-proj_unit_Point (Point* dst, const Point* a, const Point* b);
-void
-orth_unit_Point (Point* dst, const Point* a, const Point* b);
-void
-reflect_Point (Point* refl, const Point* p,
-               const Point* normal, real dot);
-
-#ifdef IncludeC
-#include "point.c"
+#define Point Point
+#endif
 #endif
 
+#ifdef Point
+#ifndef __OPENCL_VERSION__
+#include "op.h"
+#include <math.h>
+#endif  /* #ifndef __OPENCL_VERSION__ */
+
+#define def(name)  ConcatifyDef(name##_,Point)
+#define qualify static inline
+
+qualify
+    void
+def(set) (Point* a, real x)
+{
+    Op_s( real, NDims, a->coords , x );
+}
+
+qualify
+    void
+def(copy) (Point* dst, const Point* src)
+{
+    *dst = *src;
+}
+
+
+qualify
+    void
+def(zero) (Point* a)
+{
+    def(set) (a, 0);
+}
+
+    /* a - b */
+qualify
+    void
+def(diff) (Point* dst, const Point* a, const Point* b)
+{
+    Op_200( real, NDims, dst->coords ,-, a->coords, b->coords );
+}
+
+    /* a + b */
+qualify
+    void
+def(summ) (Point* dst, const Point* a, const Point* b)
+{
+    Op_200( real, NDims, dst->coords ,+, a->coords , b->coords );
+}
+
+qualify
+    void
+def(prod) (Point* dst, const Point* a, const Point* b)
+{
+    Op_200( real, NDims, dst->coords ,*, a->coords , b->coords );
+}
+
+qualify
+    void
+def(quot) (Point* dst, const Point* a, const Point* b)
+{
+    Op_200( real, NDims, dst->coords ,/, a->coords , b->coords );
+}
+
+qualify
+    real
+def(dot) (const Point* a, const Point* b)
+{
+    uint i;
+    real sum = 0;
+    UFor( i, NDims )
+        sum += a->coords[i] * b->coords[i];
+    return sum;
+}
+
+qualify
+    void
+def(scale) (Point* dst, const Point* a, real k)
+{
+    Op_20s( real, NDims, dst->coords ,*, a->coords , k );
+}
+
+qualify
+    void
+def(reci) (Point* dst, const Point* src)
+{
+    uint i;
+    UFor( i, NDims )
+    {
+        if (src->coords[i] == 0)  dst->coords[i] = 0;
+        else                      dst->coords[i] = 1 / src->coords[i];
+    }
+}
+
+qualify
+    void
+def(quot1) (Point* dst, const Point* src, real x)
+{
+    Op_20s( real, NDims, dst->coords ,/, src->coords , x );
+}
+
+qualify
+    void
+def(mix) (Point* dst, const Point* x, const Point* y, real a)
+{
+    const real* const xs = x->coords;
+    const real* const ys = y->coords;
+    { BLoop( i, NDims )
+        dst->coords[i] = xs[i] + (ys[i] - xs[i]) * a;
+    } BLose()
+}
+
+    /** /dst = origin + direct * mag/ **/
+qualify
+    void
+def(follow) (Point* dst, const Point* origin, const Point* direct, real mag)
+{
+    Op_2020s( real, NDims, dst->coords
+              ,+, origin->coords
+              ,   *, direct->coords
+              ,      mag );
+}
+
+qualify
+    bool
+def(equal) (const Point* a, const Point* b)
+{
+    uint i;
+    UFor( i, NDims )
+        if (a->coords[i] != b->coords[i])
+            return false;
+    return true;
+}
+
+qualify
+    bool
+def(ordered) (const Point* a, const Point* b)
+{
+    uint i;
+    UFor( i, NDims )
+    {
+        if (a->coords[i] < b->coords[i])  return true;
+        if (a->coords[i] > b->coords[i])  return false;
+    }
+    return true;
+}
+
+qualify
+    void
+def(negate) (Point* dst, const Point* src)
+{
+    Op_10( real, NDims, dst->coords ,-, src->coords );
+}
+
+qualify
+    void
+def(checker_negate) (Point* p)
+{
+    uint i;
+    UFor( i, NDims / 2 )
+        p->coords[2*i+1] = - p->coords[2*i+1];
+}
+
+qualify
+    real
+def(magnitude) (const Point* a)
+{
+    return sqrt (def(dot) (a, a));
+}
+
+qualify
+    real
+def(taximag) (const Point* a)
+{
+    real sum = 0;
+    { BLoop( i, NDims )
+        sum += fabs (a->coords[i]);
+    } BLose()
+    return sum;
+}
+
+qualify
+    real
+def(dist) (const Point* a, const Point* b)
+{
+    Point c;
+    def(diff) (&c, a, b);
+    return def(magnitude) (&c);
+}
+
+qualify
+    void
+def(normalize) (Point* dst, const Point* a)
+{
+    def(scale) (dst, a, 1 / def(magnitude) (a));
+}
+
+qualify
+    void
+def(proj) (Point* dst, const Point* a, const Point* b)
+{
+    def(scale) (dst, b, def(dot) (a, b) / def(dot) (b, b));
+}
+
+qualify
+    void
+def(orth) (Point* dst, const Point* a, const Point* b)
+{
+    Point tmp;
+    def(proj) (&tmp, a, b);
+    def(diff) (dst, a, &tmp);
+}
+
+qualify
+    void
+def(proj_unit) (Point* dst, const Point* a, const Point* b)
+{
+    def(scale) (dst, b, def(dot) (a, b));
+}
+
+qualify
+    void
+def(orth_unit) (Point* dst, const Point* a, const Point* b)
+{
+    Point tmp;
+    def(proj_unit) (&tmp, a, b);
+    def(diff) (dst, a, &tmp);
+}
+
+    /* /dot/ is the dot product of /p/ and /normal/ */
+qualify
+    void
+def(reflect) (Point* refl, const Point* p,
+              const Point* normal, real dot)
+{
+    real d2 = 2 * dot;
+    Op_2100( real, NDims, refl->coords
+             ,-, d2*, normal->coords
+             ,   p->coords );
+}
+
+#undef qualify
+#undef def
+#undef Point
 #endif
 

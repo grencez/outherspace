@@ -3,8 +3,6 @@
 #ifndef __OPENCL_VERSION__
 #define KPTREE_H_
 
-#include "bbox.h"
-#include "simplex.h"
 #include "space.h"
 #endif  /* #ifndef __OPENCL_VERSION__ */
 

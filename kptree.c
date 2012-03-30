@@ -1,8 +1,10 @@
 
 #ifndef __OPENCL_VERSION__
 #include "kptree.h"
+#include "bbox.h"
 #include "order.h"
 #include "point.h"
+#include "simplex.h"
 #include "slist.h"
 
 #include <assert.h>

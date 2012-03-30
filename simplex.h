@@ -5,6 +5,9 @@
 #include "space.h"
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
+
+void
+follow_Ray (Point* isect, const Ray* ray, real mag);
 bool
 hit_Simplex (real* restrict ret_dist,
              const Ray ray,

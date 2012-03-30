@@ -139,9 +139,7 @@ hit_inner_BBox (Point* isect,
         if (mags[dim] < mags[hit_dim])
             hit_dim = dim;
 
-    Op_Point_2010( isect
-                   ,+, &ray->origin
-                   ,   mags[hit_dim]*, &ray->direct );
+    follow_Point (isect, &ray->origin, &ray->direct, mags[hit_dim]);
 
     isect->coords[hit_dim] = planes[hit_dim];
     *ret_dim = hit_dim;
@@ -460,7 +458,8 @@ trxfrm_BBox (BBox* dst,
     Point diff;
     PointXfrm bbox, robox;
 
-    Op_Point_1200( &diff ,.5*, -, &box->max , &box->min );
+    Op_1200( real, NDims, diff.coords
+             ,.5*, -, box->max.coords , box->min.coords );
 
         /* Fill rows in /bbox/ matrix with components of /diff/,
          * flipping signs of the components based on the signs

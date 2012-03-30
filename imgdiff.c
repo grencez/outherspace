@@ -1,7 +1,9 @@
 
 #include "cx/def.h"
 #include "pnm-image.h"
+#include "space.h"
 
+#include <assert.h>
 #include <stdio.h>
 
 int main (int argc, const char* const* argv)

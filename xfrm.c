@@ -321,7 +321,7 @@ orthorotate_PointXfrm (PointXfrm* dst, const PointXfrm* A,
         x = A->pts[i];
         c = dot_Point (&v, &x) / d;
 
-        Op_Point_2010( &dst->pts[i] ,-, &x ,c*, &w );
+        follow_Point (&dst->pts[i], &x, &w, - c);
     }
 
     dst->pts[dim] = v;

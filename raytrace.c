@@ -1,11 +1,13 @@
 
 #ifndef __OPENCL_VERSION__
+#include "raytrace.h"
 
 #include "bbox.h"
 #include "bitstring.h"
 #include "order.h"
-#include "raytrace.h"
 #include "point.h"
+#include "simplex.h"
+#include "space-junk.h"
 #include "xfrm.h"
 
 #include <assert.h>

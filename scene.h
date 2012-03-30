@@ -4,14 +4,16 @@
 #define SCENE_H_
 
 #include "affine.h"
-#include "bbox.h"
-#include "simplex.h"
+#include "space.h"
 #include "material.h"
+#include "cx/table.h"
+#include <stdio.h>
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
 typedef struct SceneElement SceneElement;
 typedef struct GeomSurf GeomSurf;
-typedef struct SceneObj SceneObj;
+typedef struct GeomObj GeomObj;
+typedef struct GeomInst GeomInst;
 typedef struct Scene Scene;
 
 struct SceneElement
@@ -33,9 +35,21 @@ struct GeomSurf
     uint material;
 };
 
-struct SceneObj
+#ifndef Table_uint
+#define Table_uint Table_uint
+DeclTableT( uint, uint );
+#endif
+
+struct GeomObj
 {
     BBox box;
+    Table(uint) surfidcs;
+};
+
+struct GeomInst
+{
+    Point centroid;
+    PointXfrm orientation;
 };
 
 struct Scene

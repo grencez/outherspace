@@ -21,7 +21,6 @@ set (CSources
     material.c
     order.c
     pnm-image.c
-    point.c
     raytrace.c
     scene.c
     serial.c

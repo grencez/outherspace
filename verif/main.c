@@ -1,5 +1,6 @@
 
 #include "affine.h"
+#include "bbox.h"
 #include "bitstring.h"
 #include "gmrand.h"
 #include "kdtree.h"

@@ -2,10 +2,12 @@
 #ifndef __OPENCL_VERSION__
 #include "kdtree.h"
 
+#include "bbox.h"
 #include "bitstring.h"
 #include "order.h"
 #include "point.h"
 #include "serial.h"
+#include "simplex.h"
 #include "slist.h"
 
 #include <assert.h>
@@ -269,7 +271,7 @@ splitclip_Simplex_BBox (BBox* restrict lobox,
                 m = diffs[pi] / (a->coords[split_dim] - b->coords[split_dim]);
 
                     /* /isect = a + m*(b - a)/ */
-                Op_Point_201200( &isect ,+, a ,m*, -, b , a );
+                mix_Point (&isect, a, b, m);
                 isect.coords[split_dim] = split_pos;
 
                 adjust_BBox (lobox, &isect);

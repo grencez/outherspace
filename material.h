@@ -1,8 +1,6 @@
 
 #ifndef MATERIAL_H_
 #define MATERIAL_H_
-#include "util.h"
-
 #include "affine.h"
 #include "simplex.h"
 

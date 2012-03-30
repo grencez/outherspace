@@ -62,9 +62,6 @@
 #define UUFor( i, ibel, j, jbel )  UFor( i, ibel )  UFor( j, jbel )
 
 
-#define NColors 3
-
-
 typedef int tristate;
 
     /* Note: All functions below are ideally inline'd!*/

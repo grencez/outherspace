@@ -1,6 +1,7 @@
 
 #include "cx/fileb.h"
 #include "pnm-image.h"
+#include "space.h"
 
 #include <string.h>
 

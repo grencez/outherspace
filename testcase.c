@@ -1,6 +1,7 @@
 
 #include "testcase.h"
 
+#include "bbox.h"
 #include "dynamic-setup.h"
 #include "motion.h"
 #include "point.h"

@@ -1,9 +1,11 @@
 
 #include "dynamic-setup.h"
 
+#include "bbox.h"
 #include "point.h"
 #include "slist.h"
 #include "wavefront-file.h"
+#include "xfrm.h"
 
 #include <assert.h>
 #include <math.h>
@@ -143,7 +145,7 @@ add_racers (RaySpace* space, uint nracers, const Track* track,
              */
         back = 2 * q * (+ object->box.min.coords[ForwardDim]
                         - object->box.max.coords[ForwardDim]);
-        Op_Point_2010( &object->centroid ,-, &loc ,back*, &dir );
+        follow_Point (&object->centroid, &loc, &dir, - back);
 
             /* Orientation starts as identity,
              * simply turn the craft's basis to fit.

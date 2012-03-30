@@ -6,8 +6,7 @@
 #include "kdtree.h"
 #include "kptree.h"
 #include "scene.h"
-#include "simplex.h"
-#include "xfrm.h"
+#include "space.h"
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
 typedef struct RaySpace RaySpace;

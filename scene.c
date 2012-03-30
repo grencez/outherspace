@@ -1,9 +1,11 @@
 
 #include "scene.h"
 
+#include "bbox.h"
 #include "order.h"
 #include "point.h"
 #include "serial.h"
+#include "simplex.h"
 #include "xfrm.h"
 
 #include <assert.h>
@@ -709,13 +711,11 @@ interpolate1_Scene (Scene* dst, real alpha,
     copy_Scene (dst, scene_a);
 
     UFor( i, dst->nverts )
-        Op_Point_21010( &dst->verts[i]
-                        ,+, (1-alpha)*, &dst->verts[i]
-                        ,   alpha*, &scene_b->verts[i] );
+        mix_Point (&dst->verts[i], &dst->verts[i], &scene_b->verts[i], alpha);
+
     UFor( i, dst->nvnmls )
-        Op_Point_21010( &dst->vnmls[i]
-                        ,+, (1-alpha)*, &dst->vnmls[i]
-                        ,   alpha*, &scene_b->vnmls[i] );
+        mix_Point (&dst->vnmls[i], &dst->vnmls[i], &scene_b->vnmls[i], alpha);
+
     UFor( i, dst->ntxpts )
         Op_21010( real, NDimensions-1, dst->txpts[i].coords
                   ,+, (1-alpha)*, dst->txpts[i].coords
