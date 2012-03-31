@@ -105,13 +105,18 @@ map0_ogl_matrix (const Point* origin, const PointXfrm* basis)
 
     if (origin)  xfrm_Point (&p, &m, origin);
     else         zero_Point (&p);
-    if (basis)  xfrm_PointXfrm (&m, basis, &m);
+    if (basis)
+    {
+        PointXfrm tmp;
+        xfrmtr_PointXfrm (&tmp, &m, basis);
+        m = tmp;
+    }
 
     UFor( i, 3 )
     {
         uint j;
         UFor( j, 3 )
-            matrix[4 * i + j] = m.pts[i].coords[j];
+            matrix[4 * i + j] = m.pts[j].coords[i];
         matrix[4 * i + 3] = 0;
         matrix[4 * 3 + i] = p.coords[i];
     }

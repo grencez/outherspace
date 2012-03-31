@@ -116,7 +116,7 @@ init_ObjectMotion (ObjectMotion* motion, const ObjectRaySpace* object)
     motion->hover_height *= .4;
     motion->escape_height = 5 * motion->hover_height;
     zero_Point (&motion->track_normal);
-    motion->track_normal.coords[0] = 1;
+    motion->track_normal.coords[UpDim] = 1;
     motion->laps = 0;
     motion->checkpoint_idx = 0;
     motion->lock_drift = false;
@@ -348,7 +348,7 @@ apply_track_gravity (ObjectMotion* motion, const RaySpace* space,
     object = &space->objects[objidx];
 
     if (motion->flying)
-        negate_Point (&direct, &orientation->pts[0]);
+        negate_Point (&direct, &orientation->pts[UpDim]);
     else
         negate_Point (&direct, &motion->track_normal);
     copy_Point (&origin, centroid);
@@ -446,7 +446,7 @@ apply_gravity (ObjectMotion* motion, real dt)
         /* TODO: Totally arbitrary gravity!*/
     accel = -1980;
     zero_Point (&dv);
-    dv.coords[0] = accel * dt;
+    dv.coords[UpDim] = accel * dt;
 
     if (!motion->flying)
         orth_unit_Point (&dv, &dv, &motion->track_normal);

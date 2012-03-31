@@ -12,11 +12,12 @@
 #endif
 #define NDims NDimensions
 
-#if 0
+#if 1
 #define FwDim 0
 #define UpDim 1
 #define RtDim 2
 #else
+    /* Old dimension indices.*/
 #define UpDim 0
 #define RtDim 1
 #define FwDim 2

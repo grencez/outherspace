@@ -107,9 +107,9 @@ map_sky_Texture (Color* color, const Texture* texture, const Point* p)
     real zenith, azimuth;
     const byte* pixels;
     
-    x = p->coords[0];
-    y = p->coords[1];
-    z = p->coords[2];
+    x = p->coords[UpDim];
+    y = p->coords[RtDim];
+    z = p->coords[FwDim];
 
         /* TODO: In 4D, this does not work!(?)*/
     zenith = acos (x);

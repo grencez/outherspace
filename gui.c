@@ -261,7 +261,7 @@ key_press_fn (Pilot* pilot, const SDL_keysym* event)
 
         if (FollowRacer)
         {
-            if (dim == 1)
+            if (dim == RtDim)
                 input->horz = - turn;
             else
                 input->vert = turn;
@@ -1213,6 +1213,16 @@ int wrapped_main_fn (int argc, char* argv[])
 
             pilot->craft_idx = i;
             init_RaceCraft (&crafts[pilot->craft_idx]);
+        }
+
+        if (track.nstartlocs > 0)
+        {
+            Pilot* pilot = &pilots[0];
+            pilot->view_origin = track.startlocs[0];
+            identity_PointXfrm (&pilot->view_basis);
+            stable_orthorotate_PointXfrm (&pilot->view_basis,
+                                          &pilot->view_basis,
+                                          &track.startdirs[0], FwDim);
         }
 
         sdl_main (space, inpathname, pilots);
