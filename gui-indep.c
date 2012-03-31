@@ -93,6 +93,8 @@ sync_Pilot (Pilot* gui, Pilot* bkg)
 
     BSfx( bkg,=,gui, ->input );
 
+    gui->input.light_to_camera = false;
+
     { BLoop( i, 2 )
         gui->input.orbit[i] = 0;
         gui->input.pan[i] = 0;
@@ -188,7 +190,10 @@ update_object_motion (ObjectMotion* motion, const MotionInput* input)
 static real
 screen_mag(const Pilot* p, real d)
 {
-    return 2 * d * tan(.5 * p->view_angle);
+    if (p->ray_image.perspective)
+        return 2 * d * tan(.5 * p->view_angle);
+    else
+        return p->ray_image.hifov;
 }
 
     /** When not following the racer,
@@ -256,9 +261,7 @@ update_camera_location (Pilot* pilot, const MotionInput* input, real dt)
         init_Plane (&w, &view_basis->pts[FwDim], view_origin);
         d = dist_Plane (&w, &pilot->orbit_focus);
         m = d * (- 4 * input->zoom);
-        Op_Point_2010( view_origin
-                       ,+, view_origin
-                       ,   m*, &view_basis->pts[FwDim] );
+        follow_Point (view_origin, view_origin, &view_basis->pts[FwDim], m);
     }
     if (input->orbit[0] != 0 || input->orbit[1] != 0)
     {
@@ -745,8 +748,11 @@ update_pilot_images (RaySpace* space, real frame_t1)
 
 
         update_view_params (pilot, &pilot->input, space);
-        copy_Point (&origin, &pilot->view_origin);
-        copy_PointXfrm (&basis, &pilot->view_basis);
+        origin = pilot->view_origin;
+        basis = pilot->view_basis;
+
+        if (pilot->input.light_to_camera && space->nlights > 0)
+            space->lights[0].location = origin;
 
         if (ray_image->perspective)  ray_image->hifov = pilot->view_angle;
         else                         ray_image->hifov = pilot->view_width;

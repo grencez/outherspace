@@ -47,9 +47,13 @@ first_pack_KDTreeNode (uintPack* ret_nodes,
         scat_PointPack (direct, &directs[i]);
 
         UFor( j, RayPacketDimSz )
-            node[j] = first_KDTreeNode (&parent[j],
-                                        &origin[j], &direct[j],
+        {
+            Ray ray;
+            ray.origin = origin[j];
+            ray.direct = direct[j];
+            node[j] = first_KDTreeNode (&parent[j], &ray,
                                         nodes, box, inside_box[j]);
+        }
 
         ret_nodes[i] = pack_uintPack (node);
         ret_parents[i] = pack_uintPack (parent);
@@ -96,21 +100,22 @@ next_pack_KDTreeNode (uintPack* ret_nodes,
         UFor( j, RayPacketDimSz )
         {
             uint dim;
-            Point origin, direct, rdirect;
+            Ray ray;
+            Point rdirect;
 
             if (hit_in_box[j])  continue;
 
             UFor( dim, NDimensions )
             {
-                origin.coords[dim] = origins[i].vcoords[dim][j];
-                direct.coords[dim] = directs[i].vcoords[dim][j];
+                ray.origin.coords[dim] = origins[i].vcoords[dim][j];
+                ray.direct.coords[dim] = directs[i].vcoords[dim][j];
                 rdirect.coords[dim] = rdirects[i].vcoords[dim][j];
             }
 
             do
             {
                 node_idx[j] = next_KDTreeNode (&parent_idx[j],
-                                               &origin, &direct, &rdirect,
+                                               &ray, &rdirect,
                                                hit_mag[j],
                                                node_idx[j], nodes);
             } while (node_idx[j] != Max_uint &&
@@ -351,35 +356,20 @@ RayCastAPriori_to_RayPacket (RayPacket* pkt,
                              uint row_off, uint col_off,
                              const RayImage* image)
 {
-    uint i, j;
-    PointPack col_directs;
-    PointPack directs[RayPacketDimSz];
-
-    UUFor( i, NDimensions, j, RayPacketDimSz )
-        col_directs.vcoords[i][j] =  known->col_delta.coords[i] * (j+col_off);
-
-    UFor( i, RayPacketDimSz )
-    {
-        Point tmp;
-        scale_Point (&tmp, &known->row_delta, i+row_off);
-        summ_Point (&tmp, &tmp, &known->dir_start);
-        fill_PointPack (&directs[i], &tmp);
-        summ_PointPack (&directs[i], &directs[i], &col_directs);
-    }
-
-    UFor( i, RayPacketDimSz )
-    {
-        if (image->perspective)
-        {
-            fill_PointPack (&pkt->origins[i], &known->origin);
-            normalize_PointPack (&pkt->directs[i], &directs[i]);
-        }
-        else
-        {
-            copy_PointPack (&pkt->origins[i], &directs[i]);
-            fill_PointPack (&pkt->directs[i], &known->origin);
-        }
-    }
+    { BLoop( row, RayPacketDimSz )
+        { BLoop( col, RayPacketDimSz )
+            Ray ray;
+            ray_from_RayCastAPriori (&ray, known,
+                                     row_off + row, col_off + col,
+                                     image);
+            { BLoop( dim, NDims )
+                pkt->origins[row].vcoords[dim][col] =
+                    ray.origin.coords[dim];
+                pkt->directs[row].vcoords[dim][col] =
+                    ray.direct.coords[dim];
+            } BLose()
+        } BLose()
+    } BLose()
 }
 
 static
@@ -439,7 +429,7 @@ cast_packet_RayImage (RayImage* image, uint row_off, uint col_off,
             if (image->pixels)
             {
                 uint dim;
-                real colors[NColors];
+                Color color;
                 uint color_idx;
                 Point origin, direct;
 
@@ -449,15 +439,15 @@ cast_packet_RayImage (RayImage* image, uint row_off, uint col_off,
                     direct.coords[dim] = pkt.directs[i].vcoords[dim][j];
                 }
 
-                UFor( color_idx, NColors )  colors[color_idx] = 0;
-                fill_pixel (colors,
+                zero_Color (&color);
+                fill_pixel (&color,
                             hit_inds[j], hit_mags[j], hit_objs[j],
                             image, &origin, &direct,
                             space, 0);
                 UFor( color_idx, NColors )
                 {
                     image->pixels[3*img_idx + color_idx] = (byte)
-                        clamp_real (255.5 * colors[color_idx], 0, 255.5);
+                        clamp_real (255.5 * color.coords[color_idx], 0, 255.5);
                 }
             }
         }

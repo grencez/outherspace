@@ -515,12 +515,8 @@ ogl_redraw (const RaySpace* space, uint pilot_idx)
     }
     else
     {
-        uint max_n;
-        real horz, vert;
-        if (width >= height)  max_n = width;
-        else                  max_n = height;
-        horz = .5 * pilot->ray_image.hifov * (width / (real) max_n);
-        vert = .5 * pilot->ray_image.hifov * (height / (real) max_n);
+        real vert = .5 * pilot->ray_image.hifov;
+        real horz = vert * (width / (real) height);
 
         glOrtho (-horz, horz, -vert, vert,
                  near_mag, far_mag);
@@ -548,8 +544,8 @@ ogl_redraw (const RaySpace* space, uint pilot_idx)
 
     if (space->nlights > 0)
     {
-        const GLfloat light_ambient[] = {0.2, 0.2, 0.2, 1.0};
-            /* GLfloat light_ambient[] = {0, 0, 0, 1}; */
+        const GLfloat light_ambient[] = {1.0, 1.0, 1.0, 1.0};
+            /* const GLfloat light_ambient[] = {0.2, 0.2, 0.2, 1.0}; */
         const GLfloat light_diffuse[] = {1.0, 1.0, 1.0, 1.0};
             /* GLfloat light_diffuse[] = {1.0, 0.0, 0.0, 1.0}; */
         const GLfloat light_specular[] = {1.0, 1.0, 1.0, 1.0};
@@ -636,8 +632,7 @@ ogl_set_GeomSurf (const GeomSurf* surf,
     UFor( j, 3 )  color[j] = matl->specular.coords[j];
     glMaterialfv (GL_FRONT_AND_BACK, GL_SPECULAR, color);
 
-    glMaterialf (GL_FRONT_AND_BACK, GL_SHININESS,
-                 matl->optical_density);
+    glMaterialf (GL_FRONT_AND_BACK, GL_SHININESS, matl->shininess);
 
         /* These are hard-coded texture numbers set in init_ogl_ui_data()!*/
     flag = (matl->ambient_texture < Max_uint);

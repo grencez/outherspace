@@ -71,9 +71,9 @@ struct RayImage
 struct RayCastAPriori
 {
     Point origin;
-    Point dir_start;
-    Point row_delta;
-    Point col_delta;
+    PointXfrm basis;
+    real up_scale;
+    real rt_scale;
     bool inside_box;
 };
 

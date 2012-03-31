@@ -295,6 +295,7 @@ ifneq (,$(filter sse,$(CONFIG)))
 	CFLAGS += -msse -msse2
 	DFLAGS += -DPackOpsAvail
 	CSources += pack.c
+	GuiMainCSources += raytrace-pack.c
 endif
 
 LFLAGS += -lm

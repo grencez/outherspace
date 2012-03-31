@@ -74,25 +74,10 @@ cast_to_light (const RaySpace* restrict space,
                const Point* restrict dir,
                real magtolight);
 static void
-setup_ray_pixel_deltas_orthographic (Point* origin_start,
-                                     Point* row_delta,
-                                     Point* col_delta,
-                                     uint nrows, uint ncols,
-                                     const Point* origin,
-                                     const PointXfrm* view_basis,
-                                     real view_width);
-static void
 cast_row_orthographic (RayImage* restrict image,
                        uint row,
                        const RaySpace* restrict space,
                        const RayCastAPriori* restrict known);
-static void
-setup_ray_pixel_deltas_perspective (Point* dir_start,
-                                    Point* row_delta,
-                                    Point* col_delta,
-                                    uint nrows, uint ncols,
-                                    const PointXfrm* view_basis,
-                                    real view_angle);
 static void
 cast_row_perspective (RayImage* image, uint row,
                       const RaySpace* restrict space,
@@ -1016,13 +1001,11 @@ fill_pixel (Color* ret_color,
 
         follow_Point (&isect, origin, dir, mag);
 
-        UFor( i, space->nlights )
-        {
+        { BLoop( light_idx, space->nlights )
             real tscale, magtolight;
             Point tolight;
-            const PointLightSource* light;
+            const PointLightSource* const light = &space->lights[light_idx];
 
-            light = &space->lights[i];
             if (!light->on)  continue;
             diff_Point (&tolight, &light->location, &isect);
 
@@ -1061,7 +1044,7 @@ fill_pixel (Color* ret_color,
                     }
                 }
             }
-        }
+        } BLose()
 
         UFor( i, NColors )
             color.coords[i] *=
@@ -1667,45 +1650,6 @@ rays_to_hits_fixed_plane (uint* hits, real* mags,
 
 
     void
-setup_ray_pixel_deltas_orthographic (Point* origin_start,
-                                     Point* row_delta,
-                                     Point* col_delta,
-                                     uint nrows, uint ncols,
-                                     const Point* origin,
-                                     const PointXfrm* view_basis,
-                                     real view_width)
-{
-    const uint row_dim = UpDim, col_dim = RightDim;
-    uint max_n;
-    Point diff;
-    real tstart, tdelta;
-    real eff_width;
-
-    copy_Point (origin_start, origin);
-
-    if (nrows >= ncols)  max_n = nrows;
-    else                 max_n = ncols;
-
-    tdelta = view_width / max_n;
-
-
-    eff_width = (view_width * nrows) / max_n;
-    tstart = (- eff_width + tdelta) / 2;
-
-    scale_Point (row_delta, &view_basis->pts[row_dim], tdelta);
-    scale_Point (&diff, &view_basis->pts[row_dim], tstart);
-    summ_Point (origin_start, origin_start, &diff);
-
-    eff_width = (view_width * ncols) / max_n;
-    tstart = (- eff_width + tdelta) / 2;
-
-    scale_Point (col_delta, &view_basis->pts[col_dim], tdelta);
-    scale_Point (&diff, &view_basis->pts[col_dim], tstart);
-    summ_Point (origin_start, origin_start, &diff);
-}
-
-
-    void
 cast_row_orthographic (RayImage* restrict image,
                        uint row,
                        const RaySpace* restrict space,
@@ -1714,7 +1658,6 @@ cast_row_orthographic (RayImage* restrict image,
     uint col, ncols;
     const BBox* box;
     const Point* dir;
-    Point partial_ray_origin;
     uint* hitline = 0;
     real* magline = 0;
     byte* pixline = 0;
@@ -1726,18 +1669,21 @@ cast_row_orthographic (RayImage* restrict image,
     if (image->mags)  magline = &image->mags[row * image->stride];
     if (image->pixels)  pixline = &image->pixels[row * 3 * image->stride];
 
-        /* For orthographic view, origin and direction storage are swapped.*/
-    dir = &known->origin;
-    scale_Point (&partial_ray_origin, &known->row_delta, row);
-    summ_Point (&partial_ray_origin, &partial_ray_origin, &known->dir_start);
+    dir = &known->basis.pts[FwDim];
 
     UFor( col, ncols )
     {
         Point ray_origin;
         bool inside_box;
 
-        scale_Point (&ray_origin, &known->col_delta, col);
-        summ_Point (&ray_origin, &ray_origin, &partial_ray_origin);
+        ray_origin = known->origin;
+        follow_Point (&ray_origin, &ray_origin,
+                      &known->basis.pts[UpDim],
+                      known->up_scale * (-1 + (2*row+1.0) / image->nrows));
+        follow_Point (&ray_origin, &ray_origin,
+                      &known->basis.pts[RtDim],
+                      known->rt_scale * (-1 + (2*col+1.0) / image->ncols));
+
         inside_box = inside_BBox (box, &ray_origin);
 
         cast_record (hitline, magline, pixline, col,
@@ -1749,63 +1695,12 @@ cast_row_orthographic (RayImage* restrict image,
 
 
     void
-setup_ray_pixel_deltas_perspective (Point* dir_start,
-                                    Point* row_delta,
-                                    Point* col_delta,
-                                    uint nrows, uint ncols,
-                                    const PointXfrm* view_basis,
-                                    real view_angle)
-{
-    const uint row_dim = UpDim;
-    const uint col_dim = RightDim;
-    const uint dir_dim = ForwardDim;
-    Point dstart, rdelta, cdelta;
-    real halflen;
-    halflen = sin (view_angle / 2);
-
-    zero_Point (&dstart);
-    zero_Point (&rdelta);
-    zero_Point (&cdelta);
-
-        /* Make view angle...
-         * Vertical: true
-         * Min Angle: nrows <= ncols
-         * Max Angle: nrows >= ncols 
-         *
-         * OpenGL version fixes FOV to vertical, use that.
-         */
-    if (true)
-    {
-        dstart.coords[row_dim] = - halflen;
-        dstart.coords[col_dim] = - (halflen * ncols) / nrows;
-    }
-    else
-    {
-        dstart.coords[row_dim] = - (halflen * nrows) / ncols;
-        dstart.coords[col_dim] = - halflen;
-    }
-    dstart.coords[dir_dim] = 1;
-
-    rdelta.coords[row_dim] = -2 * dstart.coords[row_dim] / nrows;
-    cdelta.coords[col_dim] = -2 * dstart.coords[col_dim] / ncols;
-
-    dstart.coords[row_dim] -= dstart.coords[row_dim] / nrows;
-    dstart.coords[col_dim] -= dstart.coords[col_dim] / ncols;
-
-    trxfrm_Point (dir_start, view_basis, &dstart);
-    trxfrm_Point (row_delta, view_basis, &rdelta);
-    trxfrm_Point (col_delta, view_basis, &cdelta);
-}
-
-
-    void
 cast_row_perspective (RayImage* image, uint row,
                       const RaySpace* restrict space,
                       const RayCastAPriori* restrict known)
 {
     uint col, ncols;
     const Point* origin;
-    Point partial_dir;
     uint* hitline = 0;
     real* magline = 0;
     byte* pixline = 0;
@@ -1817,7 +1712,6 @@ cast_row_perspective (RayImage* image, uint row,
     if (image->pixels)  pixline = &image->pixels[row * 3 * image->stride];
 
     origin = &known->origin;
-    follow_Point (&partial_dir, &known->dir_start, &known->row_delta, row);
 
     UFor( col, ncols )
     {
@@ -1831,7 +1725,11 @@ cast_row_perspective (RayImage* image, uint row,
         }
 #endif
 
-        follow_Point (&dir, &partial_dir, &known->col_delta, col);
+        zero_Point (&dir);
+        dir.coords[UpDim] = known->up_scale * (-1 + (2*row+1.0) / image->nrows);
+        dir.coords[RtDim] = known->rt_scale * (-1 + (2*col+1.0) / image->ncols);
+        dir.coords[FwDim] = 1;
+        trxfrm_Point (&dir, &known->basis, &dir);
         normalize_Point (&dir, &dir);
 
         cast_record (hitline, magline, pixline, col,
@@ -1918,28 +1816,19 @@ setup_RayCastAPriori (RayCastAPriori* dst,
                       const PointXfrm* view_basis,
                       const BBox* box)
 {
+    dst->origin = *origin;
+    dst->basis = *view_basis;
     if (image->perspective)
     {
-        copy_Point (&dst->origin, origin);
-        setup_ray_pixel_deltas_perspective (&dst->dir_start,
-                                            &dst->row_delta,
-                                            &dst->col_delta,
-                                            image->nrows, image->ncols,
-                                            view_basis,
-                                            image->hifov);
+        dst->up_scale = tan(.5 * image->hifov);
         dst->inside_box = inside_BBox (box, origin);
     }
     else
     {
-        copy_Point (&dst->origin, &view_basis->pts[ForwardDim]);
-        setup_ray_pixel_deltas_orthographic (&dst->dir_start,
-                                             &dst->row_delta,
-                                             &dst->col_delta,
-                                             image->nrows, image->ncols,
-                                             origin, view_basis,
-                                             image->hifov);
+        dst->up_scale = .5 * image->hifov;
         dst->inside_box = false;
     }
+    dst->rt_scale = dst->up_scale * ((real)image->ncols / image->nrows);
 }
 
 
@@ -1949,23 +1838,28 @@ ray_from_RayCastAPriori (Ray* ray,
                          uint row, uint col,
                          const RayImage* image)
 {
-    if (!image->perspective)
+    ray->origin = known->origin;
+    if (image->perspective)
     {
-        copy_Point (&ray->direct, &known->origin);
-        Op_Point_2021010( &ray->origin
-                          ,+, &known->dir_start
-                          ,   +, row*, &known->row_delta
-                          ,      col*, &known->col_delta );
+        zero_Point (&ray->direct);
+        ray->direct.coords[UpDim] =
+            known->up_scale * (-1 + (2*row+1.0) / image->nrows);
+        ray->direct.coords[RtDim] =
+            known->rt_scale * (-1 + (2*col+1.0) / image->ncols);
+        ray->direct.coords[FwDim] = 1;
+        trxfrm_Point (&ray->direct, &known->basis, &ray->direct);
+        normalize_Point (&ray->direct, &ray->direct);
     }
     else
     {
-        copy_Point (&ray->origin, &known->origin);
+        follow_Point (&ray->origin, &ray->origin,
+                      &known->basis.pts[UpDim],
+                      known->up_scale * (-1 + (2*row+1.0) / image->nrows));
+        follow_Point (&ray->origin, &ray->origin,
+                      &known->basis.pts[RtDim],
+                      known->rt_scale * (-1 + (2*col+1.0) / image->ncols));
 
-        Op_Point_2021010( &ray->direct
-                          ,+, &known->dir_start
-                          ,   +, row*, &known->row_delta
-                          ,      col*, &known->col_delta );
-        normalize_Point (&ray->direct, &ray->direct);
+        ray->direct = known->basis.pts[FwDim];
     }
 }
 

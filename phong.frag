@@ -25,8 +25,6 @@ void main()
     Normal = normalize(Normal);
 
     vec3 Light  = normalize(L);
-    vec3 Eye    = normalize(E);
-    vec3 Half   = normalize(H);
 
     vec4 ambient = gl_FrontMaterial.ambient;
     vec4 diffuse = gl_FrontMaterial.diffuse;
@@ -48,13 +46,41 @@ void main()
         specular.rgb += (tex.rgb - specular.rgb) * tex.a;
     }
 
-    ambient *= gl_LightSource[0].ambient;
+    float spotEffect = 1.0;
+    if (gl_LightSource[0].spotCutoff <= 90.0) {
+        spotEffect = dot(normalize(gl_LightSource[0].spotDirection), -Light);
+        if (spotEffect > gl_LightSource[0].spotCosCutoff) {
+            spotEffect = pow(spotEffect, gl_LightSource[0].spotExponent);
+        }
+        else {
+            spotEffect = 0.0;
+        }
+    }
 
-    diffuse *= gl_LightSource[0].diffuse *
-        max(dot(Normal, Light), 0.0);
+    float att = (spotEffect /
+                 (gl_LightSource[0].constantAttenuation
+                  + gl_FogFragCoord *
+                  gl_LightSource[0].linearAttenuation + 
+                  + gl_FogFragCoord * gl_FogFragCoord *
+                  gl_LightSource[0].quadraticAttenuation)); 
 
-    specular *= gl_LightSource[0].specular *
-        pow(max(dot(Half, Normal), 0.0), gl_FrontMaterial.shininess);
+    ambient *= gl_LightModel.ambient + att * gl_LightSource[0].ambient;
+
+    diffuse *= (att *
+                gl_LightSource[0].diffuse *
+                max(dot(Normal, Light), 0.0));
+
+#ifdef USE_HALFWAY_VECTOR
+    vec3 Half  = normalize(H);
+    float tcos = max(dot(Half, Normal), 0.0);
+#else
+    vec3 Refl  = - reflect(Light, Normal);
+    vec3 Eye   = normalize(E);
+    float tcos = max(dot(Refl, Eye), 0.0);
+#endif
+    specular *= (att *
+                 gl_LightSource[0].specular *
+                 pow(tcos, gl_FrontMaterial.shininess));
 
     gl_FragColor = ambient + diffuse + specular;
 }

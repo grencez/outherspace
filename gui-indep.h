@@ -39,6 +39,7 @@ struct MotionInput
     real thrust[2];
     real view_azimuthcc;
     real view_zenith;
+    bool light_to_camera;
     bool boost;
     bool inv_vert;
     bool use_roll;

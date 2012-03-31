@@ -23,7 +23,7 @@ $(eval \
   $(call Rule,4d-ray,$(strict) 4d) \
   $(call Rule,4d-ogl,$(strict) 4d) \
   $(call Rule,4dgeom-ogl,$(strict) 4d match4dgeom) \
-  $(call Rule,pack,$(strict) pack) \
+  $(call Rule,pack,$(strict) sse) \
   $(call Rule,trivialmpi,$(strict) trivialmpi) \
   $(call Rule,mpi,$(strict) mpi) \
   $(call Rule,opencl,$(strict) opengl opencl,way-opencl-gui) \

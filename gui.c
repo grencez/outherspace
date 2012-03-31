@@ -141,7 +141,10 @@ key_press_fn (Pilot* pilot, const SDL_keysym* event)
         case SDLK_a:
             dim = ForwardDim; stride = 1; break;
         case SDLK_c:
-            racer_motion->collide = !racer_motion->collide;
+            if (shift_mod)
+                input->light_to_camera = true;
+            else
+                racer_motion->collide = !racer_motion->collide;
             break;
         case SDLK_d:
             if (shift_mod)
@@ -422,6 +425,10 @@ key_press_fn (Pilot* pilot, const SDL_keysym* event)
         SDL_PushEvent (&ev);
         recast = false;
     }
+    else if (input->light_to_camera)
+    {
+            /* Should update!*/
+    }
     else
     {
         recast = false;
@@ -606,7 +613,6 @@ mouse_down_fn (Pilot* pilot,
             if (!didhit)
             {
                 Plane plane;
-                Point p;
                 real d, mag;
                 real diff[2];
                 uint i;
@@ -625,12 +631,12 @@ mouse_down_fn (Pilot* pilot,
                 }
 
                 isect = pilot->view_origin;
-                scale_Point (&p, &pilot->view_basis.pts[FwDim], d);
-                summ_Point (&isect, &isect, &p);
-                scale_Point (&p, &pilot->view_basis.pts[UpDim], diff[0]);
-                summ_Point (&isect, &isect, &p);
-                scale_Point (&p, &pilot->view_basis.pts[RtDim], diff[1]);
-                summ_Point (&isect, &isect, &p);
+                follow_Point (&isect, &isect,
+                              &pilot->view_basis.pts[FwDim], d);
+                follow_Point (&isect, &isect,
+                              &pilot->view_basis.pts[UpDim], diff[0]);
+                follow_Point (&isect, &isect,
+                              &pilot->view_basis.pts[RtDim], diff[1]);
             }
             pilot->orbit_focus = isect;
         }
