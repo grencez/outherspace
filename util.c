@@ -70,31 +70,12 @@ array_cat (void* dst, const void* src, uint* end, uint count, size_t size)
 
 char* strto_uint (uint* ret, const char* in)
 {
-    unsigned long v;
-    char* out = 0;
-
-    assert (ret);
-    assert (in);
-    v = strtoul (in, &out, 10);
-
-    if (v > Max_uint)  out = 0;
-    if (out == in)  out = 0;
-    if (out)  *ret = (uint) v;
-    return out;
+    return load_uint_cstr (ret, in);
 }
 
 char* strto_real (real* ret, const char* in)
 {
-    double v;
-    char* out = 0;
-
-    assert (ret);
-    assert (in);
-    v = strtod (in, &out);
-
-    if (out == in)  out = 0;
-    if (out)  *ret = (real) v;
-    return out;
+    return load_real_cstr (ret, in);
 }
 
     uint

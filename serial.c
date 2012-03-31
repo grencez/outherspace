@@ -21,9 +21,32 @@ dumpp_PointXfrm (FileB* f, const PointXfrm* A)
         if (ci > 0)  dump_char_FileB (f, ',');
         dumpp_Point (f, &A->pts[ci]);
     } BLose()
-    dump_char_FileB (f, ')');
+    dump_char_FileB (f, ']');
 }
 
+    bool
+load_Point (FileB* f, Point* x)
+{
+    if (!f->good)  return false;
+    nextds_FileB (f, NULL, "(");
+    { BLoop( i, NDims )
+        load_real_FileB (f, &x->coords[i]);
+        nextds_FileB (f, NULL, (i < NDims-1) ? "," : ")");
+    } BLose()
+    return f->good;
+}
+
+    bool
+load_PointXfrm (FileB* f, PointXfrm* A)
+{
+    if (!f->good)  return false;
+    nextds_FileB (f, NULL, "[");
+    { BLoop( i, NDims )
+        load_Point (f, &A->pts[i]);
+        nextds_FileB (f, NULL, (i < NDims-1) ? "," : "]");
+    } BLose()
+    return f->good;
+}
 
 
 void output_Point (FILE* out, const Point* point)

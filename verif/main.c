@@ -274,6 +274,34 @@ testfn_trxfrm_BBox ()
     AssertApprox( 5, box.max.coords[1], 5, 1e0 );
 }
 
+static
+    void
+testfn_serial ()
+{
+    GMRand gmrand;
+    init_GMRand (&gmrand);
+
+    { BLoop( testidx, 1e5 )
+        DecloStack( FileB, f );
+        DecloStack( FileB, olay );
+        Point expect, result;
+
+        { BLoop( i, NDims )
+            expect.coords[i] = 1e7 * real_GMRand (&gmrand);
+        } BLose()
+
+        init_FileB (f);
+        f->sink = true;
+        dumpp_Point (f, &expect);
+        olay_FileB (olay, f);
+        load_Point (olay, &result);
+
+        Claim( equal_Point (&expect, &result) );
+        lose_FileB (olay);
+        lose_FileB (f);
+    } BLose()
+}
+
     /** First crack at a verification function.
      * This is not a truly good one because it uses random values
      * instead of iterating through all possible ones.
@@ -393,6 +421,7 @@ int main (int argc, char** argv)
     testfn_KPTree ();
     testfn_PointXfrm ();
     testfn_trxfrm_BBox ();
+    testfn_serial ();
     testfn_SList ();
     testfn_order ();
     testfn_pack ();

@@ -9,6 +9,11 @@ dumpp_Point (FileB* f, const Point* x);
 void
 dumpp_PointXfrm (FileB* f, const PointXfrm* A);
 
+bool
+load_Point (FileB* f, Point* x);
+bool
+load_PointXfrm (FileB* f, PointXfrm* A);
+
 #include <stdio.h>
 
 void output_Point (FILE* out, const Point* point);
