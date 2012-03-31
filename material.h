@@ -1,8 +1,7 @@
 
 #ifndef MATERIAL_H_
 #define MATERIAL_H_
-#include "affine.h"
-#include "simplex.h"
+#include "space.h"
 
 typedef struct Texture Texture;
 typedef struct Material Material;
@@ -48,7 +47,7 @@ bool
 readin_Texture (Texture* texture, const char* pathname, const char* filename);
 
 void
-remap_bumps_Texture (Texture* texture, const AffineMap* map);
+remap_bumps_Texture (Texture* texture, const IAMap* map);
 
 #ifdef IncludeC
 #include "material.c"

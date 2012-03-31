@@ -2,6 +2,7 @@
 #ifndef __OPENCL_VERSION__
 #include "raytrace.h"
 
+#include "affine.h"
 #include "bbox.h"
 #include "bitstring.h"
 #include "color.h"

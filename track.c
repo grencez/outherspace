@@ -14,7 +14,7 @@ init_Track (Track* track)
 }
 
     void
-cleanup_Track (Track* track)
+lose_Track (Track* track)
 {
     uint i;
     if (track->ncheckplanes > 0)

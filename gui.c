@@ -612,7 +612,7 @@ mouse_down_fn (Pilot* pilot,
                 uint i;
 
                 init_Plane (&plane,
-                            &pilot->view_basis.pts[FoDim],
+                            &pilot->view_basis.pts[FwDim],
                             &pilot->view_origin);
                 d = dist_Plane (&plane, &pilot->orbit_focus);
                 mag = screen_mag (pilot, d);
@@ -625,11 +625,11 @@ mouse_down_fn (Pilot* pilot,
                 }
 
                 isect = pilot->view_origin;
-                scale_Point (&p, &pilot->view_basis.pts[FoDim], d);
+                scale_Point (&p, &pilot->view_basis.pts[FwDim], d);
                 summ_Point (&isect, &isect, &p);
                 scale_Point (&p, &pilot->view_basis.pts[UpDim], diff[0]);
                 summ_Point (&isect, &isect, &p);
-                scale_Point (&p, &pilot->view_basis.pts[RiDim], diff[1]);
+                scale_Point (&p, &pilot->view_basis.pts[RtDim], diff[1]);
                 summ_Point (&isect, &isect, &p);
             }
             pilot->orbit_focus = isect;
@@ -1232,7 +1232,7 @@ int wrapped_main_fn (int argc, char* argv[])
 #endif
 
     cleanup_RaySpace (space);
-    cleanup_Track (&track);
+    lose_Track (&track);
 
     return 0;
 }

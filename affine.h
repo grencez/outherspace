@@ -1,51 +1,54 @@
 
-#ifndef AffineMap_H_
-#define AffineMap_H_
+#ifndef IAMap_H_
+#define IAMap_H_
 #include "space.h"
 
-typedef struct AffineMap AffineMap;
-
+#if 0
     /**
      * map (x) = xlat + xfrm scale x
      * map^-1 (x) = (xfrm^-1 (x - xlat)) / scale
      **/
-struct AffineMap
+struct IAMap
 {
     PointXfrm xfrm;
     Point xlat;
     Point scale;
 };
+#endif
 
 void
-identity_AffineMap (AffineMap* map);
-void
-mapo_Point (Point* dst, const AffineMap* map, const Point* src);
-void
-mapvec_Point (Point* dst, const AffineMap* map, const Point* src);
-void
-map_Point (Point* dst, const AffineMap* map, const Point* src);
-void
-map_Ray (Ray* dst, const AffineMap* map, const Ray* src);
+follow_Ray (Point* isect, const Ray* ray, real mag);
 
 void
-invmapvec_Point (Point* dst, const AffineMap* map, const Point* src);
+identity_IAMap (IAMap* map);
 void
-invmap_Point (Point* dst, const AffineMap* map, const Point* src);
+mapo_Point (Point* dst, const IAMap* map, const Point* src);
 void
-invmap_Ray (Ray* dst, const AffineMap* map, const Ray* src);
+mapvec_Point (Point* dst, const IAMap* map, const Point* src);
+void
+map_Point (Point* dst, const IAMap* map, const Point* src);
+void
+map_Ray (Ray* dst, const IAMap* map, const Ray* src);
 
 void
-scale0_AffineMap (AffineMap* map, real x);
+invmapvec_Point (Point* dst, const IAMap* map, const Point* src);
 void
-prod0_AffineMap (AffineMap* map, const Point* a);
+invmap_Point (Point* dst, const IAMap* map, const Point* src);
 void
-xlat0_AffineMap (AffineMap* map, const Point* a);
+invmap_Ray (Ray* dst, const IAMap* map, const Ray* src);
+
 void
-xfrm0_AffineMap (AffineMap* map, const PointXfrm* a);
+scale0_IAMap (IAMap* map, real x);
 void
-xlat_AffineMap (AffineMap* B, const Point* x, const AffineMap* A);
+prod0_IAMap (IAMap* map, const Point* a);
 void
-xfrm_AffineMap (AffineMap* C, const PointXfrm* A, const AffineMap* B);
+xlat0_IAMap (IAMap* map, const Point* a);
+void
+xfrm0_IAMap (IAMap* map, const PointXfrm* a);
+void
+xlat_IAMap (IAMap* B, const Point* x, const IAMap* A);
+void
+xfrm_IAMap (IAMap* C, const PointXfrm* A, const IAMap* B);
 
 #ifdef IncludeC
 #include "affine.c"

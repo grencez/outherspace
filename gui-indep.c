@@ -236,7 +236,7 @@ update_camera_location (Pilot* pilot, const MotionInput* input, real dt)
         real diff[2];
         Plane w;
 
-        init_Plane (&w, &view_basis->pts[FoDim], view_origin);
+        init_Plane (&w, &view_basis->pts[FwDim], view_origin);
         d = dist_Plane (&w, &pilot->orbit_focus);
 
         h = screen_mag (pilot, d);
@@ -253,41 +253,41 @@ update_camera_location (Pilot* pilot, const MotionInput* input, real dt)
         real d, m;
         Plane w;
 
-        init_Plane (&w, &view_basis->pts[FoDim], view_origin);
+        init_Plane (&w, &view_basis->pts[FwDim], view_origin);
         d = dist_Plane (&w, &pilot->orbit_focus);
         m = d * (- 4 * input->zoom);
         Op_Point_2010( view_origin
                        ,+, view_origin
-                       ,   m*, &view_basis->pts[FoDim] );
+                       ,   m*, &view_basis->pts[FwDim] );
     }
     if (input->orbit[0] != 0 || input->orbit[1] != 0)
     {
         real rev;
         PointXfrm rot, tilt, B;
-        AffineMap map;
+        IAMap map;
         PointXfrm xfrm;
         Point p;
 
         rev = sqrt (+ input->orbit[0] * input->orbit[0]
                     + input->orbit[1] * input->orbit[1]);
-        rotn_PointXfrm (&rot, UpDim, FoDim, -rev);
+        rotn_PointXfrm (&rot, UpDim, FwDim, -rev);
         rotation_PointXfrm (&tilt, UpDim, RightDim,
                             - atan2_real (input->orbit[1], input->orbit[0]));
 
-        identity_AffineMap (&map);
+        identity_IAMap (&map);
         transpose_PointXfrm (&map.xfrm, view_basis);
         map.xlat = *view_origin;
 
         xfrmtr_PointXfrm (&B, &tilt, &map.xfrm);
 
         negate_Point (&p, &pilot->orbit_focus);
-        xlat_AffineMap (&map, &p, &map);
+        xlat_IAMap (&map, &p, &map);
 
         trxfrm_PointXfrm (&xfrm, &B, &rot);
         xfrm_PointXfrm (&xfrm, &xfrm, &B);
-        xfrm_AffineMap (&map, &xfrm, &map);
+        xfrm_IAMap (&map, &xfrm, &map);
 
-        xlat_AffineMap (&map, &pilot->orbit_focus, &map);
+        xlat_IAMap (&map, &pilot->orbit_focus, &map);
 
         orthonormalize_PointXfrm (&xfrm, &map.xfrm);
         transpose_PointXfrm (view_basis, &xfrm);

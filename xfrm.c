@@ -10,12 +10,6 @@
 #include <string.h>
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
-    void
-follow_Ray (Point* isect, const Ray* ray, real mag)
-{
-    follow_Point (isect, &ray->origin, &ray->direct, mag);
-}
-
 void zero_PointXfrm (PointXfrm* xfrm)
 {
 #ifdef __OPENCL_VERSION__

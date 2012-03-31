@@ -20,6 +20,7 @@ int main (int argc, char** argv)
     PointXfrm view_basis;
     bool write_image = true;
     real t0;
+    Track track;
 
 #ifdef DistribCompute
     init_compute (&argc, &argv);
@@ -29,6 +30,7 @@ int main (int argc, char** argv)
 #endif
 
     out = stdout;
+    init_Track (&track);
     init_RayImage (&image);
 
 #if 1
@@ -45,6 +47,19 @@ int main (int argc, char** argv)
     image.nrows = 1000;
     image.ncols = 1000;
     image.pixels = AllocT( byte, 1 );
+    good = readin_Track (&track, &space, pathname, "curve-track.txt");
+    if (good)
+    {
+        view_origin = track.startlocs[0];
+        identity_PointXfrm (&view_basis);
+        stable_orthorotate_PointXfrm (&view_basis, &view_basis,
+                                      &track.startdirs[0], FwDim);
+        image.hifov = 60 * M_PI / 180;
+    }
+#elif 0
+    image.nrows = 1000;
+    image.ncols = 1000;
+    image.pixels = AllocT( byte, 1 );
     good = setup_testcase_simple (&space, &view_origin,
                                   &view_basis, &image.hifov,
                                   pathname, "machine0.obj");
@@ -52,13 +67,7 @@ int main (int argc, char** argv)
     image.nrows = 1500;
     image.ncols = 1500;
     image.pixels = AllocT( byte, 1 );
-    good =
-#if 0
-#elif 0
-        setup_testcase_track
-#elif 1
-        setup_testcase_sphere
-#endif
+    good = setup_testcase_track
         (&space, &view_origin, &view_basis, &image.hifov,
          pathname);
 #endif
@@ -153,6 +162,7 @@ int main (int argc, char** argv)
     cleanup_RayImage (&image);
 
     cleanup_RaySpace (&space);
+    lose_Track (&track);
 
 #ifdef DistribCompute
     cleanup_compute ();

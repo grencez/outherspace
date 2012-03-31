@@ -3,7 +3,6 @@
 #ifndef __OPENCL_VERSION__
 #define SCENE_H_
 
-#include "affine.h"
 #include "space.h"
 #include "material.h"
 #include "cx/table.h"
@@ -73,9 +72,9 @@ struct Scene
 };
 
 void
-map_Scene (Scene* scene, const AffineMap* map);
+map_Scene (Scene* scene, const IAMap* map);
 void
-recenter_Scene (AffineMap* map, const Scene* scene,
+recenter_Scene (IAMap* map, const Scene* scene,
                 const Point* new_centroid);
 
 #ifndef __OPENCL_VERSION__

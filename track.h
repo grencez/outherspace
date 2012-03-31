@@ -25,7 +25,7 @@ struct Track
 void
 init_Track (Track* track);
 void
-cleanup_Track (Track* track);
+lose_Track (Track* track);
 
 #ifdef IncludeC
 #include "track.c"

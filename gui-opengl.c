@@ -79,7 +79,7 @@ view_element (Point* ret_verts,
               Point* ret_vnmls,
               const SceneElement* elem,
               const Scene* scene,
-              const AffineMap* map,
+              const IAMap* map,
               const Point* normal);
 #endif
 
@@ -483,7 +483,7 @@ ogl_redraw (const RaySpace* space, uint pilot_idx)
     glClear (GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 
     ray.origin = pilot->view_origin;
-    ray.direct = pilot->view_basis.pts[FoDim];
+    ray.direct = pilot->view_basis.pts[FwDim];
 
     UFor( i, 3 )
     {
@@ -692,8 +692,8 @@ ogl_immediate_redraw_ObjectRaySpace (const RaySpace* space,
     uint material_idx = Max_uint;
 #if NDimensions == 4
 # ifdef Match4dGeom
-    AffineMap affine_map;
-    AffineMap* map;
+    IAMap affine_map;
+    IAMap* map;
     (void) view_basis;  /* TODO: Use this.*/
 # else
     Scene interp4d_scene;
@@ -714,7 +714,7 @@ ogl_immediate_redraw_ObjectRaySpace (const RaySpace* space,
 #if NDimensions == 4
 # ifdef Match4dGeom
     map = &affine_map;
-    identity_AffineMap (map);
+    identity_IAMap (map);
     map->xlat.coords[DriftDim] = (+ object->centroid.coords[DriftDim]
                                   - view_origin->coords[DriftDim]);
 # else
@@ -890,9 +890,9 @@ ogl_redraw_ObjectRaySpace (const RaySpace* space,
 #ifdef Match4dGeom
 #ifdef SupportOpenCL
     {
-        AffineMap map;
+        IAMap map;
 
-        identity_AffineMap (&map);
+        identity_IAMap (&map);
         map.xlat.coords[DriftDim] = (+ object->centroid.coords[DriftDim]
                                      - view_origin->coords[DriftDim]);
 
@@ -1003,7 +1003,7 @@ view_element (Point* ret_verts,
               Point* ret_vnmls,
               const SceneElement* elem,
               const Scene* scene,
-              const AffineMap* map,
+              const IAMap* map,
               const Point* normal)
 {
     uint i, k = 0;

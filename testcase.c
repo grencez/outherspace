@@ -1,12 +1,14 @@
 
 #include "testcase.h"
 
+#include "affine.h"
 #include "bbox.h"
 #include "color.h"
 #include "dynamic-setup.h"
 #include "motion.h"
 #include "point.h"
 #include "serial.h"
+#include "simplex.h"
 #include "wavefront-file.h"
 #include "xfrm.h"
 
@@ -72,7 +74,7 @@ setup_testcase_simple (RaySpace* space,
                        const char* pathname,
                        const char* file)
 {
-    AffineMap map;
+    IAMap map;
     bool good;
     Point v;
 
@@ -96,7 +98,7 @@ setup_testcase_simple (RaySpace* space,
     if (!good)  return false;
     condense_Scene (&space->main.scene);
 
-    identity_AffineMap (&map);
+    identity_IAMap (&map);
     parse_coord_system (&map.xfrm, "right up back");
         /* Actually though, we probably want to look at the thing head-on.*/
     parse_coord_system (&map.xfrm, "right up for");
@@ -146,7 +148,7 @@ setup_testcase_track (RaySpace* space,
                       real* view_angle,
                       const char* pathname)
 {
-    AffineMap map;
+    IAMap map;
     bool good;
 
     init_RaySpace (space);
@@ -183,13 +185,13 @@ setup_testcase_track (RaySpace* space,
     if (!good)  return false;
     condense_Scene (&space->main.scene);
 
-    identity_AffineMap (&map);
+    identity_IAMap (&map);
     parse_coord_system (&map.xfrm, "right up back");
 
     if (true)
-        scale0_AffineMap (&map, 700);
+        scale0_IAMap (&map, 700);
     else if (false)
-        scale0_AffineMap (&map, 20);
+        scale0_IAMap (&map, 20);
     map_Scene (&space->main.scene, &map);
 
     good = add_sky_texture (space, pathname, "iras.png");

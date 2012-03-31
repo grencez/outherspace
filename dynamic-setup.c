@@ -1,9 +1,11 @@
 
 #include "dynamic-setup.h"
 
+#include "affine.h"
 #include "bbox.h"
 #include "color.h"
 #include "point.h"
+#include "simplex.h"
 #include "slist.h"
 #include "wavefront-file.h"
 #include "xfrm.h"
@@ -171,9 +173,9 @@ readin_Track (Track* track, RaySpace* space,
     FILE* in;
     FILE* out = stderr;
     PointXfrm coord_system;
-    AffineMap model_map;  /* Use to save model transformation.*/
-    AffineMap affine_map;
-    AffineMap* map;
+    IAMap model_map;  /* Use to save model transformation.*/
+    IAMap affine_map;
+    IAMap* map;
     Point scale;
     Point location;
     SList startloclist, startdirlist;
@@ -186,7 +188,7 @@ readin_Track (Track* track, RaySpace* space,
 
     identity_PointXfrm (&coord_system);
     map = &affine_map;
-    identity_AffineMap (map);
+    identity_IAMap (map);
     model_map = *map;
     zero_Point (&location);
     UFor( i, NDims )  scale.coords[i] = 1;
@@ -366,10 +368,10 @@ readin_Track (Track* track, RaySpace* space,
 
         if (recalc_map)
         {
-            identity_AffineMap (map);
-            xlat0_AffineMap (map, &location);
-            xfrm0_AffineMap (map, &coord_system);
-            prod0_AffineMap (map, &scale);
+            identity_IAMap (map);
+            xlat0_IAMap (map, &location);
+            xfrm0_IAMap (map, &coord_system);
+            prod0_IAMap (map, &scale);
         }
     }
 
@@ -423,7 +425,7 @@ readin_Track (Track* track, RaySpace* space,
 
     bool
 readin_checkplanes (uint* ret_nplanes, Plane** ret_planes, Point** ret_points,
-                    const AffineMap* map,
+                    const IAMap* map,
                     const char* pathname, const char* filename)
 {
     FILE* in;
@@ -519,10 +521,10 @@ parse_coord_system (PointXfrm* a, const char* line)
 
         if      (AccepTok( line, "up" ))     d = 2 * UpDim;
         else if (AccepTok( line, "down" ))   d = 2 * UpDim + 1;
-        else if (AccepTok( line, "right" ))  d = 2 * RiDim;
-        else if (AccepTok( line, "left" ))   d = 2 * RiDim + 1;
-        else if (AccepTok( line, "for" ))    d = 2 * FoDim;
-        else if (AccepTok( line, "back" ))   d = 2 * FoDim + 1;
+        else if (AccepTok( line, "right" ))  d = 2 * RtDim;
+        else if (AccepTok( line, "left" ))   d = 2 * RtDim + 1;
+        else if (AccepTok( line, "for" ))    d = 2 * FwDim;
+        else if (AccepTok( line, "back" ))   d = 2 * FwDim + 1;
 
         good = (d < Max_uint);
         if (good)
@@ -535,8 +537,8 @@ parse_coord_system (PointXfrm* a, const char* line)
     if (good)
     {
         assert (cover[UpDim]);
-        assert (cover[RiDim]);
-        assert (cover[FoDim]);
+        assert (cover[RtDim]);
+        assert (cover[FwDim]);
         permutation_PointXfrm (a, perms);
     }
 
@@ -568,7 +570,7 @@ read_racer (Scene* scene, uint idx, const char* pathname)
     condense_Scene (scene);
 
     {
-        AffineMap map;
+        IAMap map;
         BBox box;
         Point meas;
         real vol, a;
@@ -580,10 +582,10 @@ read_racer (Scene* scene, uint idx, const char* pathname)
                meas.coords[ForwardDim]);
         a = pow (30000 / vol, 1.0 / 3);
 
-        identity_AffineMap (&map);
+        identity_IAMap (&map);
         parse_coord_system (&map.xfrm, "right up back");
         recenter_Scene (&map, scene, 0);
-        scale0_AffineMap (&map, a);
+        scale0_IAMap (&map, a);
         map_Scene (scene, &map);
     }
 

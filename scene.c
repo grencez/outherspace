@@ -1,6 +1,7 @@
 
 #include "scene.h"
 
+#include "affine.h"
 #include "bbox.h"
 #include "order.h"
 #include "point.h"
@@ -723,7 +724,7 @@ interpolate1_Scene (Scene* dst, real alpha,
 }
 
     void
-map_Scene (Scene* scene, const AffineMap* map)
+map_Scene (Scene* scene, const IAMap* map)
 {
     uint i;
     uint prevtex = Max_uint;
@@ -747,7 +748,7 @@ map_Scene (Scene* scene, const AffineMap* map)
 }
 
     void
-recenter_Scene (AffineMap* map, const Scene* scene,
+recenter_Scene (IAMap* map, const Scene* scene,
                 const Point* new_centroid)
 {
     BBox box;
@@ -761,7 +762,7 @@ recenter_Scene (AffineMap* map, const Scene* scene,
         diff_Point (&displacement, new_centroid, &centroid);
     else
         negate_Point (&displacement, &centroid);
-    xlat0_AffineMap (map, &displacement);
+    xlat0_IAMap (map, &displacement);
 }
 
     void

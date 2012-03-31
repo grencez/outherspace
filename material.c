@@ -248,7 +248,7 @@ readin_Texture (Texture* texture, const char* pathname, const char* filename)
 }
 
     void
-remap_bumps_Texture (Texture* texture, const AffineMap* map)
+remap_bumps_Texture (Texture* texture, const IAMap* map)
 {
     uint i, n;
     signed char* pixels;

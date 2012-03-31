@@ -2,6 +2,7 @@
 #ifndef __OPENCL_VERSION__
 #include "simplex.h"
 
+#include "affine.h"
 #include "point.h"
 #include "space-junk.h"
 #include "util.h"
