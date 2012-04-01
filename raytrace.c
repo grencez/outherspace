@@ -641,6 +641,9 @@ ray_to_ObjectRaySpace (Point* ret_origin,
     return object;
 }
 
+    /** Assume no solids inside one another.
+     * Otherwise, we'd need to track an IOR.
+     **/
 static
     void
 refraction_ray (Point* dst, const Point* dir, const Point* normal,
@@ -650,7 +653,7 @@ refraction_ray (Point* dst, const Point* dir, const Point* normal,
     real d;
     if (r == 1)
     {
-        copy_Point (dst, dir);
+        *dst = *dir;
         return;
     }
         /*        dir
@@ -671,6 +674,7 @@ refraction_ray (Point* dst, const Point* dir, const Point* normal,
     scale_Point (&a, &a, d);
     scale_Point (&b, normal, d-1);
     summ_Point (dst, &a, &b);
+    normalize_Point (dst, dst);
 }
 
 static
@@ -1408,7 +1412,8 @@ cast_colors (Color* ret_color,
     zero_Color (&color);
     fill_pixel (&color, hit_idx, hit_mag, hit_object,
                 image, origin, dir, space, nbounces+1);
-    prod_Color (ret_color, &color, factor);
+    prod_Color (&color, &color, factor);
+    summ_Color (ret_color, ret_color, &color);
 }
 
     bool

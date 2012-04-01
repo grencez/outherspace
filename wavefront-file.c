@@ -377,8 +377,6 @@ strto_Color (Color* a, const char* line)
 static void
 apply_illum_Material (Material* matl, uint illum)
 {
-    matl->reflective = true;
-    
     if (illum == 0)
         zero_Color (&matl->ambient);
 
@@ -404,6 +402,7 @@ readin_materials (SList* matlist, SList* namelist,
     FILE* err = stderr;
     Material scrap_material;
     Material* material;
+    uint illum = 1;
 
     material = &scrap_material;
     init_Material (material);
@@ -427,6 +426,7 @@ readin_materials (SList* matlist, SList* namelist,
 
         if (AccepTok( line, "newmtl" ))
         {
+            apply_illum_Material (material, illum);
             line = strskip_ws (line);
 
             app_SList (namelist, DuplicaT( char, line, strlen (line) + 1 ));
@@ -447,8 +447,11 @@ readin_materials (SList* matlist, SList* namelist,
         }
         else if (AccepTok( line, "d" ))
         {
-            line = strto_real (&material->opacity, line);
+            real dissolve = 0;
+            line = strto_real (&dissolve, line);
             if (!line)  good = false;
+                /* material->opacity = 1 - dissolve; */
+            material->opacity = dissolve;
         }
         else if (AccepTok( line, "Tf" ))
         {
@@ -512,15 +515,15 @@ readin_materials (SList* matlist, SList* namelist,
         }
         else if (AccepTok( line, "illum" ))
         {
-            uint illum;
             line = strto_uint (&illum, line);
             good = !!line;
-            if (good)  apply_illum_Material (material, illum);
         }
     }
 
     if (!good)
         fprintf (err, "Material read falied at %s:%u\n", filename, line_no);
+    else
+        apply_illum_Material (material, illum);
 
     assert (matlist->nmembs == namelist->nmembs);
     fclose (in);

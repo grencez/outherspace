@@ -344,14 +344,18 @@ key_press_fn (Pilot* pilot, const SDL_keysym* event)
     }
     else if (nperpixel_change != 0)
     {
+        uint nrows = max_uint (view_nrows, resize_nrows) * npixelzoom;
+        uint ncols = max_uint (view_ncols, resize_ncols) * npixelzoom;
         if (nperpixel_change > 0)  npixelzoom += 1;
         else if (npixelzoom > 1)   npixelzoom -= 1;
         else                       recast = false;
 
-        if (recast && resize_nrows == 0)
+        if (recast)
         {
-            resize_nrows = view_nrows;
-            resize_ncols = view_ncols;
+            resize_nrows = nrows / npixelzoom;
+            resize_ncols = ncols / npixelzoom;
+            if (nrows % npixelzoom < npixelzoom/2)  ++ resize_nrows;
+            if (ncols % npixelzoom < npixelzoom/2)  ++ resize_ncols;
         }
     }
     else if (reflect)
