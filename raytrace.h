@@ -32,8 +32,10 @@ struct ObjectRaySpace
 struct PointLightSource
 {
     Point location;
+    Point direct;
     Color intensity;
     bool diffuse;
+    bool hemisphere;
     bool on;
 };
 
@@ -94,7 +96,14 @@ cast1_ObjectRaySpace (uint* ret_hit, real* ret_mag,
                       const Point* origin,
                       const Point* direct,
                       const ObjectRaySpace* object,
-                      bool inside_box);
+                      bool inside_box,
+                      Trit front);
+void
+cast1_RaySpace (uint* ret_hit, real* ret_mag,
+                uint* ret_objidx,
+                const Ray* ray,
+                const RaySpace* space,
+                Trit front);
 void
 cast_nopartition (uint* ret_hit,
                   real* ret_mag,
@@ -103,6 +112,7 @@ cast_nopartition (uint* ret_hit,
                   const Point* restrict origin,
                   const Point* restrict dir,
                   bool inside_box,
+                  Trit front,
                   uint ignore_object);
 
 #ifndef __OPENCL_VERSION__

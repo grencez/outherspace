@@ -469,3 +469,12 @@ ray_from_basis (Point* ret_origin, Point* ret_dir,
     trxfrm_Point (ret_dir, basis, &diff);
 }
 
+    void
+xfrm_Simplex (Simplex* dst,
+              const PointXfrm* A,
+              const Simplex* B)
+{
+    xfrmtr_PointXfrm (dst, A, B);
+    transpose_PointXfrm (dst, dst);
+}
+

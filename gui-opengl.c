@@ -426,7 +426,6 @@ ogl_setup (const RaySpace* space)
     SDL_GL_SetAttribute (SDL_GL_BLUE_SIZE, 5);
     SDL_GL_SetAttribute (SDL_GL_DEPTH_SIZE, 16);
 
-    assert (space->nlights < 8);
     if (space->nlights > 0)  glEnable (GL_LIGHTING);
     else                     glDisable (GL_LIGHTING);
 
@@ -445,9 +444,9 @@ ogl_setup (const RaySpace* space)
     glShadeModel (GL_SMOOTH);
 
         /* Culling. */
-        /* glCullFace (GL_BACK); */
-        /* glFrontFace (GL_CCW); */
-        /* glEnable (GL_CULL_FACE); */
+    glCullFace (GL_BACK);
+    glFrontFace (GL_CCW);
+    glEnable (GL_CULL_FACE);
 
     if (DisplayRayImage)
     {

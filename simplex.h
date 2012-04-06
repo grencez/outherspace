@@ -9,16 +9,8 @@
 bool
 hit_Simplex (real* restrict ret_dist,
              const Ray ray,
-             const Simplex elem);
-bool hit_proj_Simplex (real* restrict dist,
-                        const Point* restrict origin,
-                        const Point* restrict kd_dir,
-                        const Simplex* restrict elem,
-                        const PointXfrm* restrict view_basis);
-bool hit_weak_Simplex (real* restrict dist,
-                        const Point* restrict origin,
-                        const Point* restrict kd_dir,
-                        const Simplex* restrict elem);
+             const Simplex elem,
+             Trit front);
 
 void init_Plane (Plane* plane, const Point* normal, const Point* point);
 real
@@ -29,6 +21,8 @@ void
 barycentric_Point (Point* bpoint, const Point* isect,
                    const BarySimplex* simplex);
 
+real
+area_Simplex (const Simplex* simplex);
 bool
 degenerate_Simplex (const Simplex* raw);
 bool
@@ -41,7 +35,8 @@ hit_Plane (real* restrict ret_dist,
 bool
 hit_BarySimplex (real* restrict ret_dist,
                  const Ray* restrict ray,
-                 const BarySimplex* restrict elem);
+                 const BarySimplex* restrict elem,
+                 Trit front);
 
 #ifdef IncludeC
 #include "simplex.c"

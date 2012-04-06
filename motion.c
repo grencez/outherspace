@@ -358,7 +358,7 @@ apply_track_gravity (ObjectMotion* motion, const RaySpace* space,
     hit_mag = motion->escape_height;
     cast1_ObjectRaySpace (&hit_idx, &hit_mag,
                           &origin, &direct,
-                          &space->main, inside_box);
+                          &space->main, inside_box, May);
 
     motion->flying = hit_idx >= space->main.nelems;
     if (!motion->flying)
@@ -637,7 +637,7 @@ mark_colliding (BitString* collisions,
         inside_box = inside_BBox (&space->main.box, &origin);
         cast_nopartition (&hit_idx, &hit_mag, &hit_objidx,
                           space, &origin, &direct,
-                          inside_box, objidx);
+                          inside_box, May, objidx);
 
         if (hit_objidx < n)
         {
@@ -839,7 +839,7 @@ detect_collision (ObjectMotion* motions,
                 normalize_Point (&direct, &p0);
 
                 cast1_ObjectRaySpace (&tmp_hit, &tmp_mag, &p0, &direct,
-                                      object, inside_box);
+                                      object, inside_box, May);
 
                 if (tmp_hit == Max_uint)
                 {
@@ -856,7 +856,7 @@ detect_collision (ObjectMotion* motions,
                 tmp_hit = Max_uint;
                 tmp_mag = Max_real;
                 cast1_ObjectRaySpace (&tmp_hit, &tmp_mag, &p1, &direct,
-                                      object, inside_box);
+                                      object, inside_box, May);
 
                 if (tmp_mag < hit_mag)
                 {
@@ -896,7 +896,7 @@ detect_collision (ObjectMotion* motions,
 
         cast_nopartition (&tmp_hit, &tmp_mag, &tmp_objidx,
                           space, &origin, &unit_dir,
-                          inside_box, objidx);
+                          inside_box, May, objidx);
         if (tmp_mag < distance)  continue;
 
 
@@ -914,7 +914,7 @@ detect_collision (ObjectMotion* motions,
             tmp_objidx = Max_uint;
             cast_nopartition (&tmp_hit, &tmp_mag, &tmp_objidx,
                               space, &origin, &unit_dir,
-                              inside_box, objidx);
+                              inside_box, May, objidx);
             if (tmp_mag < distance &&
                 tmp_mag < hit_mag &&
                 !test_BitString (collisions, bs_offset + tmp_objidx) &&

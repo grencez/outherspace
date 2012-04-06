@@ -25,6 +25,7 @@ init_MotionInput (MotionInput* mot)
     UFor( i, 2 )  mot->thrust[i] = 0;
     mot->view_azimuthcc = 0;
     mot->view_zenith = 0;
+    mot->light_to_camera = false;
     mot->boost = false;
     mot->inv_vert = true;
     mot->use_roll = false;
@@ -545,7 +546,7 @@ update_health (const RaySpace* space, real dt)
             inside_box = inside_BBox (&space->main.box, &origin);
             cast_nopartition (&hit_idx, &hit_mag, &hit_objidx,
                               space, &origin, &direct,
-                              inside_box, pilot->craft_idx);
+                              inside_box, May, pilot->craft_idx);
             if (hit_objidx < nracers)
             {
                 RaceCraft* craft;
@@ -775,7 +776,8 @@ update_pilot_images (RaySpace* space, real frame_t1)
         }
         if (DisplayRayImage)
         {
-            update_dynamic_RaySpace (space);
+            if (space->nobjects > 0)
+                update_dynamic_RaySpace (space);
             if (ForceFauxFishEye)
                 rays_to_hits_fish (ray_image, space,
                                    &origin, &basis, pilot->view_angle);

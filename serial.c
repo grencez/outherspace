@@ -57,7 +57,7 @@ void output_Point (FILE* out, const Point* point)
     UFor( ci, NDimensions )
     {
             /* fprintf (out, "%s%4.1f", delim, point->coords[ci]); */
-        fprintf (out, "%s%.2f", delim, point->coords[ci]);
+        fprintf (out, "%s%.5f", delim, point->coords[ci]);
             /* delim = ", "; */
         delim = " ";
     }

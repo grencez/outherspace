@@ -2,6 +2,7 @@
 #include "pnm-image.h"
 #include "testcase.h"
 #include "wavefront-file.h"
+#include "radiosity.h"
 
 #ifdef DistribCompute
 #include "compute.h"
@@ -120,6 +121,7 @@ int main (int argc, char** argv)
 #endif
 #else
     update_dynamic_RaySpace (&space);
+        /* cast_lights (&space, 2000, 4); */
     cast_RayImage (&image, &space, &view_origin, &view_basis);
     printf ("sec:%f\n", monotime () - t0);
 #endif

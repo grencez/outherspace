@@ -443,7 +443,7 @@ cast_packet_RayImage (RayImage* image, uint row_off, uint col_off,
                 fill_pixel (&color,
                             hit_inds[j], hit_mags[j], hit_objs[j],
                             image, &origin, &direct,
-                            space, 0);
+                            space, Yes, 0);
                 UFor( color_idx, NColors )
                 {
                     image->pixels[3*img_idx + color_idx] = (byte)

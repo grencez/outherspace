@@ -72,6 +72,11 @@ ray_from_basis (Point* ret_origin, Point* ret_dir,
                 const Point* origin,
                 const Point* dir,
                 const Point* new_centroid);
+void
+xfrm_Simplex (Simplex* dst,
+              const PointXfrm* A,
+              const Simplex* B);
+
 
 #ifdef IncludeC
 #include "xfrm.c"

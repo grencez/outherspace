@@ -18,6 +18,8 @@
 #include "gui-opengl.c"
 #endif
 
+#include "radiosity.h"
+
     /* SDL on OS X does some weirdo bootstrapping by redefining /main/.*/
 #ifdef main
 #undef main
@@ -55,7 +57,7 @@ struct RedrawLoopParam
 
 static
     void
-key_press_fn (Pilot* pilot, const SDL_keysym* event)
+key_press_fn (Pilot* pilot, RaySpace* space, const SDL_keysym* event)
 {
     uint dim = NDimensions;
     tristate roll = 0;
@@ -65,6 +67,7 @@ key_press_fn (Pilot* pilot, const SDL_keysym* event)
     tristate view_angle_change = 0;
     tristate resize = 0;
     tristate view_light_change = 0;
+    tristate lights_change = 0;
     tristate stride_mag_change = 0;
     tristate switch_racer = 0;
     tristate switch_kbd_pilot = 0;
@@ -171,8 +174,14 @@ key_press_fn (Pilot* pilot, const SDL_keysym* event)
             toggle_opengl = true;
             break;
         case SDLK_l:
-            if (shift_mod)  view_light_change =  1;
-            else            view_light_change = -1;
+            if (ctrl_mod)
+            {
+                lights_change = shift_mod ? 1 : -1;
+            }
+            else
+            {
+                view_light_change = shift_mod ? 1 : -1;
+            }
             break;
         case SDLK_m:
             if (shift_mod)  nperpixel_change =  1;
@@ -212,6 +221,15 @@ key_press_fn (Pilot* pilot, const SDL_keysym* event)
             ray_image->view_light -= diff;;
 
         fprintf (out, "view_light:%f\n", ray_image->view_light);
+    }
+    else if (lights_change != 0)
+    {
+        const uint nbounces = 4;
+        uint nphotons = space->nlights / nbounces;
+        if (lights_change > 0)   nphotons += 10;
+        else if (nphotons > 10)  nphotons -= 10;
+        cast_lights (space, nphotons, nbounces);
+        fprintf (out, "nlights:%u\n", space->nlights);
     }
     else if (camera_offset != 0)
     {
@@ -605,7 +623,7 @@ mouse_down_fn (Pilot* pilot,
         cast_nopartition (&hit_idx, &hit_mag, &hit_objidx,
                           space, &ray.origin, &ray.direct,
                           priori.inside_box,
-                          Max_uint);
+                          Yes, Max_uint);
 
         didhit = hit_objidx <= space->nobjects;
 
@@ -979,6 +997,7 @@ sdl_main (RaySpace* space, const char* pathname, Pilot* pilots)
         {
             case SDL_KEYDOWN:
                 key_press_fn (&pilots[kbd_pilot_idx],
+                              space,
                               &event.key.keysym);
                 break;
             case SDL_KEYUP:
@@ -1207,6 +1226,9 @@ int wrapped_main_fn (int argc, char* argv[])
         return 1;
     }
 
+    update_dynamic_RaySpace (space);
+        /* cast_lights (space, 10); */
+
 #ifdef DistribCompute
     call_gui = !rays_to_hits_computeloop (space);
 #endif
@@ -1233,6 +1255,16 @@ int wrapped_main_fn (int argc, char* argv[])
             stable_orthorotate_PointXfrm (&pilot->view_basis,
                                           &pilot->view_basis,
                                           &track.startdirs[0], FwDim);
+#if 0
+            {
+                Point up;
+                zero_Point (&up);
+                up.coords[UpDim] = 1;
+                stable_orthorotate_PointXfrm (&pilot->view_basis,
+                                              &pilot->view_basis,
+                                              &up, UpDim);
+            }
+#endif
         }
 
         sdl_main (space, inpathname, pilots);

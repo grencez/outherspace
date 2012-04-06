@@ -59,6 +59,7 @@ fill_pixel (Color* ret_color,
             const Point* origin,
             const Point* dir,
             const RaySpace* space,
+            Trit front,
             uint nbounces);
 static void
 cast_colors (Color* ret_color,
@@ -67,11 +68,13 @@ cast_colors (Color* ret_color,
              const Point* restrict origin,
              const Point* restrict dir,
              const Color* factor,
+             Trit front,
              uint nbounces);
 static bool
 cast_to_light (const RaySpace* restrict space,
                const Point* restrict origin,
                const Point* restrict dir,
+               Trit front,
                real magtolight);
 static void
 cast_row_orthographic (RayImage* restrict image,
@@ -124,6 +127,7 @@ init_PointLightSource (PointLightSource* light)
     zero_Point (&light->location);
     set_Color (&light->intensity, 1);
     light->diffuse = false;
+    light->hemisphere = false;
     light->on = true;
 }
 
@@ -428,7 +432,7 @@ void init_RayImage (RayImage* image)
     image->nrows = 0;
     image->stride = 0;
     image->ncols = 0;
-    image->hifov = 2 * M_PI / 3;
+    image->hifov = 60 * M_PI / 180;
     image->perspective = true;
     UFor( i, NColors )
         image->ambient[i] = 0.2;
@@ -729,7 +733,8 @@ splitting_plane_count (const Point* origin, const Point* direct, real mag,
      * of a pixel without considering illumination.
      **/
 static void
-pixel_from_Material (Color* ambient, Color* diffuse, Color* specular,
+pixel_from_Material (Color* ambient, Color* diffuse,
+                     Color* specular, Color* emissive,
                      const Material* matl,
                      const BaryPoint* texpoint,
                      const Scene* scene)
@@ -750,6 +755,7 @@ pixel_from_Material (Color* ambient, Color* diffuse, Color* specular,
     *ambient = matl->ambient;
     *diffuse = matl->diffuse;
     *specular = matl->specular;
+    *emissive = matl->emissive;
 
         /* Texture mapping.*/
     if (texpoint)
@@ -786,10 +792,9 @@ fill_pixel (Color* ret_color,
             const Point* origin,
             const Point* dir,
             const RaySpace* space,
+            Trit front,
             uint nbounces)
 {
-    const real offset_factor = 1e2 * Epsilon_real;
-    real offset;
     const bool shade_by_element = false;
     const bool color_by_element = false;
     const bool compute_bary_coords = true;
@@ -866,16 +871,6 @@ fill_pixel (Color* ret_color,
         summ_Color (ret_color, ret_color, &color);
         return;
     }
-
-
-        /* Use 1 + the L1 (taxicab) norm to scale the offset of the origin of
-         * subsequent rays (reflection, to-light, etc.) from the computed
-         * intersection point so those rays do not hit this object.
-         * The 1 is added in case the L1 norm is less than 1.
-         * In the end, a very small factor relating to floating point precision
-         * is multiplied on, so we should get a small offset magnitude.
-         */
-    offset = (1 + taximag_Point (origin)) * offset_factor;
 
     object = ray_to_ObjectRaySpace (&rel_origin, &rel_dir,
                                     origin, dir, space, objidx);
@@ -993,8 +988,10 @@ fill_pixel (Color* ret_color,
     {
         Point isect, refldir;
         Color dscale, sscale;
-        Color ambient, diffuse, specular;
-        pixel_from_Material (&ambient, &diffuse, &specular, material,
+        Color ambient, diffuse, specular, emissive;
+        pixel_from_Material (&ambient, &diffuse,
+                             &specular, &emissive,
+                             material,
                              (compute_bary_coords ? &texpoint : 0),
                              scene);
 
@@ -1019,16 +1016,21 @@ fill_pixel (Color* ret_color,
             tscale = dot_Point (&tolight, &normal);
             if (tscale > 0)
             {
-                real offset_magtolight;
-                Point tmp_origin;
-
-                offset_magtolight = magtolight - offset;
-                follow_Point (&tmp_origin, &isect, dir, - offset);
-
-                if (cast_to_light (space, &tmp_origin, &tolight,
-                                   offset_magtolight))
+                if (light->hemisphere)
                 {
-                        /* real dist_factor *= 1 / (magtolight * magtolight); */
+                    real dot = - dot_Point (&tolight, &light->direct);
+                    if (dot <= 0)  continue;
+                    tscale *= dot;
+                }
+                if (cast_to_light (space, &isect, &tolight,
+                                   front,
+                                   magtolight))
+                {
+                    real dist_factor = 1;
+                    if (false)
+                        dist_factor = 1 / match_real (1, magtolight * magtolight);
+
+                    tscale *= dist_factor;
 
                         /* Add diffuse portion.*/
                     follow_Color (&dscale, &dscale,
@@ -1054,11 +1056,12 @@ fill_pixel (Color* ret_color,
             color.coords[i] *=
                 ambient.coords[i]
                 + diffuse.coords[i] * dscale.coords[i]
-                + specular.coords[i] * sscale.coords[i];
+                + specular.coords[i] * sscale.coords[i]
+                + emissive.coords[i];
 
         if (material && material->opacity < 1)
         {
-            Point tmp_origin, tmp_dir;
+            Point tmp_dir;
             Color factor;
 
             scale_Color (&color, &color, material->opacity);
@@ -1067,19 +1070,16 @@ fill_pixel (Color* ret_color,
             refraction_ray (&tmp_dir, dir, &normal,
                             material->optical_density, hit_front, cos_normal);
 
-            follow_Point (&tmp_origin, &isect, &tmp_dir, offset);
-            cast_colors (&color, space, image, &tmp_origin, &tmp_dir,
-                         &factor, nbounces);
+            cast_colors (&color, space, image, &isect, &tmp_dir,
+                         &factor, !front, nbounces);
         }
         if (material && material->reflective)
         {
-            Point tmp_origin;
             Color factor;
             scale_Color (&factor, &material->specular, material->opacity);
 
-            follow_Point (&tmp_origin, &isect, dir, - offset);
-            cast_colors (&color, space, image, &tmp_origin, &refldir,
-                         &factor, nbounces);
+            cast_colors (&color, space, image, &isect, &refldir,
+                         &factor, front, nbounces);
         }
     }
 
@@ -1095,7 +1095,8 @@ test_intersections (uint* ret_hit,
                     uint nelemidcs,
                     __global const uint* restrict elemidcs,
                     __global const BarySimplex* restrict simplices,
-                    __global const Simplex* restrict tris)
+                    __global const Simplex* restrict tris,
+                    Trit front)
 {
     uint i, hit_idx;
     real hit_mag;
@@ -1114,11 +1115,13 @@ test_intersections (uint* ret_hit,
         if (BarycentricRayTrace)
         {
             didhit = hit_BarySimplex (&tmp_mag, ray,
-                                      &simplices[tmp_hit]);
+                                      &simplices[tmp_hit],
+                                      front);
         }
         else
         {
-            didhit = hit_Simplex (&tmp_mag, *ray, tris[tmp_hit]);
+            didhit = hit_Simplex (&tmp_mag, *ray, tris[tmp_hit],
+                                  front);
         }
 
         if (didhit && tmp_mag < hit_mag)
@@ -1144,7 +1147,8 @@ cast_Ray (uint* restrict ret_hit, real* restrict ret_mag,
           __global const BarySimplex* restrict simplices,
           __global const Simplex* restrict tris,
           __global const BBox* restrict box,
-          bool inside_box)
+          bool inside_box,
+          Trit front)
 {
     Point invdirect;
     uint node_idx, parent = 0;
@@ -1159,7 +1163,7 @@ cast_Ray (uint* restrict ret_hit, real* restrict ret_mag,
     {
         test_intersections (&hit_idx, &hit_mag, ray,
                             nelems, elemidcs,
-                            simplices, tris);
+                            simplices, tris, front);
         *ret_hit = hit_idx;
         *ret_mag = hit_mag;
         return;
@@ -1176,7 +1180,7 @@ cast_Ray (uint* restrict ret_hit, real* restrict ret_mag,
         leaf = &nodes[node_idx].as.leaf;
         test_intersections (&hit_idx, &hit_mag, ray,
                             leaf->nelems, &elemidcs[leaf->elemidcs],
-                            simplices, tris);
+                            simplices, tris, front);
 
         node_idx = next_KDTreeNode (&parent, ray, &invdirect,
                                     hit_mag,
@@ -1192,7 +1196,8 @@ cast1_ObjectRaySpace (uint* ret_hit, real* ret_mag,
                       const Point* origin,
                       const Point* direct,
                       const ObjectRaySpace* object,
-                      bool inside_box)
+                      bool inside_box,
+                      Trit front)
 {
     Ray ray;
     ray.origin = *origin;
@@ -1201,7 +1206,7 @@ cast1_ObjectRaySpace (uint* ret_hit, real* ret_mag,
               object->nelems,
               object->tree.elemidcs, object->tree.nodes,
               object->simplices, object->elems,
-              &object->box, inside_box);
+              &object->box, inside_box, front);
 }
 
     void
@@ -1212,6 +1217,7 @@ cast_nopartition (uint* ret_hit,
                   const Point* restrict origin,
                   const Point* restrict dir,
                   bool inside_box,
+                  Trit front,
                   uint ignore_object)
 {
     uint i;
@@ -1225,7 +1231,7 @@ cast_nopartition (uint* ret_hit,
 
     if (space->main.visible)
         cast1_ObjectRaySpace (&hit_idx, &hit_mag, origin, dir,
-                              &space->main, inside_box);
+                              &space->main, inside_box, front);
 
     if (hit_idx < space->main.nelems)
         hit_object = space->nobjects;
@@ -1252,7 +1258,7 @@ cast_nopartition (uint* ret_hit,
         tmp_mag = *ret_mag;
         cast1_ObjectRaySpace (&tmp_hit, &tmp_mag,
                               &rel_origin, &rel_dir,
-                              object, rel_inside_box);
+                              object, rel_inside_box, front);
 
         if (tmp_mag < hit_mag)
         {
@@ -1277,7 +1283,8 @@ test_object_intersections (uint* ret_hit,
                            const Ray* ray,
                            uint nobjectidcs,
                            const uint* objectidcs,
-                           const RaySpace* space)
+                           const RaySpace* space,
+                           Trit front)
 {
     uint i;
     UFor( i, nobjectidcs )
@@ -1303,7 +1310,7 @@ test_object_intersections (uint* ret_hit,
         tmp_hit = Max_uint;
         tmp_mag = *ret_mag;
         cast1_ObjectRaySpace (&tmp_hit, &tmp_mag, &rel_origin, &rel_dir,
-                              object, rel_inside_box);
+                              object, rel_inside_box, front);
 
         if (tmp_mag < *ret_mag)
         {
@@ -1324,6 +1331,7 @@ cast_partitioned (uint* ret_hit,
                   const Point* restrict origin,
                   const Point* restrict dir,
                   bool inside_box,
+                  Trit front,
                   uint ignore_object)
 {
     const uint ntestedbits = 128;
@@ -1365,7 +1373,7 @@ cast_partitioned (uint* ret_hit,
                                    tested,
                                    &ray, leaf->nelems,
                                    &elemidcs[leaf->elemidcs],
-                                   space);
+                                   space, front);
         node_idx = next_KDTreeNode (&parent, &ray,
                                     &invdirect,
                                     hit_mag,
@@ -1377,6 +1385,35 @@ cast_partitioned (uint* ret_hit,
     *ret_object = hit_object;
 }
 
+
+    void
+cast1_RaySpace (uint* ret_hit, real* ret_mag,
+                uint* ret_objidx,
+                const Ray* ray,
+                const RaySpace* space,
+                Trit front)
+{
+    bool inside_box = inside_BBox (&space->box, &ray->origin);
+    if (space->partition)
+        cast_partitioned (ret_hit,
+                          ret_mag,
+                          ret_objidx,
+                          space,
+                          &ray->origin,
+                          &ray->direct,
+                          inside_box,
+                          front,
+                          Max_uint);
+    else
+        cast_nopartition (ret_hit, ret_mag, ret_objidx,
+                          space,
+                          &ray->origin,
+                          &ray->direct,
+                          inside_box,
+                          front,
+                          Max_uint);
+}
+
     void
 cast_colors (Color* ret_color,
              const RaySpace* restrict space,
@@ -1384,6 +1421,7 @@ cast_colors (Color* ret_color,
              const Point* restrict origin,
              const Point* restrict dir,
              const Color* factor,
+             Trit front,
              uint nbounces)
 {
     Color color;
@@ -1399,6 +1437,7 @@ cast_colors (Color* ret_color,
         inside_box = inside_BBox (&space->box, origin);
         cast_partitioned (&hit_idx, &hit_mag, &hit_object,
                           space, origin, dir, inside_box,
+                          front,
                           Max_uint);
     }
     else
@@ -1406,12 +1445,13 @@ cast_colors (Color* ret_color,
         inside_box = inside_BBox (&space->main.box, origin);
         cast_nopartition (&hit_idx, &hit_mag, &hit_object,
                           space, origin, dir, inside_box,
+                          front,
                           Max_uint);
     }
 
     zero_Color (&color);
     fill_pixel (&color, hit_idx, hit_mag, hit_object,
-                image, origin, dir, space, nbounces+1);
+                image, origin, dir, space, front, nbounces+1);
     prod_Color (&color, &color, factor);
     summ_Color (ret_color, ret_color, &color);
 }
@@ -1420,29 +1460,19 @@ cast_colors (Color* ret_color,
 cast_to_light (const RaySpace* restrict space,
                const Point* restrict origin,
                const Point* restrict dir,
+               Trit front,
                real magtolight)
 {
     uint hit_idx = Max_uint;
-    real hit_mag;
+    real hit_mag = magtolight;
     uint hit_object = Max_uint;
-    bool inside_box;
-    hit_mag = magtolight;
+    Ray ray;
 
-    if (space->partition)
-    {
-        inside_box = inside_BBox (&space->box, origin);
-        cast_partitioned (&hit_idx, &hit_mag, &hit_object,
-                          space, origin, dir, inside_box,
-                          Max_uint);
-    }
-    else
-    {
-        inside_box = inside_BBox (&space->main.box, origin);
-        cast_nopartition (&hit_idx, &hit_mag, &hit_object,
-                          space, origin, dir, inside_box,
-                          Max_uint);
-    }
-    return hit_object > space->nobjects;
+    ray.origin = *origin;
+    ray.direct = *dir;
+
+    cast1_RaySpace (&hit_idx, &hit_mag, &hit_object, &ray, space, front);
+    return approx_eql (magtolight, hit_mag, 1, 1e2);
 }
 
 
@@ -1461,14 +1491,17 @@ cast_record (uint* hitline,
     uint hit_idx = Max_uint;
     real hit_mag = Max_real;
     uint hit_object = Max_uint;
+    const Trit front = Yes;
 
     if (space->partition)
         cast_partitioned (&hit_idx, &hit_mag, &hit_object,
                           space, origin, dir, inside_box,
+                          front,
                           Max_uint);
     else
         cast_nopartition (&hit_idx, &hit_mag, &hit_object,
                           space, origin, dir, inside_box,
+                          front,
                           Max_uint);
 
     if (hitline)  hitline[col] = hit_idx;
@@ -1478,7 +1511,7 @@ cast_record (uint* hitline,
         Color color;
         zero_Color (&color);
         fill_pixel (&color, hit_idx, hit_mag, hit_object,
-                    image, origin, dir, space, 0);
+                    image, origin, dir, space, front, 0);
         { BLoop( i, NColors )
             pixline[3*col+i] = (byte)
                 clamp_real (255.5 * color.coords[i], 0, 255.5);
@@ -1644,7 +1677,7 @@ rays_to_hits_fixed_plane (uint* hits, real* mags,
             mag = Max_real;
             cast1_ObjectRaySpace (&hit, &mag,
                                   &origin, &dir,
-                                  object, inside_box);
+                                  object, inside_box, Yes);
             hitline[col] = hit;
             magline[col] = mag;
 
