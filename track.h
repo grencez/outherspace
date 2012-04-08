@@ -2,8 +2,14 @@
 #ifndef TRACK_H_
 #define TRACK_H_
 #include "scene.h"
+#include "cx/table.h"
 
 typedef struct Track Track;
+
+#ifndef Table_Ray
+#define Table_Ray Table_Ray
+DeclTableT( Ray, Ray );
+#endif
 
 struct Track
 {
@@ -11,9 +17,8 @@ struct Track
     Plane* checkplanes;
     Point* checkpoints;
 
-    uint nstartlocs;
-    Point* startlocs;
-    Point* startdirs;
+    Table( Ray ) startlocs;
+    IAMap camloc;
 
     Scene scene;
 

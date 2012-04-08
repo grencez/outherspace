@@ -1,5 +1,6 @@
 
 #include "serial.h"
+#include "affine.h"
 #include "xfrm.h"
 
     void
@@ -22,6 +23,16 @@ dumpp_PointXfrm (FileB* f, const PointXfrm* A)
         dumpp_Point (f, &A->pts[ci]);
     } BLose()
     dump_char_FileB (f, ']');
+}
+
+    void
+dumpp_IAMap (FileB* f, const IAMap* A)
+{
+    dump_char_FileB (f, '{');
+    dumpp_Point (f, &A->xlat);
+    dumpp_Point (f, &A->scale);
+    dumpp_PointXfrm (f, &A->xfrm);
+    dump_char_FileB (f, '}');
 }
 
     bool
@@ -48,6 +59,17 @@ load_PointXfrm (FileB* f, PointXfrm* A)
     return f->good;
 }
 
+    bool
+load_IAMap (FileB* f, IAMap* A)
+{
+    nextds_FileB (f, NULL, "{");
+    load_Point (f, &A->xlat);
+    load_Point (f, &A->scale);
+    load_PointXfrm (f, &A->xfrm);
+    nextds_FileB (f, NULL, "}");
+        /* normalize_IAMap (A); */
+    return f->good;
+}
 
 void output_Point (FILE* out, const Point* point)
 {

@@ -50,12 +50,10 @@ int main (int argc, char** argv)
     image.pixels = AllocT( byte, 1 );
     image.hifov = 60 * M_PI / 180;
     good = readin_Track (&track, &space, pathname, "curve-track.txt");
-    if (good && track.nstartlocs > 0)
+    if (good)
     {
-        view_origin = track.startlocs[0];
-        identity_PointXfrm (&view_basis);
-        stable_orthorotate_PointXfrm (&view_basis, &view_basis,
-                                      &track.startdirs[0], FwDim);
+        view_origin = track.camloc.xlat;
+        transpose_PointXfrm (&view_basis, &track.camloc.xfrm);
     }
 #elif 0
     image.nrows = 1000;

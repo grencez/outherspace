@@ -5,10 +5,12 @@
 #include "bbox.h"
 #include "color.h"
 #include "point.h"
+#include "serial.h"
 #include "simplex.h"
 #include "slist.h"
 #include "wavefront-file.h"
 #include "xfrm.h"
+#include "cx/fileb.h"
 
 #include <assert.h>
 #include <math.h>
@@ -127,7 +129,7 @@ add_racers (RaySpace* space, uint nracers, const Track* track,
         if (!good)  return false;
         init_filled_ObjectRaySpace (object);
 
-        if (track->nstartlocs == 0)
+        if (track->startlocs.sz == 0)
         {
             q = i;
             zero_Point (&loc);
@@ -137,10 +139,10 @@ add_racers (RaySpace* space, uint nracers, const Track* track,
         else
         {
             uint r;
-            q = i / track->nstartlocs;
-            r = i % track->nstartlocs;
-            copy_Point (&loc, &track->startlocs[r]);
-            copy_Point (&dir, &track->startdirs[r]);
+            q = i / track->startlocs.sz;
+            r = i % track->startlocs.sz;
+            loc = track->startlocs.s[r].origin;
+            dir = track->startlocs.s[r].direct;
         }
 
             /* This will be the amount a racer should move backwards.
@@ -166,35 +168,28 @@ readin_Track (Track* track, RaySpace* space,
 {
     const uint ndims = 3;
     uint line_no = 0;
-    const uint len = BUFSIZ;
-    char buf[BUFSIZ];
     bool good = true;
     const char* line;
-    FILE* in;
+    DecloStack( FileB, in );
     FILE* out = stderr;
     PointXfrm coord_system;
     IAMap model_map;  /* Use to save model transformation.*/
-    IAMap affine_map;
-    IAMap* map;
+    DecloStack( IAMap, map );
     Point scale;
     Point location;
-    SList startloclist, startdirlist;
     Scene* scene = 0;
     Texture* skytex = 0;
     uint i;
 
-    in = fopen_path (pathname, filename, "rb");
-    if (!in)  return false;
+    init_FileB (in);
+    open_FileB (in, pathname, filename);
+    if (!in->good)  return false;
 
     identity_PointXfrm (&coord_system);
-    map = &affine_map;
     identity_IAMap (map);
     model_map = *map;
     zero_Point (&location);
-    UFor( i, NDims )  scale.coords[i] = 1;
-
-    init_SList (&startloclist);
-    init_SList (&startdirlist);
+    set_Point (&scale, 1);
 
     init_Track (track);
     init_RaySpace (space);
@@ -206,21 +201,23 @@ readin_Track (Track* track, RaySpace* space,
         /* Op_s( real, NColors, space->lights[0].intensity , .5 ); */
     space->lights[1].on = false;
 
-    for (line = fgets (buf, len, in);
+    for (line = getline_FileB (in);
          good && line;
-         line = fgets (buf, len, in))
+         line = getline_FileB (in))
     {
+        DecloStack( FileB, olay );
         bool recalc_map = false;
         line_no += 1;
 
-        strstrip_eol (buf);
-        line = strskip_ws (line);
+        olay_FileB (olay, in);
+        skipds_FileB (olay, NULL);
+        line = olay->buf.s;
 
         if (AccepTok( line, "scale" ))
         {
             if (line[0] == ':')  line = &line[1];
 
-            UFor( i, NDims )  scale.coords[i] = 1;
+            set_Point (&scale, 1);
             for (i = 0; i < 3; ++i)
             {
                 if (line)
@@ -260,6 +257,12 @@ readin_Track (Track* track, RaySpace* space,
             {
                 fprintf (out, "Line:%u  Need 3 location values!\n", line_no);
             }
+        }
+        else if (AccepTok( line, "camloc" ))
+        {
+            if (line[0] == ':')  line = &line[1];
+            skipto_FileB (olay, line);
+            load_IAMap (olay, &track->camloc);
         }
         else if (AccepTok( line, "model:" ))
         {
@@ -348,10 +351,11 @@ readin_Track (Track* track, RaySpace* space,
             good = !!(line);
             if (good)
             {
+                DeclGrow1Table( Ray, track->startlocs, ray );
                 map_Point (&loc, map, &loc);
                 map_Point (&dir, map, &dir);
-                app_SList (&startloclist, DuplicaT( Point, &loc, 1 ));
-                app_SList (&startdirlist, DuplicaT( Point, &dir, 1 ));
+                ray->origin = loc;
+                ray->direct = dir;
             }
             else
             {
@@ -375,7 +379,7 @@ readin_Track (Track* track, RaySpace* space,
         }
     }
 
-    fclose (in);
+    lose_FileB (in);
 
     if (good && !scene)
     {
@@ -383,12 +387,7 @@ readin_Track (Track* track, RaySpace* space,
         fputs ("No model provided for track!\n", out);
     }
 
-    if (!good)
-    {
-        cleanup_SList (&startloclist);
-        cleanup_SList (&startdirlist);
-    }
-    else
+    if (good)
     {
         if (track->nmorphs > 0)
         {
@@ -411,13 +410,6 @@ readin_Track (Track* track, RaySpace* space,
 
         copy_Scene (&space->main.scene, scene);
         init_filled_RaySpace (space);
-
-        assert (startloclist.nmembs == startdirlist.nmembs);
-        track->nstartlocs = startloclist.nmembs;
-        track->startlocs = AllocT( Point, startloclist.nmembs );
-        track->startdirs = AllocT( Point, startloclist.nmembs );
-        unroll_SList (track->startlocs, &startloclist, sizeof (Point));
-        unroll_SList (track->startdirs, &startdirlist, sizeof (Point));
     }
     return good;
 }

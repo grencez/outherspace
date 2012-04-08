@@ -18,6 +18,14 @@ identity_IAMap (IAMap* map)
     set_Point (&map->scale, 1);
 }
 
+    void
+normalize_IAMap (IAMap* map)
+{
+    PointXfrm A;
+    orthonormalize_PointXfrm (&A, &map->xfrm);
+    map->xfrm = A;
+}
+
     /** Map a vector x without scaling: xfrm x **/
     void
 mapo_Point (Point* dst, const IAMap* map, const Point* src)
@@ -51,32 +59,32 @@ map_Ray (Ray* dst, const IAMap* map, const Ray* src)
 }
 
     void
-invmapo_Point (Point* dst, const IAMap* map, const Point* src)
+imapo_Point (Point* dst, const IAMap* map, const Point* src)
 {
     trxfrm_Point (dst, &map->xfrm, src);
 }
 
     void
-invmapvec_Point (Point* dst, const IAMap* map, const Point* src)
+imapvec_Point (Point* dst, const IAMap* map, const Point* src)
 {
     Point u;
-    invmapo_Point (&u, map, src);
+    imapo_Point (&u, map, src);
     quot_Point (dst, &u, &map->scale);
 }
 
     void
-invmap_Point (Point* dst, const IAMap* map, const Point* src)
+imap_Point (Point* dst, const IAMap* map, const Point* src)
 {
     Point u;
     diff_Point (&u, src, &map->xlat);
-    invmapvec_Point (dst, map, &u);
+    imapvec_Point (dst, map, &u);
 }
 
     void
-invmap_Ray (Ray* dst, const IAMap* map, const Ray* src)
+imap_Ray (Ray* dst, const IAMap* map, const Ray* src)
 {
-    invmap_Point (&dst->origin, map, &src->origin);
-    invmapo_Point (&dst->direct, map, &src->direct);
+    imap_Point (&dst->origin, map, &src->origin);
+    imapo_Point (&dst->direct, map, &src->direct);
 }
 
     /** Post-multiply by a scaling operation.**/

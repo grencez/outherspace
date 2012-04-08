@@ -432,6 +432,8 @@ key_press_fn (Pilot* pilot, RaySpace* space, const SDL_keysym* event)
     }
     else if (print_plane_line)
     {
+        FileB* f = stdout_FileB ();
+        IAMap iatt;
         fprintf (out, "%f %f %f  %f %f %f\n",
                  view_origin->coords[0],
                  view_origin->coords[1],
@@ -439,6 +441,12 @@ key_press_fn (Pilot* pilot, RaySpace* space, const SDL_keysym* event)
                  view_basis->pts[ForwardDim].coords[0],
                  view_basis->pts[ForwardDim].coords[1],
                  view_basis->pts[ForwardDim].coords[2]);
+        identity_IAMap (&iatt);
+        transpose_PointXfrm (&iatt.xfrm, view_basis);
+        xlat_IAMap (&iatt, view_origin, &iatt);
+        dumpp_IAMap (f, &iatt);
+        dump_char_FileB (f, '\n');
+        flusho_FileB (f);
     }
     else if (quit_app)
     {
@@ -1247,26 +1255,12 @@ int wrapped_main_fn (int argc, char* argv[])
             init_RaceCraft (&crafts[pilot->craft_idx]);
         }
 
-        if (track.nstartlocs > 0)
+        if (!FollowRacer)
         {
-            Pilot* pilot = &pilots[0];
-            pilot->view_origin = track.startlocs[0];
-            identity_PointXfrm (&pilot->view_basis);
-            stable_orthorotate_PointXfrm (&pilot->view_basis,
-                                          &pilot->view_basis,
-                                          &track.startdirs[0], FwDim);
-#if 0
-            {
-                Point up;
-                zero_Point (&up);
-                up.coords[UpDim] = 1;
-                stable_orthorotate_PointXfrm (&pilot->view_basis,
-                                              &pilot->view_basis,
-                                              &up, UpDim);
-            }
-#endif
+            pilots[0].view_origin = track.camloc.xlat;
+            transpose_PointXfrm (&pilots[0].view_basis,
+                                 &track.camloc.xfrm);
         }
-
         sdl_main (space, inpathname, pilots);
 
         cleanup_ui_data ();

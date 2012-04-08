@@ -22,6 +22,8 @@ follow_Ray (Point* isect, const Ray* ray, real mag);
 void
 identity_IAMap (IAMap* map);
 void
+normalize_IAMap (IAMap* map);
+void
 mapo_Point (Point* dst, const IAMap* map, const Point* src);
 void
 mapvec_Point (Point* dst, const IAMap* map, const Point* src);
@@ -31,11 +33,11 @@ void
 map_Ray (Ray* dst, const IAMap* map, const Ray* src);
 
 void
-invmapvec_Point (Point* dst, const IAMap* map, const Point* src);
+imapvec_Point (Point* dst, const IAMap* map, const Point* src);
 void
-invmap_Point (Point* dst, const IAMap* map, const Point* src);
+imap_Point (Point* dst, const IAMap* map, const Point* src);
 void
-invmap_Ray (Ray* dst, const IAMap* map, const Ray* src);
+imap_Ray (Ray* dst, const IAMap* map, const Ray* src);
 
 void
 scale0_IAMap (IAMap* map, real x);

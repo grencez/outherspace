@@ -8,11 +8,15 @@ void
 dumpp_Point (FileB* f, const Point* x);
 void
 dumpp_PointXfrm (FileB* f, const PointXfrm* A);
+void
+dumpp_IAMap (FileB* f, const IAMap* A);
 
 bool
 load_Point (FileB* f, Point* x);
 bool
 load_PointXfrm (FileB* f, PointXfrm* A);
+bool
+load_IAMap (FileB* f, IAMap* A);
 
 #include <stdio.h>
 

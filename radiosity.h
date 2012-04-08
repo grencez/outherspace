@@ -11,12 +11,16 @@
 #include "cx/table.h"
     /* #include "hldseq.h" */
 
+typedef struct LightCutNode LightCutNode;
+typedef struct LightCutTree LightCutTree;
+
 struct LightCutNode
 {
     BSTNode bst;
     Ray iatt;  /* location + orientation */
     Color color;
 };
+DeclTableT( LightCutNode, LightCutNode );
 
 struct LightCutTree
 {
@@ -60,6 +64,7 @@ cast_lights (RaySpace* space, uint nphotons, uint nbounces)
     const Scene* const scene = &object->scene;
     GMRand gmrand;
     DeclTable( EmisElem, elems );
+    DeclTable( LightCutNode, lights );
 
     init_GMRand (&gmrand);
 
@@ -82,17 +87,6 @@ cast_lights (RaySpace* space, uint nphotons, uint nbounces)
 
 
     if (elems.sz == 0)  return;
-
-    space->nlights = nbounces*nphotons;
-    ResizeT( PointLightSource, space->lights, space->nlights );
-
-    { BLoop( light_idx, space->nlights )
-        PointLightSource* light = &space->lights[light_idx];
-        init_PointLightSource (light);
-        light->on = false;
-        light->diffuse = true;
-        light->hemisphere = true;
-    } BLose()
 
     { BLoop( photon_idx, nphotons )
         const uint elem_idx = uint_GMRand (&gmrand, elems.sz);
@@ -127,8 +121,9 @@ cast_lights (RaySpace* space, uint nphotons, uint nbounces)
         quot1_Color (&color, &color, M_PI);
 
         { BLoop( bounce_idx, nbounces )
-            const uint light_idx = nbounces*photon_idx + bounce_idx;
-            PointLightSource* light = &space->lights[light_idx];
+                /* const uint light_idx = nbounces*photon_idx + bounce_idx; */
+            DeclGrow1Table( LightCutNode, lights, light );
+                /* PointLightSource* light = &space->lights[light_idx]; */
             PointXfrm A;
             real zenith = asin (sqrt (real_GMRand (&gmrand)));
             real azimuthcc = 2 * M_PI * real_GMRand (&gmrand);
@@ -137,14 +132,13 @@ cast_lights (RaySpace* space, uint nphotons, uint nbounces)
             uint hit = Max_uint, obj = Max_uint;
             real mag = Max_real;
 
-            light->on = true;
-            scale_Color (&light->intensity, &color, (real)elems.sz / nphotons);
+                /* light->on = true; */
+            scale_Color (&light->color, &color, (real)elems.sz / nphotons);
 #if 0
             if (bounce_idx == 0)
                 quot1_Color (&light->intensity, &light->intensity, M_PI);
 #endif
-            light->location = ray.origin;
-            light->direct = ray.direct;
+            light->iatt = ray;
 
             zero_Point (&c);
             c.coords[FwDim] = sin (zenith) * cos(azimuthcc); 
@@ -201,6 +195,22 @@ cast_lights (RaySpace* space, uint nphotons, uint nbounces)
 
 
     } BLose()
+
+    PackTable( LightCutNode, lights );
+
+    space->nlights = lights.sz;
+    ResizeT( PointLightSource, space->lights, space->nlights );
+
+    { BLoop( light_idx, lights.sz )
+        PointLightSource* light = &space->lights[light_idx];
+        init_PointLightSource (light);
+        light->diffuse = true;
+        light->hemisphere = true;
+        light->location = lights.s[light_idx].iatt.origin;
+        light->direct = lights.s[light_idx].iatt.direct;
+        light->intensity = lights.s[light_idx].color;
+    } BLose()
+    LoseTable( LightCutNode, lights );
 }
 
 

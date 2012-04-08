@@ -1,12 +1,13 @@
 
 #include "track.h"
+#include "affine.h"
 #include "util.h"
 
     void
 init_Track (Track* track)
 {
-    track->ncheckplanes = 0;
-    track->nstartlocs = 0;
+    InitTable( Ray, track->startlocs );
+    identity_IAMap (&track->camloc);
     init_Scene (&track->scene);
     track->nmorphs = 0;
     track->morph_dcoords = 0;
@@ -22,11 +23,7 @@ lose_Track (Track* track)
         free (track->checkplanes);
         free (track->checkpoints);
     }
-    if (track->nstartlocs > 0)
-    {
-        free (track->startlocs);
-        free (track->startdirs);
-    }
+    LoseTable( Ray, track->startlocs );
     cleanup_Scene (&track->scene);
     if (track->nmorphs > 0)
     {
