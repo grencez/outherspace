@@ -33,7 +33,8 @@ hit_Simplex (real* restrict ret_dist,
              const Simplex elem,
              Trit front)
 {
-    const real epsilon = 16 * Epsilon_real;
+        /* const real epsilon = 16 * Epsilon_real; */
+    const real epsilon = 0;
     Point edge1, edge2, tvec, pvec, qvec;
     real det, inv_det;
     real u, v;

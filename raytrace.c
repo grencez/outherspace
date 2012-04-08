@@ -1756,11 +1756,21 @@ cast_row_perspective (RayImage* image, uint row,
         Point dir;
 
 #if 0
-        if (! (row == 10 && col == 10))
+        if (! (image->nrows - 1 - row == 31 && col == 27) &&
+            ! (image->nrows - 1 - row == 31 && col == 28) &&
+            ! (image->nrows - 1 - row == 31 && col == 26))
         {
-            hitline[col] = Max_uint;
+            if (hitline)  hitline[col] = Max_uint;
+            if (magline)  magline[col] = Max_real;
+            if (pixline)
+            {
+                pixline[3*col+0] = 0;
+                pixline[3*col+1] = 0;
+                pixline[3*col+2] = 0;
+            }
             continue;
         }
+        fprintf (stderr, "\ncol:%u  ", col);
 #endif
 
         zero_Point (&dir);

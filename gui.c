@@ -43,6 +43,7 @@ static const bool SeparateRenderThread = true;
 static bool needs_recast = true;
 static uint resize_nrows = 0;
 static uint resize_ncols = 0;
+static uint nphotons_now = 0;
 
 typedef struct RedrawLoopParam RedrawLoopParam;
 struct RedrawLoopParam
@@ -225,11 +226,13 @@ key_press_fn (Pilot* pilot, RaySpace* space, const SDL_keysym* event)
     else if (lights_change != 0)
     {
         const uint nbounces = 4;
-        uint nphotons = space->nlights / nbounces;
+        uint nphotons = nphotons_now;
         if (lights_change > 0)   nphotons += 10;
         else if (nphotons > 10)  nphotons -= 10;
         cast_lights (space, nphotons, nbounces);
-        fprintf (out, "nlights:%u\n", space->nlights);
+        fprintf (out, "nphotons:%u nlights:%u\n",
+                 nphotons, space->nlights);
+        nphotons_now = nphotons;
     }
     else if (camera_offset != 0)
     {

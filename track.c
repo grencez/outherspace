@@ -6,6 +6,7 @@
     void
 init_Track (Track* track)
 {
+    track->ncheckplanes = 0;
     InitTable( Ray, track->startlocs );
     identity_IAMap (&track->camloc);
     init_Scene (&track->scene);

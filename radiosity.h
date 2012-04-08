@@ -75,9 +75,7 @@ cast_lights (RaySpace* space, uint nphotons, uint nbounces)
         matl = &scene->matls[matl_idx];
         if (taximag_Color (&matl->emissive) > 0)
         {
-            EmisElem* elem;
-            GrowTable( EmisElem, elems, 1 );
-            elem = &elems.s[elems.sz-1];
+            DeclGrow1Table( EmisElem, elems, elem );
             elem->rad = matl->emissive;
             elem->simplex = &object->elems[ei];
             normalize_Point (&elem->normal,
@@ -121,9 +119,7 @@ cast_lights (RaySpace* space, uint nphotons, uint nbounces)
         quot1_Color (&color, &color, M_PI);
 
         { BLoop( bounce_idx, nbounces )
-                /* const uint light_idx = nbounces*photon_idx + bounce_idx; */
             DeclGrow1Table( LightCutNode, lights, light );
-                /* PointLightSource* light = &space->lights[light_idx]; */
             PointXfrm A;
             real zenith = asin (sqrt (real_GMRand (&gmrand)));
             real azimuthcc = 2 * M_PI * real_GMRand (&gmrand);
@@ -134,10 +130,6 @@ cast_lights (RaySpace* space, uint nphotons, uint nbounces)
 
                 /* light->on = true; */
             scale_Color (&light->color, &color, (real)elems.sz / nphotons);
-#if 0
-            if (bounce_idx == 0)
-                quot1_Color (&light->intensity, &light->intensity, M_PI);
-#endif
             light->iatt = ray;
 
             zero_Point (&c);
@@ -211,6 +203,7 @@ cast_lights (RaySpace* space, uint nphotons, uint nbounces)
         light->intensity = lights.s[light_idx].color;
     } BLose()
     LoseTable( LightCutNode, lights );
+    LoseTable( EmisElem, elems );
 }
 
 
