@@ -26,6 +26,7 @@ struct LightCutTree
 {
     BSTNode sentinel;
     BSTree bst;
+    Table( LightCutNode ) nodes;
 };
 
 

@@ -1172,12 +1172,12 @@ int wrapped_main_fn (int argc, char* argv[])
 #endif
     RaySpace ray_space;
     char inpathname[1024];
+    const char* infilename;
     Pilot dflt_pilot;
     RaySpace* space;
-    if (argc > 1)
-        fputs ("No options for this program, ignoring.\n", out);
 
-    sprintf (inpathname, "%s", "data");
+    strcpy (inpathname, "data");
+    infilename = "curve-track.txt";
     if (RunFromMyMac)
     {
         char pathname[1024];
@@ -1188,6 +1188,12 @@ int wrapped_main_fn (int argc, char* argv[])
         CopyT( char, pathname, argv[0], 0, idx );
         pathname[idx] = 0;
         sprintf (inpathname, "%s/../Resources/share/outherspace", pathname);
+    }
+
+    if (argc >= 2)
+    {
+        inpathname[0] = '\0';
+        infilename = argv[1];
     }
 
     space = &ray_space;
@@ -1212,7 +1218,7 @@ int wrapped_main_fn (int argc, char* argv[])
                                &dflt_pilot.view_angle,
                                inpathname, "machine0.obj");
 #elif 1
-    readin_Track (&track, space, inpathname, "curve-track.txt");
+    readin_Track (&track, space, inpathname, infilename);
 #else
 #if 0
 #elif 0

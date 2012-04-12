@@ -12,7 +12,8 @@
 
 int main (int argc, char** argv)
 {
-    const char pathname[] = "data";
+    char pathname[1024];
+    const char* infilename = 0;
     bool good = true;
     FILE* out;
     RaySpace space;
@@ -34,38 +35,42 @@ int main (int argc, char** argv)
     init_Track (&track);
     init_RayImage (&image);
 
-#if 1
-    image.nrows = 2001;
-    image.ncols = 2001;
+    strcpy (pathname, "data");
+    if (argc >= 2)
+    {
+        pathname[0] = '\0';
+        infilename = argv[1];
+    }
+
+    image.nrows = 1000;
+    image.ncols = 1000;
+    image.hifov = 60 * M_PI / 180;
+    image.pixels = AllocT( byte, 1 );
+#if 0
+        /* 2001 x 2001 */
     image.hits = AllocT( uint, 1 );
     image.mags = AllocT( real, 1 );
-    image.pixels = AllocT( byte, 1 );
     good = setup_testcase_triangles (&space,
                                      &view_origin, &view_basis,
                                      &image.hifov,
                                      pathname);
 #elif 1
-    image.nrows = 1000;
-    image.ncols = 1000;
-    image.pixels = AllocT( byte, 1 );
-    image.hifov = 60 * M_PI / 180;
-    good = readin_Track (&track, &space, pathname, "curve-track.txt");
+        /* 1000 x 1000 */
+    if (!infilename)  infilename = "curve-track.txt";
+    good = readin_Track (&track, &space, pathname, infilename);
     if (good)
     {
         view_origin = track.camloc.xlat;
         transpose_PointXfrm (&view_basis, &track.camloc.xfrm);
     }
 #elif 0
-    image.nrows = 1000;
-    image.ncols = 1000;
-    image.pixels = AllocT( byte, 1 );
+        /* 1000 x 1000 */
+    if (!infilename)  infilename = "machine0.obj";
     good = setup_testcase_simple (&space, &view_origin,
                                   &view_basis, &image.hifov,
-                                  pathname, "machine0.obj");
+                                  pathname, infilename);
 #else
-    image.nrows = 1500;
-    image.ncols = 1500;
-    image.pixels = AllocT( byte, 1 );
+        /* 1500 x 1500 */
     good = setup_testcase_track
         (&space, &view_origin, &view_basis, &image.hifov,
          pathname);

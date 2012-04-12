@@ -289,13 +289,13 @@ readin_Track (Track* track, RaySpace* space,
                     /* Ignore because we are not in 4d mode.*/
                 doit = false;
             }
-            if (doit)  good = readin_wavefront (scene, pathname, line);
+            if (doit)  good = readin_wavefront (scene, in->pathname.s, line);
         }
         else if (AccepTok( line, "concat-model:" ))
         {
             Scene tmp;
             good = !!(scene);
-            if (good)  good = readin_wavefront (&tmp, pathname, line);
+            if (good)  good = readin_wavefront (&tmp, in->pathname.s, line);
             else       fprintf (out, "Line:%u  No scene for concat!\n",
                                 line_no);
                 /* TODO: Some sort of scene mapping should happen?*/
@@ -304,7 +304,7 @@ readin_Track (Track* track, RaySpace* space,
         else if (AccepTok( line, "sky:" ))
         {
             skytex = AllocT( Texture, 1 );
-            good = readin_Texture (skytex, pathname, line);
+            good = readin_Texture (skytex, in->pathname.s, line);
             if (!good)
                 fprintf (out, "Line:%u  Sky failed!\n", line_no);
         }
@@ -313,7 +313,7 @@ readin_Track (Track* track, RaySpace* space,
             good = readin_checkplanes (&track->ncheckplanes,
                                        &track->checkplanes,
                                        &track->checkpoints,
-                                       map, pathname, line);
+                                       map, in->pathname.s, line);
             if (!good)
                 fprintf (out, "Line:%u  Checkplanes failed!\n", line_no);
         }
