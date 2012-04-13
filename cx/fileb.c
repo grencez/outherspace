@@ -12,6 +12,8 @@ DeclTableT( byte, byte );
 
 static const uint NPerChunk = BUFSIZ;
 
+static bool
+load_chunk_FileB (FileB* in);
 
     void
 init_FileB (FileB* f)
@@ -115,39 +117,57 @@ load_FileB (FileB* f)
 {
     bool good = true;
     long ret = 0;
-    size_t sz = 0;
-    char* s = 0;
 
     if (good && (good = !!f->f))
     {
         ret = fseek (f->f, 0, SEEK_END);
     }
-    if (good && (good = (ret == 0)))
+
+        /* Some streams cannot be seeked.*/
+    if (good && ret != 0)
     {
-        ret = ftell (f->f);
+        bool more = true;
+        while (more)
+            more = load_chunk_FileB (f);
     }
-    if (good && (good = (ret >= 0)))
+    else
     {
-        sz = ret;
-        ret = fseek (f->f, 0, SEEK_SET);
-    }
-    if (good && (good = (ret == 0)))
-    {
-        GrowTable( char, f->buf, sz/sizeof(char) );
-        s = &f->buf.s[f->off];
-        ret = fread (s, 1, sz, f->f);
-        f->off += ret;
-        s[ret] = 0;
+        size_t sz = 0;
+        if (good && (good = (ret == 0)))
+        {
+            ret = ftell (f->f);
+        }
+        if (good && (good = (ret >= 0)))
+        {
+            sz = ret;
+            ret = fseek (f->f, 0, SEEK_SET);
+        }
+        if (good && (good = (ret == 0)))
+        {
+            GrowTable( char, f->buf, sz/sizeof(char) );
+
+                /* Note this relation!*/
+            Claim2( f->off + sz ,==, f->buf.sz-1 );
+
+            ret = fread (&f->buf.s[f->off], 1, sz, f->f);
+            if (ret >= 0)
+                f->buf.s[f->off + ret] = '\0';
+
+            good = (ret == (long)sz);
+        }
     }
 
     close_FileB (f);
 
-    if (good && (good = (ret == (long)sz)))  return s;
-
-    return 0;
+    if (good)
+    {
+        char* s = &f->buf.s[f->off];
+        f->off = f->buf.sz-1;
+        return s;
+    }
+    return NULL;
 }
 
-static
     bool
 load_chunk_FileB (FileB* in)
 {
@@ -321,25 +341,25 @@ nextok_FileB (FileB* in, char* ret_match, const char* delims)
 inject_FileB (FileB* in, FileB* src, const char* delim)
 {
     uint delim_sz = strlen (delim);
+    uint sz;
 
     load_FileB (src);
+    Claim2( src->buf.sz ,>, 0 );
+    sz = in->buf.sz - in->off;
 
-    if (src->buf.sz > 0)
-    {
-        uint sz = in->buf.sz - in->off;
-        GrowTable( char, in->buf, src->buf.sz + delim_sz );
-            /* Make room for injection.*/
-        memmove (&in->buf.s[in->off + src->buf.sz + delim_sz],
-                 &in->buf.s[in->off],
-                 sz * sizeof (char));
-            /* Inject file contents, assume src->buf.sz is strlen!*/
-        memcpy (&in->buf.s[in->off],
-                src->buf.s,
-                src->buf.sz * sizeof (char));
-    }
+    GrowTable( char, in->buf, src->buf.sz-1 + delim_sz );
+        /* Make room for injection.*/
+    memmove (&in->buf.s[in->off + src->buf.sz-1 + delim_sz],
+             &in->buf.s[in->off],
+             sz * sizeof (char));
+        /* Inject file contents, assume src->buf.sz is strlen!*/
+    memcpy (&in->buf.s[in->off],
+            src->buf.s,
+            (src->buf.sz-1) * sizeof (char));
+
         /* Add the delimiter at the end.*/
     if (delim_sz > 0)
-        memcpy (&in->buf.s[in->off + src->buf.sz],
+        memcpy (&in->buf.s[in->off + src->buf.sz-1],
                 delim,
                 delim_sz * sizeof (char));
 }
