@@ -8,6 +8,7 @@
 #include "color.h"
 #include "order.h"
 #include "point.h"
+#include "radiosity.h"
 #include "simplex.h"
 #include "space-junk.h"
 #include "xfrm.h"
@@ -70,12 +71,6 @@ cast_colors (Color* ret_color,
              const Color* factor,
              Trit front,
              uint nbounces);
-static bool
-cast_to_light (const RaySpace* restrict space,
-               const Point* restrict origin,
-               const Point* restrict dir,
-               Trit front,
-               real magtolight);
 static void
 cast_row_orthographic (RayImage* restrict image,
                        uint row,
@@ -105,6 +100,7 @@ init_RaySpace (RaySpace* space)
     zero_Point (&space->box.min);
     zero_Point (&space->box.max);
     space->skytxtr = 0;
+    init_LightCutTree (&space->lightcuts);
 }
 
     void
@@ -226,6 +222,7 @@ cleanup_RaySpace (RaySpace* space)
     if (space->nobjects > 0)  free (space->objects);
     if (space->nlights > 0)  free (space->lights);
     cleanup_KDTree (&space->object_tree);
+    lose_LightCutTree (&space->lightcuts);
 }
 
     void
@@ -1016,20 +1013,20 @@ fill_pixel (Color* ret_color,
             tscale = dot_Point (&tolight, &normal);
             if (tscale > 0)
             {
+                Ray tolight_ray;
                 if (light->hemisphere)
                 {
                     real dot = - dot_Point (&tolight, &light->direct);
                     if (dot <= 0)  continue;
                     tscale *= dot;
                 }
-                if (cast_to_light (space, &isect, &tolight,
+                tolight_ray.origin = isect;
+                tolight_ray.direct = tolight;
+                if (cast_to_light (space, &tolight_ray,
                                    front,
                                    magtolight))
                 {
                     real dist_factor = 1;
-                    if (false)
-                        dist_factor = 1 / match_real (1, magtolight * magtolight);
-
                     tscale *= dist_factor;
 
                         /* Add diffuse portion.*/
@@ -1058,6 +1055,20 @@ fill_pixel (Color* ret_color,
                 + diffuse.coords[i] * dscale.coords[i]
                 + specular.coords[i] * sscale.coords[i]
                 + emissive.coords[i];
+
+        if (space->lightcuts.nodes.sz > 0)
+        {
+            Color tmp;
+            RayHit hit;
+            hit.isect = isect;
+            negate_Point (&hit.incid, dir);
+            hit.normal = normal;
+            hit.front = front;
+            hit.mag = mag;
+            cast_LightCutTree (&tmp, &space->lightcuts,
+                               &diffuse, &hit, space);
+            summ_Color (&color, &color, &tmp);
+        }
 
         if (material && material->opacity < 1)
         {
@@ -1458,20 +1469,15 @@ cast_colors (Color* ret_color,
 
     bool
 cast_to_light (const RaySpace* restrict space,
-               const Point* restrict origin,
-               const Point* restrict dir,
+               const Ray* restrict ray,
                Trit front,
                real magtolight)
 {
     uint hit_idx = Max_uint;
     real hit_mag = magtolight;
     uint hit_object = Max_uint;
-    Ray ray;
 
-    ray.origin = *origin;
-    ray.direct = *dir;
-
-    cast1_RaySpace (&hit_idx, &hit_mag, &hit_object, &ray, space, front);
+    cast1_RaySpace (&hit_idx, &hit_mag, &hit_object, ray, space, front);
     return approx_eql (magtolight, hit_mag, 1, 1e2);
 }
 

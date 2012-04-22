@@ -231,7 +231,7 @@ key_press_fn (Pilot* pilot, RaySpace* space, const SDL_keysym* event)
         else if (nphotons > 10)  nphotons -= 10;
         cast_lights (space, nphotons, nbounces);
         fprintf (out, "nphotons:%u nlights:%u\n",
-                 nphotons, space->nlights);
+                 nphotons, (space->lightcuts.nodes.sz+1) / 2);
         nphotons_now = nphotons;
     }
     else if (camera_offset != 0)

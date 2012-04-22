@@ -281,6 +281,13 @@ bool hit_BBox (Point* entrance,
     return true;
 }
 
+    void
+init0_BBox (BBox* box)
+{
+    set_Point (&box->min, Max_real);
+    set_Point (&box->max, Min_real);
+}
+
 void init_BBox (BBox* box, uint npoints, const Point* points)
 {
     uint i;

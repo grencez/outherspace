@@ -13,7 +13,7 @@ struct GMRand {
     uint32 w;
 };
 
-inline
+qual_inline
     void
 init_GMRand (GMRand* a)
 {
@@ -34,7 +34,7 @@ init_GMRand (GMRand* a)
      * (or any other 16-bit constants k for which both k*2^16-1
      * and k*2^15-1 are prime)
      **/
-inline
+qual_inline
     uint32
 uint32_GMRand (GMRand* a)
 {
@@ -52,7 +52,7 @@ uint32_GMRand (GMRand* a)
     return (mask & ((z<<16) + (w&65535)));
 }
 
-inline
+qual_inline
     void
 step_GMRand (GMRand* a, uint n)
 {
@@ -62,21 +62,21 @@ step_GMRand (GMRand* a, uint n)
 }
 
     /** A random real in [0,1).**/
-inline
+qual_inline
     real
 real_GMRand (GMRand* a)
 {
     return (real) (uint32_GMRand (a) * 2.328306e-10);
 }
 
-inline
+qual_inline
     uint
 uint_GMRand (GMRand* a, uint n)
 {
     return (uint) (n * real_GMRand (a));
 }
 
-inline
+qual_inline
     bool
 bool_GMRand (GMRand* a)
 {

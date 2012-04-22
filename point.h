@@ -13,7 +13,7 @@
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
 #define def(name)  ConcatifyDef(name##_,Point)
-#define qualify static inline
+#define qualify qual_inline
 
 qualify
     void
@@ -168,11 +168,19 @@ def(checker_negate) (Point* p)
 
 qualify
     real
-def(magnitude) (const Point* a)
+def(mag2) (const Point* a)
 {
-    return sqrt (def(dot) (a, a));
+    return def(dot) (a, a);
 }
 
+qualify
+    real
+def(magnitude) (const Point* a)
+{
+    return sqrt (def(mag2) (a));
+}
+
+    /** L1 norm, also known as Manhattan norm or taxicab norm.**/
 qualify
     real
 def(taximag) (const Point* a)

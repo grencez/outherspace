@@ -7,13 +7,34 @@
 #include "kptree.h"
 #include "scene.h"
 #include "space.h"
+#include "cx/bstree.h"
+#include "cx/table.h"
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
+typedef struct LightCutNode LightCutNode;
+typedef struct LightCutTree LightCutTree;
 typedef struct RaySpace RaySpace;
 typedef struct ObjectRaySpace ObjectRaySpace;
 typedef struct PointLightSource PointLightSource;
 typedef struct RayImage RayImage;
 typedef struct RayCastAPriori RayCastAPriori;
+typedef struct RayHit RayHit;
+
+struct LightCutNode
+{
+    BSTNode bst;
+    Ray iatt;  /* location + orientation */
+    Color color;
+};
+DeclTableT( LightCutNode, LightCutNode );
+
+struct LightCutTree
+{
+    BSTNode sentinel;
+    BSTree bst;
+    Table( LightCutNode ) nodes;
+};
+
 
 struct ObjectRaySpace
 {
@@ -46,6 +67,7 @@ struct RaySpace
     uint nlights;
     ObjectRaySpace* objects;
     PointLightSource* lights;
+    LightCutTree lightcuts;
     uint skytxtr; /* Index of sky texture in main object.*/
 
     bool partition;  /* When false, the below two are unused.*/
@@ -79,6 +101,15 @@ struct RayCastAPriori
     bool inside_box;
 };
 
+struct RayHit
+{
+    Point isect;
+    Point incid;
+    Point normal;
+    Trit front;
+    real mag;
+};
+
 void
 map_vertex_normal (Point* normal,
                    const Point* vnmls,
@@ -104,6 +135,11 @@ cast1_RaySpace (uint* ret_hit, real* ret_mag,
                 const Ray* ray,
                 const RaySpace* space,
                 Trit front);
+bool
+cast_to_light (const RaySpace* restrict space,
+               const Ray* restrict ray,
+               Trit front,
+               real magtolight);
 void
 cast_nopartition (uint* ret_hit,
                   real* ret_mag,

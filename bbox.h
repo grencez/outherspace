@@ -28,6 +28,7 @@ bool hit_outer_BBox (Point* entrance,
 bool hit_BBox (Point* entrance,
                const BBox* box,
                const Point* origin, const Point* dir);
+void init0_BBox (BBox* box);
 void init_BBox (BBox* box, uint npoints, const Point* points);
 void adjust_BBox (BBox* box, const Point* point);
 void

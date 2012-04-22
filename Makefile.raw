@@ -289,6 +289,7 @@ CSources = affine.c \
 		   util.c \
 		   wavefront-file.c \
 		   xfrm.c \
+		   cx/bstree.c \
 		   cx/fileb.c
 
 ifneq (,$(filter sse,$(CONFIG)))
@@ -318,13 +319,13 @@ hello: hello.c $(CSources)
 test-hello: hello
 	LD_LIBRARY_PATH=$(OpenCLLibPath) ./$<
 
-$(Pfx)cli: cli.c compute.c $(CSources)
+$(Pfx)cli: cli.c compute.c $(CSources) radiosity.h
 	$(CC) $(CFLAGS) $(DFLAGS) $< -o $@ $(LFLAGS)
 
 GuiCFlags += $(CFLAGS)
 GuiDFlags += $(DFLAGS)
 GuiLFlags += $(LFLAGS)
-$(Pfx)gui: $(GuiMainCSources) compute.c motion.c $(CSources)
+$(Pfx)gui: $(GuiMainCSources) compute.c motion.c $(CSources) radiosity.h
 	$(CC) $(GuiCFlags) $(GuiDFlags) $< -o $@ $(GuiLFlags)
 
 run-$(Pfx)gui-opencl: $(Pfx)gui
