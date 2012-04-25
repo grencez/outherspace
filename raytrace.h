@@ -24,6 +24,8 @@ struct LightCutNode
 {
     BSTNode bst;
     Ray iatt;  /* location + orientation */
+    real cos_bound;
+    real area;
     Color color;
 };
 DeclTableT( LightCutNode, LightCutNode );

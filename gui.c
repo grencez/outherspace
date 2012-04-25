@@ -18,7 +18,7 @@
 #include "gui-opengl.c"
 #endif
 
-#include "radiosity.h"
+#include "lightcut.h"
 
     /* SDL on OS X does some weirdo bootstrapping by redefining /main/.*/
 #ifdef main

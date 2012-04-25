@@ -7,7 +7,9 @@
 #include "order.h"
 #include "point.h"
 #include "serial.h"
+#include "simplex.h"
 #include "space-junk.h"
+#include "xfrm.h"
 
 #include <assert.h>
 #include <math.h>

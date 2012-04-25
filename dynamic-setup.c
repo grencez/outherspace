@@ -211,7 +211,7 @@ readin_Track (Track* track, RaySpace* space,
 
         olay_FileB (olay, in);
         skipds_FileB (olay, NULL);
-        line = olay->buf.s;
+        line = cstr_FileB (olay);
 
         if (AccepTok( line, "scale" ))
         {

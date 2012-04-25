@@ -133,7 +133,7 @@ void output_gv_KDTree (FILE* out, const KDTree* tree)
 
 static
     void
-cleanup_KDTreeNode (uint node_idx, KDTree* tree)
+lose_KDTreeNode (uint node_idx, KDTree* tree)
 {
     KDTreeNode* node;
     node = &tree->nodes[node_idx];
@@ -141,8 +141,8 @@ cleanup_KDTreeNode (uint node_idx, KDTree* tree)
     {
         KDTreeInner* inner;
         inner = &node->as.inner;
-        cleanup_KDTreeNode (inner->children[0], tree);
-        cleanup_KDTreeNode (inner->children[1], tree);
+        lose_KDTreeNode (inner->children[0], tree);
+        lose_KDTreeNode (inner->children[1], tree);
     }
 }
 
@@ -152,11 +152,11 @@ void init_KDTree (KDTree* tree)
     tree->nelemidcs = 0;
 }
 
-void cleanup_KDTree (KDTree* tree)
+void lose_KDTree (KDTree* tree)
 {
     if (tree->nnodes > 0)
     {
-        cleanup_KDTreeNode (0, tree);
+        lose_KDTreeNode (0, tree);
         free (tree->nodes);
     }
     if (tree->nelemidcs > 0)
@@ -182,7 +182,7 @@ init_KDTreeGrid (KDTreeGrid* grid, uint nelems)
 }
 
     void
-cleanup_KDTreeGrid (KDTreeGrid* grid)
+lose_KDTreeGrid (KDTreeGrid* grid)
 {
     if (grid->nelems > 0)
     {
@@ -646,7 +646,7 @@ build_KDTreeNode (KDTreeGrid* grid,
                     build_KDTreeNode (&logrid,
                                       nodelist, elemidxlist,
                                       1+depth, elems);
-                    cleanup_KDTreeGrid (&logrid);
+                    lose_KDTreeGrid (&logrid);
                 }
 
 #ifdef _OPENMP
@@ -658,7 +658,7 @@ build_KDTreeNode (KDTreeGrid* grid,
                     build_KDTreeNode (&higrid,
                                       &tmp_nodelist, &tmp_elemidxlist,
                                       1+depth, elems);
-                    cleanup_KDTreeGrid (&higrid);
+                    lose_KDTreeGrid (&higrid);
                 }
             }
 

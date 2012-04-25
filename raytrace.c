@@ -6,9 +6,9 @@
 #include "bbox.h"
 #include "bitstring.h"
 #include "color.h"
+#include "lightcut.h"
 #include "order.h"
 #include "point.h"
-#include "radiosity.h"
 #include "simplex.h"
 #include "space-junk.h"
 #include "xfrm.h"
@@ -48,8 +48,7 @@ partition_ObjectRaySpace (ObjectRaySpace* space);
 static void
 partition_verts_ObjectRaySpace (ObjectRaySpace* space);
 static void
-init_Scene_KPTreeGrid (KPTreeGrid* grid, const Scene* scene,
-                       const BBox* box);
+init_Scene_KPTreeGrid (KPTreeGrid* grid, const Scene* scene);
 static void
 init_RaySpace_KDTreeGrid (KDTreeGrid* grid, const RaySpace* space);
 
@@ -221,7 +220,7 @@ cleanup_RaySpace (RaySpace* space)
         cleanup_ObjectRaySpace (&space->objects[i]);
     if (space->nobjects > 0)  free (space->objects);
     if (space->nlights > 0)  free (space->lights);
-    cleanup_KDTree (&space->object_tree);
+    lose_KDTree (&space->object_tree);
     lose_LightCutTree (&space->lightcuts);
 }
 
@@ -229,8 +228,8 @@ cleanup_RaySpace (RaySpace* space)
 cleanup_ObjectRaySpace (ObjectRaySpace* space)
 {
     cleanup_Scene (&space->scene);
-    cleanup_KDTree (&space->tree);
-    cleanup_KPTree (&space->verttree);
+    lose_KDTree (&space->tree);
+    lose_KPTree (&space->verttree);
     if (space->nelems > 0)
     {
         free (space->elems);
@@ -248,11 +247,11 @@ update_dynamic_RaySpace (RaySpace* space)
         init_RaySpace_KDTreeGrid (&grid, space);
         space->box = grid.box;
             /* Since it's a regeneration, clean up the previous version.*/
-        cleanup_KDTree (&space->object_tree);
+        lose_KDTree (&space->object_tree);
         build_KDTree (&space->object_tree, &grid, 0);
             /* output_KDTreeGrid (stderr, &grid); */
             /* output_KDTree (stderr, &space->object_tree); */
-        cleanup_KDTreeGrid (&grid);
+        lose_KDTreeGrid (&grid);
     }
     else
     {
@@ -276,16 +275,16 @@ partition_ObjectRaySpace (ObjectRaySpace* space)
     printf ("nnodes:%u  nelemidcs:%u\n",
             space->tree.nnodes, space->tree.nelemidcs);
 #endif
-    cleanup_KDTreeGrid (&grid);
+    lose_KDTreeGrid (&grid);
 }
 
     void
 partition_verts_ObjectRaySpace (ObjectRaySpace* space)
 {
     KPTreeGrid grid;
-    init_Scene_KPTreeGrid (&grid, &space->scene, &space->box);
+    init_Scene_KPTreeGrid (&grid, &space->scene);
     build_KPTree (&space->verttree, &grid);
-    cleanup_KPTreeGrid (&grid);
+    lose_KPTreeGrid (&grid);
 }
 
     void
@@ -341,30 +340,13 @@ init_Scene_KDTreeGrid (KDTreeGrid* grid, const Scene* scene,
 }
 
     void
-init_Scene_KPTreeGrid (KPTreeGrid* grid, const Scene* scene,
-                       const BBox* box)
+init_Scene_KPTreeGrid (KPTreeGrid* grid, const Scene* scene)
 {
-    uint i;
+    init_KPTreeGrid (grid, scene->nverts);
 
-    grid->npts = scene->nverts;
-    grid->indices = AllocT( uint, grid->npts );
-    grid->coords[0] = AllocT( real, NDimensions * grid->npts );
-    grid->box = *box;
-
-    UFor( i, NDimensions-1 )
-        grid->coords[i+1] = &grid->coords[i][grid->npts];
-
-    UFor( i, grid->npts )
-    {
-        uint dim;
-        const Point* p;
-
-        grid->indices[i] = i;
-        p = &scene->verts[i];
-
-        UFor( dim, NDimensions )
-            grid->coords[dim][i] = p->coords[dim];
-    }
+    { BLoop( i, scene->nverts )
+        set1_KPTreeGrid (grid, i, &scene->verts[i]);
+    } BLose()
 }
 
     void

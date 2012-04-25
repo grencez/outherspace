@@ -187,7 +187,7 @@ testfn_KPTree ()
         i = inside_BBox_KPTree (&tree, &box, i);
     }
 
-    cleanup_KPTree (&tree);
+    lose_KPTree (&tree);
 }
 
 static

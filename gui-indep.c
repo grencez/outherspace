@@ -1,8 +1,14 @@
 
 #include "gui-indep.h"
 
+#include "affine.h"
+#include "bbox.h"
+#include "color.h"
 #include "raytrace.h"
+#include "simplex.h"
+#include "space-junk.h"
 #include "testcase.h"
+#include "xfrm.h"
 
 #include <assert.h>
 

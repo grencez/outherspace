@@ -82,34 +82,38 @@ void output_PGM_image (const char* filename, uint nrows, uint ncols,
 void output_PPM_image (const char* filename, uint nrows, uint ncols,
                        const byte* pixels)
 {
-    uint row;
-    FILE* out;
+    DecloStack( FileB, f );
 
-    out = fopen (filename, "wb");
-    if (!out)
+    init_FileB (f);
+    f->sink = true;
+    open_FileB (f, 0, filename);
+    if (!f->good)
     {
         fprintf (stderr, "Cannot open file for writing:%s\n", filename);
         return;
     }
 
-    fputs ("P3\n", out);
-    fprintf (out, "%u %u\n", ncols, nrows);
-    fputs ("255\n", out);
+    dump_cstr_FileB (f, "P3\n");
+    dump_uint_FileB (f, ncols);
+    dump_char_FileB (f, ' ');
+    dump_uint_FileB (f, nrows);
+    dump_char_FileB (f, '\n');
+    dump_cstr_FileB (f, "255\n");
 
-    UFor( row, nrows )
-    {
-        uint col;
+    { BLoop( row, nrows )
         const byte* pixline;
-
         pixline = &pixels[(nrows - row - 1) * 3 * ncols];
-        UFor( col, ncols )
-        {
-            fprintf (out, " %u %u %u",
-                     pixline[3*col+0], pixline[3*col+1], pixline[3*col+2]);
-        }
-        fputc ('\n', out);
-    }
-    fclose (out);
+        { BLoop( col, ncols )
+            dump_char_FileB (f, ' ');
+            dump_uint_FileB (f, pixline[3*col+0]);
+            dump_char_FileB (f, ' ');
+            dump_uint_FileB (f, pixline[3*col+1]);
+            dump_char_FileB (f, ' ');
+            dump_uint_FileB (f, pixline[3*col+2]);
+        } BLose()
+        dump_char_FileB (f, '\n');
+    } BLose()
+    lose_FileB (f);
 }
 
 
@@ -117,20 +121,21 @@ void output_PPM_image (const char* filename, uint nrows, uint ncols,
 readin_PPM_image (uint* ret_nrows, uint* ret_ncols,
                   const char* pathname, const char* filename)
 {
-    uint row, nrows = 0, ncols = 0;
+    uint nrows = 0, ncols = 0;
     bool good = true;
     byte* pixels;
-    const char* line;
-    DecloStack( FileB, in );
+    DecloStack( FileB, f );
     uint max_color_value = 255;
     uint header_stage;
+    bool ascii = true;
     real t0;
 
     t0 = monotime ();
 
-    init_FileB (in);
-    in->f = fopen_path (pathname, filename, "rb");
-    if (!in->f)
+    init_FileB (f);
+    open_FileB (f, pathname, filename);
+
+    if (!f->f)
     {
         fprintf (stderr, "Cannot open file for reading:%s/%s\n",
                  pathname, filename);
@@ -139,12 +144,13 @@ readin_PPM_image (uint* ret_nrows, uint* ret_ncols,
 
 
     header_stage = 0;
-    while (good && header_stage < 3 && getline_FileB (in))
+    while (good && header_stage < 3 && getline_FileB (f))
     {
+        const char* line;
         DecloStack( FileB, olay );
-        olay_FileB (olay, in);
+        olay_FileB (olay, f);
         skipds_FileB (olay, 0);
-        line = olay->buf.s;
+        line = cstr_FileB (olay);
 
         if (line[0] == '#')
         {
@@ -153,7 +159,11 @@ readin_PPM_image (uint* ret_nrows, uint* ret_ncols,
         else if (header_stage == 0)
         {
             header_stage += 1;
-            good = (0 == strcmp (line, "P3"));
+            if (0 == strcmp (line, "P6"))
+                ascii = false;
+            else
+                good = (0 == strcmp (line, "P3"));
+
             if (!good)  fprintf (stderr, "Invalid PPM type:%s\n", line);
         }
         else if (header_stage == 1)
@@ -175,40 +185,32 @@ readin_PPM_image (uint* ret_nrows, uint* ret_ncols,
 
     if (!good)
     {
-        lose_FileB (in);
+        lose_FileB (f);
         return 0;
     }
 
+    if (!ascii)  setfmt_FileB (f, FileB_Raw);
+
     pixels = AllocT( byte, nrows * ncols * NColors );
-    
-    UFor( row, nrows )
-    {
-        uint col;
+
+    { BLoop( row, nrows )
+        const uint n = ncols * NColors;
         byte* pixline;
         pixline = &pixels[NColors * (nrows - row - 1) * ncols];
-        UFor( col, ncols )
-        {
-            uint i;
-            byte* pixcell;
-            pixcell = &pixline[NColors * col];
-            UFor( i, NColors )
-            {
-                uint x;
-                line = nextok_FileB (in, 0, 0);
-                if (line && strto_uint (&x, line))
-                {
-                    pixcell[i] = (byte) (256 * x / (max_color_value+1));
-                }
-                else
-                {
-                    lose_FileB (in);
-                    return 0;
-                }
-            }
-        }
-    }
 
-    lose_FileB (in);
+        if (!loadn_byte_FileB (f, pixline, n))
+        {
+            good = false;
+            break;
+        }
+
+        { BLoop( i, n )
+            pixline[i] = (byte)
+                (256 * (uint) pixline[i] / (max_color_value+1));
+        } BLose()
+    } BLose()
+
+    lose_FileB (f);
 
     if (good)
     {

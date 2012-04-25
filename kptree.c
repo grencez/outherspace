@@ -17,19 +17,42 @@ init_KPTree (KPTree* tree)
 }
 
     void
-cleanup_KPTree (KPTree* tree)
+lose_KPTree (KPTree* tree)
 {
     if (tree->nnodes > 0)  free (tree->nodes);
 }
 
     void
-cleanup_KPTreeGrid (KPTreeGrid* grid)
+init_KPTreeGrid (KPTreeGrid* grid, uint n)
+{
+    grid->npts = n;
+    init0_BBox (&grid->box);
+    grid->indices = AllocT( uint, n );
+
+    grid->coords[0] = AllocT( real, NDims * n );
+    { BLoop( i, NDims-1 )
+        grid->coords[i+1] = &grid->coords[i][n];
+    } BLose()
+}
+
+    void
+lose_KPTreeGrid (KPTreeGrid* grid)
 {
     if (grid->npts > 0)
     {
         free (grid->indices);
         free (grid->coords[0]);
     }
+}
+
+    void 
+set1_KPTreeGrid (KPTreeGrid* grid, uint i, const Point* p)
+{
+    adjust_BBox (&grid->box, p);
+    grid->indices[i] = i;
+    { BLoop( dim, NDims )
+        grid->coords[dim][i] = p->coords[dim];
+    } BLose()
 }
 
 static
@@ -148,12 +171,12 @@ build_KPTree (KPTree* tree, KPTreeGrid* grid)
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
 
-    /* Descend the KPTree until we have an out-of-bounds (large) index
+    /** Descend the KPTree until we have an out-of-bounds (large) index
      * and return that. In effect, we find the index of some imaginary node
      * below node /i/, closest to /loc/, which has a real parent.
      * Algorithm-wise, this behavior is convenient, even though the returned
      * index is invalid.
-     */
+     **/
     uint
 descend_KPTree (const KPTree* tree, const Point* loc, uint i)
 {
@@ -169,23 +192,27 @@ descend_KPTree (const KPTree* tree, const Point* loc, uint i)
     return i;
 }
 
-    /* Find the nearest Point, given a location.*/
+    /**
+     * Use return value as index.
+     * Loop while return value is not Max_uint.
+     * Use /ret_i/ as nothing... still important though.
+     * Use /ret_mag2/ as limit to search.
+     **/
     uint
-nearest_neighbor_KPTree (const KPTree* tree, const Point* loc)
+next_KPTree (const KPTree* tree, const Point* loc,
+             uint* ret_i, real* ret_mag2)
 {
-    uint i;
-    uint best = Max_uint;
-    real mag2 = Max_real;
+    uint i = *ret_i;
+    real mag2_bound = *ret_mag2;
 
-    i = descend_KPTree (tree, loc, 0);
+    i = descend_KPTree (tree, loc, i);
 
     while (i > 0)
     {
         bool fromlo;
-        uint previ;
         real magtosplit;
-        Point diff;
         const KPTreeNode* node;
+        uint previ;
 
         previ = i;
         i = (i - 1) / 2;  /* Ascend 1.*/
@@ -194,33 +221,54 @@ nearest_neighbor_KPTree (const KPTree* tree, const Point* loc)
         magtosplit = node->loc.coords[node->dim] - loc->coords[node->dim];
         fromlo = magtosplit >= 0;
 
-        if (fromlo != even_uint (previ) && magtosplit * magtosplit < mag2)
+        if (fromlo != even_uint (previ) &&
+            magtosplit * magtosplit < mag2_bound)
         {
-            real tmpmag2;
-            diff_Point (&diff, &node->loc, loc);
-            tmpmag2 = dot_Point (&diff, &diff);
-            if (tmpmag2 < mag2)
+            real mag2 = dmag2_Point (&node->loc, loc);
+            real node_idx = i;
+
+                /* From lo side -> go to hi side.
+                 * From hi side -> go to lo side.
+                 */
+            i = 2 * i + (fromlo ? 2 : 1);
+
+            if (mag2 < mag2_bound)
             {
-                best = i;
-                mag2 = tmpmag2;
+                *ret_i = i;
+                *ret_mag2 = mag2;
+                return node_idx;
             }
 
-            if (fromlo)  i = 2 * i + 2;  /* From lo side -> go to hi side.*/
-            else         i = 2 * i + 1;  /* From hi side -> go to lo side.*/
             i = descend_KPTree (tree, loc, i);
         }
     }
 
+    *ret_i = 0;
+    return Max_uint;
+}
+
+    /** Find the nearest Point, given a location.**/
+    uint
+nearest_neighbor_KPTree (const KPTree* tree, const Point* loc)
+{
+    uint i;
+    uint best = Max_uint;
+    uint travi = 0;
+    real mag2 = Max_real;
+
+    while (Max_uint != (i = next_KPTree (tree, loc, &travi, &mag2)))
+        best = i;
+
     return best;
 }
 
-    /* For each point found inside the bounding box,
+    /** For each point found inside the bounding box,
      * the KPTreeNode index representing it is returned.
      *
      * Initiallly, /i/ is /Max_uint/.
      * Subsequently, /i/ is the previous return value.
      * Terminate when the return value is /Max_uint/.
-     */
+     **/
     uint
 inside_BBox_KPTree (const KPTree* tree, const BBox* box, uint i)
 {

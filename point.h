@@ -192,6 +192,19 @@ def(taximag) (const Point* a)
     return sum;
 }
 
+    /** Infinity norm.**/
+qualify
+    real
+def(maxmag) (const Point* a)
+{
+    real x = 0;
+    { BLoop( i, NDims )
+        real y = fabs (a->coords[i]);
+        if (y > x)  x = y;
+    } BLose()
+    return x;
+}
+
 qualify
     real
 def(dist) (const Point* a, const Point* b)
@@ -199,6 +212,15 @@ def(dist) (const Point* a, const Point* b)
     Point c;
     def(diff) (&c, a, b);
     return def(magnitude) (&c);
+}
+
+qualify
+    real
+def(dmag2) (const Point* a, const Point* b)
+{
+    Point c;
+    def(diff) (&c, a, b);
+    return def(mag2) (&c);
 }
 
 qualify

@@ -87,11 +87,11 @@ void output_gv_KDTree (FILE* out, const KDTree* tree);
 void
 init_KDTree (KDTree* tree);
 void
-cleanup_KDTree (KDTree* tree);
+lose_KDTree (KDTree* tree);
 void
 init_KDTreeGrid (KDTreeGrid* grid, uint nelems);
 void
-cleanup_KDTreeGrid (KDTreeGrid* grid);
+lose_KDTreeGrid (KDTreeGrid* grid);
 void
 shrink_KDTreeGrid (KDTreeGrid* grid, uint nelems);
 void

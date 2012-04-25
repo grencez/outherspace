@@ -18,6 +18,7 @@ set (CSources
     dynamic-setup.c
     kdtree.c
     kptree.c
+    lightcut.c
     material.c
     order.c
     pnm-image.c
@@ -31,6 +32,7 @@ set (CSources
     util.c
     wavefront-file.c
     xfrm.c
+    cx/bstree.c
     cx/fileb.c
     )
 
@@ -80,7 +82,7 @@ endmacro ()
 
 setup_dbgn_defines (${CSources})
 
-add_executable (file2array file2array.c util.c)
+add_executable (file2array file2array.c util.c cx/fileb.c)
 set_target_properties (file2array PROPERTIES
     PREFIX "" OUTPUT_NAME file2array)
 
