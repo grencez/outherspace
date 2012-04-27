@@ -26,6 +26,8 @@ typedef struct EmisElem EmisElem;
 struct EmisElem
 {
     Color rad;
+    real area;
+    uint nphotons;
     const Simplex* simplex;
     Point normal;
 };
@@ -49,7 +51,8 @@ struct LightCutBuild
 init_LightCutTree (LightCutTree* t)
 {
     InitTable( LightCutNode, t->nodes );
-    init_BSTree (&t->bst, &t->sentinel, 0);
+    t->sentinel.nlights = 0;
+    init_BSTree (&t->bst, &t->sentinel.bst, 0);
 }
 
     void
@@ -118,30 +121,79 @@ cost_LightCutBuild (LightCutBuild* ret_b,
 }
 
 static
+    uint
+climb_LightCutBuild (LightCutBuild* a, LightCutBuild* lights)
+{
+    if (a->node)  return a->idx;
+    return (a->idx = climb_LightCutBuild (&lights[a->idx], lights));
+}
+
+static
+    real
+maxmag2_LightCutBuild (const LightCutBuild* light, real e_min)
+{
+    Point diag;
+    real min, max;
+    real a2;
+    real mag2;
+
+    if (e_min == Max_real)  return Max_real;
+
+    a2 = e_min / maxmag_Color (&light->node->color);
+
+    measure_BBox (&diag, &light->box);
+    prod_Point (&diag, &diag, &diag);
+    min = max = diag.coords[NDims-1];
+    mag2 = 0;
+    { BLoop( dim, NDims-1 )
+        real x = diag.coords[dim];
+        real z = x;
+        if (x < min)
+        {
+            z = min;
+            min = x;
+        }
+        else if (x > max)
+        {
+            max = x;
+        }
+        mag2 += z;
+    } BLose()
+
+    mag2 = a2 - mag2;
+    if (max > mag2)
+        mag2 = max;
+
+    return mag2 / 4;
+}
+
+static
     real
 find_light_match (LightCutBuild* close,
                   const LightCutBuild* light,
                   LightCutBuild* lights,
                   const KPTree* kptree,
-                  real lmag2,
+                  real e_min,
                   real sdsim2)
 {
-    const Point* const loc = &light->node->iatt.origin;
+    Point loc;
     uint travi = 0;
+    real lmag2 = maxmag2_LightCutBuild (light, e_min);
     real mag2 = lmag2;
     uint i;
-    real e_min = Max_real;
+
+    centroid_BBox (&loc, &light->box);
 
     close->node = 0;
     close->idx = Max_uint;
 
-    while (Max_uint != (i = next_KPTree (kptree, loc, &travi, &mag2)))
+    while (Max_uint != (i = next_KPTree (kptree, &loc, &travi, &mag2)))
     {
         LightCutBuild b;
         real e;
         LightCutBuild* a = &lights[i];
-        while (!a->node)
-            a = &lights[a->idx];
+        if (!a->node)
+            a = &lights[climb_LightCutBuild (a, lights)];
 
         if (a == light)
         {
@@ -151,13 +203,59 @@ find_light_match (LightCutBuild* close,
         e = cost_LightCutBuild (&b, light, a, sdsim2);
         if (e < e_min)
         {
-            if (lmag2 == Max_real)  lmag2 = 4 * mag2;
             e_min = e;
             *close = b;
+            lmag2 = maxmag2_LightCutBuild (light, e_min);
         }
         mag2 = lmag2;
     }
     return e_min;
+}
+
+static
+    LightCutNode*
+linearize_LightCutNode (LightCutNode* light,
+                        LightCutTree* t,
+                        LightCutNode* off)
+{
+    LightCutNode* sp;
+    if (light == &t->sentinel)  return off;
+
+    light->lights = off;
+
+    sp = CastUp( LightCutNode, bst, light->bst.split[0] );
+    off = linearize_LightCutNode (sp, t, off);
+    light->nlights = sp->nlights;
+
+    sp = CastUp( LightCutNode, bst, light->bst.split[1] );
+    off = linearize_LightCutNode (sp, t, off);
+    light->nlights += sp->nlights;
+
+    if (light->nlights > 0)  return off;
+
+        /* We have a single light (leaf)!*/
+    light->nlights = 1;
+
+        /* Swap positions in array.*/
+    light->bst.joint->split[side_BSTNode (&light->bst)] = &off->bst;
+    off->bst.joint->split[side_BSTNode (&off->bst)] = &light->bst;
+    {
+        LightCutNode tmp = *light;
+        *light = *off;
+        light = off;
+        *light = tmp;
+    }
+
+    return &off[1];
+}
+
+static
+    void
+linearize_LightCutTree (LightCutTree* t)
+{
+    LightCutNode* light =
+        CastUp( LightCutNode, bst, root_of_BSTree (&t->bst) );
+    linearize_LightCutNode (light, t, t->nodes.s);
 }
 
 static
@@ -175,7 +273,7 @@ make_light_tree (LightCutTree* t)
     if (!clusters)  return;
 
     init_KPTreeGrid (&kpgrid, nlights);
-    init_BSTree (&t->bst, &t->sentinel, 0);
+    init_BSTree (&t->bst, &t->sentinel.bst, 0);
 
     SizeTable( LightCutNode, t->nodes, 2*nlights-1 );
     { BLoop( i, nlights )
@@ -186,6 +284,8 @@ make_light_tree (LightCutTree* t)
         c->box.min = c->box.max = c->node->iatt.origin;
         c->dox.min = c->dox.max = c->node->iatt.direct;
         c->node->cos_bound = c->cos_bound = 1;
+        c->node->nlights = 1;
+        c->node->lights = c->node;
         c->idx = i;
         set1_KPTreeGrid (&kpgrid, i, &c->node->iatt.origin);
     } BLose()
@@ -203,9 +303,10 @@ make_light_tree (LightCutTree* t)
     while (true)
     {
         LightCutBuild close;
-        real min = Max_real;
         LightCutBuild* c0 = 0;
         LightCutNode* node;
+#if 0
+        real min = Max_real;
 
         { BLoop( i, nlights )
             LightCutBuild* c1 = &clusters[i];
@@ -219,12 +320,26 @@ make_light_tree (LightCutTree* t)
                 c0 = c1;
             }
         } BLose()
+#else
+        real max = 0;
 
-        min = Max_real;
+        { BLoop( i, nlights )
+            LightCutBuild* c1 = &clusters[i];
+            real mag;
+            if (!c1->node)  continue;
+
+            mag = maxmag_Color (&c1->node->color);
+            if (mag >= max)
+            {
+                max = mag;
+                c0 = c1;
+            }
+        } BLose()
+#endif
+
         close = *c0;
         close.node = 0;
 
-#if 1
         {
             real e0;
             e0 = find_light_match (&close, c0, clusters, &kptree,
@@ -235,35 +350,15 @@ make_light_tree (LightCutTree* t)
                 LightCutBuild close_back = close;
                 real e1;
                 e1 = find_light_match (&close_back, &clusters[close.idx],
-                                       clusters, &kptree, Max_real, sdsim2);
-                Claim( close_back.node );
+                                       clusters, &kptree, e0, sdsim2);
                 if (e0 <= e1)  break;
+                Claim( close_back.node );
                 e0 = e1;
                 c0 = &clusters[close.idx];
                 close = close_back;
             }
 #endif
         }
-
-        if (false)
-#endif
-        { BLoop( i, nlights )
-            LightCutBuild* c1 = &clusters[i];
-            LightCutBuild b = *c1;
-            real mag;
-
-
-            if (!c1->node)  continue;
-            if (c1 == c0)  continue;
-
-            mag = cost_LightCutBuild (&b, c0, c1, sdsim2);
-
-            if (mag < min)
-            {
-                min = mag;
-                close = b;
-            }
-        } BLose()
 
         if (!close.node)
         {
@@ -276,7 +371,7 @@ make_light_tree (LightCutTree* t)
         c0->node->bst.joint = &node->bst;
         close.node->bst.joint = &node->bst;
         *node = *c0->node;
-        node->bst.joint = &t->sentinel;
+        node->bst.joint = &t->sentinel.bst;
         node->bst.split[0] = &c0->node->bst;
         node->bst.split[1] = &close.node->bst;
         summ_Color (&node->color, &node->color, &close.node->color);
@@ -294,6 +389,8 @@ make_light_tree (LightCutTree* t)
 
     lose_KPTreeGrid (&kpgrid);
     lose_KPTree (&kptree);
+
+    linearize_LightCutTree (t);
 }
 
     void
@@ -323,18 +420,48 @@ cast_lights (RaySpace* space, uint nphotons, uint nbounces)
         }
     } BLose()
 
-
     if (elems.sz == 0)  return;
 
+    {
+        const uint neach = nphotons / elems.sz;
+        const uint nplus1 = nphotons % elems.sz;
+
+        { BLoop( ei, elems.sz )
+            EmisElem* elem = &elems.s[ei];
+            elem->nphotons = neach + (ei < nplus1 ? 1 : 0);
+            if (elem->nphotons > 0)
+                elem->area = area_Simplex (elem->simplex) / elem->nphotons;
+            else
+                elem->area = 0;
+        } BLose()
+    }
+
+
+    {   uint elem_idx = 0;
+        uint ephoton_idx = 0;
     { BLoop( photon_idx, nphotons )
-        const uint elem_idx = uint_GMRand (&gmrand, elems.sz);
-        const EmisElem* const elem = &elems.s[elem_idx];
-        Simplex simplex = *elem->simplex;
+
+        const EmisElem* elem = &elems.s[elem_idx];
+        Simplex simplex;
         Color color;
         Ray ray;
         Point c;
         real x;
         real area;
+
+        if (ephoton_idx >= elem->nphotons)
+        {
+            ephoton_idx = 0;
+            do
+            {
+                ++ elem_idx;
+                Claim2( elem_idx ,<, elems.sz );
+                elem = &elems.s[elem_idx];
+            } while (elem->nphotons == 0);
+        }
+        ++ ephoton_idx;
+
+        simplex = *elem->simplex;
 
         c.coords[0] = real_GMRand (&gmrand);
         c.coords[1] = real_GMRand (&gmrand);
@@ -356,9 +483,8 @@ cast_lights (RaySpace* space, uint nphotons, uint nbounces)
 
         ray.direct = elem->normal;
         color = elem->rad;
-        area = area_Simplex (&simplex);
-        scale_Color (&color, &color, area);
-        quot1_Color (&color, &color, M_PI);
+        area = elem->area;
+        scale_Color (&color, &color, area / M_PI);
 
         { BLoop( bounce_idx, nbounces )
             DeclGrow1Table( LightCutNode, lights, light );
@@ -370,7 +496,7 @@ cast_lights (RaySpace* space, uint nphotons, uint nbounces)
             uint hit = Max_uint, obj = Max_uint;
             real mag = Max_real;
 
-            scale_Color (&light->color, &color, (real)elems.sz / nphotons);
+            light->color = color;
             light->iatt = ray;
             light->area = area;
 
@@ -428,8 +554,7 @@ cast_lights (RaySpace* space, uint nphotons, uint nbounces)
             }
         } BLose()
 
-
-    } BLose()
+    } BLose() }
 
     PackTable( LightCutNode, lights );
 

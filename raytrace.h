@@ -24,15 +24,18 @@ struct LightCutNode
 {
     BSTNode bst;
     Ray iatt;  /* location + orientation */
+    Color color;
     real cos_bound;
     real area;
-    Color color;
+        /* Leaf nodes.*/
+    uint nlights;
+    LightCutNode* lights;
 };
 DeclTableT( LightCutNode, LightCutNode );
 
 struct LightCutTree
 {
-    BSTNode sentinel;
+    LightCutNode sentinel;
     BSTree bst;
     Table( LightCutNode ) nodes;
 };

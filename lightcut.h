@@ -122,11 +122,9 @@ cast_LightCutTree (Color* ret_color, const LightCutTree* tree,
         tolight.origin = hit->isect;
         if (cast_to_light (space, &tolight, hit->front, magtolight))
         {
-            real dist_factor;
-            real c;
-            dist_factor = 1 / (magtolight * magtolight);
+            real c = 1 / node->area;
+            real dist_factor = 1 / (magtolight * magtolight);
             tscale *= dist_factor;
-            c = 1 / node->area;
             if (tscale > c)  tscale = c;
                 /* Add diffuse portion.*/
             follow_Color (&color, &color, &node->color, tscale);
