@@ -93,13 +93,15 @@ void output_PPM_image (const char* filename, uint nrows, uint ncols,
         return;
     }
 
-    dump_cstr_FileB (f, "P3\n");
+        /* dump_cstr_FileB (f, "P3\n"); */
+    dump_cstr_FileB (f, "P6\n");
     dump_uint_FileB (f, ncols);
     dump_char_FileB (f, ' ');
     dump_uint_FileB (f, nrows);
     dump_char_FileB (f, '\n');
     dump_cstr_FileB (f, "255\n");
 
+#if 0
     { BLoop( row, nrows )
         const byte* pixline;
         pixline = &pixels[(nrows - row - 1) * 3 * ncols];
@@ -113,6 +115,15 @@ void output_PPM_image (const char* filename, uint nrows, uint ncols,
         } BLose()
         dump_char_FileB (f, '\n');
     } BLose()
+#else
+    setfmt_FileB (f, FileB_Raw);
+    { BLoop( row, nrows )
+        dumpn_byte_FileB (f,
+                          &pixels[(nrows - row - 1) * NColors * ncols],
+                          ncols * NColors);
+    } BLose()
+#endif
+
     lose_FileB (f);
 }
 

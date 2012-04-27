@@ -2,6 +2,7 @@
 #ifndef LIGHTCUT_H_
 #define LIGHTCUT_H_
 
+#include "bbox.h"
 #include "color.h"
 #include "point.h"
 #include "raytrace.h"
@@ -17,6 +18,16 @@ void
 lose_LightCutTree (LightCutTree* t);
 void
 cast_lights (RaySpace* space, uint nphotons, uint nbounces);
+
+qual_inline
+    real
+dmag2_BBox (const BBox* box, const Point* a)
+{
+    BBox b = *box;
+    adjust_BBox (&b, a);
+    return (+ dmag2_Point (&b.max, &b.min)
+            - dmag2_Point (&box->max, &box->min));
+}
 
 qual_inline
     const LightCutNode*
@@ -54,15 +65,14 @@ next_LightCutNode (const LightCutTree* tree,
     while (a->split[0] != sentinel)
     {
         const LightCutNode* light = CastUp( LightCutNode, bst, a );
-        Point diff;
+            /* Point diff; */
         real mag2;
         real elo;
         real ehi = errbound;
 
-        elo = taximag_Color (&light->color);
+        elo = maxmag_Color (&light->color);
+        mag2 = dmag2_BBox (&light->bbox, &hit->isect);
 
-        diff_Point (&diff, &light->iatt.origin, &hit->isect);
-        mag2 = dot_Point (&diff, &diff);
 #if 0
         elo *= - dot_Point (&diff, &light->iatt.direct);
         ehi *= sqrt(mag2);
@@ -71,7 +81,7 @@ next_LightCutNode (const LightCutTree* tree,
             return next_LightCutNode (tree, light, errbound, hit);
 #endif
 
-        ehi *= M_PI * mag2;
+        ehi *= mag2;
 
         if (elo <= ehi)  return light;
             /* fprintf (stderr, "wah:%f %f\n", elo, ehi); */
@@ -91,6 +101,11 @@ cast_LightCutTree (Color* ret_color, const LightCutTree* tree,
         /* const uint nlights = (tree->nodes.sz + 1) / 2; */
     Color color;
     const LightCutNode* node = 0;
+#if 1
+    const real e_max = 1.0 / 256;
+#else
+    const real e_max = .02;
+#endif
         /* uint ni = 0; */
     zero_Color (&color);
 
@@ -99,7 +114,7 @@ cast_LightCutTree (Color* ret_color, const LightCutTree* tree,
          node != &tree->nodes.s[nlights];
          ++ node)
 #else
-    while ((node = next_LightCutNode (tree, node, 1.0 / 256, hit)))
+    while ((node = next_LightCutNode (tree, node, e_max, hit)))
 #endif
     {
         Ray tolight;
@@ -123,9 +138,18 @@ cast_LightCutTree (Color* ret_color, const LightCutTree* tree,
         if (cast_to_light (space, &tolight, hit->front, magtolight))
         {
             real c = 1 / node->area;
+#if 1
             real dist_factor = 1 / (magtolight * magtolight);
+#else
+            real dist_factor = 1 /
+                (+ dmag2_BBox (&node->bbox, &hit->isect)
+                 + .5 * dmag2_Point (&node->bbox.max, &node->bbox.min));
+#endif
+            if (true && dist_factor > c)
+            {
+                dist_factor = c;
+            }
             tscale *= dist_factor;
-            if (tscale > c)  tscale = c;
                 /* Add diffuse portion.*/
             follow_Color (&color, &color, &node->color, tscale);
         }

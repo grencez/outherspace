@@ -411,7 +411,8 @@ void init_RayImage (RayImage* image)
     image->nrows = 0;
     image->stride = 0;
     image->ncols = 0;
-    image->hifov = 60 * M_PI / 180;
+        /* image->hifov = 60 * M_PI / 180; */
+    image->hifov = 2 * atan (1.0 / 3);
     image->perspective = true;
     UFor( i, NColors )
         image->ambient[i] = 0.2;

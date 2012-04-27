@@ -25,6 +25,7 @@ struct LightCutNode
     BSTNode bst;
     Ray iatt;  /* location + orientation */
     Color color;
+    BBox bbox;
     real cos_bound;
     real area;
         /* Leaf nodes.*/

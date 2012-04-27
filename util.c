@@ -180,12 +180,19 @@ cat_filepath (const char* pathname, const char* filename)
     FILE*
 fopen_path (const char* pathname, const char* filename, const char* mode)
 {
-    char* path;
-    FILE* f;
-    path = cat_filepath (pathname, filename);
-    f = fopen (path, mode);
-    free (path);
-    return f;
+    FILE* file = 0;
+    FileB f;
+
+    init_FileB (&f);
+    f.sink = !! strchr (mode, 'w');
+    open_FileB (&f, pathname, filename);
+    if (f.good)
+    {
+        file = f.f;
+        f.f = 0;
+    }
+    lose_FileB (&f);
+    return file;
 }
 
     /** Fully read a bunch of files.

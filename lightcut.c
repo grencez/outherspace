@@ -43,6 +43,7 @@ struct LightCutBuild
     BBox box;
     BBox dox;  /* Bounding box of direction vectors.*/
     uint idx;
+    uint remidx;  /* Index into remlights table.*/
     real cos_bound;
 };
 
@@ -64,6 +65,8 @@ lose_LightCutTree (LightCutTree* t)
 
     /**
      * /sdsim2/ is the proportion between spatial and directional similarity.
+     * The result /ret_b/ will be a copy of /c1/ with properties which are
+     * essential to computing cost combined (but not color).
      **/
 static
     real
@@ -74,6 +77,7 @@ cost_LightCutBuild (LightCutBuild* ret_b,
 {
     real mag;
     LightCutBuild b = *c1;
+    Color color;
 
         /* Squared length of cluster's bounding box diagonal
          * gets factored into /mag/.
@@ -113,8 +117,8 @@ cost_LightCutBuild (LightCutBuild* ret_b,
         }
     }
 
-    mag *= (maxmag_Color (&c0->node->color) +
-            maxmag_Color (&b.node->color));
+    summ_Color (&color, &c0->node->color, &b.node->color);
+    mag *= maxmag_Color (&color);
 
     *ret_b = b;
     return mag;
@@ -260,7 +264,7 @@ linearize_LightCutTree (LightCutTree* t)
 
 static
     void
-make_light_tree (LightCutTree* t)
+make_light_tree (LightCutTree* t, GMRand* gmrand)
 {
     LightCutBuild* clusters;
     const uint nlights = t->nodes.sz;
@@ -268,6 +272,7 @@ make_light_tree (LightCutTree* t)
     real sdsim2; /* Proportion between spatial and directional similarity.*/
     KPTreeGrid kpgrid;
     KPTree kptree;
+    DeclTable( uint, remlights );
 
     clusters = AllocT( LightCutBuild, nlights );
     if (!clusters)  return;
@@ -276,18 +281,22 @@ make_light_tree (LightCutTree* t)
     init_BSTree (&t->bst, &t->sentinel.bst, 0);
 
     SizeTable( LightCutNode, t->nodes, 2*nlights-1 );
+    SizeTable( uint, remlights, nlights );
     { BLoop( i, nlights )
         LightCutBuild* c = &clusters[i];
         c->node = &t->nodes.s[i];
         c->node->bst.split[0] = t->bst.sentinel;
         c->node->bst.split[1] = t->bst.sentinel;
         c->box.min = c->box.max = c->node->iatt.origin;
+        c->node->bbox = c->box;
         c->dox.min = c->dox.max = c->node->iatt.direct;
         c->node->cos_bound = c->cos_bound = 1;
         c->node->nlights = 1;
         c->node->lights = c->node;
         c->idx = i;
         set1_KPTreeGrid (&kpgrid, i, &c->node->iatt.origin);
+        c->remidx = i;
+        remlights.s[i] = i;
     } BLose()
 
     init_KPTree (&kptree);
@@ -300,42 +309,13 @@ make_light_tree (LightCutTree* t)
         sdsim2 = mag2_Point (&diag);
     }
 
-    while (true)
+    while (remlights.sz > 1)
     {
         LightCutBuild close;
         LightCutBuild* c0 = 0;
         LightCutNode* node;
-#if 0
-        real min = Max_real;
 
-        { BLoop( i, nlights )
-            LightCutBuild* c1 = &clusters[i];
-            real mag;
-            if (!c1->node)  continue;
-
-            mag = maxmag_Color (&c1->node->color);
-            if (mag < min)
-            {
-                min = mag;
-                c0 = c1;
-            }
-        } BLose()
-#else
-        real max = 0;
-
-        { BLoop( i, nlights )
-            LightCutBuild* c1 = &clusters[i];
-            real mag;
-            if (!c1->node)  continue;
-
-            mag = maxmag_Color (&c1->node->color);
-            if (mag >= max)
-            {
-                max = mag;
-                c0 = c1;
-            }
-        } BLose()
-#endif
+        c0 = &clusters[remlights.s[uint_GMRand (gmrand, remlights.sz)]];
 
         close = *c0;
         close.node = 0;
@@ -344,11 +324,11 @@ make_light_tree (LightCutTree* t)
             real e0;
             e0 = find_light_match (&close, c0, clusters, &kptree,
                                    Max_real, sdsim2);
-#if 1
-            while (close.node)
+            while (true)
             {
                 LightCutBuild close_back = close;
                 real e1;
+                Claim( close.node );
                 e1 = find_light_match (&close_back, &clusters[close.idx],
                                        clusters, &kptree, e0, sdsim2);
                 if (e0 <= e1)  break;
@@ -357,20 +337,21 @@ make_light_tree (LightCutTree* t)
                 c0 = &clusters[close.idx];
                 close = close_back;
             }
-#endif
         }
-
-        if (!close.node)
-        {
-            Claim( c0 );
-            root_for_BSTree (&t->bst, &c0->node->bst);
-            break;
-        }
+        Claim( close.node );
 
         node = &t->nodes.s[nnodes++];
         c0->node->bst.joint = &node->bst;
         close.node->bst.joint = &node->bst;
         *node = *c0->node;
+            /* Probabilistically choose a representative based on intensity.*/
+        {
+            real a = maxmag_Color (&node->color);
+            real b = maxmag_Color (&close.node->color);
+            if (real_GMRand (gmrand) * (a + b) >= a)
+                node->iatt = close.node->iatt;
+        }
+
         node->bst.joint = &t->sentinel.bst;
         node->bst.split[0] = &c0->node->bst;
         node->bst.split[1] = &close.node->bst;
@@ -379,16 +360,27 @@ make_light_tree (LightCutTree* t)
         c0->dox = close.dox;
         c0->cos_bound = node->cos_bound = close.cos_bound;
         node->area += close.node->area;
+        node->bbox = close.box;
+
+            /* Shrink /remlights/ by removing the
+             * position of the close node.
+             */
+        remlights.s[close.remidx] = remlights.s[-- remlights.sz];
+        clusters[remlights.s[close.remidx]].remidx = close.remidx;
 
         c0->node = node;
         clusters[close.idx].node = 0;
         clusters[close.idx].idx = c0->idx;
     }
 
+    root_for_BSTree (&t->bst, &clusters[remlights.s[0]].node->bst);
+
     Claim2( nnodes ,==, 2*nlights-1 );
+    Claim2( remlights.sz ,==, 1 );
 
     lose_KPTreeGrid (&kpgrid);
     lose_KPTree (&kptree);
+    LoseTable( uint, remlights );
 
     linearize_LightCutTree (t);
 }
@@ -525,17 +517,12 @@ cast_lights (RaySpace* space, uint nphotons, uint nbounces)
                 real dot;
 
                 normal = hitobj->simplices[hit].plane.normal;
-                /*
-                xfrm_Point (&normal, &hitobj->orientation,
-                            &hitobj->simplices[hit].plane.normal);
-                            */
                 normalize_Point (&normal, &normal);
                 dot = dot_Point (&normal, &ray.direct);
 
                 prod_Color (&color, &color, &matl->diffuse);
                 scale_Color (&color, &color, - dot);
                 if (maxmag_Color (&color) <= Epsilon_real)  break;
-                    /* M_PI * match_real (1, mag * mag); */
 
                 follow_Ray (&ray.origin, &ray, mag);
                 ray.direct = normal;
@@ -563,7 +550,7 @@ cast_lights (RaySpace* space, uint nphotons, uint nbounces)
     } BLose()
 
     tree->nodes = lights;
-    make_light_tree (tree);
+    make_light_tree (tree, &gmrand);
     LoseTable( EmisElem, elems );
 }
 
