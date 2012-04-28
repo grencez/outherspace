@@ -4,6 +4,7 @@
 
 #include "bbox.h"
 #include "color.h"
+#include "gmrand.h"
 #include "point.h"
 #include "raytrace.h"
 #include "simplex.h"
@@ -36,6 +37,7 @@ next_LightCutNode (const LightCutTree* tree,
                    real errbound,
                    const RayHit* hit)
 {
+    const uint MinN = 1;
     const BSTNode* const sentinel = tree->bst.sentinel;
     const BSTNode* a;
 
@@ -70,6 +72,8 @@ next_LightCutNode (const LightCutTree* tree,
         real elo;
         real ehi = errbound;
 
+        if (light->nlights <= MinN)  return light;
+
         elo = maxmag_Color (&light->color);
         mag2 = dmag2_BBox (&light->bbox, &hit->isect);
 
@@ -96,7 +100,8 @@ qual_inline
 cast_LightCutTree (Color* ret_color, const LightCutTree* tree,
                    const Color* diffuse,
                    const RayHit* hit,
-                   const RaySpace* space)
+                   const RaySpace* space,
+                   GMRand* gmrand)
 {
         /* const uint nlights = (tree->nodes.sz + 1) / 2; */
     Color color;
@@ -120,8 +125,11 @@ cast_LightCutTree (Color* ret_color, const LightCutTree* tree,
         Ray tolight;
         real magtolight;
         real dot, tscale;
-        diff_Point (&tolight.direct, &node->iatt.origin, &hit->isect);
-            /* ni ++; */
+        const LightCutNode* light =
+                /* node; */
+        &node->lights[uint_GMRand (gmrand, node->nlights)];
+
+        diff_Point (&tolight.direct, &light->iatt.origin, &hit->isect);
 
         dot = dot_Point (&tolight.direct, &hit->normal);
         if (dot <= 0)  continue;
@@ -130,26 +138,55 @@ cast_LightCutTree (Color* ret_color, const LightCutTree* tree,
         quot1_Point (&tolight.direct, &tolight.direct, magtolight);
         tscale = dot / magtolight;
 
-        dot = - dot_Point (&tolight.direct, &node->iatt.direct);
+        dot = - dot_Point (&tolight.direct, &light->iatt.direct);
         if (dot <= 0)  continue;
         tscale *= dot;
 
         tolight.origin = hit->isect;
         if (cast_to_light (space, &tolight, hit->front, magtolight))
         {
-            real c = 1 / node->area;
-#if 1
-            real dist_factor = 1 / (magtolight * magtolight);
-#else
-            real dist_factor = 1 /
-                (+ dmag2_BBox (&node->bbox, &hit->isect)
-                 + .5 * dmag2_Point (&node->bbox.max, &node->bbox.min));
-#endif
-            if (true && dist_factor > c)
-            {
-                dist_factor = c;
-            }
-            tscale *= dist_factor;
+            const uint n = 1;
+            real mag2tolight = (magtolight * magtolight);
+            real scale = 0;
+            real c = 1 / tree->area;
+                /* real c = 1 / node->area; */
+
+            { BLoop( i, n )
+                real lscale;
+                real dist_factor;
+
+                if (i > 0)
+                {
+                    uint idx = uint_GMRand (gmrand, node->nlights);
+                    light = &node->lights[idx];
+                    diff_Point (&tolight.direct,
+                                &light->iatt.origin,
+                                &hit->isect);
+                    dot = dot_Point (&tolight.direct, &hit->normal);
+                    if (dot <= 0)  continue;
+                    lscale = dot;
+                    dot = - dot_Point (&tolight.direct, &light->iatt.direct);
+                    if (dot <= 0)  continue;
+                    lscale *= dot;
+                    mag2tolight = mag2_Point (&tolight.direct);
+                    lscale /= mag2tolight;
+                }
+                else
+                {
+                    lscale = tscale;
+                }
+
+                dist_factor = 1 / mag2tolight;
+                lscale *= dist_factor;
+                if (false && lscale > c)
+                {
+                    lscale = c;
+                }
+                scale += lscale;
+            } BLose()
+
+            scale /= n;
+            tscale = scale;
                 /* Add diffuse portion.*/
             follow_Color (&color, &color, &node->color, tscale);
         }

@@ -480,9 +480,11 @@ dump_cstr_FileB (FileB* f, const char* s)
     void
 dumpn_raw_byte_FileB (FileB* f, const byte* a, TableSzT_byte n)
 {
+    size_t sz;
     Claim2( f->fmt ,==, FileB_Raw );
     flusho_FileB (f);
-    fwrite (a, 1, n, f->f);
+    sz = fwrite (a, 1, n, f->f);
+    f->good = (sz == n);
 }
 
     void

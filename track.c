@@ -13,6 +13,11 @@ init_Track (Track* track)
     track->nmorphs = 0;
     track->morph_dcoords = 0;
     track->morph_scenes = 0;
+
+    track->nphotons = 0;
+    track->nbounces = 0;
+    track->nimgrows = 800;
+    track->nimgcols = 800;
 }
 
     void

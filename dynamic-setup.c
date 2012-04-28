@@ -369,6 +369,24 @@ readin_Track (Track* track, RaySpace* space,
             good = parse_coord_system (&coord_system, line);
             if (good)  recalc_map = true;
         }
+        else if (AccepTok( line, "vpls" ))
+        {
+            if (line[0] == ':')  line = &line[1];
+            line = strto_uint (&track->nphotons, line);
+            if (good && (good = !!line))
+                line = strto_uint (&track->nbounces, line);
+            if (good)
+                good = !!line;
+        }
+        else if (AccepTok( line, "img_dims" ))
+        {
+            if (line[0] == ':')  line = &line[1];
+            line = strto_uint (&track->nimgrows, line);
+            if (good && (good = !!line))
+                line = strto_uint (&track->nimgcols, line);
+            if (good)
+                good = !!line;
+        }
 
         if (recalc_map)
         {

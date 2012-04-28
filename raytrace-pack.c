@@ -382,6 +382,8 @@ cast_packet_RayImage (RayImage* image, uint row_off, uint col_off,
     boolPack inside_box[RayPacketDimSz];
     RayPacket pkt;
     RayHitPacket hit;
+    GMRand gmrand;
+    init1_GMRand (&gmrand, row_off);
 
     RayCastAPriori_to_RayPacket (&pkt, known, row_off, col_off, image);
 
@@ -443,7 +445,7 @@ cast_packet_RayImage (RayImage* image, uint row_off, uint col_off,
                 fill_pixel (&color,
                             hit_inds[j], hit_mags[j], hit_objs[j],
                             image, &origin, &direct,
-                            space, Yes, 0);
+                            space, Yes, 0, &gmrand);
                 UFor( color_idx, NColors )
                 {
                     image->pixels[3*img_idx + color_idx] = (byte)

@@ -21,7 +21,7 @@ int main (int argc, char** argv)
     Point view_origin;
     PointXfrm view_basis;
     bool write_image = true;
-    real t0;
+    real t0, t1;
     Track track;
 
 #ifdef DistribCompute
@@ -42,9 +42,8 @@ int main (int argc, char** argv)
         infilename = argv[1];
     }
 
-    image.nrows = 1000;
-    image.ncols = 1000;
-    image.hifov = 60 * M_PI / 180;
+    image.nrows = 800;
+    image.ncols = 800;
     image.pixels = AllocT( byte, 1 );
 #if 0
         /* 2001 x 2001 */
@@ -62,6 +61,8 @@ int main (int argc, char** argv)
     {
         view_origin = track.camloc.xlat;
         transpose_PointXfrm (&view_basis, &track.camloc.xfrm);
+        image.nrows = track.nimgrows;
+        image.ncols = track.nimgcols;
     }
 #elif 0
         /* 1000 x 1000 */
@@ -124,14 +125,20 @@ int main (int argc, char** argv)
 #endif
 #else
     update_dynamic_RaySpace (&space);
-        /* cast_lights (&space, 800, 6); */
+    t1 = monotime ();
+    printf ("Kd-tree build sec:%f\n", t1 - t0);
+    t0 = t1;
+
+    if (track.nphotons > 0)
     {
-        real t1 = monotime ();
+        cast_lights (&space, track.nphotons, track.nbounces);
+        t1 = monotime ();
         printf ("sec:%f\n", t1 - t0);
         t0 = t1;
     }
     cast_RayImage (&image, &space, &view_origin, &view_basis);
-    printf ("sec:%f\n", monotime () - t0);
+    t1 = monotime ();
+    printf ("Render sec:%f\n", t1 - t0);
 #endif
 
     if (write_image)

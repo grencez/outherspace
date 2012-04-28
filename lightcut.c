@@ -54,6 +54,7 @@ init_LightCutTree (LightCutTree* t)
     InitTable( LightCutNode, t->nodes );
     t->sentinel.nlights = 0;
     init_BSTree (&t->bst, &t->sentinel.bst, 0);
+    t->area = 0;
 }
 
     void
@@ -397,6 +398,7 @@ cast_lights (RaySpace* space, uint nphotons, uint nbounces)
 
     init_GMRand (&gmrand);
 
+    tree->area = 0;
     { BLoop( ei, scene->nelems )
         uint matl_idx = scene->elems[ei].material;
         const Material* matl;
@@ -407,6 +409,7 @@ cast_lights (RaySpace* space, uint nphotons, uint nbounces)
             DeclGrow1Table( EmisElem, elems, elem );
             elem->rad = matl->emissive;
             elem->simplex = &object->elems[ei];
+            tree->area += area_Simplex (elem->simplex);
             normalize_Point (&elem->normal,
                              &object->simplices[ei].plane.normal);
         }
@@ -521,7 +524,8 @@ cast_lights (RaySpace* space, uint nphotons, uint nbounces)
                 dot = dot_Point (&normal, &ray.direct);
 
                 prod_Color (&color, &color, &matl->diffuse);
-                scale_Color (&color, &color, - dot);
+                    /* Not sure why to comment...*/
+                    /* scale_Color (&color, &color, - dot); */
                 if (maxmag_Color (&color) <= Epsilon_real)  break;
 
                 follow_Ray (&ray.origin, &ray, mag);

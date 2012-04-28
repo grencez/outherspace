@@ -227,8 +227,8 @@ key_press_fn (Pilot* pilot, RaySpace* space, const SDL_keysym* event)
     {
         const uint nbounces = 4;
         uint nphotons = nphotons_now;
-        if (lights_change > 0)   nphotons += 10;
-        else if (nphotons > 10)  nphotons -= 10;
+        if (lights_change > 0)   nphotons += 100;
+        else if (nphotons > 10)  nphotons -= 100;
         cast_lights (space, nphotons, nbounces);
         fprintf (out, "nphotons:%u nlights:%u\n",
                  nphotons, (space->lightcuts.nodes.sz+1) / 2);

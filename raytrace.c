@@ -60,7 +60,8 @@ fill_pixel (Color* ret_color,
             const Point* dir,
             const RaySpace* space,
             Trit front,
-            uint nbounces);
+            uint nbounces,
+            GMRand* gmrand);
 static void
 cast_colors (Color* ret_color,
              const RaySpace* restrict space,
@@ -69,7 +70,8 @@ cast_colors (Color* ret_color,
              const Point* restrict dir,
              const Color* factor,
              Trit front,
-             uint nbounces);
+             uint nbounces,
+             GMRand* gmrand);
 static void
 cast_row_orthographic (RayImage* restrict image,
                        uint row,
@@ -773,7 +775,8 @@ fill_pixel (Color* ret_color,
             const Point* dir,
             const RaySpace* space,
             Trit front,
-            uint nbounces)
+            uint nbounces,
+            GMRand* gmrand)
 {
     const bool shade_by_element = false;
     const bool color_by_element = false;
@@ -1049,7 +1052,7 @@ fill_pixel (Color* ret_color,
             hit.front = front;
             hit.mag = mag;
             cast_LightCutTree (&tmp, &space->lightcuts,
-                               &diffuse, &hit, space);
+                               &diffuse, &hit, space, gmrand);
             summ_Color (&color, &color, &tmp);
         }
 
@@ -1065,7 +1068,7 @@ fill_pixel (Color* ret_color,
                             material->optical_density, hit_front, cos_normal);
 
             cast_colors (&color, space, image, &isect, &tmp_dir,
-                         &factor, !front, nbounces);
+                         &factor, !front, nbounces, gmrand);
         }
         if (material && material->reflective)
         {
@@ -1073,7 +1076,7 @@ fill_pixel (Color* ret_color,
             scale_Color (&factor, &material->specular, material->opacity);
 
             cast_colors (&color, space, image, &isect, &refldir,
-                         &factor, front, nbounces);
+                         &factor, front, nbounces, gmrand);
         }
     }
 
@@ -1416,7 +1419,8 @@ cast_colors (Color* ret_color,
              const Point* restrict dir,
              const Color* factor,
              Trit front,
-             uint nbounces)
+             uint nbounces,
+             GMRand* gmrand)
 {
     Color color;
     uint hit_idx = Max_uint;
@@ -1445,7 +1449,8 @@ cast_colors (Color* ret_color,
 
     zero_Color (&color);
     fill_pixel (&color, hit_idx, hit_mag, hit_object,
-                image, origin, dir, space, front, nbounces+1);
+                image, origin, dir, space, front, nbounces+1,
+                gmrand);
     prod_Color (&color, &color, factor);
     summ_Color (ret_color, ret_color, &color);
 }
@@ -1475,7 +1480,8 @@ cast_record (uint* hitline,
              const RayImage* restrict image,
              const Point* restrict origin,
              const Point* restrict dir,
-             bool inside_box)
+             bool inside_box,
+             GMRand* gmrand)
 {
     uint hit_idx = Max_uint;
     real hit_mag = Max_real;
@@ -1500,7 +1506,8 @@ cast_record (uint* hitline,
         Color color;
         zero_Color (&color);
         fill_pixel (&color, hit_idx, hit_mag, hit_object,
-                    image, origin, dir, space, front, 0);
+                    image, origin, dir, space, front, 0,
+                    gmrand);
         { BLoop( i, NColors )
             pixline[3*col+i] = (byte)
                 clamp_real (255.5 * color.coords[i], 0, 255.5);
@@ -1553,6 +1560,8 @@ rays_to_hits_fish (RayImage* restrict image,
         uint* hitline = 0;
         real* magline = 0;
         byte* pixline = 0;
+        GMRand gmrand;
+        init1_GMRand (&gmrand, row);
 
         if (image->hits)  hitline = &image->hits[row * image->stride];
         if (image->mags)  magline = &image->mags[row * image->stride];
@@ -1590,7 +1599,8 @@ rays_to_hits_fish (RayImage* restrict image,
 
             cast_record (hitline, magline, pixline, col,
                          space, image,
-                         origin, &dir, inside_box);
+                         origin, &dir, inside_box,
+                         &gmrand);
         }
     }
 }
@@ -1688,6 +1698,8 @@ cast_row_orthographic (RayImage* restrict image,
     uint* hitline = 0;
     real* magline = 0;
     byte* pixline = 0;
+    GMRand gmrand;
+    init1_GMRand (&gmrand, row);
 
     ncols = image->ncols;
     box = &space->box;
@@ -1716,7 +1728,7 @@ cast_row_orthographic (RayImage* restrict image,
         cast_record (hitline, magline, pixline, col,
                      space, image,
                      &ray_origin, dir,
-                     inside_box);
+                     inside_box, &gmrand);
     }
 }
 
@@ -1731,6 +1743,8 @@ cast_row_perspective (RayImage* image, uint row,
     uint* hitline = 0;
     real* magline = 0;
     byte* pixline = 0;
+    GMRand gmrand;
+    init1_GMRand (&gmrand, row);
 
     ncols = image->ncols;
 
@@ -1771,7 +1785,7 @@ cast_row_perspective (RayImage* image, uint row,
 
         cast_record (hitline, magline, pixline, col,
                      space, image,
-                     origin, &dir, known->inside_box);
+                     origin, &dir, known->inside_box, &gmrand);
 
 #if 0
         {

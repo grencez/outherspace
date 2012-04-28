@@ -293,6 +293,8 @@ CSources = affine.c \
 		   cx/bstree.c \
 		   cx/fileb.c
 
+HDeps = lightcut.h
+
 ifneq (,$(filter sse,$(CONFIG)))
 	CFLAGS += -msse -msse2
 	DFLAGS += -DPackOpsAvail
@@ -320,13 +322,13 @@ hello: hello.c $(CSources)
 test-hello: hello
 	LD_LIBRARY_PATH=$(OpenCLLibPath) ./$<
 
-$(Pfx)cli: cli.c compute.c $(CSources)
+$(Pfx)cli: cli.c compute.c $(CSources) $(HDeps)
 	$(CC) $(CFLAGS) $(DFLAGS) $< -o $@ $(LFLAGS)
 
 GuiCFlags += $(CFLAGS)
 GuiDFlags += $(DFLAGS)
 GuiLFlags += $(LFLAGS)
-$(Pfx)gui: $(GuiMainCSources) compute.c motion.c $(CSources)
+$(Pfx)gui: $(GuiMainCSources) compute.c motion.c $(CSources) $(HDeps)
 	$(CC) $(GuiCFlags) $(GuiDFlags) $< -o $@ $(GuiLFlags)
 
 run-$(Pfx)gui-opencl: $(Pfx)gui

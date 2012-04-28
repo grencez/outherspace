@@ -25,6 +25,11 @@ struct Track
     uint nmorphs;
     real* morph_dcoords;
     Scene* morph_scenes;
+
+    uint nphotons;
+    uint nbounces;
+    uint nimgrows;
+    uint nimgcols;
 };
 
 void
