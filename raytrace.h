@@ -38,7 +38,7 @@ struct LightCutTree
 {
     LightCutNode sentinel;
     BSTree bst;
-    Table( LightCutNode ) nodes;
+    TableT( LightCutNode ) nodes;
     real area;
 };
 

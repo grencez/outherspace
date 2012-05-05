@@ -17,7 +17,7 @@ struct Track
     Plane* checkplanes;
     Point* checkpoints;
 
-    Table( Ray ) startlocs;
+    TableT( Ray ) startlocs;
     IAMap camloc;
 
     Scene scene;

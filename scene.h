@@ -42,7 +42,7 @@ DeclTableT( uint, uint );
 struct GeomObj
 {
     BBox box;
-    Table(uint) surfidcs;
+    TableT(uint) surfidcs;
 };
 
 struct GeomInst
