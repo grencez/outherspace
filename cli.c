@@ -4,6 +4,8 @@
 #include "wavefront-file.h"
 #include "lightcut.h"
 
+#include "cx/sys-cx.h"
+
 #ifdef DistribCompute
 #include "compute.h"
 #endif
@@ -24,8 +26,11 @@ int main (int argc, char** argv)
     real t0, t1;
     Track track;
 
+    init_sys_cx ();
+
 #ifdef DistribCompute
     init_compute (&argc, &argv);
+    push_losefn_sys_cx (cleanup_compute);
 #else
     (void) argc;
     (void) argv;
@@ -181,9 +186,7 @@ int main (int argc, char** argv)
     cleanup_RaySpace (&space);
     lose_Track (&track);
 
-#ifdef DistribCompute
-    cleanup_compute ();
-#endif
+    lose_sys_cx ();
     return 0;
 }
 

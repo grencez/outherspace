@@ -6,8 +6,8 @@
 
 typedef struct Track Track;
 
-#ifndef Table_Ray
-#define Table_Ray Table_Ray
+#ifndef DeclTableT_Ray
+#define DeclTableT_Ray
 DeclTableT( Ray, Ray );
 #endif
 

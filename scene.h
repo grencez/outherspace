@@ -34,8 +34,8 @@ struct GeomSurf
     uint material;
 };
 
-#ifndef Table_uint
-#define Table_uint Table_uint
+#ifndef DeclTableT_uint
+#define DeclTableT_uint
 DeclTableT( uint, uint );
 #endif
 

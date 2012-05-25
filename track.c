@@ -7,7 +7,7 @@
 init_Track (Track* track)
 {
     track->ncheckplanes = 0;
-    InitTable( Ray, track->startlocs );
+    InitTable( track->startlocs );
     identity_IAMap (&track->camloc);
     init_Scene (&track->scene);
     track->nmorphs = 0;
@@ -29,7 +29,7 @@ lose_Track (Track* track)
         free (track->checkplanes);
         free (track->checkpoints);
     }
-    LoseTable( Ray, track->startlocs );
+    LoseTable( track->startlocs );
     cleanup_Scene (&track->scene);
     if (track->nmorphs > 0)
     {

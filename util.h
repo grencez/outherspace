@@ -43,9 +43,6 @@
 #define ConcaT( Type, dst, src, end, count ) \
     ((dst) = (Type*) array_cat (dst, src, &end, count, sizeof (Type)))
         
-#define Ceil_uint( a, b ) \
-    (((a) + (b) - 1) / (b))
-
 
 #ifndef uint32
 #define uint32 uint

@@ -291,7 +291,8 @@ CSources = affine.c \
 		   wavefront-file.c \
 		   xfrm.c \
 		   cx/bstree.c \
-		   cx/fileb.c
+		   cx/fileb.c \
+		   cx/sys-cx.c
 
 HDeps = lightcut.h
 

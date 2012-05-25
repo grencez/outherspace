@@ -31,8 +31,8 @@ struct EmisElem
     const Simplex* simplex;
     Point normal;
 };
-#ifndef Table_EmisElem
-#define Table_EmisElem Table_EmisElem
+#ifndef DeclTableT_EmisElem
+#define DeclTableT_EmisElem
 DeclTableT( EmisElem, EmisElem );
 #endif
 
@@ -51,7 +51,7 @@ struct LightCutBuild
     void
 init_LightCutTree (LightCutTree* t)
 {
-    InitTable( LightCutNode, t->nodes );
+    InitTable( t->nodes );
     t->sentinel.nlights = 0;
     init_BSTree (&t->bst, &t->sentinel.bst, 0);
     t->area = 0;
@@ -60,7 +60,7 @@ init_LightCutTree (LightCutTree* t)
     void
 lose_LightCutTree (LightCutTree* t)
 {
-    LoseTable( LightCutNode, t->nodes );
+    LoseTable( t->nodes );
 }
 
 
@@ -219,22 +219,34 @@ find_light_match (LightCutBuild* close,
 
 static
     LightCutNode*
+split_LightCutNode (LightCutNode* x, Bit side)
+{
+    BSTNode* y = x->bst.split[side];
+    return y ? CastUp( LightCutNode, bst, y ) : 0;
+}
+
+static
+    LightCutNode*
 linearize_LightCutNode (LightCutNode* light,
-                        LightCutTree* t,
                         LightCutNode* off)
 {
     LightCutNode* sp;
-    if (light == &t->sentinel)  return off;
 
     light->lights = off;
 
-    sp = CastUp( LightCutNode, bst, light->bst.split[0] );
-    off = linearize_LightCutNode (sp, t, off);
-    light->nlights = sp->nlights;
+    sp = split_LightCutNode (light, 0);
+    if (sp)
+    {
+        off = linearize_LightCutNode (sp, off);
+        light->nlights = sp->nlights;
+    }
 
-    sp = CastUp( LightCutNode, bst, light->bst.split[1] );
-    off = linearize_LightCutNode (sp, t, off);
-    light->nlights += sp->nlights;
+    sp = split_LightCutNode (light, 1);
+    if (sp)
+    {
+        off = linearize_LightCutNode (sp, off);
+        light->nlights += sp->nlights;
+    }
 
     if (light->nlights > 0)  return off;
 
@@ -258,9 +270,13 @@ static
     void
 linearize_LightCutTree (LightCutTree* t)
 {
-    LightCutNode* light =
-        CastUp( LightCutNode, bst, root_of_BSTree (&t->bst) );
-    linearize_LightCutNode (light, t, t->nodes.s);
+    BSTNode* root = root_of_BSTree (&t->bst);
+    if (root)
+    {
+        LightCutNode* light =
+            CastUp( LightCutNode, bst, root );
+        linearize_LightCutNode (light, t->nodes.s);
+    }
 }
 
 static
@@ -281,13 +297,13 @@ make_light_tree (LightCutTree* t, GMRand* gmrand)
     init_KPTreeGrid (&kpgrid, nlights);
     init_BSTree (&t->bst, &t->sentinel.bst, 0);
 
-    SizeTable( LightCutNode, t->nodes, 2*nlights-1 );
-    SizeTable( uint, remlights, nlights );
+    SizeTable( t->nodes, 2*nlights-1 );
+    SizeTable( remlights, nlights );
     { BLoop( i, nlights )
         LightCutBuild* c = &clusters[i];
         c->node = &t->nodes.s[i];
-        c->node->bst.split[0] = t->bst.sentinel;
-        c->node->bst.split[1] = t->bst.sentinel;
+        c->node->bst.split[0] = 0;
+        c->node->bst.split[1] = 0;
         c->box.min = c->box.max = c->node->iatt.origin;
         c->node->bbox = c->box;
         c->dox.min = c->dox.max = c->node->iatt.direct;
@@ -381,7 +397,7 @@ make_light_tree (LightCutTree* t, GMRand* gmrand)
 
     lose_KPTreeGrid (&kpgrid);
     lose_KPTree (&kptree);
-    LoseTable( uint, remlights );
+    LoseTable( remlights );
 
     linearize_LightCutTree (t);
 }
@@ -406,7 +422,7 @@ cast_lights (RaySpace* space, uint nphotons, uint nbounces)
         matl = &scene->matls[matl_idx];
         if (taximag_Color (&matl->emissive) > 0)
         {
-            DeclGrow1Table( EmisElem, elems, elem );
+            DeclGrow1Table( EmisElem, elem, elems );
             elem->rad = matl->emissive;
             elem->simplex = &object->elems[ei];
             tree->area += area_Simplex (elem->simplex);
@@ -482,7 +498,7 @@ cast_lights (RaySpace* space, uint nphotons, uint nbounces)
         scale_Color (&color, &color, area / M_PI);
 
         { BLoop( bounce_idx, nbounces )
-            DeclGrow1Table( LightCutNode, lights, light );
+            DeclGrow1Table( LightCutNode, light, lights );
             PointXfrm A;
             real zenith = asin (sqrt (real_GMRand (&gmrand)));
             real azimuthcc = 2 * M_PI * real_GMRand (&gmrand);
@@ -547,7 +563,7 @@ cast_lights (RaySpace* space, uint nphotons, uint nbounces)
 
     } BLose() }
 
-    PackTable( LightCutNode, lights );
+    PackTable( lights );
 
     { BLoop( i, space->nlights )
         space->lights[i].on = false;
@@ -555,6 +571,6 @@ cast_lights (RaySpace* space, uint nphotons, uint nbounces)
 
     tree->nodes = lights;
     make_light_tree (tree, &gmrand);
-    LoseTable( EmisElem, elems );
+    LoseTable( elems );
 }
 

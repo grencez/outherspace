@@ -1,13 +1,14 @@
 
 #include "fileb.h"
 #include "bstree.h"
+#include "sys-cx.h"
 #include "table.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 
-#ifndef Table_uint
-#define Table_uint Table_uint
+#ifndef TableT_uint
+#define TableT_uint TableT_uint
 DeclTableT( uint, uint );
 #endif
 
@@ -69,11 +70,11 @@ init_ASTree (ASTree* ast)
 }
 
     void
-init_AST (AST* ast, ASTree* t)
+init_AST (AST* ast)
 {
     ast->kind = NSyntaxKinds;
-    ast->bst.split[0] = &t->sentinel;
-    ast->bst.split[1] = &t->sentinel;
+    ast->bst.split[0] = 0;
+    ast->bst.split[1] = 0;
     ast->dat.a_other = 0;
 }
 
@@ -159,36 +160,42 @@ int main (int argc, char** argv)
     ASTree* t = &tree;
     AST nodes[10];
     AST* ast = &nodes[0];
+    (void) argc;
+    (void) argv;
+
+    init_sys_cx ();
 
     f = stdout_FileB ();
 
     init_ASTree (t);
-    init_AST (ast, t);
+    init_AST (ast);
     ast->kind = Plus;
     root_for_BSTree (&t->bst, &ast->bst);
 
-    init_AST (++ ast, t);
+    init_AST (++ ast);
     set_side_AST (ast-1, ast, 0);
     ast->kind = Int;
     ast->dat.a_int = 1;
 
-    init_AST (++ ast, t);
+    init_AST (++ ast);
     set_side_AST (ast-2, ast, 1);
     ast->kind = Minus;
 
-    init_AST (++ ast, t);
+    init_AST (++ ast);
     set_side_AST (ast-1, ast, 0);
     ast->kind = Int;
     ast->dat.a_int = 2;
 
-    init_AST (++ ast, t);
+    init_AST (++ ast);
     set_side_AST (ast-2, ast, 1);
     ast->kind = Int;
     ast->dat.a_int = 3;
 
     dump_ASTree (f, t);
-    lose_FileB (f);
+    dump_char_FileB (f, '\n');
     lose_ASTree (&tree);
+
+    lose_sys_cx ();
     return 0;
 }
 

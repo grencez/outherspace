@@ -311,7 +311,7 @@ bool even_uint (uint a)
     uint
 ceil_uint (uint a, uint b)
 {
-    return Ceil_uint (a, b);
+    return CeilQuot (a, b);
 }
 
     uint

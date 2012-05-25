@@ -34,6 +34,7 @@ set (CSources
     xfrm.c
     cx/bstree.c
     cx/fileb.c
+    cx/sys-cx.c
     )
 
 set (GuiName gui)

@@ -202,7 +202,7 @@ readin_SDL_Image (Texture* texture,
             union LocalUnion
             {
                 Uint32 u;
-                byte bytes[Ceil_uint( 32, NBitsInByte )];
+                byte bytes[CeilQuot( 32, NBitsInByte )];
             } pixel;
 
             pixel.u = 0;

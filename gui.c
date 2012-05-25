@@ -20,6 +20,8 @@
 
 #include "lightcut.h"
 
+#include "cx/sys-cx.h"
+
     /* SDL on OS X does some weirdo bootstrapping by redefining /main/.*/
 #ifdef main
 #undef main
@@ -230,7 +232,7 @@ key_press_fn (Pilot* pilot, RaySpace* space, const SDL_keysym* event)
         if (lights_change > 0)   nphotons += 100;
         else if (nphotons > 10)  nphotons -= 100;
         cast_lights (space, nphotons, nbounces);
-        fprintf (out, "nphotons:%u nlights:%u\n",
+        fprintf (out, "nphotons:%u nlights:%lu\n",
                  nphotons, (space->lightcuts.nodes.sz+1) / 2);
         nphotons_now = nphotons;
     }
@@ -1176,6 +1178,8 @@ int wrapped_main_fn (int argc, char* argv[])
     Pilot dflt_pilot;
     RaySpace* space;
 
+    init_sys_cx ();
+
     strcpy (inpathname, "data");
     infilename = "curve-track.txt";
     if (RunFromMyMac)
@@ -1200,11 +1204,13 @@ int wrapped_main_fn (int argc, char* argv[])
 
 #ifdef DistribCompute
     init_compute (&argc, &argv);
+    push_losefn_sys_cx (cleanup_compute);
 #endif
 
 #ifdef SupportImage
     ret = IMG_Init (IMG_INIT_PNG);
     assert (ret == IMG_INIT_PNG);
+    push_losefn_sys_cx (IMG_Quit);
 #endif
 
     init_Track (&track);
@@ -1278,16 +1284,10 @@ int wrapped_main_fn (int argc, char* argv[])
 #endif
     }
 
-#ifdef SupportImage
-    IMG_Quit ();
-#endif
-
-#ifdef DistribCompute
-    cleanup_compute ();
-#endif
-
     cleanup_RaySpace (space);
     lose_Track (&track);
+
+    lose_sys_cx ();
 
     return 0;
 }

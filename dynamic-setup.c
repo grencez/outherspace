@@ -351,7 +351,7 @@ readin_Track (Track* track, RaySpace* space,
             good = !!(line);
             if (good)
             {
-                DeclGrow1Table( Ray, track->startlocs, ray );
+                DeclGrow1Table( Ray, ray, track->startlocs );
                 map_Point (&loc, map, &loc);
                 map_Point (&dir, map, &dir);
                 ray->origin = loc;
