@@ -13,6 +13,7 @@ project (OutherSpace)
 
 set (bin_path ../bin)
 set (cx_path ../cx)
+set (EXECUTABLE_OUTPUT_PATH ${bin_path})
 
 set (CSources
     affine.c
@@ -63,12 +64,12 @@ else ()
     # Other warnings disabled in util.h via #pragmas.
 
     set (CMAKE_BUILD_TYPE RELEASE)
-    set (SDL_pfx "../SDL-1.2.14")
+    set (SDL_pfx "../../SDL-1.2.14")
     set (SDL_LIBRARY "${SDL_pfx}/lib/SDL")
     list (APPEND SDL_LIBRARY "${SDL_pfx}/lib/SDLmain")
     set (SDL_INCLUDE_DIR "${SDL_pfx}/include")
 
-    set (SDL_image_pfx "../SDL_image-1.2.10")
+    set (SDL_image_pfx "../../SDL_image-1.2.10")
     set (SDLIMAGE_INCLUDE_DIR "${SDL_image_pfx}/include")
     set (SDLIMAGE_LIBRARY "${SDL_image_pfx}/lib/SDL_image")
 endif ()
@@ -88,10 +89,13 @@ setup_dbgn_defines (${CSources})
 
 add_executable (file2array file2array.c util.c ${cx_path}/fileb.c)
 set_target_properties (file2array PROPERTIES
-    PREFIX "${bin_path}/" OUTPUT_NAME file2array)
+    OUTPUT_NAME file2array)
 
 
 set (EmbedSfx ".embed.h")
+
+#add_custom_command (OUTPUT ${bin_path}
+#    COMMAND ${CMAKE_COMMAND} -E make_directory ${bin_path})
 
 add_custom_command (OUTPUT "phong.glsl${EmbedSfx}"
     COMMAND file2array "phong.glsl${EmbedSfx}" phong.vert phong.frag 4d.vert
@@ -107,14 +111,14 @@ add_executable (verify
     verif/pack.c
     ${CSources})
 set_target_properties (verify PROPERTIES
-    PREFIX "${bin_path}/" OUTPUT_NAME verify)
+    OUTPUT_NAME verify)
 
 add_executable (gui gui.c motion.c
     "phong.glsl${EmbedSfx}"
     "perturb.cl${EmbedSfx}"
     ${CSources})
 set_target_properties (gui PROPERTIES
-    PREFIX "${bin_path}/" OUTPUT_NAME "${GuiName}"
+    OUTPUT_NAME "${GuiName}"
     COMPILE_DEFINITIONS "${GuiDFLAGS}"
     LINK_FLAGS "${GuiLFLAGS}")
 
