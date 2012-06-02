@@ -11,6 +11,9 @@ cmake_minimum_required (VERSION 2.8)
 
 project (OutherSpace)
 
+set (bin_path ../bin)
+set (cx_path ../cx)
+
 set (CSources
     affine.c
     bbox.c
@@ -32,9 +35,9 @@ set (CSources
     util.c
     wavefront-file.c
     xfrm.c
-    cx/bstree.c
-    cx/fileb.c
-    cx/sys-cx.c
+    ${cx_path}/bstree.c
+    ${cx_path}/fileb.c
+    ${cx_path}/sys-cx.c
     )
 
 set (GuiName gui)
@@ -83,9 +86,9 @@ endmacro ()
 
 setup_dbgn_defines (${CSources})
 
-add_executable (file2array file2array.c util.c cx/fileb.c)
+add_executable (file2array file2array.c util.c ${cx_path}/fileb.c)
 set_target_properties (file2array PROPERTIES
-    PREFIX "" OUTPUT_NAME file2array)
+    PREFIX "${bin_path}/" OUTPUT_NAME file2array)
 
 
 set (EmbedSfx ".embed.h")
@@ -104,14 +107,14 @@ add_executable (verify
     verif/pack.c
     ${CSources})
 set_target_properties (verify PROPERTIES
-    PREFIX "" OUTPUT_NAME verify)
+    PREFIX "${bin_path}/" OUTPUT_NAME verify)
 
 add_executable (gui gui.c motion.c
     "phong.glsl${EmbedSfx}"
     "perturb.cl${EmbedSfx}"
     ${CSources})
 set_target_properties (gui PROPERTIES
-    PREFIX "" OUTPUT_NAME "${GuiName}"
+    PREFIX "${bin_path}/" OUTPUT_NAME "${GuiName}"
     COMPILE_DEFINITIONS "${GuiDFLAGS}"
     LINK_FLAGS "${GuiLFLAGS}")
 
@@ -120,6 +123,7 @@ if (OPENMP_FOUND)
 endif ()
 
 include_directories (".")
+include_directories ("..")
 include_directories (SYSTEM ${SDL_INCLUDE_DIR})
 include_directories (SYSTEM ${SDLIMAGE_INCLUDE_DIR})
 include_directories (SYSTEM ${OPENGL_INCLUDE_DIR})

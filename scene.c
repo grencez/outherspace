@@ -110,15 +110,15 @@ copy_Scene (Scene* dst, const Scene* src)
 {
     uint i;
     CopyT( Scene, dst, src, 0, 1 );
-    dst->elems = DuplicaT( SceneElement, dst->elems, dst->nelems );
-    dst->surfs = DuplicaT( GeomSurf, dst->surfs, dst->nsurfs );
+    dst->elems = DupliT( SceneElement, dst->elems, dst->nelems );
+    dst->surfs = DupliT( GeomSurf, dst->surfs, dst->nsurfs );
     if (dst->vidcs)
-        dst->vidcs = DuplicaT( uint, dst->vidcs, dst->ndims * dst->nelems );
-    dst->verts = DuplicaT( Point, dst->verts, dst->nverts );
-    dst->vnmls = DuplicaT( Point, dst->vnmls, dst->nvnmls );
-    dst->txpts = DuplicaT( BaryPoint, dst->txpts, dst->ntxpts );
-    dst->matls = DuplicaT( Material, dst->matls, dst->nmatls );
-    dst->txtrs = DuplicaT( Texture, dst->txtrs, dst->ntxtrs );
+        dst->vidcs = DupliT( uint, dst->vidcs, dst->ndims * dst->nelems );
+    dst->verts = DupliT( Point, dst->verts, dst->nverts );
+    dst->vnmls = DupliT( Point, dst->vnmls, dst->nvnmls );
+    dst->txpts = DupliT( BaryPoint, dst->txpts, dst->ntxpts );
+    dst->matls = DupliT( Material, dst->matls, dst->nmatls );
+    dst->txtrs = DupliT( Texture, dst->txtrs, dst->ntxtrs );
 
     UFor( i, dst->ntxtrs )
         copy_Texture (&dst->txtrs[i], &dst->txtrs[i]);
@@ -611,7 +611,7 @@ interpolate_Scene (Scene* dst, uint k, uint nscenes, const Scene* scenes)
     dst->elems = AllocT( SceneElement, dst->nelems );
 
     dst->nsurfs = nsurfs;
-    dst->surfs = DuplicaT( GeomSurf, scenes[0].surfs, dst->nsurfs );
+    dst->surfs = DupliT( GeomSurf, scenes[0].surfs, dst->nsurfs );
 
     vcount = nscenes * nverts;
     dst->nverts = vcount + dst->nelems;
@@ -621,7 +621,7 @@ interpolate_Scene (Scene* dst, uint k, uint nscenes, const Scene* scenes)
     dst->nvnmls = vnmlcount + dst->nelems;
     dst->vnmls = AllocT( Point, dst->nvnmls );
     dst->nmatls = nmatls;
-    dst->matls = DuplicaT( Material, scenes[0].matls, dst->nmatls );
+    dst->matls = DupliT( Material, scenes[0].matls, dst->nmatls );
     
         /* Copy info.*/
     UFor( i, nscenes )
@@ -910,7 +910,7 @@ setup_surfaces_Scene (Scene* scene)
          * We would probably need a temporary index array
          * instead of a temporary scene element array.
          */
-    elems = DuplicaT( SceneElement, scene->elems, scene->nelems );
+    elems = DupliT( SceneElement, scene->elems, scene->nelems );
     UFor( i, scene->nelems )
     {
         uint* elems_offset;

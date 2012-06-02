@@ -63,6 +63,13 @@ endif
 
 #valgrind --num-callers=50 --db-attach=yes --db-command='cgdb -- %f %p'
 
+
+cx_path = ../cx
+bin_path = ../bin
+
+IFLAGS = -I..
+
+
 EmbedSfx=.embed.h
 OpenCLLibPath=
 ifneq (,$(OpenCLPath))
@@ -264,10 +271,13 @@ ifneq (,$(notdir $(Pfx)))
 	GuiDFlags += '-DEmbedFilenamePfx=$(notdir $(Pfx))'
 endif
 ifeq ($(Pfx),$(notdir $(Pfx)))
-	RunPfx = ./$(Pfx)
+	RunPfx = ./$(bin_path)/$(Pfx)
 else
-	RunPfx = $(Pfx)
+	RunPfx = $(bin_path)/$(Pfx)
 endif
+
+
+CFLAGS += $(IFLAGS)
 
 
 CSources = affine.c \
@@ -290,9 +300,9 @@ CSources = affine.c \
 		   util.c \
 		   wavefront-file.c \
 		   xfrm.c \
-		   cx/bstree.c \
-		   cx/fileb.c \
-		   cx/sys-cx.c
+		   $(cx_path)/bstree.c \
+		   $(cx_path)/fileb.c \
+		   $(cx_path)/sys-cx.c
 
 HDeps = lightcut.h
 
@@ -305,8 +315,14 @@ endif
 
 LFLAGS += -lm
 
-default_exes = $(Pfx)cli $(Pfx)gui $(Pfx)verify
-all_exes = $(default_exes) $(Pfx)imgdiff $(Pfx)file2array
+cli_exe = $(bin_path)/$(Pfx)cli
+gui_exe = $(bin_path)/$(Pfx)gui
+verify_exe = $(bin_path)/$(Pfx)verify
+imgdiff_exe = $(bin_path)/$(Pfx)imgdiff
+file2array_exe = $(bin_path)/$(Pfx)file2array
+
+default_exes = $(cli_exe) $(gui_exe) $(verify_exe)
+all_exes = $(default_exes) $(imgdiff_exe) $(file2array_exe)
 
 default: $(default_exes)
 	# Finished: default
@@ -323,45 +339,56 @@ hello: hello.c $(CSources)
 test-hello: hello
 	LD_LIBRARY_PATH=$(OpenCLLibPath) ./$<
 
-$(Pfx)cli: cli.c compute.c $(CSources) $(HDeps)
+$(cli_exe): cli.c compute.c $(CSources) $(HDeps)
 	$(CC) $(CFLAGS) $(DFLAGS) $< -o $@ $(LFLAGS)
 
 GuiCFlags += $(CFLAGS)
 GuiDFlags += $(DFLAGS)
 GuiLFlags += $(LFLAGS)
-$(Pfx)gui: $(GuiMainCSources) compute.c motion.c $(CSources) $(HDeps)
+$(gui_exe): $(GuiMainCSources) compute.c motion.c $(CSources) $(HDeps)
 	$(CC) $(GuiCFlags) $(GuiDFlags) $< -o $@ $(GuiLFlags)
 
-run-$(Pfx)gui-opencl: $(Pfx)gui
+run-$(Pfx)gui-opencl: $(gui_exe)
 	LD_LIBRARY_PATH=$(OpenCLLibPath) ./$<
 
-$(Pfx)phong.glsl$(EmbedSfx): phong.vert phong.frag 4d.vert $(Pfx)file2array
+$(Pfx)phong.glsl$(EmbedSfx): phong.vert phong.frag 4d.vert $(file2array_exe)
 	$(RunPfx)file2array $@ phong.vert phong.frag 4d.vert
 
-$(Pfx)perturb.cl$(EmbedSfx): perturb.cl $(Pfx)file2array
+$(Pfx)perturb.cl$(EmbedSfx): perturb.cl $(file2array_exe)
 	$(RunPfx)file2array $@ perturb.cl
 
 VerifyCFlags := $(filter-out -fwhole-program,$(CFLAGS))
 VerifyDFlags := $(filter-out -DIncludeC,$(DFLAGS))
 VerifyCSources = verif/main.c verif/order.c verif/pack.c
 
-$(Pfx)verify: $(VerifyCSources) $(CSources)
+$(verify_exe): $(VerifyCSources) $(CSources)
 	$(CC) $(VerifyCFlags) $(VerifyDFlags) -I . $^ -o $@ $(LFLAGS)
 
-$(Pfx)imgdiff: imgdiff.c pnm-image.c cx/fileb.c
+$(imgdiff_exe): imgdiff.c pnm-image.c $(cx_path)/fileb.c
 	$(CC) $(CFLAGS) $(DFLAGS) -I . $< -o $@ $(LFLAGS)
 
-$(Pfx)file2array: file2array.c util.c
+$(file2array_exe): file2array.c util.c
 	$(CC) $(CFLAGS) $(DFLAGS) -I . $< -o $@ $(LFLAGS)
+
+$(all_exes): | $(bin_path)
+
+$(bin_path):
+	mkdir -p $(bin_path)
 
 .PHONY: test
-test: $(Pfx)cli
+test: $(cli_exe)
 	#valgrind --track-origins=yes ./$<
 	./$<
 
 .PHONY: ways
 ways:
 	$(MAKE) -f Makefile.ways
+
+.PHONY: killcmake
+killcmake:
+	rm -r CMakeFiles
+	rm -f cmake_install.cmake CMakeCache.txt Makefile
+	ln -s Makefile.raw Makefile
 
 .PHONY: cleanways
 cleanways:

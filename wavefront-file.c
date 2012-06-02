@@ -156,7 +156,7 @@ readin_wavefront (Scene* scene, const char* pathname, const char* filename)
             if (good)
             {
                 normalize_Point (&normal, &normal);
-                app_SList (&vnmllist, DuplicaT( Point, &normal, 1 ));
+                app_SList (&vnmllist, DupliT( Point, &normal, 1 ));
             }
             else
             {
@@ -173,7 +173,7 @@ readin_wavefront (Scene* scene, const char* pathname, const char* filename)
 
             good = !!(line);
             if (good)
-                app_SList (&txptlist, DuplicaT( BaryPoint, &bpoint, 1 ));
+                app_SList (&txptlist, DupliT( BaryPoint, &bpoint, 1 ));
             else
                 fprintf (err, "Line:%u  Not enough coordinates!\n", line_no);
         }
@@ -188,7 +188,7 @@ readin_wavefront (Scene* scene, const char* pathname, const char* filename)
             good = !!(line);
             if (good)
             {
-                app_SList (&vertlist, DuplicaT( Point, &vert, 1 ));
+                app_SList (&vertlist, DupliT( Point, &vert, 1 ));
             }
             else
             {
@@ -243,7 +243,7 @@ readin_wavefront (Scene* scene, const char* pathname, const char* filename)
             line = strskip_ws (line);
             if (surf->nelems > 0)
             {
-                app_SList (&surflist, DuplicaT( GeomSurf, surf, 1 ));
+                app_SList (&surflist, DupliT( GeomSurf, surf, 1 ));
                 surf->nelems = 0;
             }
 
@@ -270,7 +270,7 @@ readin_wavefront (Scene* scene, const char* pathname, const char* filename)
         uint ei;
 
         if (surf->nelems > 0)
-            app_SList (&surflist, DuplicaT( GeomSurf, surf, 1 ));
+            app_SList (&surflist, DupliT( GeomSurf, surf, 1 ));
 
         init_Scene (scene);
         scene->ndims = ndims;
@@ -426,10 +426,11 @@ readin_materials (SList* matlist, SList* namelist,
 
         if (AccepTok( line, "newmtl" ))
         {
+            uint n = strlen (line) + 1;
             apply_illum_Material (material, illum);
             line = strskip_ws (line);
 
-            app_SList (namelist, DuplicaT( char, line, strlen (line) + 1 ));
+            app_SList (namelist, DupliT( char, line, n ));
 
             material = AllocT( Material, 1 );
             init_Material (material);
@@ -547,10 +548,10 @@ parse_texture (SList* texlist, SList* texnamelist,
 
         if (good)
         {
+            uint n = strlen (filename);
             i = texlist->nmembs;
-            app_SList (texlist, DuplicaT( Texture, &texture, 1 ));
-            app_SList (texnamelist, DuplicaT( char, filename,
-                                              strlen (filename) + 1 ));
+            app_SList (texlist, DupliT( Texture, &texture, 1 ));
+            app_SList (texnamelist, DupliT( char, filename, n+1 ));
         }
     }
     return i;

@@ -484,8 +484,8 @@ readin_checkplanes (uint* ret_nplanes, Plane** ret_planes, Point** ret_points,
             map_Point (&loc, map, &loc);
             mapvec_Point (&normal, map, &normal);
             init_Plane (&plane, &normal, &loc);
-            app_SList (&planelist, DuplicaT( Plane, &plane, 1 ));
-            app_SList (&pointlist, DuplicaT( Point, &loc, 1 ));
+            app_SList (&planelist, DupliT( Plane, &plane, 1 ));
+            app_SList (&pointlist, DupliT( Point, &loc, 1 ));
             nplanes += 1;
         }
         line_no += 1;

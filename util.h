@@ -22,10 +22,6 @@
 #endif  /* !defined(EmbedFilenamePfx) */
 
 
-#define AllocT( Type, capacity ) \
-    (((capacity) == 0) ? (Type*) 0 : \
-     (Type*) malloc ((capacity) * sizeof (Type)))
-
 #define ResizeT( Type, arr, capacity ) \
     ((arr) = (Type*) ((arr) \
                       ? realloc (arr, (capacity) * sizeof (Type)) \
@@ -36,9 +32,6 @@
 
 #define ZeroT( Type, a, count ) \
     (memset (a, 0, (count) * sizeof (Type)))
-
-#define DuplicaT( Type, src, count ) \
-    ((Type*) array_dup (src, count, sizeof (Type)))
 
 #define ConcaT( Type, dst, src, end, count ) \
     ((dst) = (Type*) array_cat (dst, src, &end, count, sizeof (Type)))
