@@ -1,4 +1,6 @@
 
+#include "cx/syscx.h"
+
 #include "color.h"
 #include "pnm-image.h"
 #include "space.h"
@@ -8,8 +10,11 @@
 #include <assert.h>
 #include <stdio.h>
 
-int main (int argc, const char* const* argv)
+int main (int argc, char** argv)
 {
+    int argi =
+        (init_sysCx (&argc, &argv),
+         1);
     uint n;
     uint lhs_nrows, lhs_ncols;
     byte* lhs_bytes;
@@ -28,9 +33,9 @@ int main (int argc, const char* const* argv)
         exit (1);
     }
 
-    lhs_file = argv[1];
-    rhs_file = argv[2];
-    dst_file = argv[3];
+    lhs_file = argv[argi++];
+    rhs_file = argv[argi++];
+    dst_file = argv[argi++];
 
     lhs_bytes = readin_PPM_image (&lhs_nrows, &lhs_ncols, 0, lhs_file);
     rhs_bytes = readin_PPM_image (&rhs_nrows, &rhs_ncols, 0, rhs_file);
@@ -70,6 +75,7 @@ int main (int argc, const char* const* argv)
     free (lhs_bytes);
     free (rhs_bytes);
 
+    lose_sysCx ();
     return 0;
 }
 

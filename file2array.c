@@ -1,8 +1,12 @@
 
+#include "cx/syscx.h"
 #include "util.h"
 
 int main (int argc, char** argv)
 {
+    int argi =
+        (init_sysCx (&argc, &argv),
+         1);
     const char nfilessym[] = "nfiles";
     const char arrsym[] = "files_bytes";
     const char lensym[] = "files_nbytes";
@@ -10,7 +14,6 @@ int main (int argc, char** argv)
     const char lentype[] = "unsigned int";
     FILE* out = stdout;
     FILE* err = stderr;
-    int argi = 1;
     uint i, nfiles;
     uint* files_nbytes;
 
@@ -83,6 +86,7 @@ int main (int argc, char** argv)
     fputs ("};\n", out);
 
     free (files_nbytes);
+    lose_sysCx ();
     return 0;
 }
 

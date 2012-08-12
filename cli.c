@@ -1,10 +1,10 @@
 
+#include "cx/syscx.h"
+
 #include "pnm-image.h"
 #include "testcase.h"
 #include "wavefront-file.h"
 #include "lightcut.h"
-
-#include "cx/sys-cx.h"
 
 #ifdef DistribCompute
 #include "compute.h"
@@ -14,6 +14,9 @@
 
 int main (int argc, char** argv)
 {
+    int argi =
+        (init_sysCx (&argc, &argv),
+         1);
     char pathname[1024];
     const char* infilename = 0;
     bool good = true;
@@ -26,14 +29,9 @@ int main (int argc, char** argv)
     real t0, t1;
     Track track;
 
-    init_sys_cx ();
-
 #ifdef DistribCompute
     init_compute (&argc, &argv);
-    push_losefn_sys_cx (cleanup_compute);
-#else
-    (void) argc;
-    (void) argv;
+    push_losefn_sysCx (cleanup_compute);
 #endif
 
     out = stdout;
@@ -41,10 +39,10 @@ int main (int argc, char** argv)
     init_RayImage (&image);
 
     strcpy (pathname, "data");
-    if (argc >= 2)
+    if (argi < argc)
     {
         pathname[0] = '\0';
-        infilename = argv[1];
+        infilename = argv[argi];
     }
 
     image.nrows = 800;
@@ -186,7 +184,7 @@ int main (int argc, char** argv)
     cleanup_RaySpace (&space);
     lose_Track (&track);
 
-    lose_sys_cx ();
+    lose_sysCx ();
     return 0;
 }
 

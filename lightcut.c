@@ -254,8 +254,8 @@ linearize_LightCutNode (LightCutNode* light,
     light->nlights = 1;
 
         /* Swap positions in array.*/
-    light->bst.joint->split[side_BSTNode (&light->bst)] = &off->bst;
-    off->bst.joint->split[side_BSTNode (&off->bst)] = &light->bst;
+    light->bst.joint->split[side_of_BSTNode (&light->bst)] = &off->bst;
+    off->bst.joint->split[side_of_BSTNode (&off->bst)] = &light->bst;
     {
         LightCutNode tmp = *light;
         *light = *off;
@@ -390,7 +390,7 @@ make_light_tree (LightCutTree* t, GMRand* gmrand)
         clusters[close.idx].idx = c0->idx;
     }
 
-    root_for_BSTree (&t->bst, &clusters[remlights.s[0]].node->bst);
+    root_fo_BSTree (&t->bst, &clusters[remlights.s[0]].node->bst);
 
     Claim2( nnodes ,==, 2*nlights-1 );
     Claim2( remlights.sz ,==, 1 );

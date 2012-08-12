@@ -170,7 +170,8 @@ readin_Track (Track* track, RaySpace* space,
     uint line_no = 0;
     bool good = true;
     const char* line;
-    DecloStack( FileB, in );
+    FileB xfb = dflt_FileB ();
+    XFileB* xf = &xfb.xo;
     FILE* out = stderr;
     PointXfrm coord_system;
     IAMap model_map;  /* Use to save model transformation.*/
@@ -181,9 +182,8 @@ readin_Track (Track* track, RaySpace* space,
     Texture* skytex = 0;
     uint i;
 
-    init_FileB (in);
-    open_FileB (in, pathname, filename);
-    if (!in->good)  return false;
+    if (!open_FileB (&xfb, pathname, filename))
+        return false;
 
     identity_PointXfrm (&coord_system);
     identity_IAMap (map);
@@ -201,17 +201,16 @@ readin_Track (Track* track, RaySpace* space,
         /* Op_s( real, NColors, space->lights[0].intensity , .5 ); */
     space->lights[1].on = false;
 
-    for (line = getline_FileB (in);
+    for (line = getline_XFileB (xf);
          good && line;
-         line = getline_FileB (in))
+         line = getline_XFileB (xf))
     {
-        DecloStack( FileB, olay );
+        DecloStack1( XFileB, olay, olay_XFileB (xf, IdxEltTable( xf->buf, line )) );
         bool recalc_map = false;
         line_no += 1;
 
-        olay_FileB (olay, in);
-        skipds_FileB (olay, NULL);
-        line = cstr_FileB (olay);
+        skipds_XFileB (olay, NULL);
+        line = cstr_XFileB (olay);
 
         if (AccepTok( line, "scale" ))
         {
@@ -261,7 +260,7 @@ readin_Track (Track* track, RaySpace* space,
         else if (AccepTok( line, "camloc" ))
         {
             if (line[0] == ':')  line = &line[1];
-            skipto_FileB (olay, line);
+            skipto_XFileB (olay, line);
             load_IAMap (olay, &track->camloc);
         }
         else if (AccepTok( line, "model:" ))
@@ -289,13 +288,13 @@ readin_Track (Track* track, RaySpace* space,
                     /* Ignore because we are not in 4d mode.*/
                 doit = false;
             }
-            if (doit)  good = readin_wavefront (scene, in->pathname.s, line);
+            if (doit)  good = readin_wavefront (scene, xfb.pathname.s, line);
         }
         else if (AccepTok( line, "concat-model:" ))
         {
             Scene tmp;
             good = !!(scene);
-            if (good)  good = readin_wavefront (&tmp, in->pathname.s, line);
+            if (good)  good = readin_wavefront (&tmp, xfb.pathname.s, line);
             else       fprintf (out, "Line:%u  No scene for concat!\n",
                                 line_no);
                 /* TODO: Some sort of scene mapping should happen?*/
@@ -304,7 +303,7 @@ readin_Track (Track* track, RaySpace* space,
         else if (AccepTok( line, "sky:" ))
         {
             skytex = AllocT( Texture, 1 );
-            good = readin_Texture (skytex, in->pathname.s, line);
+            good = readin_Texture (skytex, xfb.pathname.s, line);
             if (!good)
                 fprintf (out, "Line:%u  Sky failed!\n", line_no);
         }
@@ -313,7 +312,7 @@ readin_Track (Track* track, RaySpace* space,
             good = readin_checkplanes (&track->ncheckplanes,
                                        &track->checkplanes,
                                        &track->checkpoints,
-                                       map, in->pathname.s, line);
+                                       map, xfb.pathname.s, line);
             if (!good)
                 fprintf (out, "Line:%u  Checkplanes failed!\n", line_no);
         }
@@ -397,7 +396,7 @@ readin_Track (Track* track, RaySpace* space,
         }
     }
 
-    lose_FileB (in);
+    lose_FileB (&xfb);
 
     if (good && !scene)
     {

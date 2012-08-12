@@ -302,7 +302,7 @@ CSources = affine.c \
 		   xfrm.c \
 		   $(cx_path)/bstree.c \
 		   $(cx_path)/fileb.c \
-		   $(cx_path)/sys-cx.c
+		   $(cx_path)/syscx.c
 
 HDeps = lightcut.h
 
@@ -396,7 +396,7 @@ cleanways:
 
 .PHONY: clean
 clean:
-	rm -f $(default_exes)
+	rm -f $(default_exes) $(cx_path)/*.o
 
 .PHONY: cleanall
 cleanall:

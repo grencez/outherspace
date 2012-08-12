@@ -1,4 +1,6 @@
 
+#include "cx/syscx.h"
+
     /* Note: important stuff in this file!*/
 #include "gui-indep.c"
 
@@ -19,8 +21,6 @@
 #endif
 
 #include "lightcut.h"
-
-#include "cx/sys-cx.h"
 
     /* SDL on OS X does some weirdo bootstrapping by redefining /main/.*/
 #ifdef main
@@ -437,7 +437,7 @@ key_press_fn (Pilot* pilot, RaySpace* space, const SDL_keysym* event)
     }
     else if (print_plane_line)
     {
-        FileB* f = stdout_FileB ();
+        OFileB* of = stdout_OFileB ();
         IAMap iatt;
         fprintf (out, "%f %f %f  %f %f %f\n",
                  view_origin->coords[0],
@@ -449,9 +449,9 @@ key_press_fn (Pilot* pilot, RaySpace* space, const SDL_keysym* event)
         identity_IAMap (&iatt);
         transpose_PointXfrm (&iatt.xfrm, view_basis);
         xlat_IAMap (&iatt, view_origin, &iatt);
-        dumpp_IAMap (f, &iatt);
-        dump_char_FileB (f, '\n');
-        flusho_FileB (f);
+        dumpp_IAMap (of, &iatt);
+        dump_char_OFileB (of, '\n');
+        flush_OFileB (of);
     }
     else if (quit_app)
     {
@@ -1165,6 +1165,9 @@ int SDL_main (int argc, char* argv[])
 int wrapped_main_fn (int argc, char* argv[])
 #endif
 {
+    int argi =
+        (init_sysCx (&argc, &argv),
+         1);
     FILE* out = stderr;
     bool good = true;
     bool call_gui = true;
@@ -1177,8 +1180,6 @@ int wrapped_main_fn (int argc, char* argv[])
     const char* infilename;
     Pilot dflt_pilot;
     RaySpace* space;
-
-    init_sys_cx ();
 
     strcpy (inpathname, "data");
     infilename = "curve-track.txt";
@@ -1194,23 +1195,23 @@ int wrapped_main_fn (int argc, char* argv[])
         sprintf (inpathname, "%s/../Resources/share/outherspace", pathname);
     }
 
-    if (argc >= 2)
+    if (argi < argc)
     {
         inpathname[0] = '\0';
-        infilename = argv[1];
+        infilename = argv[argi];
     }
 
     space = &ray_space;
 
 #ifdef DistribCompute
     init_compute (&argc, &argv);
-    push_losefn_sys_cx (cleanup_compute);
+    push_losefn_sysCx (cleanup_compute);
 #endif
 
 #ifdef SupportImage
     ret = IMG_Init (IMG_INIT_PNG);
     assert (ret == IMG_INIT_PNG);
-    push_losefn_sys_cx (IMG_Quit);
+    push_losefn_sysCx (IMG_Quit);
 #endif
 
     init_Track (&track);
@@ -1287,8 +1288,7 @@ int wrapped_main_fn (int argc, char* argv[])
     cleanup_RaySpace (space);
     lose_Track (&track);
 
-    lose_sys_cx ();
-
+    lose_sysCx ();
     return 0;
 }
 

@@ -1,4 +1,5 @@
 
+#include "cx/syscx.h"
 #include "affine.h"
 #include "bbox.h"
 #include "bitstring.h"
@@ -282,23 +283,21 @@ testfn_serial ()
     init_GMRand (&gmrand);
 
     { BLoop( testidx, 1e5 )
-        DecloStack( FileB, f );
-        DecloStack( FileB, olay );
+        DecloStack1( OFileB, of, dflt_OFileB () );
+        DecloStack( OFileB, olay );
         Point expect, result;
 
         { BLoop( i, NDims )
             expect.coords[i] = 1e7 * real_GMRand (&gmrand);
         } BLose()
 
-        init_FileB (f);
-        f->sink = true;
-        dumpp_Point (f, &expect);
-        olay_FileB (olay, f);
+        dumpp_Point (of, &expect);
+        *olay = olay_OFileB (of, 0);
         load_Point (olay, &result);
 
         Claim( equal_Point (&expect, &result) );
-        lose_FileB (olay);
-        lose_FileB (f);
+        lose_OFileB (olay);
+        lose_OFileB (of);
     } BLose()
 }
 
@@ -407,7 +406,9 @@ testfn_SList ()
 
 int main (int argc, char** argv)
 {
-    int argidx = 1;
+    int argidx =
+        (init_sysCx (&argc, &argv),
+         1);
     uint npids = 1, pidx = 0;
     if (argidx < argc)
         strto_uint (&npids, argv[argidx++]);
@@ -426,6 +427,8 @@ int main (int argc, char** argv)
     testfn_order ();
     testfn_pack ();
     verifn_orthorotate_PointXfrm (npids, pidx);
+
+    lose_sysCx ();
     return 0;
 }
 

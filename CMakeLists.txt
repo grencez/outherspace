@@ -38,7 +38,7 @@ set (CSources
     xfrm.c
     ${cx_path}/bstree.c
     ${cx_path}/fileb.c
-    ${cx_path}/sys-cx.c
+    ${cx_path}/syscx.c
     )
 
 set (GuiName gui)
@@ -87,7 +87,7 @@ endmacro ()
 
 setup_dbgn_defines (${CSources})
 
-add_executable (file2array file2array.c util.c ${cx_path}/fileb.c)
+add_executable (file2array file2array.c util.c ${cx_path}/fileb.c ${cx_path}/syscx.c)
 set_target_properties (file2array PROPERTIES
     OUTPUT_NAME file2array)
 

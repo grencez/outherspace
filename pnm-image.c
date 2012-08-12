@@ -82,49 +82,48 @@ void output_PGM_image (const char* filename, uint nrows, uint ncols,
 void output_PPM_image (const char* filename, uint nrows, uint ncols,
                        const byte* pixels)
 {
-    DecloStack( FileB, f );
+    FileB ofb = dflt_FileB ();
+    OFileB* of = &ofb.xo;
 
-    init_FileB (f);
-    f->sink = true;
-    open_FileB (f, 0, filename);
-    if (!f->good)
+    ofb.sink = true;
+    if (!open_FileB (&ofb, 0, filename))
     {
         fprintf (stderr, "Cannot open file for writing:%s\n", filename);
         return;
     }
 
         /* dump_cstr_FileB (f, "P3\n"); */
-    dump_cstr_FileB (f, "P6\n");
-    dump_uint_FileB (f, ncols);
-    dump_char_FileB (f, ' ');
-    dump_uint_FileB (f, nrows);
-    dump_char_FileB (f, '\n');
-    dump_cstr_FileB (f, "255\n");
+    dump_cstr_OFileB (of, "P6\n");
+    dump_uint_OFileB (of, ncols);
+    dump_char_OFileB (of, ' ');
+    dump_uint_OFileB (of, nrows);
+    dump_char_OFileB (of, '\n');
+    dump_cstr_OFileB (of, "255\n");
 
 #if 0
     { BLoop( row, nrows )
         const byte* pixline;
         pixline = &pixels[(nrows - row - 1) * 3 * ncols];
         { BLoop( col, ncols )
-            dump_char_FileB (f, ' ');
-            dump_uint_FileB (f, pixline[3*col+0]);
-            dump_char_FileB (f, ' ');
-            dump_uint_FileB (f, pixline[3*col+1]);
-            dump_char_FileB (f, ' ');
-            dump_uint_FileB (f, pixline[3*col+2]);
+            dump_char_OFileB (of, ' ');
+            dump_uint_OFileB (of, pixline[3*col+0]);
+            dump_char_OFileB (of, ' ');
+            dump_uint_OFileB (of, pixline[3*col+1]);
+            dump_char_OFileB (of, ' ');
+            dump_uint_OFileB (of, pixline[3*col+2]);
         } BLose()
-        dump_char_FileB (f, '\n');
+        dump_char_OFileB (of, '\n');
     } BLose()
 #else
-    setfmt_FileB (f, FileB_Raw);
+    setfmt_FileB (&ofb, FileB_Raw);
     { BLoop( row, nrows )
-        dumpn_byte_FileB (f,
+        dumpn_byte_FileB (&ofb,
                           &pixels[(nrows - row - 1) * NColors * ncols],
                           ncols * NColors);
     } BLose()
 #endif
 
-    lose_FileB (f);
+    lose_FileB (&ofb);
 }
 
 
@@ -135,18 +134,17 @@ readin_PPM_image (uint* ret_nrows, uint* ret_ncols,
     uint nrows = 0, ncols = 0;
     bool good = true;
     byte* pixels;
-    DecloStack( FileB, f );
+    FileB xfb = dflt_FileB ();
+    XFileB* xf = &xfb.xo;
     uint max_color_value = 255;
     uint header_stage;
     bool ascii = true;
     real t0;
+    const char* line;
 
     t0 = monotime ();
 
-    init_FileB (f);
-    open_FileB (f, pathname, filename);
-
-    if (!f->f)
+    if (!open_FileB (&xfb, pathname, filename))
     {
         fprintf (stderr, "Cannot open file for reading:%s/%s\n",
                  pathname, filename);
@@ -155,13 +153,11 @@ readin_PPM_image (uint* ret_nrows, uint* ret_ncols,
 
 
     header_stage = 0;
-    while (good && header_stage < 3 && getline_FileB (f))
+    while (good && header_stage < 3 && (line = getline_XFileB (xf)))
     {
-        const char* line;
-        DecloStack( FileB, olay );
-        olay_FileB (olay, f);
-        skipds_FileB (olay, 0);
-        line = cstr_FileB (olay);
+        DecloStack1( XFileB, olay, olay_XFileB (xf, IdxEltTable( xf->buf, line )) );
+        skipds_XFileB (olay, 0);
+        line = cstr_XFileB (olay);
 
         if (line[0] == '#')
         {
@@ -196,11 +192,11 @@ readin_PPM_image (uint* ret_nrows, uint* ret_ncols,
 
     if (!good)
     {
-        lose_FileB (f);
+        lose_FileB (&xfb);
         return 0;
     }
 
-    if (!ascii)  setfmt_FileB (f, FileB_Raw);
+    if (!ascii)  setfmt_FileB (&xfb, FileB_Raw);
 
     pixels = AllocT( byte, nrows * ncols * NColors );
 
@@ -209,7 +205,7 @@ readin_PPM_image (uint* ret_nrows, uint* ret_ncols,
         byte* pixline;
         pixline = &pixels[NColors * (nrows - row - 1) * ncols];
 
-        if (!loadn_byte_FileB (f, pixline, n))
+        if (!loadn_byte_FileB (&xfb, pixline, n))
         {
             good = false;
             break;
@@ -221,7 +217,7 @@ readin_PPM_image (uint* ret_nrows, uint* ret_ncols,
         } BLose()
     } BLose()
 
-    lose_FileB (f);
+    lose_FileB (&xfb);
 
     if (good)
     {
