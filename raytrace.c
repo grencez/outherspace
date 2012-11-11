@@ -1068,7 +1068,7 @@ fill_pixel (Color* ret_color,
                             material->optical_density, hit_front, cos_normal);
 
             cast_colors (&color, space, image, &isect, &tmp_dir,
-                         &factor, !front, nbounces, gmrand);
+                         &factor, front == Nil ? Yes : Nil, nbounces, gmrand);
         }
         if (material && material->reflective)
         {

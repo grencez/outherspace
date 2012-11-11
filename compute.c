@@ -1,6 +1,8 @@
 
 #include "compute.h"
 #include "raytrace.h"
+#include "point.h"
+#include "xfrm.h"
 
 #include <mpi.h>
 #include <stdarg.h>

@@ -1,4 +1,6 @@
 
+default: default_exes
+
 ###### Optional user-defined variables ######
 # Override default CONFIG value (see below).
 Flags =
@@ -24,6 +26,7 @@ CONFIG += image
 #CONFIG += 4d
 #CONFIG += c++
 CONFIG += ansi
+#CONFIG += errwarn
 #CONFIG += c99
 CONFIG += fast
 #CONFIG += snappy
@@ -63,11 +66,10 @@ endif
 
 #valgrind --num-callers=50 --db-attach=yes --db-command='cgdb -- %f %p'
 
-
-cx_path = ../cx
-bin_path = ../bin
-
-IFLAGS = -I..
+PfxBldPath = $(Pfx)bld
+CxPath = ../cx
+BinPath = ../bin
+BldPath = outherspace
 
 
 EmbedSfx=.embed.h
@@ -83,11 +85,11 @@ else ifneq (,$(filter sunstudio,$(CONFIG)))
 	# But do note that, if using OpenMP,
 	# the OMP_NUM_THREADS environment variable must be set!
 else
-	CFLAGS += -fwhole-program
-	CFLAGS += -Wall -Wextra
+	#CFLAGS += -fwhole-program
+	#CFLAGS += -Wall -Wextra
 endif
 
-DFLAGS += -DIncludeC
+#DFLAGS += -DIncludeC
 
 ifneq (,$(filter image,$(CONFIG)))
 	GuiDFlags += -DSupportImage
@@ -100,7 +102,8 @@ ifneq (,$(filter 4d,$(CONFIG)))
 	DFLAGS += -DNDimensions=4
 endif
 
-GuiMainCSources = gui.c gui-indep.c
+GuiCFiles = gui.c
+GuiHFiles = gui-indep.c
 ifneq (,$(filter macapp,$(CONFIG)))
 	# Everything on this OS X setup is 32 bit.
 	CFLAGS += -m32
@@ -109,7 +112,7 @@ ifneq (,$(filter macapp,$(CONFIG)))
 	GuiLFlags += -framework SDL
 	GuiLFlags += -framework cocoa
 	# Need a wrapper around the main function.
-	GuiMainCSources += sdl-main-osx.m
+	GuiHFiles += sdl-main-osx.m
 	CFLAGS := $(filter-out -fwhole-program,$(CFLAGS))
 	ifneq (,$(filter image,$(CONFIG)))
 		GuiCFlags += -I/Library/Frameworks/SDL_image.framework/Headers
@@ -144,17 +147,11 @@ ifneq (,$(filter haptic,$(CONFIG)))
 	GuiDFlags += -DSupportHaptic
 endif
 
-## Serious debugging is about to happen.
-ifneq (,$(filter ultradebug,$(CONFIG)))
-	CONFIG := $(filter-out snappy fast debug,$(CONFIG))
-	CFLAGS += -g3
-endif
 ## Go really fast.
 ifneq (,$(filter fast,$(CONFIG)))
 	ifneq (,$(filter sunstudio,$(CONFIG)))
 		CFLAGS += -xO3
-	else
-		CFLAGS += -O3
+		CONFIG := $(filter-out fast,$(CONFIG))
 	endif
 	#CFLAGS += -ftree-vectorizer-verbose=2
 	#CFLAGS += -Ofast
@@ -162,27 +159,11 @@ ifneq (,$(filter fast,$(CONFIG)))
 	#CFLAGS += -ffast-math
 	#CFLAGS += -march=native -mtune=native
 endif
-## Go pretty fast.
-ifneq (,$(filter snappy,$(CONFIG)))
-	CFLAGS += -O2
-endif
-## Add debugging symbols.
-ifneq (,$(filter debug,$(CONFIG)))
-	CFLAGS += -g
-endif
-ifneq (,$(filter profile,$(CONFIG)))
-	CFLAGS += -pg
-	LFLAGS += -pg
-endif
 
 ## Enable benchmarking. (take out file writes)
 ifneq (,$(filter benchmark,$(CONFIG)))
 	CFLAGS += -DBENCHMARKING
 	CONFIG += noassert
-endif
-## Disable assertions.
-ifneq (,$(filter noassert,$(CONFIG)))
-	CFLAGS += -DNDEBUG
 endif
 ## Do we have bool type?
 ifneq (,$(filter c++,$(CONFIG)))
@@ -219,8 +200,7 @@ ifneq (,$(filter ansi,$(CONFIG)))
 		GuiCFlags += -xCC
 		# SDL uses incompatible __inline__ qualifier.
 		GuiDFlags += -D__inline__=""
-	else
-		CFLAGS += -ansi -pedantic
+		CONFIG := $(filter-out ansi,$(CONFIG))
 	endif
 endif
 ## Allow parallelism.
@@ -236,7 +216,7 @@ ifneq (,$(filter openmp,$(CONFIG)))
 	endif
 endif
 ifneq (,$(filter opencl,$(CONFIG)))
-	GuiMainCSources += gui-opencl.c
+	GuiHFiles += gui-opencl.c
 	ifneq (,$(OpenCLPath))
 		GuiCFlags += -I$(OpenCLPath)/include
 		GuiLFlags += -L$(OpenCLLibPath)
@@ -244,14 +224,14 @@ ifneq (,$(filter opencl,$(CONFIG)))
 	GuiDFlags += -DSupportOpenCL
 	GuiLFlags += -lOpenCL
 	ifneq (,$(filter embed_files,$(CONFIG)))
-		GuiMainCSources += $(Pfx)perturb.cl$(EmbedSfx)
+		GuiHFiles += $(Pfx)perturb.cl$(EmbedSfx)
 	endif
 endif
 ifneq (,$(filter opengl,$(CONFIG)))
-	GuiMainCSources += gui-opengl.c
+	GuiHFiles += gui-opengl.c
 	GuiDFlags += -DSupportOpenGL
 	ifneq (,$(filter embed_files,$(CONFIG)))
-		GuiMainCSources += $(Pfx)phong.glsl$(EmbedSfx)
+		GuiHFiles += $(Pfx)phong.glsl$(EmbedSfx)
 	endif
 endif
 ifneq (,$(filter embed_files,$(CONFIG)))
@@ -271,10 +251,66 @@ ifneq (,$(notdir $(Pfx)))
 	GuiDFlags += '-DEmbedFilenamePfx=$(notdir $(Pfx))'
 endif
 ifeq ($(Pfx),$(notdir $(Pfx)))
-	RunPfx = ./$(bin_path)/$(Pfx)
+	RunPfx = ./$(BinPath)/$(Pfx)
 else
-	RunPfx = $(bin_path)/$(Pfx)
+	RunPfx = $(BinPath)/$(Pfx)
 endif
+
+
+cli_exe = $(Pfx)cli
+gui_exe = $(Pfx)gui
+verify_exe = $(Pfx)verify
+imgdiff_exe = $(Pfx)imgdiff
+file2array_exe = $(Pfx)file2array
+
+DfltExeList = $(cli_exe) $(gui_exe) $(verify_exe)
+ExeList = $(DfltExeList) $(imgdiff_exe) $(file2array_exe)
+Objs = \
+	affine.o \
+	bbox.o \
+    bitstring.o \
+	compute.o \
+    dynamic-setup.o \
+    kdtree.o \
+    kptree.o \
+    lightcut.o \
+    material.o \
+    order.o \
+    pnm-image.o \
+    raytrace.o \
+    scene.o \
+    serial.o \
+    simplex.o \
+    slist.o \
+    testcase.o \
+    track.o \
+    util.o \
+    wavefront-file.o \
+    xfrm.o \
+	cli.o \
+	file2array.o \
+	gui.o \
+	imgdiff.o \
+
+include $(CxPath)/include.mk
+
+$(eval $(shell \
+	sed \
+	-e 's/\(.*\): *\(.*\)/$$(eval $$(BldPath)\/\1: $$(BldPath)\/\2)/' \
+	deps.mk))
+
+cli_exe := $(BinPath)/$(cli_exe)
+gui_exe := $(BinPath)/$(gui_exe)
+verify_exe := $(BinPath)/$(verify_exe)
+imgdiff_exe := $(BinPath)/$(imgdiff_exe)
+file2array_exe := $(BinPath)/$(file2array_exe)
+
+default_exes: $(DfltExeList)
+	# Finished: default
+
+all: $(ExeList)
+	# Finished: all
+
 
 
 CFLAGS += $(IFLAGS)
@@ -299,10 +335,7 @@ CSources = affine.c \
 		   track.c \
 		   util.c \
 		   wavefront-file.c \
-		   xfrm.c \
-		   $(cx_path)/bstree.c \
-		   $(cx_path)/fileb.c \
-		   $(cx_path)/syscx.c
+		   xfrm.c
 
 HDeps = lightcut.h
 
@@ -310,25 +343,10 @@ ifneq (,$(filter sse,$(CONFIG)))
 	CFLAGS += -msse -msse2
 	DFLAGS += -DPackOpsAvail
 	CSources += pack.c
-	GuiMainCSources += raytrace-pack.c
+	GuiHFiles += raytrace-pack.c
 endif
 
 LFLAGS += -lm
-
-cli_exe = $(bin_path)/$(Pfx)cli
-gui_exe = $(bin_path)/$(Pfx)gui
-verify_exe = $(bin_path)/$(Pfx)verify
-imgdiff_exe = $(bin_path)/$(Pfx)imgdiff
-file2array_exe = $(bin_path)/$(Pfx)file2array
-
-default_exes = $(cli_exe) $(gui_exe) $(verify_exe)
-all_exes = $(default_exes) $(imgdiff_exe) $(file2array_exe)
-
-default: $(default_exes)
-	# Finished: default
-
-all: $(all_exes)
-	# Finished: all
 
 # Note: OpenCL code does not function at this time, don't bother.
 hello: hello.c $(CSources)
@@ -339,41 +357,67 @@ hello: hello.c $(CSources)
 test-hello: hello
 	LD_LIBRARY_PATH=$(OpenCLLibPath) ./$<
 
-$(cli_exe): cli.c compute.c $(CSources) $(HDeps)
-	$(CC) $(CFLAGS) $(DFLAGS) $< -o $@ $(LFLAGS)
+CliCFiles = cli.c
+ifneq (,$(filter mpi trivialmpi,$(CONFIG)))
+	CliCFiles += compute.c
+	GuiCFiles += compute.c
+endif
+
+$(call binexe,$(Pfx)cli): \
+	$(patsubst %.c,$(BldPath)/%.c, $(CliCFiles)) \
+	$(patsubst %.c,$(BldPath)/%.o, $(CSources)) \
+	$(addprefix $(CxBldPath)/, bstree.o fileb.o syscx.o)
+	$(CC) $(CFLAGS) $(DFLAGS)  $^ -o $@ $(LFLAGS)
 
 GuiCFlags += $(CFLAGS)
 GuiDFlags += $(DFLAGS)
 GuiLFlags += $(LFLAGS)
-$(gui_exe): $(GuiMainCSources) compute.c motion.c $(CSources) $(HDeps)
-	$(CC) $(GuiCFlags) $(GuiDFlags) $< -o $@ $(GuiLFlags)
+#$(gui_exe): $(GuiCFiles) compute.c motion.c $(CSources) $(HDeps)
+#	$(CC) $(GuiCFlags) $(GuiDFlags) $< -o $@ $(GuiLFlags)
+
+$(call binexe,$(Pfx)gui): \
+	$(patsubst %.c,$(BldPath)/%.c, $(GuiCFiles)) \
+	$(patsubst %.c,$(BldPath)/%.o, $(CSources)) \
+	$(addprefix $(CxBldPath)/, bstree.o fileb.o syscx.o)
+	$(CC) $(GuiCFlags) $(GuiDFlags) $^ -o $@ $(GuiLFlags)
+
+$(gui_exe): | $(patsubst %,$(BldPath)/%, $(GuiHFiles))
 
 run-$(Pfx)gui-opencl: $(gui_exe)
 	LD_LIBRARY_PATH=$(OpenCLLibPath) ./$<
 
-$(Pfx)phong.glsl$(EmbedSfx): phong.vert phong.frag 4d.vert $(file2array_exe)
+$(BldPath)/$(Pfx)phong.glsl$(EmbedSfx): phong.vert phong.frag 4d.vert $(file2array_exe)
 	$(RunPfx)file2array $@ phong.vert phong.frag 4d.vert
 
-$(Pfx)perturb.cl$(EmbedSfx): perturb.cl $(file2array_exe)
+$(BldPath)/$(Pfx)perturb.cl$(EmbedSfx): perturb.cl $(file2array_exe)
 	$(RunPfx)file2array $@ perturb.cl
 
-VerifyCFlags := $(filter-out -fwhole-program,$(CFLAGS))
-VerifyDFlags := $(filter-out -DIncludeC,$(DFLAGS))
+VerifyCFlags := $(CFLAGS)
+#VerifyCFlags := $(filter-out -fwhole-program,$(CFLAGS))
+#VerifyDFlags := $(filter-out -DIncludeC,$(DFLAGS))
 VerifyCSources = verif/main.c verif/order.c verif/pack.c
 
-$(verify_exe): $(VerifyCSources) $(CSources)
-	$(CC) $(VerifyCFlags) $(VerifyDFlags) -I . $^ -o $@ $(LFLAGS)
+$(patsubst %.c,$(BldPath)/%.c, $(VerifyCSources)): | $(BldPath)/verif
 
-$(imgdiff_exe): imgdiff.c pnm-image.c $(cx_path)/fileb.c
-	$(CC) $(CFLAGS) $(DFLAGS) -I . $< -o $@ $(LFLAGS)
+$(BldPath)/verif:
+	mkdir -p $@
 
-$(file2array_exe): file2array.c util.c
-	$(CC) $(CFLAGS) $(DFLAGS) -I . $< -o $@ $(LFLAGS)
+$(call binexe,$(Pfx)verify): \
+	$(patsubst %.c,$(BldPath)/%.c, $(VerifyCSources)) \
+	$(patsubst %.c,$(BldPath)/%.o, $(CSources)) \
+	$(addprefix $(CxBldPath)/, bstree.o fileb.o syscx.o)
+	$(CC) $(VerifyCFlags) $(VerifyDFlags) -I $(BldPath) $^ -o $@ $(LFLAGS)
 
-$(all_exes): | $(bin_path)
+$(call binexe,$(Pfx)imgdiff): $(BldPath)/imgdiff.o \
+	$(BldPath)/pnm-image.o \
+	$(BldPath)/util.o \
+	$(addprefix $(CxBldPath)/, fileb.o syscx.o)
+	$(CC) $(CFLAGS) $(DFLAGS) -I . $^ -o $@ $(LFLAGS)
 
-$(bin_path):
-	mkdir -p $(bin_path)
+$(call binexe,$(Pfx)file2array): $(BldPath)/file2array.o \
+	$(BldPath)/util.o \
+	$(addprefix $(CxBldPath)/, fileb.o syscx.o)
+	$(CC) $(CFLAGS) -o $@ $^ -lm
 
 .PHONY: test
 test: $(cli_exe)
@@ -384,21 +428,17 @@ test: $(cli_exe)
 ways:
 	$(MAKE) -f Makefile.ways
 
-.PHONY: killcmake
-killcmake:
-	rm -r CMakeFiles
-	rm -f cmake_install.cmake CMakeCache.txt Makefile
-	ln -s Makefile.raw Makefile
-
 .PHONY: cleanways
 cleanways:
 	$(MAKE) -f Makefile.ways clean
 
 .PHONY: clean
 clean:
-	rm -f $(default_exes) $(cx_path)/*.o
+	rm -fr $(PfxBldPath)
+	rm -f $(ExeList)
+
 
 .PHONY: cleanall
-cleanall:
-	rm -f hello $(all_exes) $(Pfx)phong.glsl$(EmbedSfx) $(Pfx)perturb.cl$(EmbedSfx)
+cleanall: clean
+	rm -f hello
 

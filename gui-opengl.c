@@ -263,9 +263,9 @@ init_ogl_ui_data ()
 #endif
 
 #ifndef EmbedFiles
-    { BLoop( i, nfiles )
+    {:for (i ; nfiles)
         free (files_bytes[i]);
-    } BLose()
+    }
 #endif
 }
 

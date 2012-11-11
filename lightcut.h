@@ -118,6 +118,7 @@ cast_LightCutTree (Color* ret_color, const LightCutTree* tree,
     for (node = &tree->nodes.s[0];
          node != &tree->nodes.s[nlights];
          ++ node)
+        ;
 #else
     while ((node = next_LightCutNode (tree, node, e_max, hit)))
 #endif

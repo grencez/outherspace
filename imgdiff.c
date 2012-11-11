@@ -45,18 +45,18 @@ int main (int argc, char** argv)
     Claim2( lhs_ncols ,==, rhs_ncols );
 
     n = NColors * lhs_nrows * lhs_ncols;
-    { BLoop( i, lhs_nrows )
-        { BLoop( j, lhs_ncols )
+    {:for (i ; lhs_nrows)
+        {:for (j ; lhs_ncols)
             Color c0, c1;
             byte* cb0 = &lhs_bytes[(j + i * lhs_ncols) * NColors];
             byte* cb1 = &rhs_bytes[(j + i * lhs_ncols) * NColors];
             Color diff;
             real mag0, mag1;
-            { BLoop( k, NColors )
+            {:for (k ; NColors)
                 c0.coords[k] = (1.0 / 255) * cb0[k];
                 c1.coords[k] = (1.0 / 255) * cb1[k];
                 cb0[k] = 0;
-            } BLose()
+            }
 
             diff_Color (&diff, &c1, &c0);
 
@@ -67,8 +67,8 @@ int main (int argc, char** argv)
                 cb0[0] = clamp_real (255.5 * (mag0 - mag1), 0, 255.5);
             else
                 cb0[1] = clamp_real (255.5 * (mag1 - mag0), 0, 255.5);
-        } BLose()
-    } BLose()
+        }
+    }
 
     output_PPM_image (dst_file, lhs_nrows, lhs_ncols, lhs_bytes);
 

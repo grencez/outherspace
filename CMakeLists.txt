@@ -42,6 +42,7 @@ list (APPEND CFiles
     ${CommonCFiles}
     cli.c
     gui.c
+    imgdiff.c
     motion.c
     file2array.c
     verif/main.c
@@ -148,6 +149,15 @@ endmacro ()
 
 setup_dbgn_defines (${CSources})
 
+add_executable (imgdiff
+    ${BldPath}/imgdiff.c
+    ${BldPath}/pnm-image.c
+    ${BldPath}/util.c
+    )
+set_target_properties (imgdiff PROPERTIES
+    OUTPUT_NAME imgdiff)
+target_link_libraries (imgdiff CxLib)
+
 
 add_executable (file2array
     ${BldPath}/file2array.c
@@ -213,6 +223,7 @@ target_link_libraries (gui ${SDLIMAGE_LIBRARY})
 target_link_libraries (gui ${OPENGL_LIBRARIES})
 
 if (UNIX)
+    target_link_libraries (imgdiff m)
     target_link_libraries (file2array m)
     target_link_libraries (gui m)
     target_link_libraries (cli m)
