@@ -22,6 +22,9 @@ dynamic-setup.h: raytrace.h
 dynamic-setup.h: space.h
 dynamic-setup.h: track.h
 file2array.c: util.h
+gui.c: gui-indep.c
+gui.c: gui-opengl.c
+gui.c: lightcut.h
 gui-indep.c: gui-indep.h
 gui-indep.h: dynamic-setup.h
 gui-indep.h: motion.h

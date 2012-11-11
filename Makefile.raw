@@ -257,14 +257,8 @@ else
 endif
 
 
-cli_exe = $(Pfx)cli
-gui_exe = $(Pfx)gui
-verify_exe = $(Pfx)verify
-imgdiff_exe = $(Pfx)imgdiff
-file2array_exe = $(Pfx)file2array
-
-DfltExeList = $(cli_exe) $(gui_exe) $(verify_exe)
-ExeList = $(DfltExeList) $(imgdiff_exe) $(file2array_exe)
+ExeList = $(addprefix $(Pfx),verify cli gui imgdiff file2array)
+ExeList := $(addprefix $(BinPath)/,$(ExeList))
 Objs = \
 	affine.o \
 	bbox.o \
@@ -290,7 +284,7 @@ Objs = \
 	cli.o \
 	file2array.o \
 	gui.o \
-	imgdiff.o \
+	imgdiff.o
 
 include $(CxPath)/include.mk
 
@@ -299,13 +293,12 @@ $(eval $(shell \
 	-e 's/\(.*\): *\(.*\)/$$(eval $$(BldPath)\/\1: $$(BldPath)\/\2)/' \
 	deps.mk))
 
-cli_exe := $(BinPath)/$(cli_exe)
-gui_exe := $(BinPath)/$(gui_exe)
-verify_exe := $(BinPath)/$(verify_exe)
-imgdiff_exe := $(BinPath)/$(imgdiff_exe)
-file2array_exe := $(BinPath)/$(file2array_exe)
+gui_exe = $(BinPath)/$(Pfx)$(call exename,gui)
+cli_exe = $(BinPath)/$(Pfx)$(call exename,cli)
+file2array_exe = $(BinPath)/$(Pfx)$(call exename,file2array)
+verify_exe = $(BinPath)/$(Pfx)$(call exename,verify)
 
-default_exes: $(DfltExeList)
+default_exes: $(verify_exe) $(gui_exe) $(cli_exe)
 	# Finished: default
 
 all: $(ExeList)
@@ -336,8 +329,6 @@ CSources = affine.c \
 		   util.c \
 		   wavefront-file.c \
 		   xfrm.c
-
-HDeps = lightcut.h
 
 ifneq (,$(filter sse,$(CONFIG)))
 	CFLAGS += -msse -msse2
@@ -372,8 +363,6 @@ $(call binexe,$(Pfx)cli): \
 GuiCFlags += $(CFLAGS)
 GuiDFlags += $(DFLAGS)
 GuiLFlags += $(LFLAGS)
-#$(gui_exe): $(GuiCFiles) compute.c motion.c $(CSources) $(HDeps)
-#	$(CC) $(GuiCFlags) $(GuiDFlags) $< -o $@ $(GuiLFlags)
 
 $(call binexe,$(Pfx)gui): \
 	$(patsubst %.c,$(BldPath)/%.c, $(GuiCFiles)) \
@@ -412,7 +401,7 @@ $(call binexe,$(Pfx)imgdiff): $(BldPath)/imgdiff.o \
 	$(BldPath)/pnm-image.o \
 	$(BldPath)/util.o \
 	$(addprefix $(CxBldPath)/, fileb.o syscx.o)
-	$(CC) $(CFLAGS) $(DFLAGS) -I . $^ -o $@ $(LFLAGS)
+	$(CC) $(CFLAGS) $(DFLAGS) $^ -o $@ $(LFLAGS)
 
 $(call binexe,$(Pfx)file2array): $(BldPath)/file2array.o \
 	$(BldPath)/util.o \
@@ -420,7 +409,7 @@ $(call binexe,$(Pfx)file2array): $(BldPath)/file2array.o \
 	$(CC) $(CFLAGS) -o $@ $^ -lm
 
 .PHONY: test
-test: $(cli_exe)
+test: $(call exename,$(Pfx)cli)
 	#valgrind --track-origins=yes ./$<
 	./$<
 
