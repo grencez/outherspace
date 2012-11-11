@@ -74,9 +74,9 @@ qual_inline
     void
 step_GMRand (GMRand* a, uint n)
 {
-    { BLoop( i, n )
+    {:for (i ; n)
         uint32_GMRand (a);
-    } BLose()
+    }
 }
 
     /** A random real in [0,1).**/

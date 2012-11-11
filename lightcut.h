@@ -151,7 +151,7 @@ cast_LightCutTree (Color* ret_color, const LightCutTree* tree,
             real c = 1 / tree->area;
                 /* real c = 1 / node->area; */
 
-            { BLoop( i, n )
+            {:for (i ; n)
                 real lscale;
                 real dist_factor;
 
@@ -183,7 +183,7 @@ cast_LightCutTree (Color* ret_color, const LightCutTree* tree,
                     lscale = c;
                 }
                 scale += lscale;
-            } BLose()
+            }
 
             scale /= n;
             tscale = scale;

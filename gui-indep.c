@@ -102,10 +102,10 @@ sync_Pilot (Pilot* gui, Pilot* bkg)
 
     gui->input.light_to_camera = false;
 
-    { BLoop( i, 2 )
+    {:for (i ; 2)
         gui->input.orbit[i] = 0;
         gui->input.pan[i] = 0;
-    } BLose()
+    }
     gui->input.zoom = 0;
 
     BSfx( gui,=,bkg, ->image_start_row );
@@ -310,7 +310,7 @@ update_camera_location (Pilot* pilot, const MotionInput* input, real dt)
             /* output_Point (stderr, &pilot->orbit_focus); */
             /* fputc ('\n', stderr); */
     }
-    
+
         /* TODO: This is never true because of /FollowRacer/.*/
     if (NDimensions == 4 && FollowRacer)
     {
@@ -388,7 +388,7 @@ set_checkpoint_light (PointLightSource* light,
     PointXfrm raw;
     const Plane* checkplane;
     const Point* checkpoint;
-    
+
     light->on = true;
     checkplane = &track.checkplanes[mot->checkpoint_idx];
     checkpoint = &track.checkpoints[mot->checkpoint_idx];
@@ -424,7 +424,7 @@ set_checkpoint_light (PointLightSource* light,
             elem.pts[i].coords[DriftDim] =
                 view_origin->coords[DriftDim];
     }
-    
+
     scale_Point (&centroid, &centroid, 1 / (real) NDimensions);
     diff_Point (&diff, checkpoint, &centroid);
 
@@ -577,9 +577,9 @@ argb_nbytes (uint32 argb_map)
 {
     uint npp = 0;
         /* Count the number of bytes we should use! */
-    { BLoop( i, 4 )
+    {:for (i ; 4)
         npp += ((0xF & (argb_map >> (4 * i))) < 4) ? 1 : 0;
-    } BLose()
+    }
     return npp;
 }
 
@@ -593,9 +593,9 @@ set_argb_pixel (byte* dst, uint nbytes, uint32 argb_map,
     tmp[(0x0F00 & argb_map) >>  8] = r;
     tmp[(0x00F0 & argb_map) >>  4] = g;
     tmp[(0x000F & argb_map) >>  0] = b;
-    { BLoop( i, nbytes )
+    {:for (i ; nbytes)
         dst[i] = tmp[i];
-    } BLose()
+    }
 }
 
     void
@@ -604,10 +604,10 @@ render_pattern (byte* data, uint nrows, uint ncols, uint stride,
 {
     uint npp = argb_nbytes (argb_map);
 
-    { BLoop( row, nrows )
+    {:for (row ; nrows)
         byte* line;
         line = &(data)[row * stride];
-        { BLoop( col, ncols )
+        {:for (col ; ncols)
             byte r, g, b;
             r = (byte) ((~col |  row) / 2);
             g = (byte) (( col | ~row) / 2);
@@ -617,8 +617,8 @@ render_pattern (byte* data, uint nrows, uint ncols, uint stride,
 
                 /* v  = (uint32)(0x7FFFFF*(1+sin(~(x^y) % ~(x|y)))); */
                 /* v |= 0xFF000000; */
-        } BLose()
-    } BLose()
+        }
+    }
 }
 
     void
@@ -636,7 +636,7 @@ render_RayImage (byte* data, uint nrows, uint ncols, uint stride,
     start_row = image_start_row + npixelzoom * ray_image->nrows - 1;
     start_col = image_start_col;
 
-    { BLoop( ray_row, npixelzoom * ray_image->nrows )
+    {:for (ray_row ; npixelzoom * ray_image->nrows)
         uint image_row;
         const byte* pixline;
         byte* outline;
@@ -647,7 +647,7 @@ render_RayImage (byte* data, uint nrows, uint ncols, uint stride,
                                       3 * ray_image->stride)];
         outline = &data[image_row * stride];
 
-        { BLoop( ray_col, npixelzoom * ray_image->ncols )
+        {:for (ray_col ; npixelzoom * ray_image->ncols)
             uint image_col;
             image_col = start_col + ray_col;
             if (image_col >= ncols)  break;
@@ -656,15 +656,15 @@ render_RayImage (byte* data, uint nrows, uint ncols, uint stride,
                             pixline[3*(image_col/npixelzoom)+0],
                             pixline[3*(image_col/npixelzoom)+1],
                             pixline[3*(image_col/npixelzoom)+2]);
-        } BLose()
-    } BLose()
+        }
+    }
 }
 
     void
 render_pilot_images (byte* data, uint nrows, uint ncols, uint stride,
                      bool argb_order)
 {
-    { BLoop( pilot_idx, npilots )
+    {:for (pilot_idx ; npilots)
         Pilot* pilot;
         pilot = &pilots[pilot_idx];
 
@@ -673,7 +673,7 @@ render_pilot_images (byte* data, uint nrows, uint ncols, uint stride,
                          pilot->image_start_row * npixelzoom,
                          pilot->image_start_col * npixelzoom,
                          argb_order);
-    } BLose()
+    }
 }
 
     void

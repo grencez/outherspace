@@ -5,7 +5,6 @@
 #include "bbox.h"
 #include "color.h"
 #include "dynamic-setup.h"
-#include "motion.h"
 #include "point.h"
 #include "serial.h"
 #include "simplex.h"

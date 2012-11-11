@@ -11,11 +11,11 @@ cmake_minimum_required (VERSION 2.8)
 
 project (OutherSpace)
 
-set (bin_path ../bin)
-set (cx_path ../cx)
-set (EXECUTABLE_OUTPUT_PATH ${bin_path})
+set (CxPath ../cx)
+set (BinPath ../bin)
+set (BldPath outherspace)
 
-set (CSources
+set (CommonCFiles
     affine.c
     bbox.c
     bitstring.c
@@ -36,10 +36,71 @@ set (CSources
     util.c
     wavefront-file.c
     xfrm.c
-    ${cx_path}/bstree.c
-    ${cx_path}/fileb.c
-    ${cx_path}/syscx.c
     )
+
+list (APPEND CFiles
+    ${CommonCFiles}
+    cli.c
+    gui.c
+    motion.c
+    file2array.c
+    verif/main.c
+    verif/order.c
+    verif/pack.c
+    )
+
+list (APPEND HFiles
+    affine.h
+    bbox.h
+    bitstring.h
+    color.h
+    dynamic-setup.h
+    gmrand.h
+    gui-indep.c
+    gui-indep.h
+    gui-opengl.c
+    kdtree.h
+    kptree.h
+    lightcut.h
+    material.h
+    motion.h
+    op.h
+    order.h
+    point.h
+    point2.h
+    pnm-image.h
+    raytrace.h
+    scene.h
+    serial.h
+    space.h
+    space-junk.h
+    simplex.h
+    slist.h
+    testcase.h
+    track.h
+    util.h
+    wavefront-file.h
+    xfrm.h
+    )
+
+include (${CxPath}/include.cmake)
+
+#set (CMAKE_RUNTIME_OUTPUT_DIRECTORY ${BinPath})
+
+file (MAKE_DIRECTORY ${BldPath}/verif)
+
+foreach (f ${CommonCFiles})
+    list (APPEND FullCommonCFiles ${BldPath}/${f})
+endforeach ()
+
+add_executable (cli
+    ${BldPath}/cli.c
+    ${BldPath}/util.c
+    ${FullCommonCFiles}
+    )
+set_target_properties (cli PROPERTIES
+    OUTPUT_NAME cli)
+target_link_libraries (cli CxLib)
 
 set (GuiName gui)
 list (APPEND GuiDFLAGS "NDimensions=3")
@@ -53,7 +114,7 @@ if (UNIX)
         set (CMAKE_BUILD_TYPE DEBUG)
     else ()
     endif ()
-    set (CMAKE_C_FLAGS "-Wall -Wextra -ansi -pedantic")
+    #set (CMAKE_C_FLAGS "-Wall -Wextra -ansi -pedantic")
     find_package (SDL REQUIRED)
     find_package (SDL_image REQUIRED)
     find_package (OpenMP REQUIRED)
@@ -87,47 +148,62 @@ endmacro ()
 
 setup_dbgn_defines (${CSources})
 
-add_executable (file2array file2array.c util.c ${cx_path}/fileb.c ${cx_path}/syscx.c)
+
+add_executable (file2array
+    ${BldPath}/file2array.c
+    ${BldPath}/util.c
+    )
 set_target_properties (file2array PROPERTIES
     OUTPUT_NAME file2array)
-
+target_link_libraries (file2array CxLib)
 
 set (EmbedSfx ".embed.h")
 
-#add_custom_command (OUTPUT ${bin_path}
-#    COMMAND ${CMAKE_COMMAND} -E make_directory ${bin_path})
-
-add_custom_command (OUTPUT "phong.glsl${EmbedSfx}"
-    COMMAND file2array "phong.glsl${EmbedSfx}" phong.vert phong.frag 4d.vert
+add_custom_command (OUTPUT ${BldPath}/"phong.glsl${EmbedSfx}"
+    COMMAND file2array ${BldPath}/"phong.glsl${EmbedSfx}" phong.vert phong.frag 4d.vert
     DEPENDS phong.vert phong.frag 4d.vert)
 
-add_custom_command (OUTPUT "perturb.cl${EmbedSfx}"
-    COMMAND file2array "perturb.cl${EmbedSfx}" perturb.cl
+add_custom_command (OUTPUT ${BldPath}/"perturb.cl${EmbedSfx}"
+    COMMAND file2array ${BldPath}/"perturb.cl${EmbedSfx}" perturb.cl
     DEPENDS perturb.cl)
 
 add_executable (verify
-    verif/main.c
-    verif/order.c
-    verif/pack.c
-    ${CSources})
+    ${BldPath}/verif/main.c
+    ${BldPath}/verif/order.c
+    ${BldPath}/verif/pack.c
+    ${FullCommonCFiles}
+    )
 set_target_properties (verify PROPERTIES
     OUTPUT_NAME verify)
+target_link_libraries (verify CxLib)
 
-add_executable (gui gui.c motion.c
-    "phong.glsl${EmbedSfx}"
-    "perturb.cl${EmbedSfx}"
-    ${CSources})
+add_executable (gui
+    ${BldPath}/gui.c
+    ${BldPath}/motion.c
+    ${BldPath}/"phong.glsl${EmbedSfx}"
+    ${BldPath}/"perturb.cl${EmbedSfx}"
+    ${FullCommonCFiles}
+    )
 set_target_properties (gui PROPERTIES
     OUTPUT_NAME "${GuiName}"
     COMPILE_DEFINITIONS "${GuiDFLAGS}"
     LINK_FLAGS "${GuiLFLAGS}")
-
+target_link_libraries (gui CxLib)
+#add_executable (gui gui.c motion.c
+#    "phong.glsl${EmbedSfx}"
+#    "perturb.cl${EmbedSfx}"
+#    ${CSources})
+#set_target_properties (gui PROPERTIES
+#    OUTPUT_NAME "${GuiName}"
+#    COMPILE_DEFINITIONS "${GuiDFLAGS}"
+#    LINK_FLAGS "${GuiLFLAGS}")
+#
 if (OPENMP_FOUND)
     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
 endif ()
 
-include_directories (".")
-include_directories ("..")
+#include_directories (".")
+include_directories (${BldPath})
 include_directories (SYSTEM ${SDL_INCLUDE_DIR})
 include_directories (SYSTEM ${SDLIMAGE_INCLUDE_DIR})
 include_directories (SYSTEM ${OPENGL_INCLUDE_DIR})
@@ -139,6 +215,7 @@ target_link_libraries (gui ${OPENGL_LIBRARIES})
 if (UNIX)
     target_link_libraries (file2array m)
     target_link_libraries (gui m)
+    target_link_libraries (cli m)
     target_link_libraries (verify m)
 endif ()
 

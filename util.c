@@ -70,12 +70,12 @@ array_cat (void* dst, const void* src, uint* end, uint count, size_t size)
 
 char* strto_uint (uint* ret, const char* in)
 {
-    return load_uint_cstr (ret, in);
+    return xget_uint_cstr (ret, in);
 }
 
 char* strto_real (real* ret, const char* in)
 {
-    return load_real_cstr (ret, in);
+    return xget_real_cstr (ret, in);
 }
 
     uint

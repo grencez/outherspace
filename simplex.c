@@ -141,11 +141,11 @@ area_Simplex (const Simplex* simplex)
 {
     PointXfrm A;
     real x;
-    { BLoop( i, NDims-1 )
+    {:for (i ; NDims-1)
         diff_Point (&A.pts[i],
                     &simplex->pts[i+1],
                     &simplex->pts[0]);
-    } BLose()
+    }
     zero_Point (&A.pts[NDims-1]);
 
     transpose_PointXfrm (&A, &A);
@@ -264,12 +264,12 @@ isect_BarySimplex (real* restrict ret_dist,
     follow_Ray (&isect, ray, dist);
     
     bcoord_sum = fuzz;
-    { BLoop( i, NDims-1 )
+    {:for (i ; NDims-1)
         bpoint.coords[i] = dist_Plane (&elem->barys[i], &isect);
         if (bpoint.coords[i] < fuzz)  return false;
         bcoord_sum += bpoint.coords[i];
         if (bcoord_sum > 1)  return false;
-    } BLose()
+    }
     *ret_dist = dist;
     return true;
 }
@@ -309,14 +309,14 @@ delayed_div_isect_BarySimplex (real* restrict ret_dist,
                     ,   dot*, &ray->origin );
     
     bcoord_sum = fuzz;
-    { BLoop( i, NDims-1 )
+    {:for (i ; NDims-1)
         bpoint.coords[i] =
             dot_Point (&elem->barys[i].normal, &isect)
             + elem->barys[i].offset * dot;
         if (bpoint.coords[i] < fuzz)  return false;
         bcoord_sum += bpoint.coords[i];
         if (bcoord_sum > dot)  return false;
-    } BLose()
+    }
 
     dot = 1 / dot;
     *ret_dist = dist * dot;
@@ -346,16 +346,16 @@ superfast_isect_BarySimplex (real* restrict ret_dist,
                         ,+, dist*, &ray->direct
                         ,   dot*, &ray->origin );
 
-        { BLoop( i, NDims-1 )
+        {:for (i ; NDims-1)
             bpoint.coords[i] =
                 dot_Point (&elem->barys[i].normal, &isect)
                 + elem->barys[i].offset * dot;
             if (bpoint.coords[i] < fuzz)  return false;
-        } BLose()
+        }
 
-        { BLoop( i, NDims-1 )
+        {:for (i ; NDims-1)
             bcoord_sum += bpoint.coords[i];
-        } BLose()
+        }
 
         if (bcoord_sum > dot)  return false;
     }
@@ -367,16 +367,16 @@ superfast_isect_BarySimplex (real* restrict ret_dist,
                         ,+, dist*, &ray->direct
                         ,   dot*, &ray->origin );
 
-        { BLoop( i, NDims-1 )
+        {:for (i ; NDims-1)
             bpoint.coords[i] =
                 dot_Point (&elem->barys[i].normal, &isect)
                 + elem->barys[i].offset * dot;
             if (bpoint.coords[i] > - fuzz)  return false;
-        } BLose()
+        }
 
-        { BLoop( i, NDims-1 )
+        {:for (i ; NDims-1)
             bcoord_sum += bpoint.coords[i];
-        } BLose()
+        }
 
         if (bcoord_sum < dot)  return false;
     }

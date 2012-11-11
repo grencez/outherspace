@@ -150,7 +150,7 @@ maxmag2_LightCutBuild (const LightCutBuild* light, real e_min)
     prod_Point (&diag, &diag, &diag);
     min = max = diag.coords[NDims-1];
     mag2 = 0;
-    { BLoop( dim, NDims-1 )
+    {:for (dim ; NDims-1)
         real x = diag.coords[dim];
         real z = x;
         if (x < min)
@@ -163,7 +163,7 @@ maxmag2_LightCutBuild (const LightCutBuild* light, real e_min)
             max = x;
         }
         mag2 += z;
-    } BLose()
+    }
 
     mag2 = a2 - mag2;
     if (max > mag2)
@@ -299,7 +299,7 @@ make_light_tree (LightCutTree* t, GMRand* gmrand)
 
     SizeTable( t->nodes, 2*nlights-1 );
     SizeTable( remlights, nlights );
-    { BLoop( i, nlights )
+    {:for (i ; nlights)
         LightCutBuild* c = &clusters[i];
         c->node = &t->nodes.s[i];
         c->node->bst.split[0] = 0;
@@ -314,7 +314,7 @@ make_light_tree (LightCutTree* t, GMRand* gmrand)
         set1_KPTreeGrid (&kpgrid, i, &c->node->iatt.origin);
         c->remidx = i;
         remlights.s[i] = i;
-    } BLose()
+    }
 
     init_KPTree (&kptree);
     build_KPTree (&kptree, &kpgrid);
@@ -415,7 +415,7 @@ cast_lights (RaySpace* space, uint nphotons, uint nbounces)
     init_GMRand (&gmrand);
 
     tree->area = 0;
-    { BLoop( ei, scene->nelems )
+    {:for (ei ; scene->nelems)
         uint matl_idx = scene->elems[ei].material;
         const Material* matl;
         if (matl_idx == Max_uint)  continue;
@@ -429,7 +429,7 @@ cast_lights (RaySpace* space, uint nphotons, uint nbounces)
             normalize_Point (&elem->normal,
                              &object->simplices[ei].plane.normal);
         }
-    } BLose()
+    }
 
     if (elems.sz == 0)  return;
 
@@ -437,20 +437,20 @@ cast_lights (RaySpace* space, uint nphotons, uint nbounces)
         const uint neach = nphotons / elems.sz;
         const uint nplus1 = nphotons % elems.sz;
 
-        { BLoop( ei, elems.sz )
+        {:for (ei ; elems.sz)
             EmisElem* elem = &elems.s[ei];
             elem->nphotons = neach + (ei < nplus1 ? 1 : 0);
             if (elem->nphotons > 0)
                 elem->area = area_Simplex (elem->simplex) / elem->nphotons;
             else
                 elem->area = 0;
-        } BLose()
+        }
     }
 
 
     {   uint elem_idx = 0;
         uint ephoton_idx = 0;
-    { BLoop( photon_idx, nphotons )
+    {:for (photon_idx ; nphotons)
 
         const EmisElem* elem = &elems.s[elem_idx];
         Simplex simplex;
@@ -486,18 +486,18 @@ cast_lights (RaySpace* space, uint nphotons, uint nbounces)
         c.coords[2] = 1 - x;
 
         zero_Point (&ray.origin);
-        { BLoop( dim, NDims )
+        {:for (dim ; NDims)
             follow_Point (&ray.origin, &ray.origin,
                           &simplex.pts[dim],
                           c.coords[dim]);
-        } BLose()
+        }
 
         ray.direct = elem->normal;
         color = elem->rad;
         area = elem->area;
         scale_Color (&color, &color, area / M_PI);
 
-        { BLoop( bounce_idx, nbounces )
+        {:for (bounce_idx ; nbounces)
             DeclGrow1Table( LightCutNode, light, lights );
             PointXfrm A;
             real zenith = asin (sqrt (real_GMRand (&gmrand)));
@@ -547,27 +547,27 @@ cast_lights (RaySpace* space, uint nphotons, uint nbounces)
                 follow_Ray (&ray.origin, &ray, mag);
                 ray.direct = normal;
 
-                { BLoop( dim, NDims )
+                {:for (dim ; NDims)
                     point_from_basis (&simplex.pts[dim],
                                       &object->orientation,
                                       &simplex.pts[dim],
                                       &object->centroid);
-                } BLose()
+                }
             }
             else
             {
                     /* fputs ("awww...\n", stderr); */
                 break;
             }
-        } BLose()
+        }
 
-    } BLose() }
+    }}
 
     PackTable( lights );
 
-    { BLoop( i, space->nlights )
+    {:for (i ; space->nlights)
         space->lights[i].on = false;
-    } BLose()
+    }
 
     tree->nodes = lights;
     make_light_tree (tree, &gmrand);

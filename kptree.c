@@ -30,9 +30,9 @@ init_KPTreeGrid (KPTreeGrid* grid, uint n)
     grid->indices = AllocT( uint, n );
 
     grid->coords[0] = AllocT( real, NDims * n );
-    { BLoop( i, NDims-1 )
+    {:for (i ; NDims-1)
         grid->coords[i+1] = &grid->coords[i][n];
-    } BLose()
+    }
 }
 
     void
@@ -50,9 +50,9 @@ set1_KPTreeGrid (KPTreeGrid* grid, uint i, const Point* p)
 {
     adjust_BBox (&grid->box, p);
     grid->indices[i] = i;
-    { BLoop( dim, NDims )
+    {:for (dim ; NDims)
         grid->coords[dim][i] = p->coords[dim];
-    } BLose()
+    }
 }
 
 static

@@ -92,35 +92,35 @@ void output_PPM_image (const char* filename, uint nrows, uint ncols,
         return;
     }
 
-        /* dump_cstr_FileB (f, "P3\n"); */
-    dump_cstr_OFileB (of, "P6\n");
-    dump_uint_OFileB (of, ncols);
-    dump_char_OFileB (of, ' ');
-    dump_uint_OFileB (of, nrows);
-    dump_char_OFileB (of, '\n');
-    dump_cstr_OFileB (of, "255\n");
+        /* oput_cstr_FileB (f, "P3\n"); */
+    oput_cstr_OFileB (of, "P6\n");
+    oput_uint_OFileB (of, ncols);
+    oput_char_OFileB (of, ' ');
+    oput_uint_OFileB (of, nrows);
+    oput_char_OFileB (of, '\n');
+    oput_cstr_OFileB (of, "255\n");
 
 #if 0
-    { BLoop( row, nrows )
+    {:for (row ; nrows)
         const byte* pixline;
         pixline = &pixels[(nrows - row - 1) * 3 * ncols];
-        { BLoop( col, ncols )
-            dump_char_OFileB (of, ' ');
-            dump_uint_OFileB (of, pixline[3*col+0]);
-            dump_char_OFileB (of, ' ');
-            dump_uint_OFileB (of, pixline[3*col+1]);
-            dump_char_OFileB (of, ' ');
-            dump_uint_OFileB (of, pixline[3*col+2]);
-        } BLose()
-        dump_char_OFileB (of, '\n');
-    } BLose()
+        {:for (col ; ncols)
+            oput_char_OFileB (of, ' ');
+            oput_uint_OFileB (of, pixline[3*col+0]);
+            oput_char_OFileB (of, ' ');
+            oput_uint_OFileB (of, pixline[3*col+1]);
+            oput_char_OFileB (of, ' ');
+            oput_uint_OFileB (of, pixline[3*col+2]);
+        }
+        oput_char_OFileB (of, '\n');
+    }
 #else
     setfmt_FileB (&ofb, FileB_Raw);
-    { BLoop( row, nrows )
-        dumpn_byte_FileB (&ofb,
+    {:for (row ; nrows)
+        oputn_byte_FileB (&ofb,
                           &pixels[(nrows - row - 1) * NColors * ncols],
                           ncols * NColors);
-    } BLose()
+    }
 #endif
 
     lose_FileB (&ofb);
@@ -200,22 +200,22 @@ readin_PPM_image (uint* ret_nrows, uint* ret_ncols,
 
     pixels = AllocT( byte, nrows * ncols * NColors );
 
-    { BLoop( row, nrows )
+    {:for (row ; nrows)
         const uint n = ncols * NColors;
         byte* pixline;
         pixline = &pixels[NColors * (nrows - row - 1) * ncols];
 
-        if (!loadn_byte_FileB (&xfb, pixline, n))
+        if (!xgetn_byte_FileB (&xfb, pixline, n))
         {
             good = false;
             break;
         }
 
-        { BLoop( i, n )
+        {:for (i ; n)
             pixline[i] = (byte)
                 (256 * (uint) pixline[i] / (max_color_value+1));
-        } BLose()
-    } BLose()
+        }
+    }
 
     lose_FileB (&xfb);
 

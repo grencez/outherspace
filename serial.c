@@ -4,68 +4,68 @@
 #include "xfrm.h"
 
     void
-dumpp_Point (OFileB* of, const Point* x)
+oput_Point (OFileB* of, const Point* x)
 {
-    dump_char_OFileB (of, '(');
-    { BLoop( ci, NDims )
-        if (ci > 0)  dump_char_OFileB (of, ',');
-        dump_real_OFileB (of, x->coords[ci]);
-    } BLose()
-    dump_char_OFileB (of, ')');
+    oput_char_OFileB (of, '(');
+    {:for (ci ; NDims)
+        if (ci > 0)  oput_char_OFileB (of, ',');
+        oput_real_OFileB (of, x->coords[ci]);
+    }
+    oput_char_OFileB (of, ')');
 }
 
     void
-dumpp_PointXfrm (OFileB* of, const PointXfrm* A)
+oput_PointXfrm (OFileB* of, const PointXfrm* A)
 {
-    dump_char_OFileB (of, '[');
-    { BLoop( ci, NDims )
-        if (ci > 0)  dump_char_OFileB (of, ',');
-        dumpp_Point (of, &A->pts[ci]);
-    } BLose()
-    dump_char_OFileB (of, ']');
+    oput_char_OFileB (of, '[');
+    {:for (ci ; NDims)
+        if (ci > 0)  oput_char_OFileB (of, ',');
+        oput_Point (of, &A->pts[ci]);
+    }
+    oput_char_OFileB (of, ']');
 }
 
     void
-dumpp_IAMap (OFileB* of, const IAMap* A)
+oput_IAMap (OFileB* of, const IAMap* A)
 {
-    dump_char_OFileB (of, '{');
-    dumpp_Point (of, &A->xlat);
-    dumpp_Point (of, &A->scale);
-    dumpp_PointXfrm (of, &A->xfrm);
-    dump_char_OFileB (of, '}');
+    oput_char_OFileB (of, '{');
+    oput_Point (of, &A->xlat);
+    oput_Point (of, &A->scale);
+    oput_PointXfrm (of, &A->xfrm);
+    oput_char_OFileB (of, '}');
 }
 
     bool
-load_Point (XFileB* xf, Point* x)
+xget_Point (XFileB* xf, Point* x)
 {
     nextds_XFileB (xf, NULL, "(");
-    { BLoop( i, NDims )
-        if (!load_real_XFileB (xf, &x->coords[i]))
+    {:for (i ; NDims)
+        if (!xget_real_XFileB (xf, &x->coords[i]))
             return false;
         nextds_XFileB (xf, NULL, (i < NDims-1) ? "," : ")");
-    } BLose()
+    }
     return true;
 }
 
     bool
-load_PointXfrm (XFileB* xf, PointXfrm* A)
+xget_PointXfrm (XFileB* xf, PointXfrm* A)
 {
     nextds_XFileB (xf, NULL, "[");
-    { BLoop( i, NDims )
-        if (!load_Point (xf, &A->pts[i]))
+    {:for (i ; NDims)
+        if (!xget_Point (xf, &A->pts[i]))
             return false;
         nextds_XFileB (xf, NULL, (i < NDims-1) ? "," : "]");
-    } BLose()
+    }
     return true;
 }
 
     bool
-load_IAMap (XFileB* xf, IAMap* A)
+xget_IAMap (XFileB* xf, IAMap* A)
 {
     nextds_XFileB (xf, NULL, "{");
-    if (!load_Point (xf, &A->xlat))  return false;
-    if (!load_Point (xf, &A->scale))  return false;
-    if (!load_PointXfrm (xf, &A->xfrm))  return false;
+    if (!xget_Point (xf, &A->xlat))  return false;
+    if (!xget_Point (xf, &A->scale))  return false;
+    if (!xget_PointXfrm (xf, &A->xfrm))  return false;
     nextds_XFileB (xf, NULL, "}");
         /* normalize_IAMap (A); */
     return true;

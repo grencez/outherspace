@@ -110,9 +110,9 @@ def(mix) (Point* dst, const Point* x, const Point* y, real a)
 {
     const real* const xs = x->coords;
     const real* const ys = y->coords;
-    { BLoop( i, NDims )
+    {:for (i ; NDims)
         dst->coords[i] = xs[i] + (ys[i] - xs[i]) * a;
-    } BLose()
+    }
 }
 
     /** /dst = origin + direct * mag/ **/
@@ -186,9 +186,9 @@ qualify
 def(taximag) (const Point* a)
 {
     real sum = 0;
-    { BLoop( i, NDims )
+    {:for (i ; NDims)
         sum += fabs (a->coords[i]);
-    } BLose()
+    }
     return sum;
 }
 
@@ -198,10 +198,10 @@ qualify
 def(maxmag) (const Point* a)
 {
     real x = 0;
-    { BLoop( i, NDims )
+    {:for (i ; NDims)
         real y = fabs (a->coords[i]);
         if (y > x)  x = y;
-    } BLose()
+    }
     return x;
 }
 

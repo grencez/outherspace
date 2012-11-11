@@ -1,6 +1,7 @@
 
 #include "cx/syscx.h"
 
+#include "dynamic-setup.h"
 #include "pnm-image.h"
 #include "testcase.h"
 #include "wavefront-file.h"

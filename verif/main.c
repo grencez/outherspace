@@ -282,23 +282,23 @@ testfn_serial ()
     GMRand gmrand;
     init_GMRand (&gmrand);
 
-    { BLoop( testidx, 1e5 )
+    {:for (testidx ; 1e5)
         DecloStack1( OFileB, of, dflt_OFileB () );
         DecloStack( OFileB, olay );
         Point expect, result;
 
-        { BLoop( i, NDims )
+        {:for (i ; NDims)
             expect.coords[i] = 1e7 * real_GMRand (&gmrand);
-        } BLose()
+        }
 
-        dumpp_Point (of, &expect);
+        oput_Point (of, &expect);
         *olay = olay_OFileB (of, 0);
-        load_Point (olay, &result);
+        xget_Point (olay, &result);
 
         Claim( equal_Point (&expect, &result) );
         lose_OFileB (olay);
         lose_OFileB (of);
-    } BLose()
+    }
 }
 
     /** First crack at a verification function.

@@ -346,9 +346,9 @@ init_Scene_KPTreeGrid (KPTreeGrid* grid, const Scene* scene)
 {
     init_KPTreeGrid (grid, scene->nverts);
 
-    { BLoop( i, scene->nverts )
+    {:for (i ; scene->nverts)
         set1_KPTreeGrid (grid, i, &scene->verts[i]);
-    } BLose()
+    }
 }
 
     void
@@ -985,7 +985,7 @@ fill_pixel (Color* ret_color,
 
         follow_Point (&isect, origin, dir, mag);
 
-        { BLoop( light_idx, space->nlights )
+        {:for (light_idx ; space->nlights)
             real tscale, magtolight;
             Point tolight;
             const PointLightSource* const light = &space->lights[light_idx];
@@ -1033,7 +1033,7 @@ fill_pixel (Color* ret_color,
                     }
                 }
             }
-        } BLose()
+        }
 
         UFor( i, NColors )
             color.coords[i] *=
@@ -1508,10 +1508,10 @@ cast_record (uint* hitline,
         fill_pixel (&color, hit_idx, hit_mag, hit_object,
                     image, origin, dir, space, front, 0,
                     gmrand);
-        { BLoop( i, NColors )
+        {:for (i ; NColors)
             pixline[3*col+i] = (byte)
                 clamp_real (255.5 * color.coords[i], 0, 255.5);
-        } BLose()
+        }
     }
 }
 

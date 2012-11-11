@@ -449,8 +449,8 @@ key_press_fn (Pilot* pilot, RaySpace* space, const SDL_keysym* event)
         identity_IAMap (&iatt);
         transpose_PointXfrm (&iatt.xfrm, view_basis);
         xlat_IAMap (&iatt, view_origin, &iatt);
-        dumpp_IAMap (of, &iatt);
-        dump_char_OFileB (of, '\n');
+        oput_IAMap (of, &iatt);
+        oput_char_OFileB (of, '\n');
         flush_OFileB (of);
     }
     else if (quit_app)
