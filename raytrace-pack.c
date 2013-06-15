@@ -356,20 +356,20 @@ RayCastAPriori_to_RayPacket (RayPacket* pkt,
                              uint row_off, uint col_off,
                              const RayImage* image)
 {
-    { BLoop( row, RayPacketDimSz )
-        { BLoop( col, RayPacketDimSz )
-            Ray ray;
-            ray_from_RayCastAPriori (&ray, known,
-                                     row_off + row, col_off + col,
-                                     image);
-            { BLoop( dim, NDims )
-                pkt->origins[row].vcoords[dim][col] =
-                    ray.origin.coords[dim];
-                pkt->directs[row].vcoords[dim][col] =
-                    ray.direct.coords[dim];
-            } BLose()
-        } BLose()
-    } BLose()
+  {:for (row ; RayPacketDimSz)
+    {:for (col ; RayPacketDimSz)
+      Ray ray;
+      ray_from_RayCastAPriori (&ray, known,
+                               row_off + row, col_off + col,
+                               image);
+      {:for (dim ; NDims)
+        pkt->origins[row].vcoords[dim][col] =
+          ray.origin.coords[dim];
+        pkt->directs[row].vcoords[dim][col] =
+          ray.direct.coords[dim];
+      }
+    }
+  }
 }
 
 static
