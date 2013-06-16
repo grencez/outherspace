@@ -203,18 +203,6 @@ ifneq (,$(filter ansi,$(CONFIG)))
 		CONFIG := $(filter-out ansi,$(CONFIG))
 	endif
 endif
-## Allow parallelism.
-ifneq (,$(filter openmp,$(CONFIG)))
-	ifeq ($(CC),icc)
-		CFLAGS += -openmp
-	else ifneq (,$(filter sunstudio,$(CONFIG)))
-		# Important! Set the OMP_NUM_THREADS
-		# environment variable to see parallelism!
-		CFLAGS += -xopenmp
-	else
-		CFLAGS += -fopenmp
-	endif
-endif
 ifneq (,$(filter opencl,$(CONFIG)))
 	GuiHFiles += gui-opencl.c
 	ifneq (,$(OpenCLPath))

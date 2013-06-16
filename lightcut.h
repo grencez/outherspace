@@ -2,9 +2,9 @@
 #ifndef LIGHTCUT_H_
 #define LIGHTCUT_H_
 
+#include "cx/gmrand.h"
 #include "bbox.h"
 #include "color.h"
-#include "gmrand.h"
 #include "point.h"
 #include "raytrace.h"
 #include "simplex.h"

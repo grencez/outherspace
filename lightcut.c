@@ -1,9 +1,9 @@
 
 #include "lightcut.h"
 
+#include "cx/gmrand.h"
 #include "affine.h"
 #include "bbox.h"
-#include "gmrand.h"
 #include "kptree.h"
 
 #include <assert.h>

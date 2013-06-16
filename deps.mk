@@ -40,7 +40,6 @@ imgdiff.c: util.h
 kdtree.c: kdtree.h
 kdtree.c: order.h
 lightcut.c: lightcut.h
-lightcut.h: gmrand.h
 material.c: color.h
 material.c: material.h
 material.c: point.h
@@ -70,7 +69,6 @@ util.c: util.h
 verif/main.c: affine.h
 verif/main.c: bbox.h
 verif/main.c: bitstring.h
-verif/main.c: gmrand.h
 verif/main.c: kdtree.h
 verif/main.c: kptree.h
 verif/main.c: order.h

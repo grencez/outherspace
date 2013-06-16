@@ -37,11 +37,6 @@
     ((dst) = (Type*) array_cat (dst, src, &end, count, sizeof (Type)))
         
 
-#ifndef uint32
-#define uint32 uint
-#endif
-
-
 #define __global
 #else  /* ^^^ !defined(__OPENCL_VERSION__) */
 #define assert (void)

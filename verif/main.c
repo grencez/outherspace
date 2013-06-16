@@ -1,9 +1,9 @@
 
 #include "cx/syscx.h"
+#include "cx/gmrand.h"
 #include "affine.h"
 #include "bbox.h"
 #include "bitstring.h"
-#include "gmrand.h"
 #include "kdtree.h"
 #include "kptree.h"
 #include "order.h"
