@@ -5,18 +5,18 @@
 #include "space.h"
 
 void
-oput_Point (OFileB* of, const Point* x);
+oput_Point (OFile* of, const Point* x);
 void
-oput_PointXfrm (OFileB* of, const PointXfrm* A);
+oput_PointXfrm (OFile* of, const PointXfrm* A);
 void
-oput_IAMap (OFileB* of, const IAMap* A);
+oput_IAMap (OFile* of, const IAMap* A);
 
 bool
-xget_Point (XFileB* xf, Point* x);
+xget_Point (XFile* xf, Point* x);
 bool
-xget_PointXfrm (XFileB* xf, PointXfrm* A);
+xget_PointXfrm (XFile* xf, PointXfrm* A);
 bool
-xget_IAMap (XFileB* xf, IAMap* A);
+xget_IAMap (XFile* xf, IAMap* A);
 
 #include <stdio.h>
 

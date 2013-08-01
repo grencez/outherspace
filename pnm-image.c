@@ -79,51 +79,52 @@ void output_PGM_image (const char* filename, uint nrows, uint ncols,
 }
 
 
-void output_PPM_image (const char* filename, uint nrows, uint ncols,
-                       const byte* pixels)
+  void
+output_PPM_image (const char* filename, uint nrows, uint ncols,
+                  const byte* pixels)
 {
-    FileB ofb = dflt_FileB ();
-    OFileB* of = &ofb.xo;
+  OFileB ofb[1];
+  OFile* of = &ofb->of;
 
-    ofb.sink = true;
-    if (!open_FileB (&ofb, 0, filename))
-    {
-        fprintf (stderr, "Cannot open file for writing:%s\n", filename);
-        return;
-    }
+  init_OFileB (ofb);
+  if (!open_FileB (&ofb->fb, 0, filename))
+  {
+    fprintf (stderr, "Cannot open file for writing:%s\n", filename);
+    return;
+  }
 
-        /* oput_cstr_FileB (f, "P3\n"); */
-    oput_cstr_OFileB (of, "P6\n");
-    oput_uint_OFileB (of, ncols);
-    oput_char_OFileB (of, ' ');
-    oput_uint_OFileB (of, nrows);
-    oput_char_OFileB (of, '\n');
-    oput_cstr_OFileB (of, "255\n");
+  /* oput_cstr_FileB (f, "P3\n"); */
+  oput_cstr_OFile (of, "P6\n");
+  oput_uint_OFile (of, ncols);
+  oput_char_OFile (of, ' ');
+  oput_uint_OFile (of, nrows);
+  oput_char_OFile (of, '\n');
+  oput_cstr_OFile (of, "255\n");
 
 #if 0
-    {:for (row ; nrows)
-        const byte* pixline;
-        pixline = &pixels[(nrows - row - 1) * 3 * ncols];
-        {:for (col ; ncols)
-            oput_char_OFileB (of, ' ');
-            oput_uint_OFileB (of, pixline[3*col+0]);
-            oput_char_OFileB (of, ' ');
-            oput_uint_OFileB (of, pixline[3*col+1]);
-            oput_char_OFileB (of, ' ');
-            oput_uint_OFileB (of, pixline[3*col+2]);
-        }
-        oput_char_OFileB (of, '\n');
+  {:for (row ; nrows)
+    const byte* pixline;
+    pixline = &pixels[(nrows - row - 1) * 3 * ncols];
+    {:for (col ; ncols)
+      oput_char_OFile (of, ' ');
+      oput_uint_OFile (of, pixline[3*col+0]);
+      oput_char_OFile (of, ' ');
+      oput_uint_OFile (of, pixline[3*col+1]);
+      oput_char_OFile (of, ' ');
+      oput_uint_OFile (of, pixline[3*col+2]);
     }
+    oput_char_OFile (of, '\n');
+  }
 #else
-    setfmt_FileB (&ofb, FileB_Raw);
-    {:for (row ; nrows)
-        oputn_byte_FileB (&ofb,
-                          &pixels[(nrows - row - 1) * NColors * ncols],
-                          ncols * NColors);
-    }
+  setfmt_OFileB (ofb, FileB_Raw);
+  {:for (row ; nrows)
+    oputn_byte_OFileB (ofb,
+                       &pixels[(nrows - row - 1) * NColors * ncols],
+                       ncols * NColors);
+  }
 #endif
 
-    lose_FileB (&ofb);
+  lose_OFileB (ofb);
 }
 
 
@@ -131,106 +132,108 @@ void output_PPM_image (const char* filename, uint nrows, uint ncols,
 readin_PPM_image (uint* ret_nrows, uint* ret_ncols,
                   const char* pathname, const char* filename)
 {
-    uint nrows = 0, ncols = 0;
-    bool good = true;
-    byte* pixels;
-    FileB xfb = dflt_FileB ();
-    XFileB* xf = &xfb.xo;
-    uint max_color_value = 255;
-    uint header_stage;
-    bool ascii = true;
-    real t0;
-    const char* line;
+  uint nrows = 0, ncols = 0;
+  bool good = true;
+  byte* pixels;
+  XFileB xfb[1];
+  XFile* xf = &xfb->xf;
+  uint max_color_value = 255;
+  uint header_stage;
+  bool ascii = true;
+  real t0;
+  const char* line;
 
-    t0 = monotime ();
+  t0 = monotime ();
 
-    if (!open_FileB (&xfb, pathname, filename))
+  init_XFileB (xfb);
+  if (!open_FileB (&xfb->fb, pathname, filename))
+  {
+    fprintf (stderr, "Cannot open file for reading:%s/%s\n",
+             pathname, filename);
+    return 0;
+  }
+
+
+  header_stage = 0;
+  while (good && header_stage < 3 && (line = getline_XFile (xf)))
+  {
+    XFile olay[1];
+    olay_XFile (olay, xf, IdxEltTable( xf->buf, line ));
+    skipds_XFile (olay, 0);
+    line = cstr_XFile (olay);
+
+    if (line[0] == '#')
     {
-        fprintf (stderr, "Cannot open file for reading:%s/%s\n",
-                 pathname, filename);
-        return 0;
+      /* Do nothing!*/
     }
-
-
-    header_stage = 0;
-    while (good && header_stage < 3 && (line = getline_XFileB (xf)))
+    else if (header_stage == 0)
     {
-        DecloStack1( XFileB, olay, olay_XFileB (xf, IdxEltTable( xf->buf, line )) );
-        skipds_XFileB (olay, 0);
-        line = cstr_XFileB (olay);
+      header_stage += 1;
+      if (0 == strcmp (line, "P6"))
+        ascii = false;
+      else
+        good = (0 == strcmp (line, "P3"));
 
-        if (line[0] == '#')
-        {
-                /* Do nothing!*/
-        }
-        else if (header_stage == 0)
-        {
-            header_stage += 1;
-            if (0 == strcmp (line, "P6"))
-                ascii = false;
-            else
-                good = (0 == strcmp (line, "P3"));
-
-            if (!good)  fprintf (stderr, "Invalid PPM type:%s\n", line);
-        }
-        else if (header_stage == 1)
-        {
-            header_stage += 1;
-            line = strto_uint (&ncols, line);
-            if (line)
-                line = strto_uint (&nrows, line);
-
-            good = (line != 0);
-        }
-        else if (header_stage == 2)
-        {
-            header_stage += 1;
-            line = strto_uint (&max_color_value, line);
-            good = (line != 0);
-        }
+      if (!good)  fprintf (stderr, "Invalid PPM type:%s\n", line);
     }
-
-    if (!good)
+    else if (header_stage == 1)
     {
-        lose_FileB (&xfb);
-        return 0;
+      header_stage += 1;
+      line = strto_uint (&ncols, line);
+      if (line)
+        line = strto_uint (&nrows, line);
+
+      good = (line != 0);
     }
-
-    if (!ascii)  setfmt_FileB (&xfb, FileB_Raw);
-
-    pixels = AllocT( byte, nrows * ncols * NColors );
-
-    {:for (row ; nrows)
-        const uint n = ncols * NColors;
-        byte* pixline;
-        pixline = &pixels[NColors * (nrows - row - 1) * ncols];
-
-        if (!xgetn_byte_FileB (&xfb, pixline, n))
-        {
-            good = false;
-            break;
-        }
-
-        {:for (i ; n)
-            pixline[i] = (byte)
-                (256 * (uint) pixline[i] / (max_color_value+1));
-        }
-    }
-
-    lose_FileB (&xfb);
-
-    if (good)
+    else if (header_stage == 2)
     {
-        *ret_nrows = nrows;
-        *ret_ncols = ncols;
+      header_stage += 1;
+      line = strto_uint (&max_color_value, line);
+      good = (line != 0);
     }
-    else
+  }
+
+  if (!good)
+  {
+    lose_XFileB (xfb);
+    return 0;
+  }
+
+  if (!ascii)  setfmt_XFileB (xfb, FileB_Raw);
+
+  pixels = AllocT( byte, nrows * ncols * NColors );
+
+  {:for (row ; nrows)
+    const uint n = ncols * NColors;
+    byte* pixline;
+    pixline = &pixels[NColors * (nrows - row - 1) * ncols];
+
+    if (!xgetn_byte_XFileB (xfb, pixline, n))
     {
-        free (pixels);
-        pixels = 0;
+      good = false;
+      break;
     }
 
-    fprintf (stderr, "Read PPM seconds:%f\n", monotime () - t0);
-    return pixels;
+    {:for (i ; n)
+      pixline[i] = (byte)
+        (256 * (uint) pixline[i] / (max_color_value+1));
+    }
+  }
+
+  lose_XFileB (xfb);
+
+  if (good)
+  {
+    *ret_nrows = nrows;
+    *ret_ncols = ncols;
+  }
+  else
+  {
+    free (pixels);
+    pixels = 0;
+  }
+
+  fprintf (stderr, "Read PPM seconds:%f\n", monotime () - t0);
+  return pixels;
 }
 

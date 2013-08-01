@@ -177,22 +177,27 @@ cat_filepath (const char* pathname, const char* filename)
     return cat_strings (3, parts);
 }
 
-    FILE*
+  FILE*
 fopen_path (const char* pathname, const char* filename, const char* mode)
 {
-    FILE* file = 0;
-    FileB f;
+  FILE* file = 0;
+  FileB* fb;
+  XFileB xfb[1];
+  OFileB ofb[1];
 
-    init_FileB (&f);
-    f.sink = !! strchr (mode, 'w');
-    open_FileB (&f, pathname, filename);
-    if (f.good)
-    {
-        file = f.f;
-        f.f = 0;
-    }
-    lose_FileB (&f);
-    return file;
+  init_XFileB (xfb);
+  init_OFileB (ofb);
+
+  fb = strchr (mode, 'w') ? &ofb->fb : &xfb->fb;
+  open_FileB (fb, pathname, filename);
+  if (fb->good)
+  {
+    file = fb->f;
+    fb->f = 0;
+  }
+  lose_XFileB (xfb);
+  lose_OFileB (ofb);
+  return file;
 }
 
     /** Fully read a bunch of files.

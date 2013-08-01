@@ -345,7 +345,7 @@ endif
 $(call binexe,$(Pfx)cli): \
 	$(patsubst %.c,$(BldPath)/%.c, $(CliCFiles)) \
 	$(patsubst %.c,$(BldPath)/%.o, $(CSources)) \
-	$(addprefix $(CxBldPath)/, alphatab.o bstree.o fileb.o syscx.o)
+	$(CxStdObjs) $(addprefix $(CxBldPath)/, bstree.o)
 	$(CC) $(CFLAGS) $(DFLAGS)  $^ -o $@ $(LFLAGS)
 
 GuiCFlags += $(CFLAGS)
@@ -355,7 +355,7 @@ GuiLFlags += $(LFLAGS)
 $(call binexe,$(Pfx)gui): \
 	$(patsubst %.c,$(BldPath)/%.c, $(GuiCFiles)) \
 	$(patsubst %.c,$(BldPath)/%.o, $(CSources)) \
-	$(addprefix $(CxBldPath)/, alphatab.o bstree.o fileb.o syscx.o)
+	$(CxStdObjs) $(addprefix $(CxBldPath)/, bstree.o)
 	$(CC) $(GuiCFlags) $(GuiDFlags) $^ -o $@ $(GuiLFlags)
 
 $(gui_exe): | $(patsubst %,$(BldPath)/%, $(GuiHFiles))
@@ -382,18 +382,17 @@ $(BldPath)/verif:
 $(call binexe,$(Pfx)verify): \
 	$(patsubst %.c,$(BldPath)/%.c, $(VerifyCSources)) \
 	$(patsubst %.c,$(BldPath)/%.o, $(CSources)) \
-	$(addprefix $(CxBldPath)/, alphatab.o bstree.o fileb.o syscx.o)
+	$(CxStdObjs) $(addprefix $(CxBldPath)/, bstree.o)
 	$(CC) $(VerifyCFlags) $(VerifyDFlags) -I $(BldPath) $^ -o $@ $(LFLAGS)
 
 $(call binexe,$(Pfx)imgdiff): $(BldPath)/imgdiff.o \
 	$(BldPath)/pnm-image.o \
 	$(BldPath)/util.o \
-	$(addprefix $(CxBldPath)/, alphatab.o fileb.o syscx.o)
+	$(CxStdObjs)
 	$(CC) $(CFLAGS) $(DFLAGS) $^ -o $@ $(LFLAGS)
 
 $(call binexe,$(Pfx)file2array): $(BldPath)/file2array.o \
-	$(BldPath)/util.o \
-	$(addprefix $(CxBldPath)/, alphatab.o fileb.o syscx.o)
+	$(BldPath)/util.o $(CxStdObjs)
 	$(CC) $(CFLAGS) -o $@ $^ -lm
 
 .PHONY: test

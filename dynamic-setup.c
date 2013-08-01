@@ -166,269 +166,271 @@ add_racers (RaySpace* space, uint nracers, const Track* track,
 readin_Track (Track* track, RaySpace* space,
               const char* pathname, const char* filename)
 {
-    const uint ndims = 3;
-    uint line_no = 0;
-    bool good = true;
-    const char* line;
-    FileB xfb = dflt_FileB ();
-    XFileB* xf = &xfb.xo;
-    FILE* out = stderr;
-    PointXfrm coord_system;
-    IAMap model_map;  /* Use to save model transformation.*/
-    DecloStack( IAMap, map );
-    Point scale;
-    Point location;
-    Scene* scene = 0;
-    Texture* skytex = 0;
-    uint i;
+  const uint ndims = 3;
+  uint line_no = 0;
+  bool good = true;
+  const char* line;
+  XFileB xfb[1];
+  XFile* xf = &xfb->xf;
+  FILE* out = stderr;
+  PointXfrm coord_system;
+  IAMap model_map;  /* Use to save model transformation.*/
+  DecloStack( IAMap, map );
+  Point scale;
+  Point location;
+  Scene* scene = 0;
+  Texture* skytex = 0;
+  uint i;
 
-    if (!open_FileB (&xfb, pathname, filename))
-        return false;
+  init_XFileB (xfb);
+  if (!open_FileB (&xfb->fb, pathname, filename))
+    return false;
 
-    identity_PointXfrm (&coord_system);
-    identity_IAMap (map);
-    model_map = *map;
-    zero_Point (&location);
-    set_Point (&scale, 1);
+  identity_PointXfrm (&coord_system);
+  identity_IAMap (map);
+  model_map = *map;
+  zero_Point (&location);
+  set_Point (&scale, 1);
 
-    init_Track (track);
-    init_RaySpace (space);
+  init_Track (track);
+  init_RaySpace (space);
 
-    space->nlights = 2;
-    space->lights = AllocT( PointLightSource, space->nlights );
-    init_PointLightSource (&space->lights[0]);
-    init_PointLightSource (&space->lights[1]);
-        /* Op_s( real, NColors, space->lights[0].intensity , .5 ); */
-    space->lights[1].on = false;
+  space->nlights = 2;
+  space->lights = AllocT( PointLightSource, space->nlights );
+  init_PointLightSource (&space->lights[0]);
+  init_PointLightSource (&space->lights[1]);
+  /* Op_s( real, NColors, space->lights[0].intensity , .5 ); */
+  space->lights[1].on = false;
 
-    for (line = getline_XFileB (xf);
-         good && line;
-         line = getline_XFileB (xf))
+  for (line = getline_XFile (xf);
+       good && line;
+       line = getline_XFile (xf))
+  {
+    XFile olay[1];
+    bool recalc_map = false;
+    line_no += 1;
+    olay_XFile (olay, xf, IdxEltTable( xf->buf, line ));
+
+    skipds_XFile (olay, NULL);
+    line = cstr_XFile (olay);
+
+    if (AccepTok( line, "scale" ))
     {
-        DecloStack1( XFileB, olay, olay_XFileB (xf, IdxEltTable( xf->buf, line )) );
-        bool recalc_map = false;
-        line_no += 1;
+      if (line[0] == ':')  line = &line[1];
 
-        skipds_XFileB (olay, NULL);
-        line = cstr_XFileB (olay);
-
-        if (AccepTok( line, "scale" ))
+      set_Point (&scale, 1);
+      for (i = 0; i < 3; ++i)
+      {
+        if (line)
+          line = strto_real (&scale.coords[i], line);
+        if (!line)
         {
-            if (line[0] == ':')  line = &line[1];
+          good = (i > 0);
+          if (!good)  break;
+          scale.coords[i] = scale.coords[i-1];
+        }
+      }
 
-            set_Point (&scale, 1);
-            for (i = 0; i < 3; ++i)
-            {
-                if (line)
-                    line = strto_real (&scale.coords[i], line);
-                if (!line)
-                {
-                    good = (i > 0);
-                    if (!good)  break;
-                    scale.coords[i] = scale.coords[i-1];
-                }
-            }
-
-            if (good)
-            {
-                xfrm_Point (&scale, &coord_system, &scale);
-                recalc_map = true;
-            }
-            else
-            {
-                fprintf (out, "Line:%u  Need scale value!\n", line_no);
-            }
-        }
-        else if (AccepTok( line, "loc" ))
-        {
-            if (line[0] == ':')  line = &line[1];
-
-            UFor( i, 3 )
-                if (line)  line = strto_real (&location.coords[i], line);
-
-            good = !!(line);
-            if (good)
-            {
-                xfrm_Point (&location, &coord_system, &location);
-                recalc_map = true;
-            }
-            else
-            {
-                fprintf (out, "Line:%u  Need 3 location values!\n", line_no);
-            }
-        }
-        else if (AccepTok( line, "camloc" ))
-        {
-            if (line[0] == ':')  line = &line[1];
-            skipto_XFileB (olay, line);
-            xget_IAMap (olay, &track->camloc);
-        }
-        else if (AccepTok( line, "model:" ))
-        {
-            bool doit = true;
-            model_map = *map;
-            if (NDimensions == 4)
-            {
-                real dcoord = 0;
-                if (track->nmorphs > 0)
-                    dcoord = track->morph_dcoords[track->nmorphs-1] + 1;
-
-                ++ track->nmorphs;
-                ResizeT( real, track->morph_dcoords, track->nmorphs );
-                ResizeT( Scene, track->morph_scenes, track->nmorphs );
-                track->morph_dcoords[track->nmorphs-1] = dcoord;
-                scene = &track->morph_scenes[track->nmorphs-1];
-            }
-            else if (!scene)
-            {
-                scene = &track->scene;
-            }
-            else
-            {
-                    /* Ignore because we are not in 4d mode.*/
-                doit = false;
-            }
-            if (doit)  good = readin_wavefront (scene, xfb.pathname.s, line);
-        }
-        else if (AccepTok( line, "concat-model:" ))
-        {
-            Scene tmp;
-            good = !!(scene);
-            if (good)  good = readin_wavefront (&tmp, xfb.pathname.s, line);
-            else       fprintf (out, "Line:%u  No scene for concat!\n",
-                                line_no);
-                /* TODO: Some sort of scene mapping should happen?*/
-            if (good)  concat0_Scene (scene, &tmp);
-        }
-        else if (AccepTok( line, "sky:" ))
-        {
-            skytex = AllocT( Texture, 1 );
-            good = readin_Texture (skytex, xfb.pathname.s, line);
-            if (!good)
-                fprintf (out, "Line:%u  Sky failed!\n", line_no);
-        }
-        else if (AccepTok( line, "checkplanes:" ))
-        {
-            good = readin_checkplanes (&track->ncheckplanes,
-                                       &track->checkplanes,
-                                       &track->checkpoints,
-                                       map, xfb.pathname.s, line);
-            if (!good)
-                fprintf (out, "Line:%u  Checkplanes failed!\n", line_no);
-        }
-        else if (AccepTok( line, "light" ))
-        {
-            Point* loc;
-
-            if (line[0] == ':')  line = &line[1];
-            loc = &space->lights[0].location;
-
-            zero_Point (loc);
-            UFor( i, ndims )
-                if (line)  line = strto_real (&loc->coords[i], line);
-
-            good = !!(line);
-            if (good)
-                map_Point (loc, map, loc);
-            else
-                fprintf (out, "Line:%u  Not enough coordinates for light!\n",
-                         line_no);
-        }
-        else if (AccepTok( line, "start" ))
-        {
-            Point loc, dir;
-            if (line[0] == ':')  line = &line[1];
-
-            zero_Point (&loc);
-            UFor( i, ndims )
-                if (line)  line = strto_real (&loc.coords[i], line);
-
-            zero_Point (&dir);
-            UFor( i, ndims )
-                if (line)  line = strto_real (&dir.coords[i], line);
-
-            good = !!(line);
-            if (good)
-            {
-                DeclGrow1Table( Ray, ray, track->startlocs );
-                map_Point (&loc, map, &loc);
-                map_Point (&dir, map, &dir);
-                ray->origin = loc;
-                ray->direct = dir;
-            }
-            else
-            {
-                fprintf (out, "Line:%u  Not enough coordinates for start!\n",
-                         line_no);
-            }
-        }
-        else if (AccepTok( line, "coords" ))
-        {
-            if (line[0] == ':')  line = &line[1];
-            good = parse_coord_system (&coord_system, line);
-            if (good)  recalc_map = true;
-        }
-        else if (AccepTok( line, "vpls" ))
-        {
-            if (line[0] == ':')  line = &line[1];
-            line = strto_uint (&track->nphotons, line);
-            if (good && (good = !!line))
-                line = strto_uint (&track->nbounces, line);
-            if (good)
-                good = !!line;
-        }
-        else if (AccepTok( line, "img_dims" ))
-        {
-            if (line[0] == ':')  line = &line[1];
-            line = strto_uint (&track->nimgrows, line);
-            if (good && (good = !!line))
-                line = strto_uint (&track->nimgcols, line);
-            if (good)
-                good = !!line;
-        }
-
-        if (recalc_map)
-        {
-            identity_IAMap (map);
-            xlat0_IAMap (map, &location);
-            xfrm0_IAMap (map, &coord_system);
-            prod0_IAMap (map, &scale);
-        }
+      if (good)
+      {
+        xfrm_Point (&scale, &coord_system, &scale);
+        recalc_map = true;
+      }
+      else
+      {
+        fprintf (out, "Line:%u  Need scale value!\n", line_no);
+      }
     }
-
-    lose_FileB (&xfb);
-
-    if (good && !scene)
+    else if (AccepTok( line, "loc" ))
     {
-        good = false;
-        fputs ("No model provided for track!\n", out);
+      if (line[0] == ':')  line = &line[1];
+
+      UFor( i, 3 )
+        if (line)  line = strto_real (&location.coords[i], line);
+
+      good = !!(line);
+      if (good)
+      {
+        xfrm_Point (&location, &coord_system, &location);
+        recalc_map = true;
+      }
+      else
+      {
+        fprintf (out, "Line:%u  Need 3 location values!\n", line_no);
+      }
     }
-
-    if (good)
+    else if (AccepTok( line, "camloc" ))
     {
+      if (line[0] == ':')  line = &line[1];
+      skipto_XFile (olay, line);
+      xget_IAMap (olay, &track->camloc);
+    }
+    else if (AccepTok( line, "model:" ))
+    {
+      bool doit = true;
+      model_map = *map;
+      if (NDimensions == 4)
+      {
+        real dcoord = 0;
         if (track->nmorphs > 0)
-        {
-            uint i;
-            interpolate_Track (track, &model_map.scale);
-            scene = &track->scene;
-            UFor( i, track->nmorphs )
-                map_Scene (&track->morph_scenes[i], &model_map);
-        }
-        condense_Scene (scene);
-        map_Scene (scene, &model_map);
+          dcoord = track->morph_dcoords[track->nmorphs-1] + 1;
 
-        if (skytex)
-        {
-            if (scene->ntxtrs == 0)  scene->txtrs = 0;  /* Assure NULL.*/
-            space->skytxtr = scene->ntxtrs;
-            ConcaT( Texture, scene->txtrs, skytex, scene->ntxtrs, 1 );
-            free (skytex);
-        }
-
-        copy_Scene (&space->main.scene, scene);
-        init_filled_RaySpace (space);
+        ++ track->nmorphs;
+        ResizeT( real, track->morph_dcoords, track->nmorphs );
+        ResizeT( Scene, track->morph_scenes, track->nmorphs );
+        track->morph_dcoords[track->nmorphs-1] = dcoord;
+        scene = &track->morph_scenes[track->nmorphs-1];
+      }
+      else if (!scene)
+      {
+        scene = &track->scene;
+      }
+      else
+      {
+        /* Ignore because we are not in 4d mode.*/
+        doit = false;
+      }
+      if (doit)  good = readin_wavefront (scene, xfb->fb.pathname.s, line);
     }
-    return good;
+    else if (AccepTok( line, "concat-model:" ))
+    {
+      Scene tmp;
+      good = !!(scene);
+      if (good)  good = readin_wavefront (&tmp, xfb->fb.pathname.s, line);
+      else       fprintf (out, "Line:%u  No scene for concat!\n",
+                          line_no);
+      /* TODO: Some sort of scene mapping should happen?*/
+      if (good)  concat0_Scene (scene, &tmp);
+    }
+    else if (AccepTok( line, "sky:" ))
+    {
+      skytex = AllocT( Texture, 1 );
+      good = readin_Texture (skytex, xfb->fb.pathname.s, line);
+      if (!good)
+        fprintf (out, "Line:%u  Sky failed!\n", line_no);
+    }
+    else if (AccepTok( line, "checkplanes:" ))
+    {
+      good = readin_checkplanes (&track->ncheckplanes,
+                                 &track->checkplanes,
+                                 &track->checkpoints,
+                                 map, xfb->fb.pathname.s, line);
+      if (!good)
+        fprintf (out, "Line:%u  Checkplanes failed!\n", line_no);
+    }
+    else if (AccepTok( line, "light" ))
+    {
+      Point* loc;
+
+      if (line[0] == ':')  line = &line[1];
+      loc = &space->lights[0].location;
+
+      zero_Point (loc);
+      UFor( i, ndims )
+        if (line)  line = strto_real (&loc->coords[i], line);
+
+      good = !!(line);
+      if (good)
+        map_Point (loc, map, loc);
+      else
+        fprintf (out, "Line:%u  Not enough coordinates for light!\n",
+                 line_no);
+    }
+    else if (AccepTok( line, "start" ))
+    {
+      Point loc, dir;
+      if (line[0] == ':')  line = &line[1];
+
+      zero_Point (&loc);
+      UFor( i, ndims )
+        if (line)  line = strto_real (&loc.coords[i], line);
+
+      zero_Point (&dir);
+      UFor( i, ndims )
+        if (line)  line = strto_real (&dir.coords[i], line);
+
+      good = !!(line);
+      if (good)
+      {
+        DeclGrow1Table( Ray, ray, track->startlocs );
+        map_Point (&loc, map, &loc);
+        map_Point (&dir, map, &dir);
+        ray->origin = loc;
+        ray->direct = dir;
+      }
+      else
+      {
+        fprintf (out, "Line:%u  Not enough coordinates for start!\n",
+                 line_no);
+      }
+    }
+    else if (AccepTok( line, "coords" ))
+    {
+      if (line[0] == ':')  line = &line[1];
+      good = parse_coord_system (&coord_system, line);
+      if (good)  recalc_map = true;
+    }
+    else if (AccepTok( line, "vpls" ))
+    {
+      if (line[0] == ':')  line = &line[1];
+      line = strto_uint (&track->nphotons, line);
+      if (good && (good = !!line))
+        line = strto_uint (&track->nbounces, line);
+      if (good)
+        good = !!line;
+    }
+    else if (AccepTok( line, "img_dims" ))
+    {
+      if (line[0] == ':')  line = &line[1];
+      line = strto_uint (&track->nimgrows, line);
+      if (good && (good = !!line))
+        line = strto_uint (&track->nimgcols, line);
+      if (good)
+        good = !!line;
+    }
+
+    if (recalc_map)
+    {
+      identity_IAMap (map);
+      xlat0_IAMap (map, &location);
+      xfrm0_IAMap (map, &coord_system);
+      prod0_IAMap (map, &scale);
+    }
+  }
+
+  lose_XFileB (xfb);
+
+  if (good && !scene)
+  {
+    good = false;
+    fputs ("No model provided for track!\n", out);
+  }
+
+  if (good)
+  {
+    if (track->nmorphs > 0)
+    {
+      uint i;
+      interpolate_Track (track, &model_map.scale);
+      scene = &track->scene;
+      UFor( i, track->nmorphs )
+        map_Scene (&track->morph_scenes[i], &model_map);
+    }
+    condense_Scene (scene);
+    map_Scene (scene, &model_map);
+
+    if (skytex)
+    {
+      if (scene->ntxtrs == 0)  scene->txtrs = 0;  /* Assure NULL.*/
+      space->skytxtr = scene->ntxtrs;
+      ConcaT( Texture, scene->txtrs, skytex, scene->ntxtrs, 1 );
+      free (skytex);
+    }
+
+    copy_Scene (&space->main.scene, scene);
+    init_filled_RaySpace (space);
+  }
+  return good;
 }
 
 

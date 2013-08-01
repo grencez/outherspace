@@ -1,5 +1,6 @@
 
 #include "cx/syscx.h"
+#include "cx/fileb.h"
 #include "cx/gmrand.h"
 #include "affine.h"
 #include "bbox.h"
@@ -276,29 +277,31 @@ testfn_trxfrm_BBox ()
 }
 
 static
-    void
+  void
 testfn_serial ()
 {
-    GMRand gmrand;
-    init_GMRand (&gmrand);
+  GMRand gmrand;
+  init_GMRand (&gmrand);
 
-    {:for (testidx ; 1e5)
-        DecloStack1( OFileB, of, dflt_OFileB () );
-        DecloStack( OFileB, olay );
-        Point expect, result;
+  {:for (testidx ; 1e5)
+    OFile of[1];
+    XFile olay[1];
+    Point expect, result;
 
-        {:for (i ; NDims)
-            expect.coords[i] = 1e7 * real_GMRand (&gmrand);
-        }
+    init_OFile (of);
 
-        oput_Point (of, &expect);
-        *olay = olay_OFileB (of, 0);
-        xget_Point (olay, &result);
-
-        Claim( equal_Point (&expect, &result) );
-        lose_OFileB (olay);
-        lose_OFileB (of);
+    {:for (i ; NDims)
+      expect.coords[i] = 1e7 * real_GMRand (&gmrand);
     }
+
+    oput_Point (of, &expect);
+    olay_OFile (olay, of, 0);
+    xget_Point (olay, &result);
+
+    Claim( equal_Point (&expect, &result) );
+    lose_XFile (olay);
+    lose_OFile (of);
+  }
 }
 
     /** First crack at a verification function.

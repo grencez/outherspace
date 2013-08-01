@@ -437,7 +437,7 @@ key_press_fn (Pilot* pilot, RaySpace* space, const SDL_keysym* event)
     }
     else if (print_plane_line)
     {
-        OFileB* of = stdout_OFileB ();
+        OFile* of = stdout_OFile ();
         IAMap iatt;
         fprintf (out, "%f %f %f  %f %f %f\n",
                  view_origin->coords[0],
@@ -450,8 +450,8 @@ key_press_fn (Pilot* pilot, RaySpace* space, const SDL_keysym* event)
         transpose_PointXfrm (&iatt.xfrm, view_basis);
         xlat_IAMap (&iatt, view_origin, &iatt);
         oput_IAMap (of, &iatt);
-        oput_char_OFileB (of, '\n');
-        flush_OFileB (of);
+        oput_char_OFile (of, '\n');
+        flush_OFile (of);
     }
     else if (quit_app)
     {
