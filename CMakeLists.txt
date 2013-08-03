@@ -56,7 +56,6 @@ list (APPEND HFiles
     bitstring.h
     color.h
     dynamic-setup.h
-    gmrand.h
     gui-indep.c
     gui-indep.h
     gui-opengl.c
