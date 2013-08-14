@@ -1561,7 +1561,10 @@ rays_to_hits_fish (RayImage* restrict image,
         real* magline = 0;
         byte* pixline = 0;
         GMRand gmrand;
-        init1_GMRand (&gmrand, row);
+
+        // Setup is poor, arbitrary numbers.
+        init2_GMRand (&gmrand, row % 2, 2);
+        step_GMRand (&gmrand, (row * 2) % 17);
 
         if (image->hits)  hitline = &image->hits[row * image->stride];
         if (image->mags)  magline = &image->mags[row * image->stride];
@@ -1699,7 +1702,10 @@ cast_row_orthographic (RayImage* restrict image,
     real* magline = 0;
     byte* pixline = 0;
     GMRand gmrand;
-    init1_GMRand (&gmrand, row);
+
+    // Setup is poor, arbitrary numbers.
+    init2_GMRand (&gmrand, row % 2, 2);
+    step_GMRand (&gmrand, (row * 2) % 17);
 
     ncols = image->ncols;
     box = &space->box;
@@ -1744,7 +1750,10 @@ cast_row_perspective (RayImage* image, uint row,
     real* magline = 0;
     byte* pixline = 0;
     GMRand gmrand;
-    init1_GMRand (&gmrand, row);
+
+    // Setup is poor, arbitrary numbers.
+    init2_GMRand (&gmrand, row % 2, 2);
+    step_GMRand (&gmrand, (row * 2) % 17);
 
     ncols = image->ncols;
 
