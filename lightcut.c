@@ -53,7 +53,7 @@ init_LightCutTree (LightCutTree* t)
 {
     InitTable( t->nodes );
     t->sentinel.nlights = 0;
-    init_BSTree (&t->bst, &t->sentinel.bst, 0);
+    init_BSTree (&t->bst, &t->sentinel.bst, dflt2_PosetCmp (0, 0));
     t->area = 0;
 }
 
@@ -295,7 +295,7 @@ make_light_tree (LightCutTree* t, GMRand* gmrand)
     if (!clusters)  return;
 
     init_KPTreeGrid (&kpgrid, nlights);
-    init_BSTree (&t->bst, &t->sentinel.bst, 0);
+    init_BSTree (&t->bst, &t->sentinel.bst, dflt2_PosetCmp (0, 0));
 
     SizeTable( t->nodes, 2*nlights-1 );
     SizeTable( remlights, nlights );
