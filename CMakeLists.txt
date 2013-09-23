@@ -119,12 +119,6 @@ if (UNIX)
     find_package (SDL_image REQUIRED)
     find_package (OpenMP REQUIRED)
 else ()
-    set (CMAKE_C_FLAGS "/W4 /MP")
-    # Disable warning: 'fopen' unsafe, use fopen_s instead
-    add_definitions ("-D_CRT_SECURE_NO_WARNINGS")
-    # Other warnings disabled in util.h via #pragmas.
-
-    set (CMAKE_BUILD_TYPE RELEASE)
     set (SDL_pfx "../../SDL-1.2.14")
     set (SDL_LIBRARY "${SDL_pfx}/lib/SDL")
     list (APPEND SDL_LIBRARY "${SDL_pfx}/lib/SDLmain")

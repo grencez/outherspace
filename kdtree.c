@@ -634,14 +634,10 @@ build_KDTreeNode (KDTreeGrid* grid,
             /* Perform tree split.*/
         {
             SList tmp_nodelist, tmp_elemidxlist;
-#ifdef _OPENMP
 #pragma omp parallel sections
-#endif
             {
 
-#ifdef _OPENMP
 #pragma omp section
-#endif
                 {
                     build_KDTreeNode (&logrid,
                                       nodelist, elemidxlist,
@@ -649,9 +645,7 @@ build_KDTreeNode (KDTreeGrid* grid,
                     lose_KDTreeGrid (&logrid);
                 }
 
-#ifdef _OPENMP
 #pragma omp section
-#endif
                 {
                     init_SList (&tmp_nodelist);
                     init_SList (&tmp_elemidxlist);

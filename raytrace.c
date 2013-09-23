@@ -1550,9 +1550,7 @@ rays_to_hits_fish (RayImage* restrict image,
 
     inside_box = inside_BBox (&space->box, origin);
 
-#ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic)
-#endif
     UFor( row, nrows )
     {
         uint col;
@@ -1649,9 +1647,7 @@ rays_to_hits_fixed_plane (uint* hits, real* mags,
 
     inside_box = inside_BBox (box, &origin);
 
-#ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic)
-#endif
     UFor( row, nrows )
     {
         uint col;
@@ -1951,9 +1947,7 @@ cast_partial_RayImage (RayImage* restrict image,
     inc = nprocs;
 #endif
 
-#ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic)
-#endif
     for (i = myrank; i < row_nul; i += inc)
     {
 #ifdef PackOpsAvail
