@@ -80,13 +80,15 @@ endif
 
 ifeq ($(CC),icc)
 	#CFLAGS += -Wremarks
-else ifneq (,$(filter sunstudio,$(CONFIG)))
+else
+ifneq (,$(filter sunstudio,$(CONFIG)))
 	# Nothing!
 	# But do note that, if using OpenMP,
 	# the OMP_NUM_THREADS environment variable must be set!
 else
 	#CFLAGS += -fwhole-program
 	#CFLAGS += -Wall -Wextra
+endif
 endif
 
 #DFLAGS += -DIncludeC
