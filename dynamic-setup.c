@@ -209,7 +209,7 @@ readin_Track (Track* track, RaySpace* space,
     XFile olay[1];
     bool recalc_map = false;
     line_no += 1;
-    olay_XFile (olay, xf, IdxEltTable( xf->buf, line ));
+    olay_txt_XFile (olay, xf, IdxEltTable( xf->buf, line ));
 
     skipds_XFile (olay, NULL);
     line = cstr_XFile (olay);

@@ -104,7 +104,7 @@ ifneq (,$(filter 4d,$(CONFIG)))
 	DFLAGS += -DNDimensions=4
 endif
 
-GuiCFiles = gui.c
+GuiCFiles = gui.c motion.c
 GuiHFiles = gui-indep.c
 ifneq (,$(filter macapp,$(CONFIG)))
 	# Everything on this OS X setup is 32 bit.

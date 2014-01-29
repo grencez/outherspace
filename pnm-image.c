@@ -158,7 +158,7 @@ readin_PPM_image (uint* ret_nrows, uint* ret_ncols,
   while (good && header_stage < 3 && (line = getline_XFile (xf)))
   {
     XFile olay[1];
-    olay_XFile (olay, xf, IdxEltTable( xf->buf, line ));
+    olay_txt_XFile (olay, xf, IdxEltTable( xf->buf, line ));
     skipds_XFile (olay, 0);
     line = cstr_XFile (olay);
 
