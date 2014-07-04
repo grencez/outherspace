@@ -52,8 +52,5 @@ xlat_IAMap (IAMap* B, const Point* x, const IAMap* A);
 void
 xfrm_IAMap (IAMap* C, const PointXfrm* A, const IAMap* B);
 
-#ifdef IncludeC
-#include "affine.c"
-#endif
 #endif
 

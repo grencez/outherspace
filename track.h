@@ -37,8 +37,5 @@ init_Track (Track* track);
 void
 lose_Track (Track* track);
 
-#ifdef IncludeC
-#include "track.c"
-#endif
 #endif
 

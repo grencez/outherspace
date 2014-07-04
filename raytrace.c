@@ -4,7 +4,7 @@
 
 #include "affine.h"
 #include "bbox.h"
-#include "bitstring.h"
+#include "cx/bittable.h"
 #include "color.h"
 #include "lightcut.h"
 #include "order.h"
@@ -378,7 +378,7 @@ init_RaySpace_KDTreeGrid (KDTreeGrid* grid, const RaySpace* space)
         if (!object->visible)  continue;
 
         ti = 2 * nvisible;
-        
+
         if (i < space->nobjects)
             trxfrm_BBox (&box,
                          &object->orientation,
@@ -684,7 +684,7 @@ splitting_plane_count (const Point* origin, const Point* direct, real mag,
                                           tree->nodes);
     else
         destin_nodeidx = Max_uint;
-    
+
 #if 0
         /* Return the number of elements in the hit node.*/
     return ((destin_nodeidx == Max_uint) ? 0 :
@@ -1232,7 +1232,7 @@ cast_nopartition (uint* ret_hit,
 
     if (hit_idx < space->main.nelems)
         hit_object = space->nobjects;
-        
+
 
     UFor( i, space->nobjects )
     {
@@ -1276,7 +1276,7 @@ static
 test_object_intersections (uint* ret_hit,
                            real* ret_mag,
                            uint* ret_object,
-                           BitString* tested,
+                           BitTable tested,
                            const Ray* ray,
                            uint nobjectidcs,
                            const uint* objectidcs,
@@ -1295,7 +1295,7 @@ test_object_intersections (uint* ret_hit,
         real tmp_mag;
 
         objidx = objectidcs[i];
-        if (set1_BitString (tested, objidx))  continue;
+        if (set1_BitTable (tested, objidx))  continue;
 
         object = ray_to_ObjectRaySpace (&rel_origin, &rel_dir,
                                         &ray->origin, &ray->direct,
@@ -1332,7 +1332,7 @@ cast_partitioned (uint* ret_hit,
                   uint ignore_object)
 {
     const uint ntestedbits = 128;
-    Declare_BitString( tested, 128 );
+    FixDeclBitTable( tested, 128, 0 );
     uint node_idx, parent = 0;
     const KDTreeNode* restrict nodes;
     const uint* restrict elemidcs;
@@ -1346,9 +1346,8 @@ cast_partitioned (uint* ret_hit,
     copy_Point (&ray.direct, dir);
 
     assert (space->nobjects < ntestedbits);
-    zero_BitString (tested, ntestedbits);
     if (ignore_object <= space->nobjects)
-        set1_BitString (tested, ignore_object);
+      set1_BitTable (tested, ignore_object);
 
     nodes = space->object_tree.nodes;
     elemidcs = space->object_tree.elemidcs;

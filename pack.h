@@ -116,8 +116,5 @@ test_pack_intersections (uintPack* ret_hit,
                          const uint* restrict elemidcs,
                          const BarySimplex* restrict simplices);
 
-#ifdef IncludeC
-#include "pack.c"
-#endif
 #endif
 

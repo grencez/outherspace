@@ -99,9 +99,6 @@ build_trivial_KDTree (KDTree* tree, uint nelems, const BBox* box);
 void
 build_KDTree (KDTree* tree, KDTreeGrid* grid, const Simplex* elems);
 
-#ifdef IncludeC
-#include "kdtree.c"
-#endif
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
 #endif

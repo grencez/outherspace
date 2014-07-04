@@ -318,7 +318,7 @@ setup_testcase_4d_normals (RaySpace* space,
     scene->verts = AllocT( Point, scene->nverts );
     UFor( i, scene->nverts )
         copy_Point (&scene->verts[i], &verts[i]);
-        
+
     scene->nmatls = 2;
     scene->matls = AllocT( Material, scene->nmatls );
     UFor( i, scene->nmatls )

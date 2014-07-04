@@ -424,7 +424,7 @@ midfill_between_simplices (SceneElement* dst_elems,
     if (use_vnmls)
         UFor( i, 4 )
             normalize_Point (&new_vnmls[i], &new_vnmls[i]);
-    
+
     UFor( i, nelems )
     {
         uint j;
@@ -622,7 +622,7 @@ interpolate_Scene (Scene* dst, uint k, uint nscenes, const Scene* scenes)
     dst->vnmls = AllocT( Point, dst->nvnmls );
     dst->nmatls = nmatls;
     dst->matls = DupliT( Material, scenes[0].matls, dst->nmatls );
-    
+
         /* Copy info.*/
     UFor( i, nscenes )
     {

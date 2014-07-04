@@ -35,7 +35,7 @@
 
 #define ConcaT( Type, dst, src, end, count ) \
     ((dst) = (Type*) array_cat (dst, src, &end, count, sizeof (Type)))
-        
+
 
 #define __global
 #else  /* ^^^ !defined(__OPENCL_VERSION__) */
@@ -141,9 +141,6 @@ readin_files (uint nfiles, uint* files_nbytes, byte** files_bytes,
               const char* const* files);
 real monotime ();
 void assert_status (int stat, const char* msg, const char* file, int line);
-#ifdef IncludeC
-#include "util.c"
-#endif
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
 #endif

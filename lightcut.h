@@ -197,8 +197,5 @@ cast_LightCutTree (Color* ret_color, const LightCutTree* tree,
         /* fprintf (stderr, "%u\n", ni); */
 }
 
-#ifdef IncludeC
-#include "lightcut.c"
-#endif
 #endif
 

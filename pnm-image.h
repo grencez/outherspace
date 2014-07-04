@@ -14,8 +14,5 @@ byte*
 readin_PPM_image (uint* ret_nrows, uint* ret_ncols,
                   const char* pathname, const char* filename);
 
-#ifdef IncludeC
-#include "pnm-image.c"
-#endif
 #endif
 

@@ -1,6 +1,6 @@
 
 #include "order.h"
-#include "bitstring.h"
+#include "cx/bittable.h"
 
 #include <assert.h>
 
@@ -31,19 +31,19 @@ fill_minimal_unique (uint* a, uint n)
 minimal_unique (uint n, const uint* a)
 {
     uint i;
-    BitString* hits;
+    BitTable hits;
     bool pred = true;
 
-    hits = alloc_BitString (n, false);
+    hits = cons2_BitTable (n, 0);
 
     UFor( i, n )
     {
         Claim( a[i] < n );
-        if (set1_BitString (hits, a[i]))
+        if (set1_BitTable (hits, a[i]))
             pred = false;
     }
 
-    free_BitString (hits);
+    lose_BitTable (&hits);
     return pred;
 }
 

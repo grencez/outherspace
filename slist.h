@@ -34,8 +34,5 @@ uint
 search_SList (SList* l, const void* item,
               bool (*f) (const void*, const void*));
 
-#ifdef IncludeC
-#include "slist.c"
-#endif
 #endif
 

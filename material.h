@@ -32,7 +32,7 @@ struct Material
     uint emissive_texture;
     uint bump_texture;
 };
-    
+
 void init_Material (Material* mat);
 void
 copy_Texture (Texture* dst, const Texture* src);
@@ -49,8 +49,5 @@ readin_Texture (Texture* texture, const char* pathname, const char* filename);
 void
 remap_bumps_Texture (Texture* texture, const IAMap* map);
 
-#ifdef IncludeC
-#include "material.c"
-#endif
 #endif
 

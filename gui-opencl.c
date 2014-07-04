@@ -19,7 +19,7 @@ struct SysOpenCL
 {
     cl_program program;
     cl_kernel kernel;
-    
+
     uint ndevices;
     cl_device_id* devices;
     cl_context context;
@@ -116,7 +116,7 @@ compute_devices (uint* ret_ndevices,
 
 
 static
-    void 
+    void
 load_program (cl_program* ret_program, cl_context context,
               uint ndevices, const cl_device_id* devices,
               uint nfiles,
@@ -202,7 +202,7 @@ init_opencl_data ()
 
     readin_files (nfiles, files_nbytes, files_bytes, 0, files);
 #endif  /* !defined(EmbedFiles) */
-    
+
     cl->ndevices = 0;
     compute_devices (&cl->ndevices, &cl->devices, &cl->context, &cl->comqs);
     printf ("I have %u devices!\n", cl->ndevices);
@@ -241,7 +241,7 @@ perturb_vertices (const Scene* scene, const SceneGL* scenegl)
     static uint count = 0;
     SysOpenCL* cl = &opencl_state;
     int err;
-      
+
     size_t global, local;
     const uint dev_idx = 0;
     cl_mem verts;

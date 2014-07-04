@@ -28,8 +28,5 @@ setup_box_lights (RaySpace* space,
                   const PointLightSource* light,
                   const BBox* box);
 
-#ifdef IncludeC
-#include "dynamic-setup.c"
-#endif
 #endif
 

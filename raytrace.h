@@ -222,9 +222,6 @@ void restride_RayImage (RayImage* image);
 void unstride_RayImage (RayImage* image);
 void downsample_RayImage (RayImage* image, uint inv);
 void cleanup_RayImage (RayImage* image);
-#ifdef IncludeC
-#include "raytrace.c"
-#endif
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
 #endif

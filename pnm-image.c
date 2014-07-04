@@ -51,7 +51,7 @@ void output_PGM_image (const char* filename, uint nrows, uint ncols,
 
     fputs ("P2\n", out);
     fprintf (out, "%u %u\n", ncols, nrows);
-    fprintf (out, "%u\n", nelems);
+    fprintf (out, "%u\n", nelems+1);
 
     if (debug)
         fprintf (out, "# nelems:%u  maxval:%u  (elem_idx = val - 1)\n",
@@ -83,6 +83,7 @@ void output_PGM_image (const char* filename, uint nrows, uint ncols,
 output_PPM_image (const char* filename, uint nrows, uint ncols,
                   const byte* pixels)
 {
+  const bool textmode = true;
   OFileB ofb[1];
   OFile* of = &ofb->of;
 
@@ -93,15 +94,20 @@ output_PPM_image (const char* filename, uint nrows, uint ncols,
     return;
   }
 
-  /* oput_cstr_FileB (f, "P3\n"); */
-  oput_cstr_OFile (of, "P6\n");
+  if (textmode)
+    oput_cstr_OFile (of, "P3\n");
+  else
+    oput_cstr_OFile (of, "P6\n");
   oput_uint_OFile (of, ncols);
   oput_char_OFile (of, ' ');
   oput_uint_OFile (of, nrows);
   oput_char_OFile (of, '\n');
   oput_cstr_OFile (of, "255\n");
 
-#if 0
+  if (!textmode)
+    setfmt_OFileB (ofb, FileB_Raw);
+
+  if (textmode)
   {:for (row ; nrows)
     const byte* pixline;
     pixline = &pixels[(nrows - row - 1) * 3 * ncols];
@@ -115,14 +121,12 @@ output_PPM_image (const char* filename, uint nrows, uint ncols,
     }
     oput_char_OFile (of, '\n');
   }
-#else
-  setfmt_OFileB (ofb, FileB_Raw);
+  else
   {:for (row ; nrows)
     oputn_byte_OFileB (ofb,
                        &pixels[(nrows - row - 1) * NColors * ncols],
                        ncols * NColors);
   }
-#endif
 
   lose_OFileB (ofb);
 }

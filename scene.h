@@ -106,9 +106,6 @@ void
 setup_surfaces_Scene (Scene* scene);
 void
 condense_Scene (Scene* scene);
-#ifdef IncludeC
-#include "scene.c"
-#endif
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
 #endif

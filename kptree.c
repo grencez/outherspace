@@ -45,7 +45,7 @@ lose_KPTreeGrid (KPTreeGrid* grid)
     }
 }
 
-    void 
+    void
 set1_KPTreeGrid (KPTreeGrid* grid, uint i, const Point* p)
 {
     adjust_BBox (&grid->box, p);

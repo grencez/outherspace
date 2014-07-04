@@ -52,9 +52,5 @@ trxfrm_BBox (BBox* dst,
              const BBox* box,
              const Point* new_centroid);
 
-#ifdef IncludeC
-#include "bbox.c"
-#endif
-
 #endif
 

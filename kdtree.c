@@ -3,7 +3,7 @@
 #include "kdtree.h"
 
 #include "bbox.h"
-#include "bitstring.h"
+#include "cx/bittable.h"
 #include "order.h"
 #include "point.h"
 #include "serial.h"
@@ -727,7 +727,7 @@ static
 complete_KDTree (const KDTree* tree, const KDTreeGrid* grid)
 {
     uint i;
-    BitString* contains;
+    BitTable contains;
     bool pred = true;
     uint elemidx_capac = 0;
 
@@ -735,9 +735,9 @@ complete_KDTree (const KDTree* tree, const KDTreeGrid* grid)
         if (grid->elemidcs[i] >= elemidx_capac)
             elemidx_capac = grid->elemidcs[i] + 1;
 
-    contains = alloc_BitString (elemidx_capac, true);
+    contains= cons2_BitTable (elemidx_capac, 1);
     UFor( i, grid->nelems )
-        set0_BitString (contains, grid->elemidcs[i]);
+      set0_BitTable (contains, grid->elemidcs[i]);
 
     UFor( i, tree->nnodes )
     {
@@ -752,14 +752,14 @@ complete_KDTree (const KDTree* tree, const KDTreeGrid* grid)
                 uint idx;
                 idx = tree->elemidcs[leaf->elemidcs + j];
                 assert (idx < elemidx_capac);
-                set1_BitString (contains, idx);
+                set1_BitTable (contains, idx);
             }
         }
     }
 
-    pred = all_BitString (elemidx_capac, contains);
+    pred = all_BitTable (contains);
 
-    if (elemidx_capac > 0)  free_BitString (contains);
+    if (elemidx_capac > 0)  lose_BitTable (&contains);
     return pred;
 }
 

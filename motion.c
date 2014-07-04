@@ -3,7 +3,7 @@
 #include "motion.h"
 
 #include "bbox.h"
-#include "bitstring.h"
+#include "cx/bittable.h"
 #include "order.h"
 #include "point.h"
 #include "serial.h"
@@ -22,7 +22,7 @@ static void
 zero_rotations (ObjectMotion* motion);
 static void
 move_object (RaySpace* space, ObjectMotion* motions,
-             BitString* collisions, Point* refldirs,
+             BitTable collisions, Point* refldirs,
              uint objidx, real dt);
 static void
 apply_track_gravity (ObjectMotion* motion, const RaySpace* space,
@@ -38,13 +38,13 @@ apply_thrust (Point* veloc,
               const ObjectMotion* motion,
               real dt);
 static void
-mark_colliding (BitString* collisions,
+mark_colliding (BitTable collisions,
                 Point* refldirs,
                 ObjectMotion* motions,
                 uint objidx, const RaySpace* space);
 static bool
 detect_collision (ObjectMotion* motions,
-                  BitString* collisions,
+                  BitTable collisions,
                   const RaySpace* space,
                   uint objidx,
                   const Point* new_centroid,
@@ -154,7 +154,7 @@ move_objects (RaySpace* space, ObjectMotion* motions, real dt,
     real inc;
     uint i, nobjects;
     Point* prev_centroids;
-    BitString* collisions;
+    BitTable collisions;
     Point* refldirs;
 
         /* Make our time increment about 1/200 sec.*/
@@ -169,7 +169,7 @@ move_objects (RaySpace* space, ObjectMotion* motions, real dt,
 
     i = 1 + space->nobjects;
     i *= i;
-    collisions = alloc_BitString (i, false);
+    collisions = cons2_BitTable (i, 0);
     refldirs = AllocT( Point, i );
 
     UFor( i, nobjects )
@@ -220,7 +220,7 @@ move_objects (RaySpace* space, ObjectMotion* motions, real dt,
     }
 
     free (prev_centroids);
-    free_BitString (collisions);
+    lose_BitTable (&collisions);
     free (refldirs);
 }
 
@@ -238,7 +238,7 @@ zero_rotations (ObjectMotion* motion)
 
     void
 move_object (RaySpace* space, ObjectMotion* motions,
-             BitString* collisions, Point* refldirs,
+             BitTable collisions, Point* refldirs,
              uint objidx, real dt)
 {
     bool commit_move = true;
@@ -489,7 +489,7 @@ apply_thrust (Point* veloc,
             Op_Point_2010( &normal
                            ,+, &basis.pts[UpDim]
                            ,   .01*(1-dot)*dt*, &motion->track_normal );
-            
+
             orthorotate_PointXfrm (&basis, &basis, &normal, UpDim);
         }
         else
@@ -594,7 +594,7 @@ apply_thrust (Point* veloc,
      * I don't much like this function.
      **/
     void
-mark_colliding (BitString* collisions,
+mark_colliding (BitTable collisions,
                 Point* refldirs,
                 ObjectMotion* motions,
                 uint objidx, const RaySpace* space)
@@ -617,7 +617,7 @@ mark_colliding (BitString* collisions,
     {
         uint idx;
         idx = tmp_off + i;
-        set0_BitString (collisions, idx);
+        set0_BitTable (collisions, idx);
         zero_Point (&refldirs[idx]);
     }
 
@@ -651,8 +651,8 @@ mark_colliding (BitString* collisions,
                 fputc ('\n', out);
             }
 
-            if (!test_BitString (collisions, off + hit_objidx) &&
-                !set1_BitString (collisions, tmp_off + hit_objidx))
+            if (!ck_BitTable (collisions, off + hit_objidx) &&
+                !set1_BitTable (collisions, tmp_off + hit_objidx))
             {
                 Point veloc, normal;
 
@@ -683,7 +683,7 @@ mark_colliding (BitString* collisions,
     UFor( i, n )
     {
         bool collide;
-        collide = set0_BitString (collisions, tmp_off + i);
+        collide = set0_BitTable (collisions, tmp_off + i);
 
         if (collide)
         {
@@ -692,7 +692,7 @@ mark_colliding (BitString* collisions,
             assert (i != objidx);
             veloc = &motions[objidx].veloc;
 
-            if (set1_BitString (collisions, off + i))
+            if (set1_BitTable (collisions, off + i))
             {
                 real arbitrary_spring = 10;
                 real dot;
@@ -702,7 +702,7 @@ mark_colliding (BitString* collisions,
                 dot = dot_Point (veloc, direct);
                 if (dot < 0)
                     dot = - dot;
-                
+
                 scale_Point (veloc, direct, dot + arbitrary_spring);
             }
             else
@@ -713,14 +713,14 @@ mark_colliding (BitString* collisions,
         }
         else
         {
-            set0_BitString (collisions, off + i);
+          set0_BitTable (collisions, off + i);
         }
     }
 }
 
     bool
 detect_collision (ObjectMotion* motions,
-                  BitString* collisions,
+                  BitTable collisions,
                   const RaySpace* space,
                   uint objidx,
                   const Point* new_centroid,
@@ -761,7 +761,7 @@ detect_collision (ObjectMotion* motions,
         if (i == objidx)  eff_objidx = space->nobjects;
         else              eff_objidx = i;
 
-            /* set0_BitString (collisions, bs_offset + eff_objidx); */
+        /* set0_BitTable (collisions, bs_offset + eff_objidx); */
 
         if (eff_objidx == space->nobjects)
         {
@@ -812,18 +812,18 @@ detect_collision (ObjectMotion* motions,
             }
 
             diff_Point (&p0, &p0, displacement);
-            
+
             if (eff_objidx < space->nobjects)
                 summ_Point (&p0, &p0, &object->centroid);
                 /* /p1/ and /p0/ are now in global coordinates.*/
-            
+
             diff_Point (&tmp, &p1, &object->centroid);
             trxfrm_Point (&p1, &object->orientation, &tmp);
 
             diff_Point (&tmp, &p0, &object->centroid);
             trxfrm_Point (&p0, &object->orientation, &tmp);
                 /* /p1/ and /p0/ are now in local coordinates.*/
-            
+
             if (false)
             {
                 output_Point (out, &p1);
@@ -846,7 +846,7 @@ detect_collision (ObjectMotion* motions,
                 if (tmp_hit == Max_uint)
                 {
                     inside_object = true;
-                    set1_BitString (collisions, bs_offset + eff_objidx);
+                    set1_BitTable (collisions, bs_offset + eff_objidx);
                 }
             }
 
@@ -919,8 +919,8 @@ detect_collision (ObjectMotion* motions,
                               inside_box, May, objidx);
             if (tmp_mag < distance &&
                 tmp_mag < hit_mag &&
-                !test_BitString (collisions, bs_offset + tmp_objidx) &&
-                !test_BitString (collisions, tmp_objidx * (space->nobjects+1) + objidx))
+                !ck_BitTable (collisions, bs_offset + tmp_objidx) &&
+                !ck_BitTable (collisions, tmp_objidx * (space->nobjects+1) + objidx))
             {
                 hit_idx = tmp_hit;
                 hit_mag = tmp_mag;
@@ -1004,7 +1004,7 @@ detect_collision (ObjectMotion* motions,
             }
 
             copy_Point (&motions[hit_objidx].veloc, &v2);
-            
+
                 /* Project reflection onto plane.*/
             scale_Point (&reflveloc, &hit_dir, hit_speed);
             diff_Point (&reflveloc, &reflveloc, &u1);

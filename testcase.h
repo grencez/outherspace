@@ -33,8 +33,5 @@ setup_testcase_manual_interp (RaySpace* space,
                               PointXfrm* view_basis,
                               real* view_angle,
                               const char* pathname);
-#ifdef IncludeC
-#include "testcase.c"
-#endif
 #endif
 

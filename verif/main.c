@@ -1,10 +1,10 @@
 
 #include "cx/syscx.h"
 #include "cx/fileb.h"
+#include "cx/bittable.h"
 #include "cx/gmrand.h"
 #include "affine.h"
 #include "bbox.h"
-#include "bitstring.h"
 #include "kdtree.h"
 #include "kptree.h"
 #include "order.h"
@@ -44,71 +44,6 @@ testfn_IAMap ()
     map_Point (&v, &map, &v);
     AssertApprox(  1.5, v.coords[0], 1, 1e0 );
     AssertApprox( -3.0, v.coords[1], 1, 1e0 );
-}
-
-static
-    void
-testfn_BitString ()
-{
-    uint i, n, ni;
-    BitString* bs;
-
-    n = 1000;
-    bs = alloc_BitString (n, 0);
-
-    ni = ceil_uint (n, 3);
-    UFor( i, ni )
-    {
-        bool x;
-        x = set1_BitString (bs, 3 * i);
-        assert (!x);
-    }
-
-    UFor( i, n )
-    {
-        bool x, y;
-        x = test_BitString (bs, i);
-        y = (0 == (i % 3));
-        assert (x == y);
-        x = set1_BitString (bs, i);
-        assert (x == y);
-    }
-    free (bs);
-}
-
-    /* This mimics the dirty bit in a set associative cache,
-     * but is unrealistic since it disregards any values.
-     * Now, if all values fall inside [0..255], then we have a useful tool,
-     * but then LowBits() would not be tested.
-     */
-static
-    void
-testfn_BitString_cache ()
-{
-    uint i;
-    bool flag;
-    Declare_BitString( cache, 256 );
-    const uint nslots = 256;
-    const uint nbits = 8;
-
-    zero_BitString (cache, nslots);
-    set1_BitString (cache, 100);
-    zero_BitString (cache, nslots);
-    UFor( i, nslots )
-        assert (!test_BitString (cache, i));
-
-    i = LowBits( uint, nbits, nslots+1 );
-    flag = set1_BitString (cache, i);
-    assert (i == 1 && !flag);
-    i = LowBits( uint, nbits, nslots-1 );
-    flag = set1_BitString (cache, i);
-    assert (i == nslots-1 && !flag);
-    i = LowBits( uint, nbits, 3*(nslots-1) );
-    flag = set1_BitString (cache, i);
-    assert (i == nslots-3 && !flag);
-    i = LowBits( uint, nbits, 5*nslots-3 );
-    flag = set1_BitString (cache, i);
-    assert (i == nslots-3 && flag);
 }
 
 static
@@ -420,8 +355,6 @@ int main (int argc, char** argv)
         strto_uint (&pidx, argv[argidx++]);
 
     testfn_IAMap ();
-    testfn_BitString ();
-    testfn_BitString_cache ();
     testfn_KPTree ();
     testfn_PointXfrm ();
     testfn_trxfrm_BBox ();

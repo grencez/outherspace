@@ -105,7 +105,7 @@ compute_devices (uint* ret_ndevices,
 
 
 static
-    void 
+    void
 load_program (cl_program* ret_program, cl_context context,
               uint ndevices, const cl_device_id* devices,
               uint nfnames, const char* const* fnames)
@@ -192,7 +192,7 @@ static
 run_hello ()
 {
     int err;
-      
+
     uint count = 1024*1024;
     real* data = AllocT( real, count );
     real* results = AllocT( real, count );
@@ -202,7 +202,7 @@ run_hello ()
 
     cl_program program;
     cl_kernel kernel;
-    
+
     uint ndevices = 0;
     cl_device_id* devices;
     cl_context context;
@@ -210,13 +210,13 @@ run_hello ()
     const uint dev_idx = 0;
 
     cl_mem input, output;
-    
+
         /* Fill our data set with random float values.*/
     uint i;
 
     UFor( i, count )
         data[i] = rand() / (real)RAND_MAX;
-    
+
     compute_devices (&ndevices, &devices, &context, &comqs);
     printf ("I have %u devices!\n", ndevices);
 
@@ -241,7 +241,7 @@ run_hello ()
     check_cl_status (err, "alloc read mem");
     output = clCreateBuffer (context, CL_MEM_WRITE_ONLY, sizeof(real) * count, 0, &err);
     check_cl_status (err, "alloc write mem");
-    
+
         /* Write our data set into the input array in device memory.*/
     err = clEnqueueWriteBuffer(comqs[dev_idx], input, CL_TRUE, 0, sizeof(real) * count, data, 0,  0, 0);
     check_cl_status (err, "write source array");
@@ -269,7 +269,7 @@ run_hello ()
         /* Read back the results from the device to verify the output */
     err = clEnqueueReadBuffer (comqs[dev_idx], output, CL_TRUE, 0, sizeof(real) * count, results, 0, NULL, NULL);
     check_cl_status (err, "read output array");
-    
+
 #if 1
         /* Validate our results.*/
     correct = 0;
@@ -279,11 +279,11 @@ run_hello ()
             correct++;
             /* else printf ("\nexpect:%.15f\nresult:%.15f\n", results[i], data[i] * data[i]); */
     }
-    
+
         /* Print a brief summary detailing the results.*/
     printf("Computed '%d/%d' correct values!\n", correct, count);
 #endif
-    
+
         /* Shutdown and cleanup.*/
     clReleaseMemObject(input);
     clReleaseMemObject(output);
@@ -307,7 +307,7 @@ run_ray_cast ()
     cl_program program;
     size_t global_work_size[2];
     cl_kernel kernel;
-    
+
     uint ndevices = 0;
     cl_device_id* devices;
     cl_context context;

@@ -716,7 +716,7 @@ mouse_move_fn (Pilot* pilot, const SDL_MouseMotionEvent* event)
     npix = min_uint (pilot->ray_image.nrows,
                      pilot->ray_image.ncols);
 #endif
-    
+
     coords[0] = event->y;
     coords[1] = event->x;
     sane_mouse_coords (coords, pilot);
@@ -852,7 +852,7 @@ sdl_main (RaySpace* space, const char* pathname, Pilot* pilots)
     SDL_Thread* render_thread = 0;
     SDL_Surface* icon = 0;
     SDL_Surface* screen = 0;
-    SDL_Joystick* joysticks[NRacersMax]; 
+    SDL_Joystick* joysticks[NRacersMax];
 #ifdef SupportHaptic
     SDL_Haptic* haptics[NRacersMax];
     SDL_HapticEffect haptic_effect;

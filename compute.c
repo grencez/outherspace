@@ -83,7 +83,7 @@ dbgout_compute (const char* format, ...)
 
     buf[off++] = '\n';
     buf[off] = '\0';
-    
+
     fputs (buf, stderr);
 }
 
@@ -647,7 +647,7 @@ rays_to_hits_balancer (RayImage* image)
         row_off = cpts[i].intl[0];
         row_nul = cpts[i].intl[1];
         dt = cpts[i].dt;
-        
+
         ncomplete += row_nul;
         compute_time += dt;
         cpts[i].compute_time += dt;

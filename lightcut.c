@@ -234,11 +234,12 @@ linearize_LightCutNode (LightCutNode* light,
 
     light->lights = off;
 
+    light->nlights = 0;
     sp = split_LightCutNode (light, 0);
     if (sp)
     {
         off = linearize_LightCutNode (sp, off);
-        light->nlights = sp->nlights;
+        light->nlights += sp->nlights;
     }
 
     sp = split_LightCutNode (light, 1);
@@ -512,7 +513,7 @@ cast_lights (RaySpace* space, uint nphotons, uint nbounces)
             light->area = area;
 
             zero_Point (&c);
-            c.coords[FwDim] = sin (zenith) * cos(azimuthcc); 
+            c.coords[FwDim] = sin (zenith) * cos(azimuthcc);
             c.coords[RtDim] = sin (zenith) * sin(azimuthcc);
             c.coords[UpDim] = cos (zenith);
 

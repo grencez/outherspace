@@ -66,6 +66,8 @@ endif
 
 #valgrind --num-callers=50 --db-attach=yes --db-command='cgdb -- %f %p'
 
+DEPENDFILE = deps.mk
+
 PfxBldPath = $(Pfx)bld
 CxPath = ../cx
 BinPath = ../bin
@@ -252,25 +254,24 @@ ExeList := $(addprefix $(BinPath)/,$(ExeList))
 Objs = \
 	affine.o \
 	bbox.o \
-    bitstring.o \
 	compute.o \
-    dynamic-setup.o \
-    kdtree.o \
-    kptree.o \
-    lightcut.o \
-    material.o \
-    order.o \
-    pnm-image.o \
-    raytrace.o \
-    scene.o \
-    serial.o \
-    simplex.o \
-    slist.o \
-    testcase.o \
-    track.o \
-    util.o \
-    wavefront-file.o \
-    xfrm.o \
+	dynamic-setup.o \
+	kdtree.o \
+	kptree.o \
+	lightcut.o \
+	material.o \
+	order.o \
+	pnm-image.o \
+	raytrace.o \
+	scene.o \
+	serial.o \
+	simplex.o \
+	slist.o \
+	testcase.o \
+	track.o \
+	util.o \
+	wavefront-file.o \
+	xfrm.o \
 	cli.o \
 	file2array.o \
 	gui.o \
@@ -279,9 +280,10 @@ Objs = \
 include $(CxPath)/include.mk
 
 $(eval $(shell \
+	test -e $(DEPENDFILE) && \
 	sed \
 	-e 's/\(.*\): *\(.*\)/$$(eval $$(BldPath)\/\1: $$(BldPath)\/\2)/' \
-	deps.mk))
+	$(DEPENDFILE)))
 
 gui_exe = $(BinPath)/$(Pfx)$(call exename,gui)
 cli_exe = $(BinPath)/$(Pfx)$(call exename,cli)
@@ -301,7 +303,6 @@ CFLAGS += $(IFLAGS)
 
 CSources = affine.c \
 		   bbox.c \
-		   bitstring.c \
 		   dynamic-setup.c \
 		   kdtree.c \
 		   kptree.c \
@@ -353,6 +354,10 @@ $(call binexe,$(Pfx)cli): \
 GuiCFlags += $(CFLAGS)
 GuiDFlags += $(DFLAGS)
 GuiLFlags += $(LFLAGS)
+CFLAGS := $(GuiCFlags)
+DFLAGS := $(GuiDFlags)
+LFLAGS := $(GuiLFlags)
+CFLAGS += $(DFLAGS)
 
 $(call binexe,$(Pfx)gui): \
 	$(patsubst %.c,$(BldPath)/%.c, $(GuiCFiles)) \
@@ -402,6 +407,14 @@ test: $(call exename,$(Pfx)cli)
 	#valgrind --track-origins=yes ./$<
 	./$<
 
+.PHONY: depend
+depend:
+	grep '^#include *"' *.c *.h \
+		| grep -v -e 'mdd\.h' -e 'cx/' \
+		| sed -e 's/\(.*\):#include.*"\(.*\)".*/\1: \2/' \
+		> $(DEPENDFILE)
+	sed -i -e 's/\(.*\)\.\(c\?\):\(.*\)\.\(hh\?\)/\1.\2:\3.\4\n\1.o:\3.\4/' $(DEPENDFILE)
+
 .PHONY: ways
 ways:
 	$(MAKE) -f Makefile.ways
@@ -413,7 +426,7 @@ cleanways:
 .PHONY: clean
 clean:
 	rm -fr $(PfxBldPath)
-	rm -f $(ExeList)
+	rm -f $(ExeList) $(DEPENDFILE)
 
 
 .PHONY: cleanall

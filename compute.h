@@ -23,8 +23,5 @@ void compute_rays_to_hits (RayImage* image,
                            const PointXfrm* restrict view_basis);
 bool rays_to_hits_computeloop (RaySpace* restrict space);
 
-#ifdef IncludeC
-#include "compute.c"
-#endif
 #endif
 

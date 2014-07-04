@@ -262,7 +262,7 @@ isect_BarySimplex (real* restrict ret_dist,
 
     dist *= 1 / dot;
     follow_Ray (&isect, ray, dist);
-    
+
     bcoord_sum = fuzz;
     {:for (i ; NDims-1)
         bpoint.coords[i] = dist_Plane (&elem->barys[i], &isect);
@@ -307,7 +307,7 @@ delayed_div_isect_BarySimplex (real* restrict ret_dist,
     Op_Point_21010( &isect
                     ,+, dist*, &ray->direct
                     ,   dot*, &ray->origin );
-    
+
     bcoord_sum = fuzz;
     {:for (i ; NDims-1)
         bpoint.coords[i] =

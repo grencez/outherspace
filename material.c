@@ -106,7 +106,7 @@ map_sky_Texture (Color* color, const Texture* texture, const Point* p)
     real x, y, z;
     real zenith, azimuth;
     const byte* pixels;
-    
+
     x = p->coords[UpDim];
     y = p->coords[RtDim];
     z = p->coords[FwDim];
@@ -266,7 +266,7 @@ remap_bumps_Texture (Texture* texture, const IAMap* map)
             p.coords[j] = pixels[3*i+j];
 
         xfrm_Point (&p, &map->xfrm, &p);
-        
+
         m = match_real (abs_real (p.coords[0]),
                         match_real (p.coords[1], p.coords[2]));
         m = 127.5 / m;

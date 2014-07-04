@@ -128,7 +128,7 @@ static
     void
 init_ogl_ui_data ()
 {
-    GLint status = GL_NO_ERROR; 
+    GLint status = GL_NO_ERROR;
     FILE* err = stderr;
     GLint loc;
 #ifdef EmbedFiles
@@ -451,7 +451,7 @@ ogl_setup (const RaySpace* space)
     if (DisplayRayImage)
     {
         glUseProgram (0);
-        glDisable (GL_LIGHTING); 
+        glDisable (GL_LIGHTING);
         glEnable (GL_TEXTURE_2D);
         glActiveTexture (GL_TEXTURE0);
     }

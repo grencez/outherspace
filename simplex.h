@@ -38,9 +38,6 @@ hit_BarySimplex (real* restrict ret_dist,
                  const BarySimplex* restrict elem,
                  Trit front);
 
-#ifdef IncludeC
-#include "simplex.c"
-#endif
 
 #endif
 

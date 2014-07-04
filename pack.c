@@ -45,7 +45,7 @@ count_boolPack (boolPack a)
     {
         0, 1, 1, 2,
         1, 2, 2, 3,
-        1, 2, 2, 3, 
+        1, 2, 2, 3,
         2, 3, 3, 4
     };
     return bits[_mm_movemask_ps (a)];
@@ -268,7 +268,7 @@ inside_pack_BBox (const BBox* box, const PointPack* point)
         hi = fill_realPack (box->max.coords[i]);
         intmp = and_boolPack (leql_realPack (lo, point->coords[i]),
                               geql_realPack (hi, point->coords[i]));
-                                           
+
         inside = and_boolPack (inside, intmp);
     }
     return inside;
@@ -296,7 +296,7 @@ hit_pack_BarySimplex (realPack* restrict ret_dist,
     rayto_PointPack (&isect, origin, direct, dist);
     *ret_dist = dist;
         /* /dist/ means something different below!*/
-    
+
     bcoord_sum = zero_realPack ();
     UFor( i, NDimensions-1 )
     {

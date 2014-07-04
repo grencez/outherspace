@@ -78,9 +78,6 @@ xfrm_Simplex (Simplex* dst,
               const Simplex* B);
 
 
-#ifdef IncludeC
-#include "xfrm.c"
-#endif
 
 #endif
 

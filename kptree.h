@@ -32,7 +32,7 @@ struct KPTreeGrid
 };
 
 
-void 
+void
 set1_KPTreeGrid (KPTreeGrid* grid, uint i, const Point* p);
 uint
 descend_KPTree (const KPTree* tree, const Point* loc, uint i);
@@ -55,9 +55,6 @@ lose_KPTreeGrid (KPTreeGrid* grid);
 void
 build_KPTree (KPTree* tree, KPTreeGrid* grid);
 
-#ifdef IncludeC
-#include "kptree.c"
-#endif
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
 #endif

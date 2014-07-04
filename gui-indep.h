@@ -17,7 +17,7 @@
 
 #define NRacersMax 10
 
-static const bool FollowRacer = true;
+static const bool FollowRacer = false;
 
 static const bool RenderDrawsPattern = false;
 static const bool ForceFauxFishEye = false;

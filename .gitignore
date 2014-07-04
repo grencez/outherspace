@@ -1,4 +1,6 @@
 
+deps.mk
+bld
 cli
 file2array
 gui
@@ -7,4 +9,5 @@ verify
 
 tags
 *.embed.h
+*.swp
 

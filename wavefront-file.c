@@ -367,7 +367,7 @@ strto_Color (Color* a, const char* line)
         if (!line)
         {
             if (i == 0)  return false;
-            a->coords[i] = a->coords[i-1]; 
+            a->coords[i] = a->coords[i-1];
         }
     }
     return true;
