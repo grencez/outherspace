@@ -14,7 +14,7 @@
 #include <string.h>
 
 #define MaxKDTreeDepth 50
-    /* #define MaxKDTreeDepth 0 */
+/* #define MaxKDTreeDepth 0 */
 
     void
 output_KDTreeGrid (FILE* out, const KDTreeGrid* grid)
@@ -857,15 +857,14 @@ upnext_KDTreeNode (Point* entrance,
     uint child_idx;
     uint split_dim;
     uint to_idx;
+    uint ret_idx = Max_uint;
 
     {
-        __global const KDTreeNode* node;
-        __global const BBox* box;
+        __global const KDTreeNode* node = &nodes[node_idx];
+        const BBox box = node->as.leaf.box;
         real mag;
-        node = &nodes[node_idx];
         assert (leaf_KDTreeNode (node));
-        box = &node->as.leaf.box;
-        mag = hit_inner_BBox (entrance, &split_dim, box,
+        mag = hit_inner_BBox (entrance, &split_dim, &box,
                               ray, invdirect);
         if (hit_mag < mag)
             return Max_uint;
@@ -882,7 +881,7 @@ upnext_KDTreeNode (Point* entrance,
         /* Terminating condition:
          * Backtracked from root node => no possible next leaf.
          */
-    while (child_idx != 0)
+    while (child_idx != 0 && ret_idx == Max_uint)
     {
         __global const KDTreeNode* node;
         __global const KDTreeInner* inner;
@@ -899,13 +898,15 @@ upnext_KDTreeNode (Point* entrance,
             inner->children[to_idx] != child_idx)
         {
             *ret_parent = node_idx;
-            return inner->children[to_idx];
+            ret_idx = inner->children[to_idx];
         }
-
-        child_idx = node_idx;
-        node_idx = inner->parent;
+        else
+        {
+          child_idx = node_idx;
+          node_idx = inner->parent;
+        }
     }
-    return Max_uint;
+    return ret_idx;
 }
 
 static

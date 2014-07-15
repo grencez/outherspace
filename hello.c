@@ -1,6 +1,13 @@
 
 #include "pnm-image.h"
 #include "testcase.h"
+#include "track.h"
+#include "dynamic-setup.h"
+#include "space.h"
+#include "point.h"
+#include "xfrm.h"
+#include "cx/syscx.h"
+#include "cx/alphatab.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -13,6 +20,47 @@
 #include <CL/cl.h>
 #endif
 
+#define ENABLE_SMOKETEST
+
+
+#if 0
+static
+  void
+ray_cast_kernel (uint row, uint col,
+                 __global unsigned int* hits,
+                 __global const RayCastAPriori* known,
+                 __global const uint* dims,
+                 __global const BBox* box,
+                 __global const uint* nelems,
+                 __global const Simplex* elems,
+                 __global const BarySimplex* simplices,
+                 __global const uint* elemidcs,
+                 __global const KDTreeNode* nodes)
+{
+  Ray ray;
+  uint hit = Max_uint;
+  real mag = Max_real;
+
+  ray.origin = known->origin;
+  zero_Point (&ray.direct);
+  ray.direct.coords[UpDim] = known->up_scale * (-1 + (2*row+1.0) / dims[0]);
+  ray.direct.coords[RtDim] = known->rt_scale * (-1 + (2*col+1.0) / dims[1]);
+  ray.direct.coords[FwDim] = 1;
+  trxfrm_Point (&ray.direct, &known->basis, &ray.direct);
+  normalize_Point (&ray.direct, &ray.direct);
+
+  cast_Ray (&hit, &mag, &ray,
+            *nelems,
+            elemidcs,
+            nodes,
+            simplices,
+            elems,
+            box,
+            known->inside_box,
+            Yes);
+  hits[row * dims[2] + col] = hit;
+}
+#endif
 
 static
     void
@@ -62,6 +110,7 @@ compute_devices (uint* ret_ndevices,
         ndevices += n;
     }
 
+    /* ndevices = 1; */
     devices = AllocT( cl_device_id, ndevices );
 
     device_offset = 0;
@@ -123,6 +172,21 @@ load_program (cl_program* ret_program, cl_context context,
     {
         long len;
         FILE* in;
+
+        if (eq_cstr ("color.h", fnames[i])) {
+          const char color_pfx[] =
+            "#undef NDims\n#define NDims NColors\n#define Point Color\n";
+          const char color_sfx[] =
+            "\n#undef NDims\n#define NDims NDimensions\n";
+          len = strlen(color_pfx) + sizes[i-1] + strlen(color_sfx);
+          bufs[i] = AllocT( char, (size_t) len );
+          sizes[i] = len;
+          strncpy (bufs[i], color_pfx, strlen(color_pfx));
+          strncpy (bufs[i]+strlen(color_pfx), bufs[i-1], sizes[i-1]);
+          strncpy (bufs[i]+strlen(color_pfx)+sizes[i-1], color_sfx, strlen(color_sfx));
+          continue;
+        }
+
         in = fopen (fnames[i], "rb");
         assert (in);
         fseek (in, 0, SEEK_END);
@@ -143,7 +207,7 @@ load_program (cl_program* ret_program, cl_context context,
     check_cl_status (err, "create program");
 
     err = clBuildProgram (program, ndevices, devices, 0, 0, 0);
-    if (err != CL_SUCCESS)
+    if (false || err != CL_SUCCESS)
     {
         cl_build_status build_stat;
         UFor( i, ndevices )
@@ -155,7 +219,7 @@ load_program (cl_program* ret_program, cl_context context,
                                         &build_stat,
                                         0);
             check_cl_status (be, "build info");
-            if (build_stat != CL_BUILD_SUCCESS) {
+            if (false || build_stat != CL_BUILD_SUCCESS) {
                 char* log;
                 size_t size;
                 FILE* out;
@@ -187,6 +251,7 @@ load_program (cl_program* ret_program, cl_context context,
     *ret_program = program;
 }
 
+#ifdef ENABLE_SMOKETEST
 static
     void
 run_hello ()
@@ -223,12 +288,36 @@ run_hello ()
     {
         const char* fnames[] =
         {
-            "util.h", "util.c", "space.h", "space.c",
-            "scene.h", "kdtree.h", "kdtree.c",
-            "xfrm.h", "xfrm.c", "raytrace.h", "raytrace.c",
-            "hello.cl"
+          "bld/cx/def.h",
+          "bld/cx/synhax.h",
+          "bld/outherspace/util.h",
+          "bld/outherspace/util.c",
+          "bld/outherspace/op.h",
+          "bld/outherspace/space.h",
+          "bld/outherspace/point.h",
+          "bld/outherspace/space-junk.h",
+          "bld/outherspace/xfrm.h",
+          "bld/outherspace/xfrm.c",
+          "bld/outherspace/affine.h",
+          "bld/outherspace/affine.c",
+          "bld/outherspace/simplex.h",
+          "bld/outherspace/simplex.c",
+          "bld/outherspace/bbox.h",
+          "bld/outherspace/bbox.c",
+          "bld/outherspace/kdtree.h",
+          "bld/outherspace/kdtree.c",
+          "bld/cx/table.h",
+          "bld/cx/bstree.h",
+          "bld/cx/bstree.c",
+          "bld/outherspace/material.h",
+          "bld/outherspace/scene.h",
+          "bld/outherspace/kptree.h",
+          "bld/outherspace/raytrace.h",
+          "bld/outherspace/raytrace.c",
+          "hello.cl"
         };
-        const uint nfnames = sizeof(fnames) / sizeof(const char*);
+        const uint nfnames = ArraySz( fnames );
+        /* ndevices = 1; */
         load_program (&program, context, ndevices, devices, nfnames, fnames);
     }
 
@@ -296,189 +385,299 @@ run_hello ()
     free (data);
     free (results);
 }
+#endif
 
+#if 1
 static
     void
 run_ray_cast ()
 {
-    int err;
-    uint i;
+  int err;
+  uint i;
+  RaySpace space;
+  RayImage image;
+  RayCastAPriori raycast_apriori;
+  Track track;
+  real t0, t1;
 
-    cl_program program;
-    size_t global_work_size[2];
-    cl_kernel kernel;
+  cl_program program;
+  size_t global_work_size[2];
+  cl_kernel kernel;
+  uint dims[4];
 
-    uint ndevices = 0;
-    cl_device_id* devices;
-    cl_context context;
-    cl_command_queue* comqs;
-    const uint dev_idx = 0;
-    real view_angle = 2 * M_PI / 3;
+  uint ndevices = 0;
+  cl_device_id* devices;
+  cl_context context;
+  cl_command_queue* comqs;
+  const uint dev_idx = 0;
 
-    cl_mem ret_hits, inp_params, inp_elems, inp_elemidcs, inp_nodes;
+  cl_mem kernel_args[20];
+  uint n_kernel_args = 0;
 
-    RaySpace space;
+  size_t hits_size;
+  ObjectRaySpace* object;
+
+  init_Track (&track);
+  init_RayImage (&image);
+
+  image.nrows = 500;
+  image.ncols = 500;
+  image.hits = AllocT( uint, 1 );
+
+  if (!readin_Track (&track, &space, "data", "rgtest.txt")) {
+    DBog0( "Can't read file!" );
+    return;
+  }
+  {
     Point view_origin;
     PointXfrm view_basis;
-    MultiRayCastParams params;
+    view_origin = track.camloc.xlat;
+    transpose_PointXfrm (&view_basis, &track.camloc.xfrm);
+    image.nrows = track.nimgrows;
+    image.ncols = track.nimgcols;
+    setup_RayCastAPriori (&raycast_apriori, &image, &view_origin, &view_basis,
+                          &space.box);
+  }
 
-    const uint nrows = 5000;
-    const uint ncols = 5000;
-    uint* hits;
-    size_t hits_size;
+  global_work_size[0] = image.nrows;
+  global_work_size[1] = image.ncols;
+  hits_size = image.nrows * image.ncols * sizeof (uint);
 
-    global_work_size[0] = nrows;
-    global_work_size[1] = ncols;
+  compute_devices (&ndevices, &devices, &context, &comqs);
+  printf ("I have %u devices!\n", ndevices);
 
-    setup_testcase_triangles (&space, &view_origin, &view_basis, &view_angle);
-
-    hits = AllocT( uint, nrows * ncols );
-    hits_size = nrows * ncols * sizeof (uint);
-
-    build_MultiRayCastParams (&params, nrows, ncols, &space,
-                              &view_origin, &view_basis,
-                              view_angle);
-
-
-    compute_devices (&ndevices, &devices, &context, &comqs);
-    printf ("I have %u devices!\n", ndevices);
-
+  {
+    const char* fnames[] =
     {
-        const char* fnames[] =
-        {
-            "util.h", "util.c", "space.h", "space.c",
-            "scene.h", "kdtree.h", "kdtree.c",
-            "xfrm.h", "xfrm.c", "raytrace.h", "raytrace.c",
-            "hello.cl"
-        };
-        const uint nfnames = sizeof(fnames) / sizeof(const char*);
-        load_program (&program, context, ndevices, devices, nfnames, fnames);
-    }
+      "bld/cx/def.h",
+      "bld/cx/synhax.h",
+      "bld/outherspace/util.h",
+      "bld/outherspace/util.c",
+      "bld/outherspace/op.h",
+      "bld/outherspace/space.h",
+      "bld/outherspace/point.h",
+      "color.h",
+      "bld/outherspace/space-junk.h",
+      "bld/outherspace/xfrm.h",
+      "bld/outherspace/xfrm.c",
+      "bld/outherspace/affine.h",
+      "bld/outherspace/affine.c",
+      "bld/outherspace/simplex.h",
+      "bld/outherspace/simplex.c",
+      "bld/outherspace/bbox.h",
+      "bld/outherspace/bbox.c",
+      "bld/outherspace/kdtree.h",
+      "bld/outherspace/kdtree.c",
+      "bld/cx/table.h",
+      "bld/cx/bstree.h",
+      "bld/cx/bstree.c",
+      "bld/outherspace/material.h",
+      "bld/outherspace/scene.h",
+      "bld/outherspace/kptree.h",
+      "bld/outherspace/raytrace.h",
+      "bld/outherspace/raytrace.c",
+      "hello.cl"
+    };
+    const uint nfnames = ArraySz( fnames );
+    /* ndevices = 1; */
+    load_program (&program, context, ndevices, devices, nfnames, fnames);
+    /* load_program (&program, context, 1, devices, nfnames, fnames); */
+  }
 
-        /* Create the compute kernel in the program we wish to run.*/
-    kernel = clCreateKernel (program, "ray_cast_kernel", &err);
-    check_cl_status (err, "create compute kernel");
+  /* Create the compute kernel in the program we wish to run.*/
+  kernel = clCreateKernel (program, "ray_cast_kernel", &err);
+  check_cl_status (err, "create compute kernel");
+
+  object = &space.main;
+  resize_RayImage (&image);
+  t0 = monotime ();
+  update_dynamic_RaySpace (&space);
+  t1 = monotime ();
+  printf ("Kd-tree build sec:%f\n", t1 - t0);
+  t0 = t1;
 
 
 #if 1
-    ret_hits = clCreateBuffer (context,
-                               CL_MEM_WRITE_ONLY | CL_MEM_USE_HOST_PTR,
-                               hits_size, hits, &err);
-    check_cl_status (err, "alloc hits buffer");
+  kernel_args[n_kernel_args++] =
+    clCreateBuffer (context,
+                    CL_MEM_WRITE_ONLY | CL_MEM_USE_HOST_PTR,
+                    hits_size, image.hits, &err);
+  check_cl_status (err, "alloc hits buffer");
 #else
-    ret_hits = clCreateBuffer (context, CL_MEM_WRITE_ONLY,
-                               hits_size, 0, &err);
-    check_cl_status (err, "alloc hits buffer");
+  ret_hits = clCreateBuffer (context, CL_MEM_WRITE_ONLY,
+                             hits_size, 0, &err);
+  check_cl_status (err, "alloc hits buffer");
 #endif
 
-    inp_params = clCreateBuffer (context,
-                                 CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                                 sizeof (MultiRayCastParams),
-                                 &params, &err);
-    check_cl_status (err, "alloc params buffer");
+  kernel_args[n_kernel_args++] =
+    clCreateBuffer (context,
+                    CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                    sizeof (RayCastAPriori),
+                    &raycast_apriori, &err);
+  check_cl_status (err, "alloc params buffer");
 
-    inp_elems = clCreateBuffer (context,
-                                CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                                space.nelems * sizeof (Simplex),
-                                space.elems, &err);
-    check_cl_status (err, "alloc elems buffer");
+  dims[0] = image.nrows;
+  dims[1] = image.ncols;
+  dims[2] = image.stride;
+  dims[3] = object->nelems;
+  kernel_args[n_kernel_args++] =
+    clCreateBuffer (context,
+                    CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                    sizeof(dims),
+                    dims, &err);
+  check_cl_status (err, "alloc dims buffer");
 
-    inp_elemidcs = clCreateBuffer (context,
-                                   CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                                   space.tree.nelemidcs * sizeof (uint),
-                                   space.tree.elemidcs, &err);
-    check_cl_status (err, "alloc elemidcs buffer");
+  kernel_args[n_kernel_args++] =
+    clCreateBuffer (context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                    sizeof (BBox),
+                    &object->box, &err);
+  check_cl_status (err, "alloc bounding box");
 
-    inp_nodes = clCreateBuffer (context,
-                                CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                                space.tree.nnodes * sizeof (KDTreeNode),
-                                space.tree.nodes, &err);
-    check_cl_status (err, "alloc nodes buffer");
+  kernel_args[n_kernel_args++] =
+    clCreateBuffer (context,
+                    CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                    object->nelems * sizeof (Simplex),
+                    object->elems, &err);
+  check_cl_status (err, "alloc elems buffer");
+
+  kernel_args[n_kernel_args++] =
+    clCreateBuffer (context,
+                    CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                    object->nelems * sizeof (BarySimplex),
+                    object->simplices, &err);
+  check_cl_status (err, "alloc barycentric elems buffer");
+
+  kernel_args[n_kernel_args++] =
+    clCreateBuffer (context,
+                    CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                    object->tree.nelemidcs * sizeof (uint),
+                    object->tree.elemidcs, &err);
+  check_cl_status (err, "alloc elemidcs buffer");
+
+  kernel_args[n_kernel_args++] =
+    clCreateBuffer (context,
+                    CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                    object->tree.nnodes * sizeof (KDTreeNode),
+                    object->tree.nodes, &err);
+  check_cl_status (err, "alloc nodes buffer");
 
 
-        /* Set the arguments to our compute kernel.*/
-    err  = clSetKernelArg (kernel, 0, sizeof(cl_mem), &ret_hits);
-    check_cl_status (err, "set kernel argument 0");
+  UFor( i, n_kernel_args )
+  {
+    char msg[100];
+    /* Set the arguments to our compute kernel.*/
+    err  = clSetKernelArg (kernel, i, sizeof(cl_mem), &kernel_args[i]);
+    sprintf (msg, "set kernel argument %u", i);
+    check_cl_status (err, msg);
+  }
 
-    err = clSetKernelArg (kernel, 1, sizeof(cl_mem), &inp_params);
-    check_cl_status (err, "set kernel argument 1");
-
-    err = clSetKernelArg (kernel, 2, sizeof(cl_mem), &inp_elems);
-    check_cl_status (err, "set kernel argument 2");
-
-    err = clSetKernelArg (kernel, 3, sizeof(cl_mem), &inp_elemidcs);
-    check_cl_status (err, "set kernel argument 3");
-
-    err = clSetKernelArg (kernel, 4, sizeof(cl_mem), &inp_nodes);
-    check_cl_status (err, "set kernel argument 4");
-
-#if 1
-    UFor( i, 10 )
+  t0 = monotime ();
+#if 0
+  {
+    const uint n_work_rows = 2;
+    const uint n_work_cols = 2;
+  UFor( i, n_work_rows )
+  {
+    uint j;
+    UFor( j, n_work_cols )
     {
-        uint j;
-        UFor( j, 10 )
-        {
-            size_t work_offset[2];
-            size_t work_size[2];
+      size_t work_offset[2];
+      size_t work_size[2];
 
-            work_size[0] = nrows / 10;
-            work_size[1] = ncols / 10;
+      work_size[0] = image.nrows / n_work_rows;
+      work_size[1] = image.ncols / n_work_cols;
 
-            work_offset[0] = i * work_size[0];
-            work_offset[1] = j * work_size[1];
+      work_offset[0] = i * work_size[0];
+      work_offset[1] = j * work_size[1];
+      /* if ((i+j) % 2 == 0) continue; */
 
-            err = clEnqueueNDRangeKernel (comqs[dev_idx], kernel, 2,
-                                          work_offset,
-                                          work_size, 0, 0, 0, 0);
-            check_cl_status (err, "enqueue kernel");
-            err = clFinish (comqs[dev_idx]);
-            check_cl_status (err, "finish kernel");
-        }
+      err = clEnqueueNDRangeKernel (comqs[dev_idx], kernel, 2,
+                                    work_offset,
+                                    work_size, 0, 0, 0, 0);
+      check_cl_status (err, "enqueue kernel");
+      err = clFinish (comqs[dev_idx]);
+      check_cl_status (err, "finish kernel");
     }
+  }
+  }
 #else
-    err = clEnqueueNDRangeKernel (comqs[dev_idx], kernel, 2, 0,
-                                  global_work_size, 0, 0, 0, 0);
-    check_cl_status (err, "enqueue kernel");
+  err = clEnqueueNDRangeKernel (comqs[dev_idx], kernel, 2, 0,
+                                global_work_size, 0, 0, 0, 0);
+  check_cl_status (err, "enqueue kernel");
 
-        /* Wait for the command commands to get serviced before reading back results.*/
-    err = clFinish (comqs[dev_idx]);
-    check_cl_status (err, "finish kernel");
+  /* Wait for the command commands to get serviced before reading back results.*/
+  err = clFlush (comqs[dev_idx]);
+  err = clFinish (comqs[dev_idx]);
+  check_cl_status (err, "finish kernel");
 #endif
+  t1 = monotime ();
+  printf ("Render sec:%f\n", t1 - t0);
 
 #if 0
-        /* Read back the results from the device to verify the output */
-    err = clEnqueueReadBuffer (comqs[dev_idx], ret_hits, CL_TRUE,
-                               0, hits_size, hits, 0, 0, 0);
-    check_cl_status (err, "read output hits");
+  /* Read back the results from the device to verify the output */
+  err = clEnqueueReadBuffer (comqs[dev_idx], kernel_args[0], CL_TRUE,
+                             0, hits_size, image.hits, 0, 0, 0);
+  check_cl_status (err, "read output hits");
 #endif
 
+  /* Shutdown and cleanup.*/
+  UFor( i, n_kernel_args )
+  {
+    clReleaseMemObject (kernel_args[i]);
+  }
+  clReleaseProgram (program);
+  clReleaseKernel (kernel);
+  UFor( i, ndevices )
+    clReleaseCommandQueue (comqs[i]);
+  clReleaseContext (context);
 
-        /* Shutdown and cleanup.*/
-    clReleaseMemObject (ret_hits);
-    clReleaseMemObject (inp_params);
-    clReleaseMemObject (inp_elems);
-    clReleaseMemObject (inp_elemidcs);
-    clReleaseMemObject (inp_nodes);
-    clReleaseProgram (program);
-    clReleaseKernel (kernel);
-    UFor( i, ndevices )
-        clReleaseCommandQueue (comqs[i]);
-    clReleaseContext (context);
+  if (devices)  free (devices);
+  if (comqs)  free (comqs);
 
-    if (devices)  free (devices);
-    if (comqs)  free (comqs);
+#if 0
+#pragma omp parallel for
+  for (i = 0; i < image.nrows; ++i) {
+    for (uint j = 0; j < image.ncols; ++j) {
+      ray_cast_kernel (i, j,
+                       image.hits,
+                       &raycast_apriori,
+                       dims,
+                       &object->box,
+                       &object->nelems,
+                       object->elems,
+                       object->simplices,
+                       object->tree.elemidcs,
+                       object->tree.nodes);
+    }
+  }
+#elif 0
+#pragma omp parallel for
+  for (i = 0; i < image.nrows; ++i) {
+    cast_row_perspective (&image, i, &space, &raycast_apriori);
+  }
+#elif 0
+  cast_RayImage (&image, &space, &raycast_apriori.origin, &raycast_apriori.basis);
+#endif
 
 #ifndef BENCHMARKING
-    output_PGM_image ("out.pgm", nrows, ncols, hits, space.nelems);
+  output_PGM_image ("out.pgm", image.nrows, image.ncols, image.hits, object->nelems);
 #endif
-    free (hits);
-    cleanup_RaySpace (&space);
+  cleanup_RayImage (&image);
+  cleanup_RaySpace (&space);
 }
+#endif
 
-int main ()
+int main (int argc, char** argv)
 {
-        /* run_hello (); */
-    run_ray_cast ();
-    return 0;
+  int argi =
+    (init_sysCx (&argc, &argv),
+     1);
+  (void) argi;
+#ifdef ENABLE_SMOKETEST
+  run_hello ();
+#endif
+  run_ray_cast ();
+  lose_sysCx ();
+  return 0;
 }
 

@@ -1,7 +1,9 @@
 
 #ifndef MATERIAL_H_
+#ifndef __OPENCL_VERSION__
 #define MATERIAL_H_
 #include "space.h"
+#endif  /* #ifndef __OPENCL_VERSION__ */
 
 typedef struct Texture Texture;
 typedef struct Material Material;

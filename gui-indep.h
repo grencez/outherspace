@@ -22,7 +22,6 @@ static const bool FollowRacer = false;
 static const bool RenderDrawsPattern = false;
 static const bool ForceFauxFishEye = false;
 static const bool ShowFrameRate = false;
-static const bool LightAtCamera = false;
 static const bool ShowSpeed = false;
 
 typedef struct MotionInput MotionInput;

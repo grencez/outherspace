@@ -151,80 +151,80 @@ bool hit_outer_BBox (Point* entrance,
                      __global const BBox* box,
                      const Point* origin, const Point* dir)
 {
-    uint dim;
-    Point cost;
-    real hit_cost;
-    uint hit_dim;
+  bool keep_going = true;
+  Point cost;
+  real hit_cost;
+  uint hit_dim;
 
-    UFor( dim, NDimensions )
+  for (uint dim = 0; dim < NDims && keep_going; ++dim)
+  {
+    if (dir->coords[dim] > 0)
     {
-        if (dir->coords[dim] > 0)
-        {
-            if (origin->coords[dim] > box->max.coords[dim])
-                return false;
-            if (origin->coords[dim] > box->min.coords[dim])
-                cost.coords[dim] = Small_real;
-            else
-                cost.coords[dim] = ((box->min.coords[dim]
-                                     - origin->coords[dim])
-                                    / dir->coords[dim]);
-        }
-        else if (dir->coords[dim] < 0)
-        {
-            if (origin->coords[dim] < box->min.coords[dim])
-                return false;
-            if (origin->coords[dim] < box->max.coords[dim])
-                cost.coords[dim] = Small_real;
-            else
-                cost.coords[dim] = ((box->max.coords[dim]
-                                     - origin->coords[dim])
-                                    / dir->coords[dim]);
-        }
-        else
-        {
-            cost.coords[dim] = Small_real;
-        }
+      if (origin->coords[dim] > box->max.coords[dim])
+        keep_going = false;
+      else if (origin->coords[dim] > box->min.coords[dim])
+        cost.coords[dim] = Small_real;
+      else
+        cost.coords[dim] = ((box->min.coords[dim]
+                             - origin->coords[dim])
+                            / dir->coords[dim]);
     }
-
-    hit_cost = 0;
-    hit_dim = 0;
-
-    UFor( dim, NDimensions )
+    else if (dir->coords[dim] < 0)
     {
-        if (cost.coords[dim] > hit_cost)
-        {
-            hit_cost = cost.coords[dim];
-            hit_dim = dim;
-        }
+      if (origin->coords[dim] < box->min.coords[dim])
+        keep_going = false;
+      else if (origin->coords[dim] < box->max.coords[dim])
+        cost.coords[dim] = Small_real;
+      else
+        cost.coords[dim] = ((box->max.coords[dim]
+                             - origin->coords[dim])
+                            / dir->coords[dim]);
     }
-
-    UFor( dim, NDimensions )
+    else
     {
-        if (dim == hit_dim)
-        {
-            if (dir->coords[dim] > 0)
-                entrance->coords[dim] = box->min.coords[dim];
-            else
-                entrance->coords[dim] = box->max.coords[dim];
-        }
-        else
-        {
-            entrance->coords[dim] = (origin->coords[dim]
-                                     + hit_cost * dir->coords[dim]);
-            if (dir->coords[dim] > 0)
-            {
-                if (entrance->coords[dim] > box->max.coords[dim])
-                    return false;
-            }
-            else
-            {
-                if (entrance->coords[dim] < box->min.coords[dim])
-                    return false;
-            }
-        }
+      cost.coords[dim] = Small_real;
     }
+  }
+  if (!keep_going)
+    return false;
 
-    return true;
+  hit_cost = 0;
+  hit_dim = 0;
+
+  {:for (dim ; NDims)
+    if (cost.coords[dim] > hit_cost)
+    {
+      hit_cost = cost.coords[dim];
+      hit_dim = dim;
+    }
+  }
+
+  for (uint dim = 0; dim < NDims && keep_going; ++dim) {
+    if (dim == hit_dim)
+    {
+      if (dir->coords[dim] > 0)
+        entrance->coords[dim] = box->min.coords[dim];
+      else
+        entrance->coords[dim] = box->max.coords[dim];
+    }
+    else
+    {
+      entrance->coords[dim] = (origin->coords[dim]
+                               + hit_cost * dir->coords[dim]);
+      if (dir->coords[dim] > 0)
+      {
+        if (entrance->coords[dim] > box->max.coords[dim])
+          keep_going = false;
+      }
+      else
+      {
+        if (entrance->coords[dim] < box->min.coords[dim])
+          keep_going = false;
+      }
+    }
+  }
+
+  return keep_going;
 }
 
 bool hit_BBox (Point* entrance,

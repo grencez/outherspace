@@ -438,8 +438,11 @@ key_press_fn (Pilot* pilot, RaySpace* space, const SDL_keysym* event)
     else if (print_plane_line)
     {
         OFile* of = stdout_OFile ();
+        Point light_pos;
         IAMap iatt;
-        fprintf (out, "%f %f %f  %f %f %f\n",
+        fprintf (out, "img_dims: %u %u\n", ray_image->nrows, ray_image->ncols);
+        fputs ("coords fwd up right\n", out);
+        fprintf (out, "#%f %f %f  %f %f %f\n",
                  view_origin->coords[0],
                  view_origin->coords[1],
                  view_origin->coords[2],
@@ -448,7 +451,18 @@ key_press_fn (Pilot* pilot, RaySpace* space, const SDL_keysym* event)
                  view_basis->pts[ForwardDim].coords[2]);
         identity_IAMap (&iatt);
         transpose_PointXfrm (&iatt.xfrm, view_basis);
+        if (space->lights) {
+          light_pos = space->lights[0].location;
+        }
+        else {
+          light_pos = *view_origin;
+        }
+        printf_OFile (of, "light: %f %f %f\n",
+                      light_pos.coords[0],
+                      light_pos.coords[1],
+                      light_pos.coords[2]);
         xlat_IAMap (&iatt, view_origin, &iatt);
+        oput_cstr_OFile (of, "camloc:");
         oput_IAMap (of, &iatt);
         oput_char_OFile (of, '\n');
         flush_OFile (of);
@@ -832,6 +846,7 @@ render_loop_fn (void* data)
         UFor( i, npilots )
             param->pilots[i] = pilots[i];
 
+        usleep(1000);
         SDL_PushEvent (&draw_event);
         if (SeparateRenderThread)
             SDL_SemWait (param->sig);
@@ -1250,6 +1265,8 @@ int wrapped_main_fn (int argc, char* argv[])
         return 1;
     }
 
+    /* dflt_pilot.ray_image.diffuse_camera_on = true; */
+
     update_dynamic_RaySpace (space);
         /* cast_lights (space, 10); */
 
@@ -1266,6 +1283,9 @@ int wrapped_main_fn (int argc, char* argv[])
 
             pilot = &pilots[i];
             *pilot = dflt_pilot;
+
+            // Enable detection of holes in geometry.
+            /* pilot->ray_image.hits = AllocT( uint, 1 ); */
 
             pilot->craft_idx = i;
             init_RaceCraft (&crafts[pilot->craft_idx]);

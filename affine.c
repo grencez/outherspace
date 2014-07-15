@@ -1,8 +1,10 @@
 
+#ifndef __OPENCL_VERSION__
 #include "affine.h"
 
 #include "point.h"
 #include "xfrm.h"
+#endif  /* #ifndef __OPENCL_VERSION__ */
 
     void
 follow_Ray (Point* isect, const Ray* ray, real mag)

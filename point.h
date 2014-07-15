@@ -23,6 +23,15 @@ def(set) (Point* a, real x)
 }
 
 qualify
+  Point
+def(dflt) (real x)
+{
+  Point p;
+  def(set) (&p, x);
+  return p;
+}
+
+qualify
     void
 def(copy) (Point* dst, const Point* src)
 {

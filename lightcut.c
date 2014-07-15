@@ -317,8 +317,14 @@ make_light_tree (LightCutTree* t, GMRand* gmrand)
         remlights.s[i] = i;
     }
 
-    init_KPTree (&kptree);
-    build_KPTree (&kptree, &kpgrid);
+    {
+      real t0 = monotime ();
+      real t1;
+      init_KPTree (&kptree);
+      build_KPTree (&kptree, &kpgrid);
+      t1 = monotime ();
+      printf ("Kp-tree build sec:%f\n", t1 - t0);
+    }
 
     {
         Point diag;

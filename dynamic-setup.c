@@ -162,6 +162,46 @@ add_racers (RaySpace* space, uint nracers, const Track* track,
     return good;
 }
 
+static
+  bool
+readin_wavefront_Track (Track* track, RaySpace* space,
+                        const char* pathname,
+                        const char* filename)
+{
+  bool good;
+  init_Track (track);
+  init_RaySpace (space);
+
+  {
+    XFileB xfb[1];
+    const char* fname = strrchr (filename, '/');
+    if (fname) {
+      fname = &fname[1];
+    }
+    else {
+      fname = filename;
+    }
+    init_XFileB (xfb);
+    if (!open_FileB (&xfb->fb, pathname, filename))
+      BailOut( false, "couldn't read file" );
+    good = readin_wavefront (&track->scene, xfb->fb.pathname.s, fname);
+    lose_XFileB (xfb);
+  }
+  if (!good)
+    BailOut( false, "it's just no good!");
+
+  copy_Scene (&space->main.scene, &track->scene);
+  init_filled_RaySpace (space);
+  {
+    IAMap map;
+    identity_IAMap (&map);
+    zero_PointXfrm (&map.xfrm);
+    map_Scene (&track->scene, &map);
+    parse_coord_system (&map.xfrm, "right up back");
+  }
+  return good;
+}
+
     bool
 readin_Track (Track* track, RaySpace* space,
               const char* pathname, const char* filename)
@@ -181,6 +221,10 @@ readin_Track (Track* track, RaySpace* space,
   Scene* scene = 0;
   Texture* skytex = 0;
   uint i;
+
+  if (sfxeq_cstr (filename, ".obj")) {
+    return readin_wavefront_Track (track, space, pathname, filename);
+  }
 
   init_XFileB (xfb);
   if (!open_FileB (&xfb->fb, pathname, filename))
@@ -419,10 +463,10 @@ readin_Track (Track* track, RaySpace* space,
     condense_Scene (scene);
     map_Scene (scene, &model_map);
 
+    space->skytxtr = scene->ntxtrs;
     if (skytex)
     {
       if (scene->ntxtrs == 0)  scene->txtrs = 0;  /* Assure NULL.*/
-      space->skytxtr = scene->ntxtrs;
       ConcaT( Texture, scene->txtrs, skytex, scene->ntxtrs, 1 );
       free (skytex);
     }
@@ -535,6 +579,7 @@ parse_coord_system (PointXfrm* a, const char* line)
         else if (AccepTok( line, "right" ))  d = 2 * RtDim;
         else if (AccepTok( line, "left" ))   d = 2 * RtDim + 1;
         else if (AccepTok( line, "for" ))    d = 2 * FwDim;
+        else if (AccepTok( line, "fwd" ))    d = 2 * FwDim;
         else if (AccepTok( line, "back" ))   d = 2 * FwDim + 1;
 
         good = (d < Max_uint);

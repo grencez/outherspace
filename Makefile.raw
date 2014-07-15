@@ -331,9 +331,11 @@ endif
 LFLAGS += -lm
 
 # Note: OpenCL code does not function at this time, don't bother.
-hello: hello.c $(CSources)
-	$(CC) $(CFLAGS) $(DFLAGS) -I $(OpenCLPath)/include $< -o $@ \
-		-L $(OpenCLLibPath) -lOpenCL $(LFLAGS)
+$(BldPath)/hello.o: $(BldPath)/hello.c
+	$(CC) -c $(CFLAGS) $(DFLAGS) -I $(OpenCLPath)/include $< -o $@
+
+hello: $(BldPath)/hello.o $(patsubst %.c,$(BldPath)/%.o, $(CSources)) $(CxStdObjs) $(addprefix $(CxBldPath)/, bstree.o)
+	$(CC) $(CFLAGS) $^ -o $@ -lOpenCL $(LFLAGS)
 
 .PHONY: test-hello
 test-hello: hello

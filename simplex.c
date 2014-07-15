@@ -33,8 +33,9 @@ hit_Simplex (real* restrict ret_dist,
              const Simplex elem,
              Trit front)
 {
+  const real fuzz = 128 * Epsilon_real;
         /* const real epsilon = 16 * Epsilon_real; */
-    const real epsilon = 0;
+    real epsilon = fuzz;
     Point edge1, edge2, tvec, pvec, qvec;
     real det, inv_det;
     real u, v;
@@ -237,7 +238,7 @@ isect_BarySimplex (real* restrict ret_dist,
                    const BarySimplex* restrict elem,
                    Trit front)
 {
-    const real fuzz = -16 * Epsilon_real;
+    const real fuzz = -128 * Epsilon_real;
     real dist, dot, bcoord_sum;
     BaryPoint bpoint;
     Point isect;
@@ -260,10 +261,10 @@ isect_BarySimplex (real* restrict ret_dist,
         return false;
     }
 
+    bcoord_sum = max_uint(dist,1)*fuzz;
     dist *= 1 / dot;
     follow_Ray (&isect, ray, dist);
 
-    bcoord_sum = fuzz;
     {:for (i ; NDims-1)
         bpoint.coords[i] = dist_Plane (&elem->barys[i], &isect);
         if (bpoint.coords[i] < fuzz)  return false;
@@ -281,7 +282,7 @@ delayed_div_isect_BarySimplex (real* restrict ret_dist,
                                const BarySimplex* restrict elem,
                                Trit front)
 {
-    const real fuzz = -16 * Epsilon_real;
+    const real fuzz = -128 * Epsilon_real;
     real dist, dot, bcoord_sum;
     BaryPoint bpoint;
     Point isect;
@@ -308,7 +309,7 @@ delayed_div_isect_BarySimplex (real* restrict ret_dist,
                     ,+, dist*, &ray->direct
                     ,   dot*, &ray->origin );
 
-    bcoord_sum = fuzz;
+    bcoord_sum = dist*fuzz;
     {:for (i ; NDims-1)
         bpoint.coords[i] =
             dot_Point (&elem->barys[i].normal, &isect)
@@ -330,13 +331,13 @@ superfast_isect_BarySimplex (real* restrict ret_dist,
                              const BarySimplex* restrict elem,
                              Trit front)
 {
-    const real fuzz = -16 * Epsilon_real;
+    const real fuzz = -128 * Epsilon_real;
     real dist, dot, bcoord_sum;
     BaryPoint bpoint;
     Point isect;
 
-    bcoord_sum = fuzz;
     dist = dist_Plane (&elem->plane, &ray->origin);
+    bcoord_sum = dist*fuzz;
     dot = - dot_Point (&elem->plane.normal, &ray->direct);
     if (dot > 0 && front != Nil)
     {
@@ -399,7 +400,7 @@ hit_BarySimplex (real* restrict ret_dist,
                  Trit front)
 {
     return
-#if 0
+#if 1
         isect_BarySimplex
 #elif 0
         delayed_div_isect_BarySimplex

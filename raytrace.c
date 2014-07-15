@@ -21,6 +21,7 @@
 #include <omp.h>
 #endif
 
+#endif  /* #ifndef __OPENCL_VERSION__ */
     /* Note: When setting this to false, set MaxKDTreeDepth = 0 in kdtree.c.*/
 static const bool KDTreeRayTrace = true;
 #if NDimensions == 3
@@ -28,7 +29,9 @@ static const bool BarycentricRayTrace = false;
 #else
 static const bool BarycentricRayTrace = true;
 #endif
+#ifndef __OPENCL_VERSION__
 
+//static bool DBogTraceOn = false;
 
 #ifdef TrivialMpiRayTrace
 #include <mpi.h>
@@ -176,8 +179,8 @@ update_internal_transformed_ObjectRaySpace (ObjectRaySpace* space)
         bool good;
         simplex_Scene (&raw, scene, ei);
         good = init_BarySimplex (&space->simplices[ei], &raw);
-        if (!good)  printf ("ei:%u\n", ei);
-        assert (good);
+        if (!good)  DBog1( "ei:%u\n", ei );
+        /* assert (good); */
     }
 }
 
@@ -421,6 +424,7 @@ void init_RayImage (RayImage* image)
     image->view_light = 0;
     image->shading_on = true;
     image->color_distance_on = true;
+    image->diffuse_camera_on = false;
     image->nbounces_max = 2;
 }
 
@@ -711,6 +715,7 @@ splitting_plane_count (const Point* origin, const Point* direct, real mag,
     return count;
 }
 
+#ifndef __OPENCL_VERSION__
     /** Get the ambient, diffuse, and specular components
      * of a pixel without considering illumination.
      **/
@@ -766,6 +771,50 @@ pixel_from_Material (Color* ambient, Color* diffuse,
     }
 }
 
+  void
+find_holes (TableT(uint2)* holes, const RayImage* ray_image, uint nelems)
+{
+  const uint* hits = ray_image->hits;
+  const uint stride = ray_image->stride;
+  if (ray_image->nrows < 3 || ray_image->ncols < 3)
+    return;
+  if (!hits) {
+    DBog0("hits array is null");
+    return;
+  }
+
+  for (uint row = 1; row < ray_image->nrows - 1; ++row)
+  {
+    for (uint col = 1; col < ray_image->ncols - 1; ++col)
+    {
+      if (nelems <= hits[(row-1) * stride + (col-1)])  continue;
+      if (nelems <= hits[(row-1) * stride + (col+0)])  continue;
+      if (nelems <= hits[(row-1) * stride + (col+1)])  continue;
+      if (nelems <= hits[(row+0) * stride + (col-1)])  continue;
+      if (nelems <= hits[(row+0) * stride + (col+1)])  continue;
+      if (nelems <= hits[(row+1) * stride + (col-1)])  continue;
+      if (nelems <= hits[(row+1) * stride + (col+0)])  continue;
+      if (nelems <= hits[(row+1) * stride + (col+1)])  continue;
+      if (nelems <= hits[(row+0) * stride + (col+0)]) {
+        uint2 hole;
+        hole.s[0] = row;
+        hole.s[1] = col;
+        PushTable( *holes, hole );
+      }
+    }
+  }
+}
+
+  void
+diffuse_camera_shading (Color* ret_color, const Ray* ray, const Point* normal)
+{
+  real cos_normal = dot_Point (&ray->direct, normal);
+  if (cos_normal < 0)
+    cos_normal = - cos_normal;
+  {:for (dim ; NColors)
+    ret_color->coords[dim] = cos_normal;
+  }
+}
 
     void
 fill_pixel (Color* ret_color,
@@ -820,7 +869,7 @@ fill_pixel (Color* ret_color,
         set_Color (&color, 1);
     }
 
-    if (show_splitting_planes)
+    if (show_splitting_planes && objidx > space->nobjects)
     {
         const real frac = .1;
         real red;
@@ -931,6 +980,14 @@ fill_pixel (Color* ret_color,
         /* The above cases do not give a normalized vector!*/
     normalize_Point (&normal, &normal);
 
+    if (image->diffuse_camera_on) {
+      Ray ray;
+      ray.origin = *origin;
+      ray.direct = *dir;
+      diffuse_camera_shading (ret_color, &ray, &normal);
+      return;
+    }
+
         /* Assure the normal is in our direction.*/
     cos_normal = dot_Point (dir, &normal);
     if (hit_front)
@@ -1008,6 +1065,18 @@ fill_pixel (Color* ret_color,
                 }
                 tolight_ray.origin = isect;
                 tolight_ray.direct = tolight;
+
+                {
+                  const real dot = dot_Point (&simplex->plane.normal, &tolight_ray.direct);
+                  if (dot < 0) {
+                  const real adjust = 1e2*Epsilon_real * taximag_Point (&isect);
+                    if (dot < 10 * (M_PI/180))
+                      continue;
+                    magtolight -= adjust;
+                    follow_Point (&tolight_ray.origin, &tolight_ray.origin,
+                                  &tolight_ray.direct, adjust);
+                  }
+                }
                 if (cast_to_light (space, &tolight_ray,
                                    front,
                                    magtolight))
@@ -1082,12 +1151,12 @@ fill_pixel (Color* ret_color,
 
     summ_Color (ret_color, ret_color, &color);
 }
-
+#endif  /* #ifndef __OPENCL_VERSION__ */
 
 static
-    void
-test_intersections (uint* ret_hit,
-                    real* ret_mag,
+  void
+test_intersections (uint* restrict ret_hit,
+                    real* restrict ret_mag,
                     const Ray* restrict ray,
                     uint nelemidcs,
                     __global const uint* restrict elemidcs,
@@ -1095,47 +1164,42 @@ test_intersections (uint* ret_hit,
                     __global const Simplex* restrict tris,
                     Trit front)
 {
-    uint i, hit_idx;
-    real hit_mag;
+  uint hit_idx = *ret_hit;
+  real hit_mag = *ret_mag;
 
-    hit_idx = *ret_hit;
-    hit_mag = *ret_mag;
+  {:for ( i ; nelemidcs )
+    bool didhit;
+    uint tmp_hit = elemidcs[i];
+    real tmp_mag;
 
-    UFor( i, nelemidcs )
+    if (BarycentricRayTrace)
     {
-        bool didhit;
-        uint tmp_hit;
-        real tmp_mag;
-
-        tmp_hit = elemidcs[i];
-
-        if (BarycentricRayTrace)
-        {
-            didhit = hit_BarySimplex (&tmp_mag, ray,
-                                      &simplices[tmp_hit],
-                                      front);
-        }
-        else
-        {
-            didhit = hit_Simplex (&tmp_mag, *ray, tris[tmp_hit],
-                                  front);
-        }
-
-        if (didhit && tmp_mag < hit_mag)
-        {
-            hit_idx = tmp_hit;
-            hit_mag = tmp_mag;
-        }
+      didhit = hit_BarySimplex (&tmp_mag, ray,
+                                &simplices[tmp_hit],
+                                front);
+    }
+    else
+    {
+      didhit = hit_Simplex (&tmp_mag, *ray, tris[tmp_hit],
+                            front);
     }
 
+    //if (DBogTraceOn)
+    //  DBog2( "Test:%u  hit?:%s", tmp_hit, didhit ? "yes" : "no" );
 
-    *ret_hit = hit_idx;
-    *ret_mag = hit_mag;
+    if (didhit && tmp_mag < hit_mag)
+    {
+      hit_idx = tmp_hit;
+      hit_mag = tmp_mag;
+    }
+  }
+
+  *ret_hit = hit_idx;
+  *ret_mag = hit_mag;
 }
 
 
-static
-    void
+  void
 cast_Ray (uint* restrict ret_hit, real* restrict ret_mag,
           const Ray* restrict ray,
           const uint nelems,
@@ -1149,21 +1213,17 @@ cast_Ray (uint* restrict ret_hit, real* restrict ret_mag,
 {
     Point invdirect;
     uint node_idx, parent = 0;
-    uint hit_idx;
-    real hit_mag;
-
-    hit_idx = *ret_hit;
-    hit_mag = *ret_mag;
-
+    uint hit_idx = *ret_hit;
+    real hit_mag = *ret_mag;
 
     if (!KDTreeRayTrace)
     {
-        test_intersections (&hit_idx, &hit_mag, ray,
-                            nelems, elemidcs,
-                            simplices, tris, front);
-        *ret_hit = hit_idx;
-        *ret_mag = hit_mag;
-        return;
+      test_intersections (&hit_idx, &hit_mag, ray,
+                          nelems, elemidcs,
+                          simplices, tris, front);
+      *ret_hit = hit_idx;
+      *ret_mag = hit_mag;
+      return;
     }
 
     reci_Point (&invdirect, &ray->direct);
@@ -1271,6 +1331,7 @@ cast_nopartition (uint* ret_hit,
 }
 
 
+#ifndef __OPENCL_VERSION__
 static
     void
 test_object_intersections (uint* ret_hit,
@@ -1331,8 +1392,7 @@ cast_partitioned (uint* ret_hit,
                   Trit front,
                   uint ignore_object)
 {
-    const uint ntestedbits = 128;
-    FixDeclBitTable( tested, 128, 0 );
+  FixDeclBitTable( tested, 128, 0 );
     uint node_idx, parent = 0;
     const KDTreeNode* restrict nodes;
     const uint* restrict elemidcs;
@@ -1345,7 +1405,7 @@ cast_partitioned (uint* ret_hit,
     copy_Point (&ray.origin, origin);
     copy_Point (&ray.direct, dir);
 
-    assert (space->nobjects < ntestedbits);
+    assert (space->nobjects < tested.sz);
     if (ignore_object <= space->nobjects)
       set1_BitTable (tested, ignore_object);
 
@@ -1486,6 +1546,7 @@ cast_record (uint* hitline,
     real hit_mag = Max_real;
     uint hit_object = Max_uint;
     const Trit front = Yes;
+    /* const Trit front = May; */
 
     if (space->partition)
         cast_partitioned (&hit_idx, &hit_mag, &hit_object,
@@ -1513,6 +1574,7 @@ cast_record (uint* hitline,
         }
     }
 }
+#endif  /* #ifndef __OPENCL_VERSION__ */
 
 
 #ifndef __OPENCL_VERSION__
@@ -1763,6 +1825,14 @@ cast_row_perspective (RayImage* image, uint row,
         Point dir;
 
 #if 0
+        if (row == 103 && col == 61)
+        {
+          DBogTraceOn = true;
+          DBog0( "TRACE ON" );
+        }
+#endif
+
+#if 0
         if (! (image->nrows - 1 - row == 31 && col == 27) &&
             ! (image->nrows - 1 - row == 31 && col == 28) &&
             ! (image->nrows - 1 - row == 31 && col == 26))
@@ -1771,9 +1841,9 @@ cast_row_perspective (RayImage* image, uint row,
             if (magline)  magline[col] = Max_real;
             if (pixline)
             {
-                pixline[3*col+0] = 0;
-                pixline[3*col+1] = 0;
-                pixline[3*col+2] = 0;
+                pixline[3*col+0] = 255;
+                pixline[3*col+1] = 255;
+                pixline[3*col+2] = 255;
             }
             continue;
         }
@@ -1790,6 +1860,8 @@ cast_row_perspective (RayImage* image, uint row,
         cast_record (hitline, magline, pixline, col,
                      space, image,
                      origin, &dir, known->inside_box, &gmrand);
+        //if (DBogTraceOn)
+        //  DBogTraceOn = false;
 
 #if 0
         {

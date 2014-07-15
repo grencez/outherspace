@@ -49,6 +49,8 @@ int main (int argc, char** argv)
     image.nrows = 800;
     image.ncols = 800;
     image.pixels = AllocT( byte, 1 );
+    /* image.hits = AllocT( uint, 1 ); */
+    /* image.mags = AllocT( real, 1 ); */
 #if 0
         /* 2001 x 2001 */
     image.hits = AllocT( uint, 1 );
@@ -137,13 +139,23 @@ int main (int argc, char** argv)
     {
         cast_lights (&space, track.nphotons, track.nbounces);
         t1 = monotime ();
-        printf ("sec:%f\n", t1 - t0);
+        printf ("nvpls:%u  lightcut tree build sec:%f\n", (uint)(space.lightcuts.nodes.sz+1)/2, t1 - t0);
         t0 = t1;
     }
     cast_RayImage (&image, &space, &view_origin, &view_basis);
     t1 = monotime ();
     printf ("Render sec:%f\n", t1 - t0);
 #endif
+
+    if (image.hits) {
+      TableT( uint2 ) holes;
+      InitTable( holes );
+      find_holes (&holes, &image, space.main.nelems);
+      for (uint i = 0; i < holes.sz; ++i) {
+        DBog2("miss: %u %u", holes.s[i].s[0], holes.s[i].s[1]);
+      }
+      LoseTable( holes );
+    }
 
     if (write_image)
     {

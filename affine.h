@@ -1,7 +1,9 @@
 
 #ifndef IAMap_H_
+#ifndef __OPENCL_VERSION__
 #define IAMap_H_
 #include "space.h"
+#endif  /* #ifndef __OPENCL_VERSION__ */
 
 #if 0
     /**

@@ -1,7 +1,9 @@
 
 #ifndef Op_Point_0
 
+#ifndef __OPENCL_VERSION__
 #include "op.h"
+#endif  /* #ifndef __OPENCL_VERSION__ */
 
 #define Op_Point_0( dst, a ) \
     Op_0( real, NDimensions, (dst)->coords, (a)->coords )

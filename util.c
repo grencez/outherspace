@@ -172,7 +172,7 @@ cat_filepath (const char* pathname, const char* filename)
 {
     const char* parts[3];
     parts[0] = pathname;
-    parts[1] = pathname ? "/" : 0;
+    parts[1] = (pathname && pathname[0] != '\0') ? "/" : 0;
     parts[2] = filename;
     return cat_strings (3, parts);
 }

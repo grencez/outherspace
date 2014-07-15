@@ -55,9 +55,9 @@ struct SceneGL
 #endif
 
 SceneGL* scenegls = 0;
-GLuint vert_shader;
-GLuint frag_shader;
-GLuint shader_program;
+static GLuint vert_shader;
+static GLuint frag_shader;
+static GLuint shader_program;
 #if NDimensions == 4
 static GLuint hivert_attrib_loc;
 static GLuint hivnml_attrib_loc;
@@ -66,6 +66,7 @@ static GLuint ambient_texflag_loc;
 static GLuint diffuse_texflag_loc;
 static GLuint specular_texflag_loc;
 static GLuint normal_texflag_loc;
+static GLuint diffuse_camera_flag_loc;
 
 
 static void
@@ -147,7 +148,7 @@ init_ogl_ui_data ()
 
     good = readin_files (nfiles, files_nbytes, files_bytes, 0, files);
 
-    if (!good) { fputs ("Bad read!\n", err); exit (1); }
+    if (!good)  failout_sysCx ("Bad read!");
 #endif  /* !defined(EmbedFiles) */
 
 #ifndef GL_GLEXT_PROTOTYPES
@@ -170,24 +171,23 @@ init_ogl_ui_data ()
     glBindBuffer = (PFNGLBINDBUFFERPROC) SDL_GL_GetProcAddress ("glBindBuffer");
     glBufferData = (PFNGLBUFFERDATAPROC) SDL_GL_GetProcAddress ("glBufferData");
 
-    if (!glUseProgram) { fputs ("glUseProgram\n", err); exit(1); }
-    if (!glLinkProgram) { fputs ("glLinkProgram\n", err); exit(1); }
-    if (!glCompileShader) { fputs ("glCompileShader\n", err); exit(1); }
-    if (!glShaderSource) { fputs ("glShaderSource\n", err); exit(1); }
-    if (!glAttachShader) { fputs ("glAttachShader\n", err); exit(1); }
-    if (!glCreateProgram) { fputs ("glCreateProgram\n", err); exit(1); }
-    if (!glCreateShader) { fputs ("glCreateShader\n", err); exit(1); }
-    if (!glActiveTexture) { fputs ("glActiveTexture\n", err); exit(1); }
-    if (!glUniform1i) { fputs ("glUniform1i\n", err); exit(1); }
-    if (!glGetUniformLocation) { fputs ("glGetUniformLocation\n", err); exit(1); }
-    if (!glGetShaderiv) { fputs ("glGetShaderiv\n", err); exit(1); }
-
-    if (!glDeleteProgram) { fputs ("glDeleteProgram\n", err); exit(1); }
-    if (!glDeleteShader) { fputs ("glDeleteShader\n", err); exit(1); }
-    if (!glGenBuffers) { fputs ("glGenBuffers\n", err); exit(1); }
-    if (!glDeleteBuffers) { fputs ("glDeleteBuffers\n", err); exit(1); }
-    if (!glBindBuffer) { fputs ("glBindBuffer\n", err); exit(1); }
-    if (!glBufferData) { fputs ("glBufferData\n", err); exit(1); }
+    if (!glUseProgram)  failout_sysCx ("glUseProgram");
+    if (!glLinkProgram)  failout_sysCx ("glLinkProgram");
+    if (!glCompileShader)  failout_sysCx ("glCompileShader");
+    if (!glShaderSource)  failout_sysCx ("glShaderSource");
+    if (!glAttachShader)  failout_sysCx ("glAttachShader");
+    if (!glCreateProgram)  failout_sysCx ("glCreateProgram");
+    if (!glCreateShader)  failout_sysCx ("glCreateShader");
+    if (!glActiveTexture)  failout_sysCx ("glActiveTexture");
+    if (!glUniform1i)  failout_sysCx ("glUniform1i");
+    if (!glGetUniformLocation)  failout_sysCx ("glGetUniformLocation");
+    if (!glGetShaderiv)  failout_sysCx ("glGetShaderiv");
+    if (!glDeleteProgram)  failout_sysCx ("glDeleteProgram");
+    if (!glDeleteShader)  failout_sysCx ("glDeleteShader");
+    if (!glGenBuffers)  failout_sysCx ("glGenBuffers");
+    if (!glDeleteBuffers)  failout_sysCx ("glDeleteBuffers");
+    if (!glBindBuffer)  failout_sysCx ("glBindBuffer");
+    if (!glBufferData)  failout_sysCx ("glBufferData");
     fputs ("Loaded all required function pointers!\n", err);
 #endif
 
@@ -220,24 +220,15 @@ init_ogl_ui_data ()
         /* Check for errors.*/
     glGetShaderiv (vert_shader, GL_COMPILE_STATUS, &status);
     if (status != GL_TRUE)
-    {
-        fputs ("Failed to compile vertex shader!\n", err);
-        exit (1);
-    }
+        failout_sysCx ("Failed to compile vertex shader!");
 
     glGetShaderiv (frag_shader, GL_COMPILE_STATUS, &status);
     if (status != GL_TRUE)
-    {
-        fputs ("Failed to compile fragment shader!\n", err);
-        exit (1);
-    }
+        failout_sysCx ("Failed to compile fragment shader!");
 
     glGetShaderiv (shader_program, GL_LINK_STATUS, &status);
     if (status != GL_TRUE)
-    {
-        fputs ("Failed to link shader program!\n", err);
-        exit (1);
-    }
+      failout_sysCx ("Failed to link shader program!");
 
 #if NDimensions == 4
     hivert_attrib_loc = glGetAttribLocation (shader_program, "hivert");
@@ -257,6 +248,7 @@ init_ogl_ui_data ()
     diffuse_texflag_loc = glGetUniformLocation (shader_program, "HaveDiffuseTex");
     specular_texflag_loc = glGetUniformLocation (shader_program, "HaveSpecularTex");
     normal_texflag_loc = glGetUniformLocation (shader_program, "HaveNormalTex");
+    diffuse_camera_flag_loc = glGetUniformLocation (shader_program, "DiffuseCameraOn");
 
 #ifdef SupportOpenCL
     init_opencl_data ();
@@ -334,14 +326,15 @@ ogl_setup (const RaySpace* space)
     uint i;
     uint ntextures = 0;
 
-    if (!scenegls)
+    if (true || !scenegls)
     {
 #if NDimensions == 4 && !defined(Match4dGeom)
         const uint nscenes = space->nobjects + track.nmorphs;
 #else
         const uint nscenes = space->nobjects+1;
 #endif
-        scenegls = AllocT( SceneGL, nscenes );
+        if (!scenegls)
+          scenegls = AllocT( SceneGL, nscenes );
         glActiveTexture (GL_TEXTURE0);
         UFor( i, nscenes )
         {
@@ -473,6 +466,7 @@ ogl_redraw (const RaySpace* space, uint pilot_idx)
     Ray ray;
 
     pilot = &pilots[pilot_idx];
+    glUniform1i (diffuse_camera_flag_loc, pilot->ray_image.diffuse_camera_on ? 1 : 0);
 
     glClearColor (0, 0, 0, 0);
 

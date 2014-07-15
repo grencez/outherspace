@@ -767,12 +767,6 @@ update_pilot_images (RaySpace* space, real frame_t1)
 #ifdef DistribCompute
         compute_rays_to_hits (ray_image, space, &origin, &basis);
 #else
-        if (LightAtCamera)
-        {
-            assert (space->nlights > 0);
-            space->lights[0].location = origin;
-            set_Color (&space->lights[0].intensity, .5);
-        }
         if (FollowRacer && track.ncheckplanes > 0)
         {
             set_checkpoint_light (&space->lights[space->nlights-1],
@@ -789,6 +783,16 @@ update_pilot_images (RaySpace* space, real frame_t1)
                                    &origin, &basis, pilot->view_angle);
             else
                 cast_RayImage (ray_image, space, &origin, &basis);
+
+            if (ray_image->hits) {
+              TableT( uint2 ) holes;
+              InitTable( holes );
+              find_holes (&holes, ray_image, space->main.nelems);
+              for (uint i = 0; i < holes.sz; ++i) {
+                DBog2("miss: %u %u", holes.s[i].s[0], holes.s[i].s[1]);
+              }
+              LoseTable( holes );
+            }
         }
 #ifdef SupportOpenGL
         else

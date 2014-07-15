@@ -122,7 +122,10 @@ readin_wavefront (Scene* scene, const char* pathname, const char* filename)
     buf[len-1] = 0;
 
     in = fopen_path (pathname, filename, "rb");
-    if (!in)  return false;
+    if (!in) {
+      fprintf (err, "No file with pathname:%s filename:%s\n", pathname, filename);
+      return false;
+    }
 
     init_SList (&elemlist);
     init_SList (&surflist);

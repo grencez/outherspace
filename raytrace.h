@@ -91,11 +91,12 @@ struct RayImage
     uint ncols;
     uint stride;
     real hifov;  /* Large field of view parameter.*/
-    bool perspective;
+    Bool perspective;
     real ambient[NColors];
     real view_light;
-    bool shading_on;
-    bool color_distance_on;
+    Bool shading_on;
+    Bool color_distance_on;
+    Bool diffuse_camera_on;
     uint nbounces_max;
 };
 
@@ -105,7 +106,7 @@ struct RayCastAPriori
     PointXfrm basis;
     real up_scale;
     real rt_scale;
-    bool inside_box;
+    Bool inside_box;
 };
 
 struct RayHit
@@ -129,6 +130,18 @@ map_isect_height (Point* ret_isect,
                   const SceneElement* elem,
                   const Point* verts,
                   const Point* vnmls);
+
+void
+cast_Ray (uint* restrict ret_hit, real* restrict ret_mag,
+          const Ray* restrict ray,
+          const uint nelems,
+          __global const uint* restrict elemidcs,
+          __global const KDTreeNode* restrict nodes,
+          __global const BarySimplex* restrict simplices,
+          __global const Simplex* restrict tris,
+          __global const BBox* restrict box,
+          bool inside_box,
+          Trit front);
 void
 cast1_ObjectRaySpace (uint* ret_hit, real* ret_mag,
                       const Point* origin,
@@ -224,5 +237,7 @@ void downsample_RayImage (RayImage* image, uint inv);
 void cleanup_RayImage (RayImage* image);
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
+void
+find_holes (TableT(uint2)* holes, const RayImage* ray_image, uint nelems);
 #endif
 

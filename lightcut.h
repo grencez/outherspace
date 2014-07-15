@@ -41,8 +41,6 @@ next_LightCutNode (const LightCutTree* tree,
     const BSTNode* const sentinel = tree->bst.sentinel;
     const BSTNode* a;
 
-    (void) hit;
-
     /*
     if (!node)  return &tree->nodes.s[0];
     else if (node+1 == tree->nodes.s + (tree->nodes.sz + 1) / 2)  return 0;

@@ -1,7 +1,9 @@
 
 #ifndef SPACE_H_
 #define SPACE_H_
+#ifndef __OPENCL_VERSION__
 #include "cx/def.h"
+#endif
 
 #ifndef NDimensions
 #define NDimensions 3

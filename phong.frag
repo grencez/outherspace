@@ -14,6 +14,7 @@ uniform int HaveAmbientTex;
 uniform int HaveDiffuseTex;
 uniform int HaveSpecularTex;
 uniform int HaveNormalTex;
+uniform int DiffuseCameraOn;
 
 void main()
 {
@@ -82,6 +83,11 @@ void main()
                  gl_LightSource[0].specular *
                  pow(tcos, gl_FrontMaterial.shininess));
 
-    gl_FragColor = ambient + diffuse + specular;
+    if (DiffuseCameraOn == 1) {
+      gl_FragColor = abs(dot(normalize(E), Normal));
+    }
+    else {
+      gl_FragColor = ambient + diffuse + specular;
+    }
 }
 
