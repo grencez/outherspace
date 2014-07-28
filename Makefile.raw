@@ -293,10 +293,10 @@ verify_exe = $(BinPath)/$(Pfx)$(call exename,verify)
 default_exes: $(verify_exe) $(gui_exe) $(cli_exe)
 	# Finished: default
 
-all: $(ExeList)
+all:
+	$(MAKE) depend
+	$(MAKE) $(ExeList)
 	# Finished: all
-
-
 
 CFLAGS += $(IFLAGS)
 

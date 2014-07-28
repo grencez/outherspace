@@ -219,12 +219,28 @@ init_ogl_ui_data ()
 
         /* Check for errors.*/
     glGetShaderiv (vert_shader, GL_COMPILE_STATUS, &status);
-    if (status != GL_TRUE)
-        failout_sysCx ("Failed to compile vertex shader!");
+    if (status != GL_TRUE) {
+      GLint logbufsz = 0;
+      GLchar* logbuf;
+      glGetShaderiv(vert_shader, GL_INFO_LOG_LENGTH, &logbufsz);
+      logbuf = AllocT( GLchar, logbufsz );
+      glGetShaderInfoLog(vert_shader, logbufsz, &logbufsz, logbuf);
+
+      DBog0("Failed to compile vertex shader!");
+      failout_sysCx (logbuf);
+    }
 
     glGetShaderiv (frag_shader, GL_COMPILE_STATUS, &status);
-    if (status != GL_TRUE)
-        failout_sysCx ("Failed to compile fragment shader!");
+    if (status != GL_TRUE) {
+      GLint logbufsz = 0;
+      GLchar* logbuf;
+      glGetShaderiv(frag_shader, GL_INFO_LOG_LENGTH, &logbufsz);
+      logbuf = AllocT( GLchar, logbufsz );
+      glGetShaderInfoLog(frag_shader, logbufsz, &logbufsz, logbuf);
+
+      DBog0("Failed to compile fragment shader!");
+      failout_sysCx (logbuf);
+    }
 
     glGetShaderiv (shader_program, GL_LINK_STATUS, &status);
     if (status != GL_TRUE)

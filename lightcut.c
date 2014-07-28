@@ -504,7 +504,7 @@ cast_lights (RaySpace* space, uint nphotons, uint nbounces)
         area = elem->area;
         scale_Color (&color, &color, area / M_PI);
 
-        {:for (bounce_idx ; nbounces)
+        {:for (bounce_idx ; nbounces+1)
             DeclGrow1Table( LightCutNode, light, lights );
             PointXfrm A;
             real zenith = asin (sqrt (real_GMRand (&gmrand)));
@@ -527,7 +527,7 @@ cast_lights (RaySpace* space, uint nphotons, uint nbounces)
             stable_orthorotate_PointXfrm (&A, &A, &ray.direct, UpDim);
             trxfrm_Point (&ray.direct, &A, &c);
 
-            if (bounce_idx + 1 == nbounces)  break;
+            if (bounce_idx == nbounces)  break;
 
             cast1_RaySpace (&hit, &mag, &obj, &ray, space, Yes);
 

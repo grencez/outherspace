@@ -63,18 +63,18 @@ static
 key_press_fn (Pilot* pilot, RaySpace* space, const SDL_keysym* event)
 {
     uint dim = NDimensions;
-    tristate roll = 0;
-    tristate stride = 0;
-    tristate turn = 0;
-    tristate camera_offset = 0;
-    tristate view_angle_change = 0;
-    tristate resize = 0;
-    tristate view_light_change = 0;
-    tristate lights_change = 0;
-    tristate stride_mag_change = 0;
-    tristate switch_racer = 0;
-    tristate switch_kbd_pilot = 0;
-    tristate nperpixel_change = 0;  /* Magnify.*/
+    Sign roll = 0;
+    Sign stride = 0;
+    Sign turn = 0;
+    Sign camera_offset = 0;
+    Sign view_angle_change = 0;
+    Sign resize = 0;
+    Sign view_light_change = 0;
+    Sign lights_change = 0;
+    Sign stride_mag_change = 0;
+    Sign switch_racer = 0;
+    Sign switch_kbd_pilot = 0;
+    Sign nperpixel_change = 0;  /* Magnify.*/
     bool reflect = false;
     bool rotate_dir_dim = false;
     bool change_cast_method = false;
@@ -227,7 +227,7 @@ key_press_fn (Pilot* pilot, RaySpace* space, const SDL_keysym* event)
     }
     else if (lights_change != 0)
     {
-        const uint nbounces = 4;
+        const uint nbounces = 0;
         uint nphotons = nphotons_now;
         if (lights_change > 0)   nphotons += 100;
         else if (nphotons > 10)  nphotons -= 100;
@@ -517,7 +517,7 @@ static
     void
 joystick_button_event (MotionInput* mot, uint btnidx, bool pressed)
 {
-    tristate value;
+    Sign value;
 #if 0
     FILE* out = stderr;
     fprintf (out, "\rbtnidx:%u  pressed:%u",

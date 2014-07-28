@@ -84,7 +84,11 @@ void main()
                  pow(tcos, gl_FrontMaterial.shininess));
 
     if (DiffuseCameraOn == 1) {
-      gl_FragColor = abs(dot(normalize(E), Normal));
+      float d = abs(dot(normalize(E), Normal));
+      gl_FragColor.x = d;
+      gl_FragColor.y = d;
+      gl_FragColor.z = d;
+      gl_FragColor.w = 1.0;
     }
     else {
       gl_FragColor = ambient + diffuse + specular;
