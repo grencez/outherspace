@@ -18,7 +18,6 @@ set (BldPath outherspace)
 set (CommonCFiles
     affine.c
     bbox.c
-    bitstring.c
     dynamic-setup.c
     kdtree.c
     kptree.c
@@ -53,7 +52,6 @@ list (APPEND CFiles
 list (APPEND HFiles
     affine.h
     bbox.h
-    bitstring.h
     color.h
     dynamic-setup.h
     gui-indep.c
@@ -104,7 +102,6 @@ target_link_libraries (cli CxLib)
 
 set (GuiName gui)
 list (APPEND GuiDFLAGS "NDimensions=3")
-list (APPEND GuiDFLAGS "SupportImage")
 list (APPEND GuiDFLAGS "SupportOpenGL")
 list (APPEND GuiDFLAGS "EmbedFiles")
 #list (APPEND GuiDFLAGS "INCLUDE_SOURCE")
@@ -116,8 +113,8 @@ if (UNIX)
     endif ()
     #set (CMAKE_C_FLAGS "-Wall -Wextra -ansi -pedantic")
     find_package (SDL REQUIRED)
-    find_package (SDL_image REQUIRED)
-    find_package (OpenMP REQUIRED)
+    find_package (SDL_image)
+    find_package (OpenMP)
 else ()
     set (SDL_pfx "../../SDL-1.2.14")
     set (SDL_LIBRARY "${SDL_pfx}/lib/SDL")
@@ -125,8 +122,12 @@ else ()
     set (SDL_INCLUDE_DIR "${SDL_pfx}/include")
 
     set (SDL_image_pfx "../../SDL_image-1.2.10")
-    set (SDLIMAGE_INCLUDE_DIR "${SDL_image_pfx}/include")
-    set (SDLIMAGE_LIBRARY "${SDL_image_pfx}/lib/SDL_image")
+    set (SDL_IMAGE_INCLUDE_DIR "${SDL_image_pfx}/include")
+    set (SDL_IMAGE_LIBRARY "${SDL_image_pfx}/lib/SDL_image")
+endif ()
+
+if (SDL_IMAGE_FOUND)
+  list (APPEND GuiDFLAGS "SupportImage")
 endif ()
 
 find_package (OpenGL REQUIRED)
@@ -192,15 +193,7 @@ set_target_properties (gui PROPERTIES
     COMPILE_DEFINITIONS "${GuiDFLAGS}"
     LINK_FLAGS "${GuiLFLAGS}")
 target_link_libraries (gui CxLib)
-#add_executable (gui gui.c motion.c
-#    "phong.glsl${EmbedSfx}"
-#    "perturb.cl${EmbedSfx}"
-#    ${CSources})
-#set_target_properties (gui PROPERTIES
-#    OUTPUT_NAME "${GuiName}"
-#    COMPILE_DEFINITIONS "${GuiDFLAGS}"
-#    LINK_FLAGS "${GuiLFLAGS}")
-#
+
 if (OPENMP_FOUND)
     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
 endif ()
@@ -208,11 +201,15 @@ endif ()
 #include_directories (".")
 include_directories (${BldPath})
 include_directories (SYSTEM ${SDL_INCLUDE_DIR})
-include_directories (SYSTEM ${SDLIMAGE_INCLUDE_DIR})
+if (SDL_IMAGE_FOUND)
+  include_directories (SYSTEM ${SDL_IMAGE_INCLUDE_DIR})
+endif ()
 include_directories (SYSTEM ${OPENGL_INCLUDE_DIR})
 
 target_link_libraries (gui ${SDL_LIBRARY})
-target_link_libraries (gui ${SDLIMAGE_LIBRARY})
+if (SDL_IMAGE_FOUND)
+  target_link_libraries (gui ${SDL_IMAGE_LIBRARY})
+endif ()
 target_link_libraries (gui ${OPENGL_LIBRARIES})
 
 if (UNIX)
