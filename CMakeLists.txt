@@ -11,8 +11,8 @@ cmake_minimum_required (VERSION 2.8)
 
 project (OutherSpace)
 
-set (CxPath ../cx)
-set (BinPath ../bin)
+set (CxPath ${CMAKE_CURRENT_SOURCE_DIR}/../cx)
+set (BinPath ${CMAKE_CURRENT_SOURCE_DIR}/../bin)
 set (BldPath outherspace)
 
 set (CommonCFiles
@@ -84,6 +84,7 @@ list (APPEND HFiles
 include (${CxPath}/include.cmake)
 
 #set (CMAKE_RUNTIME_OUTPUT_DIRECTORY ${BinPath})
+set (CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
 file (MAKE_DIRECTORY ${BldPath}/verif)
 
@@ -164,12 +165,14 @@ target_link_libraries (file2array CxLib)
 set (EmbedSfx ".embed.h")
 
 add_custom_command (OUTPUT ${BldPath}/"phong.glsl${EmbedSfx}"
-    COMMAND file2array ${BldPath}/"phong.glsl${EmbedSfx}" phong.vert phong.frag 4d.vert
-    DEPENDS phong.vert phong.frag 4d.vert)
+  COMMAND file2array ${BldPath}/"phong.glsl${EmbedSfx}" phong.vert phong.frag 4d.vert
+  DEPENDS phong.vert phong.frag 4d.vert
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_custom_command (OUTPUT ${BldPath}/"perturb.cl${EmbedSfx}"
-    COMMAND file2array ${BldPath}/"perturb.cl${EmbedSfx}" perturb.cl
-    DEPENDS perturb.cl)
+  COMMAND file2array ${BldPath}/"perturb.cl${EmbedSfx}" perturb.cl
+  DEPENDS perturb.cl
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_executable (verify
     ${BldPath}/verif/main.c
@@ -195,7 +198,8 @@ set_target_properties (gui PROPERTIES
 target_link_libraries (gui CxLib)
 
 if (OPENMP_FOUND)
-    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+  set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 endif ()
 
 #include_directories (".")
