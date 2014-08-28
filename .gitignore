@@ -1,13 +1,10 @@
 
-deps.mk
-bld
-cli
-file2array
-gui
-imgdiff
-verify
-
-tags
-*.embed.h
-*.swp
+/bld/
+/data/
+/cli
+/file2array
+/gui
+/hello
+/imgdiff
+/verify
 

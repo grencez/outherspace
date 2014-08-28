@@ -48,8 +48,8 @@ struct ObjectRaySpace
     Point centroid;
     PointXfrm orientation;
     uint nelems;
-    Simplex* elems;
-    BarySimplex* simplices;
+    __global Simplex* elems;
+    __global BarySimplex* simplices;
     Scene scene;
     BBox box;
     KDTree tree;
@@ -139,7 +139,7 @@ cast_Ray (uint* restrict ret_hit, real* restrict ret_mag,
           __global const KDTreeNode* restrict nodes,
           __global const BarySimplex* restrict simplices,
           __global const Simplex* restrict tris,
-          __global const BBox* restrict box,
+          const BBox* restrict box,
           bool inside_box,
           Trit front);
 void

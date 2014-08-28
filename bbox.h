@@ -23,7 +23,7 @@ hit_inner_BBox (Point* isect,
                 const Ray* ray,
                 const Point* invdirect);
 bool hit_outer_BBox (Point* entrance,
-                     __global const BBox* box,
+                     const BBox* box,
                      const Point* origin, const Point* dir);
 bool hit_BBox (Point* entrance,
                const BBox* box,
@@ -37,7 +37,7 @@ void
 centroid_BBox (Point* dst, const BBox* box);
 void
 measure_BBox (Point* dst, const BBox* box);
-bool inside_BBox (__global const BBox* box, const Point* point);
+bool inside_BBox (const BBox* box, const Point* point);
 real surface_area_BBox (const BBox* box);
 void split_BBox (BBox* lo_box, BBox* hi_box,
                  const BBox* box,

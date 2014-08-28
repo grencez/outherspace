@@ -148,7 +148,7 @@ hit_inner_BBox (Point* isect,
 
     /* Assume ray is coming from outside BBox.*/
 bool hit_outer_BBox (Point* entrance,
-                     __global const BBox* box,
+                     const BBox* box,
                      const Point* origin, const Point* dir)
 {
   bool keep_going = true;
@@ -345,7 +345,7 @@ measure_BBox (Point* dst, const BBox* box)
     diff_Point (dst, &box->max, &box->min);
 }
 
-bool inside_BBox (__global const BBox* box, const Point* point)
+bool inside_BBox (const BBox* box, const Point* point)
 {
     bool inside = true;
     uint i;

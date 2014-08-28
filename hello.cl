@@ -27,6 +27,7 @@ ray_cast_kernel (__write_only __global unsigned int* hits,
   uint hit = Max_uint;
   real mag = Max_real;
   uint i;
+  const BBox tmp_box = *box;
 
   ray.origin = known->origin;
   zero_Point (&ray.direct);
@@ -45,7 +46,7 @@ ray_cast_kernel (__write_only __global unsigned int* hits,
             nodes,
             simplices,
             elems,
-            box,
+            &tmp_box,
             known->inside_box,
             Yes);
   hits[row * dims[2] + col] = hit;

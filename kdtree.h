@@ -39,8 +39,8 @@ struct KDTree
 {
     uint nnodes;
     uint nelemidcs;
-    KDTreeNode* nodes;
-    uint* elemidcs;
+    __global KDTreeNode* nodes;
+    __global uint* elemidcs;
 };
 
 struct KDTreeGrid

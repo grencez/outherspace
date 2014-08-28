@@ -8,8 +8,12 @@
 
 # Just a guess, can probably go older.
 cmake_minimum_required (VERSION 2.8)
+set(CMAKE_DISABLE_SOURCE_CHANGES ON)
+set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
 
 project (OutherSpace)
+
+list (APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../cmake)
 
 set (CxPath ${CMAKE_CURRENT_SOURCE_DIR}/../cx)
 set (BinPath ${CMAKE_CURRENT_SOURCE_DIR}/../bin)
@@ -79,7 +83,10 @@ list (APPEND HFiles
     util.h
     wavefront-file.h
     xfrm.h
+    verif/testlist.h
     )
+
+list (APPEND CFiles hello.c)
 
 include (${CxPath}/include.cmake)
 
@@ -88,50 +95,49 @@ set (CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
 file (MAKE_DIRECTORY ${BldPath}/verif)
 
-foreach (f ${CommonCFiles})
-    list (APPEND FullCommonCFiles ${BldPath}/${f})
-endforeach ()
+find_library (M_LIB m)
+find_package (SDL)
+find_package (SDL_image)
+find_package (OpenMP)
+find_package (OpenGL)
+find_package (OpenCL)
 
-add_executable (cli
-    ${BldPath}/cli.c
-    ${BldPath}/util.c
-    ${FullCommonCFiles}
-    )
-set_target_properties (cli PROPERTIES
-    OUTPUT_NAME cli)
-target_link_libraries (cli CxLib)
+addbinexe (cli
+  cli.c
+  util.c
+  ${CommonCFiles}
+  )
+target_link_libraries (cli CxLib ${M_LIB})
 
 set (GuiName gui)
 list (APPEND GuiDFLAGS "NDimensions=3")
-list (APPEND GuiDFLAGS "SupportOpenGL")
 list (APPEND GuiDFLAGS "EmbedFiles")
 #list (APPEND GuiDFLAGS "INCLUDE_SOURCE")
 
-if (UNIX)
-    if (NOT CMAKE_BUILD_TYPE)
-        set (CMAKE_BUILD_TYPE DEBUG)
-    else ()
-    endif ()
-    #set (CMAKE_C_FLAGS "-Wall -Wextra -ansi -pedantic")
-    find_package (SDL REQUIRED)
-    find_package (SDL_image)
-    find_package (OpenMP)
-else ()
+if (NOT UNIX)
+  if (NOT SDL_FOUND)
     set (SDL_pfx "../../SDL-1.2.14")
     set (SDL_LIBRARY "${SDL_pfx}/lib/SDL")
     list (APPEND SDL_LIBRARY "${SDL_pfx}/lib/SDLmain")
     set (SDL_INCLUDE_DIR "${SDL_pfx}/include")
+    set (SDL_FOUND YES)
+  endif ()
 
+  if (NOT SDL_IMAGE_FOUND)
     set (SDL_image_pfx "../../SDL_image-1.2.10")
     set (SDL_IMAGE_INCLUDE_DIR "${SDL_image_pfx}/include")
     set (SDL_IMAGE_LIBRARY "${SDL_image_pfx}/lib/SDL_image")
+    set (SDL_IMAGE_FOUND YES)
+  endif ()
 endif ()
 
 if (SDL_IMAGE_FOUND)
   list (APPEND GuiDFLAGS "SupportImage")
 endif ()
 
-find_package (OpenGL REQUIRED)
+if (OPENGL_FOUND)
+  list (APPEND GuiDFLAGS "SupportOpenGL")
+endif ()
 
 # Usage:
 #   setup_dbgn_defines (${my_sources})
@@ -144,83 +150,89 @@ endmacro ()
 
 setup_dbgn_defines (${CSources})
 
-add_executable (imgdiff
-    ${BldPath}/imgdiff.c
-    ${BldPath}/pnm-image.c
-    ${BldPath}/util.c
-    )
-set_target_properties (imgdiff PROPERTIES
-    OUTPUT_NAME imgdiff)
-target_link_libraries (imgdiff CxLib)
+addbinexe (imgdiff
+  imgdiff.c
+  pnm-image.c
+  util.c
+  )
+target_link_libraries (imgdiff CxLib ${M_LIB})
 
 
-add_executable (file2array
-    ${BldPath}/file2array.c
-    ${BldPath}/util.c
-    )
-set_target_properties (file2array PROPERTIES
-    OUTPUT_NAME file2array)
-target_link_libraries (file2array CxLib)
+addbinexe (file2array
+  file2array.c
+  util.c
+  )
+target_link_libraries (file2array CxLib ${M_LIB})
 
-set (EmbedSfx ".embed.h")
+set (EmbedSfx .embed.h)
 
-add_custom_command (OUTPUT ${BldPath}/"phong.glsl${EmbedSfx}"
-  COMMAND file2array ${BldPath}/"phong.glsl${EmbedSfx}" phong.vert phong.frag 4d.vert
+add_custom_command (OUTPUT ${BldPath}/phong.glsl${EmbedSfx}
+  COMMAND file2array ${BldPath}/phong.glsl${EmbedSfx} phong.vert phong.frag 4d.vert
   DEPENDS phong.vert phong.frag 4d.vert
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
-add_custom_command (OUTPUT ${BldPath}/"perturb.cl${EmbedSfx}"
-  COMMAND file2array ${BldPath}/"perturb.cl${EmbedSfx}" perturb.cl
+add_custom_command (OUTPUT ${BldPath}/perturb.cl${EmbedSfx}
+  COMMAND file2array ${BldPath}/perturb.cl${EmbedSfx} perturb.cl
   DEPENDS perturb.cl
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-
-add_executable (verify
-    ${BldPath}/verif/main.c
-    ${BldPath}/verif/order.c
-    ${BldPath}/verif/pack.c
-    ${FullCommonCFiles}
-    )
-set_target_properties (verify PROPERTIES
-    OUTPUT_NAME verify)
-target_link_libraries (verify CxLib)
-
-add_executable (gui
-    ${BldPath}/gui.c
-    ${BldPath}/motion.c
-    ${BldPath}/"phong.glsl${EmbedSfx}"
-    ${BldPath}/"perturb.cl${EmbedSfx}"
-    ${FullCommonCFiles}
-    )
-set_target_properties (gui PROPERTIES
-    OUTPUT_NAME "${GuiName}"
-    COMPILE_DEFINITIONS "${GuiDFLAGS}"
-    LINK_FLAGS "${GuiLFLAGS}")
-target_link_libraries (gui CxLib)
 
 if (OPENMP_FOUND)
   set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
   set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 endif ()
 
-#include_directories (".")
-include_directories (${BldPath})
-include_directories (SYSTEM ${SDL_INCLUDE_DIR})
 if (SDL_IMAGE_FOUND)
   include_directories (SYSTEM ${SDL_IMAGE_INCLUDE_DIR})
 endif ()
-include_directories (SYSTEM ${OPENGL_INCLUDE_DIR})
 
-target_link_libraries (gui ${SDL_LIBRARY})
-if (SDL_IMAGE_FOUND)
-  target_link_libraries (gui ${SDL_IMAGE_LIBRARY})
-endif ()
-target_link_libraries (gui ${OPENGL_LIBRARIES})
+addbinexe (verify
+  verif/main.c
+  verif/order.c
+  verif/pack.c
+  ${CommonCFiles}
+  )
+target_include_directories (verify PUBLIC ${BldPath})
+target_link_libraries (verify CxLib ${M_LIB})
 
-if (UNIX)
-    target_link_libraries (imgdiff m)
-    target_link_libraries (file2array m)
-    target_link_libraries (gui m)
-    target_link_libraries (cli m)
-    target_link_libraries (verify m)
+if (SDL_FOUND AND OPENGL_FOUND)
+  addbinexe (gui
+    gui.c
+    motion.c
+    phong.glsl${EmbedSfx}
+    perturb.cl${EmbedSfx}
+    ${CommonCFiles}
+    )
+
+  target_include_directories (gui PUBLIC ${SDL_INCLUDE_DIR})
+  target_include_directories (gui PUBLIC ${OPENGL_INCLUDE_DIR})
+
+  set_target_properties (gui PROPERTIES
+    OUTPUT_NAME "${GuiName}"
+    COMPILE_DEFINITIONS "${GuiDFLAGS}"
+    LINK_FLAGS "${GuiLFLAGS}")
+  target_link_libraries (gui CxLib)
+  target_link_libraries (gui ${SDL_LIBRARY})
+  if (SDL_IMAGE_FOUND)
+    target_link_libraries (gui ${SDL_IMAGE_LIBRARY})
+  endif ()
+  target_link_libraries (gui ${OPENGL_LIBRARIES} ${M_LIB})
 endif ()
+
+if (OPENCL_FOUND)
+  addbinexe (hello hello.c ${CommonCFiles})
+  target_include_directories (hello PUBLIC ${OPENCL_INCLUDE_DIR})
+  target_link_libraries (hello ${OPENCL_LIBRARIES} ${M_LIB})
+endif ()
+
+
+enable_testing ()
+
+cat_parenthesized (TestNames "${CMAKE_CURRENT_SOURCE_DIR}/verif/testlist.h")
+
+foreach (testname ${TestNames})
+  add_test (NAME ${testname}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    COMMAND verify ${testname})
+endforeach ()
+
 

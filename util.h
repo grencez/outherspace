@@ -7,7 +7,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#define Stringify(a) #a
 #define StringifyPath(a,b) Stringify(a/b)
 
 #ifndef EmbedPathnamePfx

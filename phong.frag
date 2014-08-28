@@ -61,9 +61,9 @@ void main()
     float att = (spotEffect /
                  (gl_LightSource[0].constantAttenuation
                   + gl_FogFragCoord *
-                  gl_LightSource[0].linearAttenuation + 
+                  gl_LightSource[0].linearAttenuation +
                   + gl_FogFragCoord * gl_FogFragCoord *
-                  gl_LightSource[0].quadraticAttenuation)); 
+                  gl_LightSource[0].quadraticAttenuation));
 
     ambient *= gl_LightModel.ambient + att * gl_LightSource[0].ambient;
 

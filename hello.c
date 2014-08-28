@@ -314,7 +314,7 @@ run_hello ()
           "bld/outherspace/kptree.h",
           "bld/outherspace/raytrace.h",
           "bld/outherspace/raytrace.c",
-          "hello.cl"
+          "../hello.cl"
         };
         const uint nfnames = ArraySz( fnames );
         /* ndevices = 1; */
@@ -456,7 +456,6 @@ run_ray_cast ()
       "bld/outherspace/op.h",
       "bld/outherspace/space.h",
       "bld/outherspace/point.h",
-      "color.h",
       "bld/outherspace/space-junk.h",
       "bld/outherspace/xfrm.h",
       "bld/outherspace/xfrm.c",
@@ -476,7 +475,7 @@ run_ray_cast ()
       "bld/outherspace/kptree.h",
       "bld/outherspace/raytrace.h",
       "bld/outherspace/raytrace.c",
-      "hello.cl"
+      "../hello.cl"
     };
     const uint nfnames = ArraySz( fnames );
     /* ndevices = 1; */
@@ -613,7 +612,7 @@ run_ray_cast ()
   t1 = monotime ();
   printf ("Render sec:%f\n", t1 - t0);
 
-#if 0
+#if 1
   /* Read back the results from the device to verify the output */
   err = clEnqueueReadBuffer (comqs[dev_idx], kernel_args[0], CL_TRUE,
                              0, hits_size, image.hits, 0, 0, 0);

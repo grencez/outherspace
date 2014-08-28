@@ -964,8 +964,10 @@ first_KDTreeNode (uint* ret_parent,
     {
             /* Find the initial node.*/
         node_idx = find_KDTreeNode (&parent, &ray->origin, nodes);
+#ifndef __OPENCL_VERSION__
         box = &nodes[node_idx].as.leaf.box;
         assert (inside_BBox (box, &ray->origin));
+#endif  /* #ifndef __OPENCL_VERSION__ */
     }
     else
     {

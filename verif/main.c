@@ -281,6 +281,12 @@ verifn_orthorotate_PointXfrm (uint npids, uint pidx)
     }
 }
 
+static void
+testfn_orthorotate_PointXfrm ()
+{
+  verifn_orthorotate_PointXfrm (1, 0);
+}
+
 static
     void
 testfn_SList ()
@@ -342,29 +348,78 @@ testfn_SList ()
     free (membs);
 }
 
-int main (int argc, char** argv)
+
+static void testfn_TestOrder();
+static void testfn_All();
+
+typedef struct TestInfo TestInfo;
+struct TestInfo
 {
-    int argidx =
-        (init_sysCx (&argc, &argv),
-         1);
-    uint npids = 1, pidx = 0;
-    if (argidx < argc)
-        strto_uint (&npids, argv[argidx++]);
+  const char* name;
+  void (*fn) ();
+};
 
-    if (argidx < argc)
-        strto_uint (&pidx, argv[argidx++]);
+static int CmpTestInfo(const void* a, const void* b)
+{
+  return strcmp(((TestInfo*)a)->name, ((TestInfo*)b)->name);
+}
 
-    testfn_IAMap ();
-    testfn_KPTree ();
-    testfn_PointXfrm ();
-    testfn_trxfrm_BBox ();
-    testfn_serial ();
-    testfn_SList ();
-    testfn_order ();
-    testfn_pack ();
-    verifn_orthorotate_PointXfrm (npids, pidx);
+#define W(testname)  ,{ Stringify(testname), testfn_##testname }
+static const TestInfo AllTests[] = {
+  { "", testfn_All }
+#include "testlist.h"
+};
+#undef W
 
-    lose_sysCx ();
-    return 0;
+void testfn_TestOrder()
+{
+  for (uint i = 1; i < ArraySz(AllTests); ++i)
+    Claim2( 0 ,>, CmpTestInfo(&AllTests[i-1], &AllTests[i]) );
+}
+
+void testfn_All()
+{
+  for (uint i = 1; i < ArraySz(AllTests); ++i)
+    AllTests[i].fn();
+}
+
+static void Test(const char testname[])
+{
+  TestInfo key;
+  key.name = testname;
+  key.fn = 0;
+  {
+    const TestInfo* t = (TestInfo*) bsearch
+      (&key, AllTests, ArraySz(AllTests), sizeof(AllTests[0]), CmpTestInfo);
+    Claim( t );
+    t->fn();
+  }
+}
+
+
+int main(int argc, char** argv)
+{
+  int argi = (init_sysCx (&argc, &argv), 1);
+
+#if 0
+  uint npids = 1, pidx = 0;
+  if (argi < argc)
+    strto_uint (&npids, argv[argi++]);
+
+  if (argi < argc)
+    strto_uint (&pidx, argv[argi++]);
+#endif
+
+  if (argi == argc) {
+    testfn_All();
+  }
+  else {
+    while (argi < argc) {
+      Test(argv[argi++]);
+    }
+  }
+
+  lose_sysCx ();
+  return 0;
 }
 

@@ -1174,8 +1174,9 @@ test_intersections (uint* restrict ret_hit,
 
     if (BarycentricRayTrace)
     {
+      const BarySimplex simplex = simplices[tmp_hit];
       didhit = hit_BarySimplex (&tmp_mag, ray,
-                                &simplices[tmp_hit],
+                                &simplex,
                                 front);
     }
     else
@@ -1207,7 +1208,7 @@ cast_Ray (uint* restrict ret_hit, real* restrict ret_mag,
           __global const KDTreeNode* restrict nodes,
           __global const BarySimplex* restrict simplices,
           __global const Simplex* restrict tris,
-          __global const BBox* restrict box,
+          const BBox* restrict box,
           bool inside_box,
           Trit front)
 {
@@ -1227,8 +1228,11 @@ cast_Ray (uint* restrict ret_hit, real* restrict ret_mag,
     }
 
     reci_Point (&invdirect, &ray->direct);
-    node_idx = first_KDTreeNode (&parent, ray,
-                                 nodes, box, inside_box);
+    {
+      const BBox tmp_box = *box;
+      node_idx = first_KDTreeNode (&parent, ray,
+                                   nodes, &tmp_box, inside_box);
+    }
 
     while (node_idx != Max_uint)
     {
