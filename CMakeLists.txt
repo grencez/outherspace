@@ -192,7 +192,8 @@ addbinexe (verify
   verif/pack.c
   ${CommonCFiles}
   )
-target_include_directories (verify PUBLIC ${BldPath})
+set_property (TARGET verify
+  APPEND PROPERTY INCLUDE_DIRECTORIES ${BldPath})
 target_link_libraries (verify CxLib ${M_LIB})
 
 if (SDL_FOUND AND OPENGL_FOUND)
@@ -206,8 +207,8 @@ if (SDL_FOUND AND OPENGL_FOUND)
   #set_property (SOURCE ${BldPath}/gui.c
   #  APPEND PROPERTY OBJECT_DEPENDS ${BldPath}/phong.glsl${EmbedSfx})
 
-  target_include_directories (gui PUBLIC ${SDL_INCLUDE_DIR})
-  target_include_directories (gui PUBLIC ${OPENGL_INCLUDE_DIR})
+  set_property (TARGET gui
+    APPEND PROPERTY INCLUDE_DIRECTORIES ${SDL_INCLUDE_DIR} ${OPENGL_INCLUDE_DIR})
 
   set_target_properties (gui PROPERTIES
     OUTPUT_NAME "${GuiName}"
@@ -223,7 +224,8 @@ endif ()
 
 if (OPENCL_FOUND)
   addbinexe (hello hello.c ${CommonCFiles})
-  target_include_directories (hello PUBLIC ${OPENCL_INCLUDE_DIR})
+  set_property (TARGET hello
+    APPEND PROPERTY INCLUDE_DIRECTORIES ${OPENCL_INCLUDE_DIR})
   target_link_libraries (hello ${OPENCL_LIBRARIES} ${M_LIB})
 endif ()
 
