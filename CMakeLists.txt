@@ -160,9 +160,8 @@ target_link_libraries (imgdiff CxLib ${M_LIB})
 
 addbinexe (file2array
   file2array.c
-  util.c
   )
-target_link_libraries (file2array CxLib ${M_LIB})
+target_link_libraries (file2array CxLib)
 
 set (EmbedSfx .embed.h)
 
@@ -175,6 +174,8 @@ add_custom_command (OUTPUT ${BldPath}/perturb.cl${EmbedSfx}
   COMMAND file2array ${BldPath}/perturb.cl${EmbedSfx} perturb.cl
   DEPENDS perturb.cl
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_custom_target (EmbedSources SOURCES ${BldPath}/phong.glsl${EmbedSfx} ${BldPath}/perturb.cl${EmbedSfx})
 
 if (OPENMP_FOUND)
   set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
@@ -198,10 +199,12 @@ if (SDL_FOUND AND OPENGL_FOUND)
   addbinexe (gui
     gui.c
     motion.c
-    phong.glsl${EmbedSfx}
-    perturb.cl${EmbedSfx}
     ${CommonCFiles}
     )
+
+  add_dependencies(gui EmbedSources)
+  #set_property (SOURCE ${BldPath}/gui.c
+  #  APPEND PROPERTY OBJECT_DEPENDS ${BldPath}/phong.glsl${EmbedSfx})
 
   target_include_directories (gui PUBLIC ${SDL_INCLUDE_DIR})
   target_include_directories (gui PUBLIC ${OPENGL_INCLUDE_DIR})

@@ -1,10 +1,13 @@
 
 #include "wavefront-file.h"
 
+#include "cx/alphatab.h"
+#include "cx/fileb.h"
 #include "color.h"
 #include "pnm-image.h"
 #include "point.h"
 #include "slist.h"
+#include "simplex.h"
 
 #include <assert.h>
 #include <string.h>
@@ -98,229 +101,242 @@ output_wavefront (const Scene* scene,
     return true;
 }
 
-    bool
+  bool
 readin_wavefront (Scene* scene, const char* pathname, const char* filename)
 {
-    const uint ndims = 3;
-    uint line_no = 0;
-    const uint len = BUFSIZ;
-    char buf[BUFSIZ];
-    bool good = true;
-    const char* line;
-    FILE* in;
-    FILE* err = stderr;
-    SList elemlist, surflist,
-          vertlist, vnmllist, txptlist,
-          matlist, matnamelist,
-          texlist, texnamelist;
-    GeomSurf object_surface;
-    GeomSurf* surf;
+  const uint ndims = 3;
+  uint line_no = 0;
+  bool good = true;
+  const char* line;
+  XFileB xfileb;
+  FILE* err = stderr;
+  SList matlist, matnamelist,
+        texlist, texnamelist;
+  DeclTable( SceneElement, elems );
+  DeclTable( GeomSurf, surfs );
+  DeclTable( Point, verts );
+  DeclTable( Point, vnmls );
+  DeclTable( BaryPoint, txpts );
+  GeomSurf object_surface;
+  GeomSurf* surf;
 
-    surf = &object_surface;
-    init_GeomSurf (surf);
+  init_XFileB (&xfileb);
 
-    buf[len-1] = 0;
+  surf = &object_surface;
+  init_GeomSurf (surf);
 
-    in = fopen_path (pathname, filename, "rb");
-    if (!in) {
-      fprintf (err, "No file with pathname:%s filename:%s\n", pathname, filename);
-      return false;
-    }
+  if (!open_FileB (&xfileb.fb, pathname, filename)) {
+    fprintf (err, "No file with pathname:%s filename:%s\n", pathname, filename);
+    return false;
+  }
 
-    init_SList (&elemlist);
-    init_SList (&surflist);
-    init_SList (&vertlist);
-    init_SList (&vnmllist);
-    init_SList (&txptlist);
-    init_SList (&matlist);
-    init_SList (&matnamelist);
-    init_SList (&texlist);
-    init_SList (&texnamelist);
+  init_SList (&matlist);
+  init_SList (&matnamelist);
+  init_SList (&texlist);
+  init_SList (&texnamelist);
 
-    for (line = fgets (buf, len, in);
-         good && line;
-         line = fgets (buf, len, in))
+  for (line = getline_XFile (&xfileb.xf);
+       good && line;
+       line = getline_XFile (&xfileb.xf))
+  {
+    uint i;
+    line_no += 1;
+
+    line = strskip_ws (line);
+
+    if (AccepTok( line, "vn" ))
     {
-        uint i;
-        line_no += 1;
+      Point normal;
+      zero_Point (&normal);
+      UFor( i, ndims )
+        if (line)  line = strto_real (&normal.coords[i], line);
 
-        strstrip_eol (buf);
-        line = strskip_ws (line);
-
-        if (line[0] == 'v' && line[1] == 'n')
-        {
-            Point normal;
-            line = &line[2];
-            zero_Point (&normal);
-            UFor( i, ndims )
-                if (line)  line = strto_real (&normal.coords[i], line);
-
-            good = !!(line);
-            if (good)
-            {
-                normalize_Point (&normal, &normal);
-                app_SList (&vnmllist, DupliT( Point, &normal, 1 ));
-            }
-            else
-            {
-                fprintf (err, "Line:%u  Not enough coordinates!\n", line_no);
-            }
-        }
-        else if (line[0] == 'v' && line[1] == 't')
-        {
-            BaryPoint bpoint;
-            line = &line[2];
-            Op_s( real, NDimensions-1, bpoint.coords , 0 );
-            UFor( i, ndims-1 )
-                if (line)  line = strto_real (&bpoint.coords[i], line);
-
-            good = !!(line);
-            if (good)
-                app_SList (&txptlist, DupliT( BaryPoint, &bpoint, 1 ));
-            else
-                fprintf (err, "Line:%u  Not enough coordinates!\n", line_no);
-        }
-        else if (line[0] == 'v')
-        {
-            Point vert;
-            line = &line[1];
-            zero_Point (&vert);
-            UFor( i, ndims )
-                if (line)  line = strto_real (&vert.coords[i], line);
-
-            good = !!(line);
-            if (good)
-            {
-                app_SList (&vertlist, DupliT( Point, &vert, 1 ));
-            }
-            else
-            {
-                fprintf (err, "Line:%u  Not enough coordinates!\n", line_no);
-            }
-        }
-        else if (line[0] == 'f')
-        {
-            SceneElement elem;
-            init_SceneElement (&elem);
-
-            good = false;
-
-            line = &line[1];
-            line = parse_face_field (&elem.verts[0], &elem.txpts[0],
-                                     &elem.vnmls[0], line);
-            line = parse_face_field (&elem.verts[1], &elem.txpts[1],
-                                     &elem.vnmls[1], line);
-
-            if (line) while (true)
-            {
-                SceneElement* tri_elt;
-                line = parse_face_field (&elem.verts[2], &elem.txpts[2],
-                                         &elem.vnmls[2], line);
-                if (line)  good = true;
-                else       break;
-
-                tri_elt = AllocT( SceneElement, 1 );
-                copy_SceneElement (tri_elt, &elem);
-                app_SList (&elemlist, tri_elt);
-                surf->nelems += 1;
-
-                elem.verts[1] = elem.verts[2];
-                elem.txpts[1] = elem.txpts[2];
-            }
-            if (!good)
-                fprintf (err, "Line:%u  Failed to read face!\n", line_no);
-        }
-        else if (AccepTok( line, "mtllib" ))
-        {
-            line = strskip_ws (line);
-            good = readin_materials (&matlist, &matnamelist,
-                                     &texlist, &texnamelist,
-                                     pathname, line);
-            if (!good)
-            {
-                fprintf (err, "Line:%u  Failed to read materials!\n", line_no);
-            }
-        }
-        else if (AccepTok( line, "usemtl" ))
-        {
-            line = strskip_ws (line);
-            if (surf->nelems > 0)
-            {
-                app_SList (&surflist, DupliT( GeomSurf, surf, 1 ));
-                surf->nelems = 0;
-            }
-
-            surf->material = search_SList (&matnamelist, line, streql);
-        }
+      good = !!(line);
+      if (good)
+      {
+        normalize_Point (&normal, &normal);
+        PushTable( vnmls, normal );
+      }
+      else
+      {
+        fprintf (err, "Line:%u  Not enough coordinates!\n", line_no);
+      }
     }
-    fclose (in);
-
-    cleanup_SList (&matnamelist);
-    cleanup_SList (&texnamelist);
-
-    if (!good)
+    else if (AccepTok( line, "vt" ))
     {
-        cleanup_SList (&elemlist);
-        cleanup_SList (&surflist);
-        cleanup_SList (&vertlist);
-        cleanup_SList (&vnmllist);
-        cleanup_SList (&txptlist);
-        cleanup_SList (&matlist);
-        cleanup_SList (&texlist);
+      BaryPoint bpoint;
+      Op_s( real, NDimensions-1, bpoint.coords , 0 );
+      UFor( i, ndims-1 )
+        if (line)  line = strto_real (&bpoint.coords[i], line);
+
+      good = !!(line);
+      if (good)
+        PushTable( txpts, bpoint );
+      else
+        fprintf (err, "Line:%u  Not enough coordinates!\n", line_no);
     }
-    else
+    else if (AccepTok( line, "v" ))
     {
-        uint ei;
+      Point vert;
+      zero_Point (&vert);
+      UFor( i, ndims )
+        if (line)  line = strto_real (&vert.coords[i], line);
 
-        if (surf->nelems > 0)
-            app_SList (&surflist, DupliT( GeomSurf, surf, 1 ));
+      good = !!(line);
+      if (good) {
+        PushTable( verts, vert );
+      }
+      else {
+        fprintf (err, "Line:%u  Not enough coordinates!\n", line_no);
+      }
+    }
+    else if (AccepTok( line, "f" ))
+    {
+      SceneElement elem;
+      init_SceneElement (&elem);
 
-        init_Scene (scene);
-        scene->ndims = ndims;
-        scene->nelems = elemlist.nmembs;
-        scene->nsurfs = surflist.nmembs;
-        scene->nverts = vertlist.nmembs;
-        scene->nvnmls = vnmllist.nmembs;
-        scene->ntxpts = txptlist.nmembs;
-        scene->nmatls = matlist.nmembs;
-        scene->ntxtrs = texlist.nmembs;
-        scene->elems = AllocT( SceneElement, elemlist.nmembs );
-        scene->surfs = AllocT( GeomSurf, surflist.nmembs );
-        scene->verts = AllocT( Point, vertlist.nmembs );
-        scene->vnmls = AllocT( Point, vnmllist.nmembs );
-        scene->txpts = AllocT( BaryPoint, txptlist.nmembs );
-        scene->matls = AllocT( Material, matlist.nmembs );
-        scene->txtrs = AllocT( Texture, texlist.nmembs );
-        unroll_SList (scene->elems, &elemlist, sizeof (SceneElement));
-        unroll_SList (scene->surfs, &surflist, sizeof (GeomSurf));
-        unroll_SList (scene->verts, &vertlist, sizeof (Point));
-        unroll_SList (scene->vnmls, &vnmllist, sizeof (Point));
-        unroll_SList (scene->txpts, &txptlist, sizeof (BaryPoint));
-        unroll_SList (scene->matls, &matlist, sizeof (Material));
-        unroll_SList (scene->txtrs, &texlist, sizeof (Texture));
+      good = false;
 
-        UFor( ei, scene->nelems )
-        {
-            const uint nverts = 3;
-            uint pi;
-            SceneElement* elem;
-            elem = &scene->elems[ei];
+      line = parse_face_field (&elem.verts[0], &elem.txpts[0],
+                               &elem.vnmls[0], line);
+      line = parse_face_field (&elem.verts[1], &elem.txpts[1],
+                               &elem.vnmls[1], line);
 
-            UFor( pi, nverts )
-            {
-                uint vi;
-                vi = elem->verts[pi];
-                if (vi >= scene->nverts)
-                {
-                    fprintf (err, "Bad vertex:%u\n", vi);
-                    good = false;
-                }
-            }
+      if (line) while (true)
+      {
+        line = parse_face_field (&elem.verts[2], &elem.txpts[2],
+                                 &elem.vnmls[2], line);
+        if (line)  good = true;
+        else       break;
+
+        PushTable( elems, elem );
+        surf->nelems += 1;
+
+        elem.verts[1] = elem.verts[2];
+        elem.txpts[1] = elem.txpts[2];
+        elem.vnmls[1] = elem.vnmls[2];
+      }
+      if (!good)
+        fprintf (err, "Line:%u  Failed to read face!\n", line_no);
+    }
+    else if (AccepTok( line, "mtllib" ))
+    {
+      line = strskip_ws (line);
+      good = readin_materials (&matlist, &matnamelist,
+                               &texlist, &texnamelist,
+                               pathname, line);
+      if (!good)
+      {
+        fprintf (err, "Line:%u  Failed to read materials!\n", line_no);
+      }
+    }
+    else if (AccepTok( line, "usemtl" ))
+    {
+      line = strskip_ws (line);
+      if (surf->nelems > 0)
+      {
+        PushTable( surfs, *surf );
+        surf->nelems = 0;
+      }
+
+      surf->material = search_SList (&matnamelist, line, streql);
+    }
+  }
+  lose_XFileB (&xfileb);
+
+
+#if 1
+  for (uint ei = 0; ei < elems.sz; ++ei) {
+    SceneElement* elem = &elems.s[ei];
+    Point normal;
+
+    if (elem->vnmls[0] == Max_uint) {
+      for (uint dim = 1; dim < NDims; ++dim) {
+        if (elem->vnmls[dim] < Max_uint) {
+          elem->vnmls[0] = elem->vnmls[dim];
         }
-        reshuffle_for_surfaces_Scene (scene);
+      }
     }
 
-    return good;
+    if (elem->vnmls[0] < Max_uint) {
+      for (uint dim = 1; dim < NDims; ++dim) {
+        if (elem->vnmls[dim] == Max_uint) {
+          elem->vnmls[dim] = elem->vnmls[0];
+        }
+      }
+      continue;
+    }
+
+    for (dim ; NDims)
+      elem->vnmls[dim] = vnmls.sz;
+    normal = normal_of_tri (&verts.s[elem->verts[0]], &verts.s[elem->verts[1]], &verts.s[elem->verts[2]]);
+    PushTable( vnmls, normal );
+  }
+#endif
+
+  cleanup_SList (&matnamelist);
+  cleanup_SList (&texnamelist);
+
+  if (!good)
+  {
+    LoseTable( elems );
+    LoseTable( surfs );
+    LoseTable( verts );
+    LoseTable( vnmls );
+    LoseTable( txpts );
+    cleanup_SList (&matlist);
+    cleanup_SList (&texlist);
+  }
+  else
+  {
+    if (surf->nelems > 0)
+      PushTable( surfs, *surf );
+
+    init_Scene (scene);
+    scene->ndims = ndims;
+    scene->nelems = elems.sz;
+    scene->nsurfs = surfs.sz;
+    scene->nverts = verts.sz;
+    scene->nvnmls = vnmls.sz;
+    scene->ntxpts = txpts.sz;
+    scene->nmatls = matlist.nmembs;
+    scene->ntxtrs = texlist.nmembs;
+    PackTable( elems );
+    PackTable( surfs );
+    PackTable( verts );
+    PackTable( vnmls );
+    PackTable( txpts );
+    scene->elems = elems.s;
+    scene->surfs = surfs.s;
+    scene->verts = verts.s;
+    scene->vnmls = vnmls.s;
+    scene->txpts = txpts.s;
+    scene->matls = AllocT( Material, matlist.nmembs );
+    scene->txtrs = AllocT( Texture, texlist.nmembs );
+    unroll_SList (scene->matls, &matlist, sizeof (Material));
+    unroll_SList (scene->txtrs, &texlist, sizeof (Texture));
+
+    for (ei ; scene->nelems)
+    {
+      const uint nverts = 3;
+      uint pi;
+      SceneElement* elem = &scene->elems[ei];
+
+      UFor( pi, nverts )
+      {
+        uint vi;
+        vi = elem->verts[pi];
+        if (vi >= scene->nverts)
+        {
+          fprintf (err, "Bad vertex:%u\n", vi);
+          good = false;
+        }
+      }
+    }
+    reshuffle_for_surfaces_Scene (scene);
+  }
+
+  return good;
 }
 
 
@@ -397,34 +413,30 @@ readin_materials (SList* matlist, SList* namelist,
                   const char* pathname, const char* filename)
 {
     uint line_no = 0;
-    uint len = BUFSIZ;
-    char buf[BUFSIZ];
+    XFileB xfileb;
     bool good = true;
     const char* line;
-    FILE* in;
     FILE* err = stderr;
     Material scrap_material;
     Material* material;
     uint illum = 1;
 
+    init_XFileB (&xfileb);
     material = &scrap_material;
     init_Material (material);
 
     assert (matlist->nmembs == namelist->nmembs);
-    in = fopen_path (pathname, filename, "rb");
-    if (!in)
-    {
+    if (!open_FileB (&xfileb.fb, pathname, filename)) {
         fprintf (err, "Could not open file:%s/%s\n", pathname, filename);
         return false;
     }
 
-    for (line = fgets (buf, len, in);
+    for (line = getline_XFile (&xfileb.xf);
          good && line;
-         line = fgets (buf, len, in))
+         line = getline_XFile (&xfileb.xf))
     {
         line_no += 1;
 
-        strstrip_eol (buf);
         line = strskip_ws (line);
 
         if (AccepTok( line, "newmtl" ))
@@ -530,7 +542,7 @@ readin_materials (SList* matlist, SList* namelist,
         apply_illum_Material (material, illum);
 
     assert (matlist->nmembs == namelist->nmembs);
-    fclose (in);
+    lose_XFileB (&xfileb);
     return good;
 }
 

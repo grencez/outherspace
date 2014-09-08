@@ -133,7 +133,7 @@ init_ogl_ui_data ()
     FILE* err = stderr;
     GLint loc;
 #ifdef EmbedFiles
-#include EmbedInclude(phong.glsl)
+#include "phong.glsl.embed.h"
     (void) nfiles;
 #else  /* ^^^ defined(EmbedFiles) */
     static const char* const files[] =
@@ -430,6 +430,7 @@ ogl_setup (const RaySpace* space)
 
 
     SDL_GL_SetAttribute (SDL_GL_DOUBLEBUFFER, 1);
+    SDL_GL_SetAttribute (SDL_GL_SWAP_CONTROL, 1);
     SDL_GL_SetAttribute (SDL_GL_RED_SIZE, 5);
     SDL_GL_SetAttribute (SDL_GL_GREEN_SIZE, 5);
     SDL_GL_SetAttribute (SDL_GL_BLUE_SIZE, 5);
@@ -443,19 +444,25 @@ ogl_setup (const RaySpace* space)
         /* glEnable (GL_COLOR_MATERIAL); */
 
 #if 0
-        /* This works.*/
-    glEnable (GL_BLEND);
-    glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    /* This works.*/
+  glEnable (GL_BLEND);
+  glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 #endif
-    glPolygonMode (GL_FRONT_AND_BACK, GL_FILL);
+  glPolygonMode (GL_FRONT_AND_BACK, GL_FILL);
 
-        /* Our shading model--Gouraud (smooth). */
-    glShadeModel (GL_SMOOTH);
+  /* Our shading model--Gouraud (smooth). */
+  glShadeModel (GL_SMOOTH);
+  glLightModeli (GL_LIGHT_MODEL_TWO_SIDE, GL_TRUE);
+  /* glLightModeli (GL_LIGHT_MODEL_TWO_SIDE, GL_FALSE); */
+  /* glEnable (GL_NORMALIZE); */
 
-        /* Culling. */
+  glFrontFace (GL_CCW);
+
+  if (false) {
+    /* Culling. */
     glCullFace (GL_BACK);
-    glFrontFace (GL_CCW);
     glEnable (GL_CULL_FACE);
+  }
 
     if (DisplayRayImage)
     {
@@ -484,7 +491,8 @@ ogl_redraw (const RaySpace* space, uint pilot_idx)
     pilot = &pilots[pilot_idx];
     glUniform1i (diffuse_camera_flag_loc, pilot->ray_image.diffuse_camera_on ? 1 : 0);
 
-    glClearColor (0, 0, 0, 0);
+    // White background.
+    glClearColor (1, 1, 1, 1);
 
     height = npixelzoom * pilot->ray_image.nrows;
     width = npixelzoom * pilot->ray_image.ncols;

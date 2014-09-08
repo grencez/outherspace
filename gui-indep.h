@@ -89,9 +89,9 @@ static uint npilots = 1;
 static uint kbd_pilot_idx = 0;
 static ObjectMotion racer_motions[NRacersMax];  /* Reset every frame.*/
 static RaceCraft crafts[NRacersMax];
-static uint view_nrows = 200;
-static uint view_ncols = 200;
-static uint npixelzoom = 2;
+static uint view_nrows = 400;
+static uint view_ncols = 400;
+static uint npixelzoom = 1;
 static real frame_t0 = 0;
 static real framerate_report_dt = 0;
 static uint framerate_report_count = 0;

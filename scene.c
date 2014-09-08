@@ -825,8 +825,7 @@ reshuffle_for_surfaces_Scene (Scene* scene)
                 scene->verts[idx] = verts[elem->verts[i]];
                 elem->verts[i] = idx;
 
-                assert ((elem->vnmls[i]     < Max_uint) ==
-                        (surf->vnmls_offset < Max_uint));
+                Claim2( (elem->vnmls[i] < Max_uint) ,==, (surf->vnmls_offset < Max_uint) );
                 if (surf->vnmls_offset < Max_uint)
                 {
                     idx = i + ei * ndims + surf->vnmls_offset;
@@ -834,8 +833,7 @@ reshuffle_for_surfaces_Scene (Scene* scene)
                     elem->vnmls[i] = idx;
                 }
 
-                assert ((elem->txpts[i]     < Max_uint) ==
-                        (surf->txpts_offset < Max_uint));
+                Claim2( (elem->txpts[i] < Max_uint) ,==, (surf->txpts_offset < Max_uint) );
                 if (surf->txpts_offset < Max_uint)
                 {
                     idx = i + ei * ndims + surf->txpts_offset;

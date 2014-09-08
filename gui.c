@@ -586,9 +586,9 @@ mouse_down_fn (Pilot* pilot,
     RayCastAPriori priori;
     Ray ray;
 
-    if      (event->button == 1)  do_rotate = true;
-    else if (event->button == 3)  do_raycast = true;
-    else if (event->button == 2)
+    if      (event->button == 2)  do_rotate = true;
+    else if (event->button == 1)  do_raycast = true;
+    else if (event->button == 3)
     {
         SDLMod mod = SDL_GetModState ();
         if (mod & KMOD_CTRL)        input->mouse_zoom = true;
@@ -650,7 +650,7 @@ mouse_down_fn (Pilot* pilot,
         cast_nopartition (&hit_idx, &hit_mag, &hit_objidx,
                           space, &ray.origin, &ray.direct,
                           priori.inside_box,
-                          Yes, Max_uint);
+                          May, Max_uint);
 
         didhit = hit_objidx <= space->nobjects;
 
@@ -790,7 +790,6 @@ sdl_redraw (SDL_Surface* screen)
     glTexCoord2f (0, 0);  glVertex2f (-1,  1);
     glEnd ();
 
-    glFlush ();
     SDL_GL_SwapBuffers ();
     free (pixels);
 #else
@@ -836,9 +835,7 @@ render_loop_fn (void* data)
 #ifdef SupportOpenGL
             if (!DisplayRayImage)
             {
-                glFlush ();
-                    /* glFinish (); */
-                SDL_GL_SwapBuffers ();
+              SDL_GL_SwapBuffers ();
             }
 #endif
         }
@@ -846,7 +843,9 @@ render_loop_fn (void* data)
         UFor( i, npilots )
             param->pilots[i] = pilots[i];
 
+#if 0
         usleep(1000);
+#endif
         SDL_PushEvent (&draw_event);
         if (SeparateRenderThread)
             SDL_SemWait (param->sig);

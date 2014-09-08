@@ -15,7 +15,7 @@
 static Pilot pilots[NRacersMax];
 
 #ifdef SupportOpenGL
-static bool DisplayRayImage = false;
+static bool DisplayRayImage = true;
 #else
 static const bool DisplayRayImage = true;
 #endif
@@ -759,7 +759,10 @@ update_pilot_images (RaySpace* space, real frame_t1)
         basis = pilot->view_basis;
 
         if (pilot->input.light_to_camera && space->nlights > 0)
-            space->lights[0].location = origin;
+        {
+          space->lights[0].location = origin;
+          space->lights[0].on = true;
+        }
 
         if (ray_image->perspective)  ray_image->hifov = pilot->view_angle;
         else                         ray_image->hifov = pilot->view_width;

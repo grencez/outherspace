@@ -15,7 +15,7 @@ void init_Material (Material* mat)
 {
     set_Color (&mat->ambient, 0.2);
     set_Color (&mat->diffuse, 0.8);
-    set_Color (&mat->specular, 1);
+    set_Color (&mat->specular, 0);
     set_Color (&mat->emissive, 0);
     set_Color (&mat->transmission, 1);
 

@@ -15,6 +15,26 @@ typedef struct GeomObj GeomObj;
 typedef struct GeomInst GeomInst;
 typedef struct Scene Scene;
 
+#ifndef DeclTableT_Point
+#define DeclTableT_Point
+DeclTableT( Point, Point );
+#endif
+
+#ifndef DeclTableT_BaryPoint
+#define DeclTableT_BaryPoint
+DeclTableT( BaryPoint, BaryPoint );
+#endif
+
+#ifndef DeclTableT_SceneElement
+#define DeclTableT_SceneElement
+DeclTableT( SceneElement, SceneElement );
+#endif
+
+#ifndef DeclTableT_GeomSurf
+#define DeclTableT_GeomSurf
+DeclTableT( GeomSurf, GeomSurf );
+#endif
+
 struct SceneElement
 {
     uint verts[NDimensions];
@@ -33,11 +53,6 @@ struct GeomSurf
     uint txpts_offset;
     uint material;
 };
-
-#ifndef DeclTableT_uint
-#define DeclTableT_uint
-DeclTableT( uint, uint );
-#endif
 
 struct GeomObj
 {

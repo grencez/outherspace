@@ -27,59 +27,72 @@ cross_Point (Point* restrict dst,
         dst->coords[i] = 0;
 }
 
-    bool
+  Point
+normal_of_tri (const Point* a, const Point* b, const Point* c)
+{
+  Point u, v, normal;
+  Op_Point_200( &u ,-, b , a );
+  Op_Point_200( &v ,-, c , a );
+  cross_Point (&normal, &u, &v);
+  normalize_Point (&normal, &normal);
+  return normal;
+}
+
+  bool
 hit_Simplex (real* restrict ret_dist,
              const Ray ray,
              const Simplex elem,
              Trit front)
 {
-  const real fuzz = 128 * Epsilon_real;
-        /* const real epsilon = 16 * Epsilon_real; */
-    real epsilon = fuzz;
-    Point edge1, edge2, tvec, pvec, qvec;
-    real det, inv_det;
-    real u, v;
+  /* const real fuzz = 128 * Epsilon_real; */
+  //const real fuzz = 16 * Epsilon_real;
+  /* const real fuzz = Epsilon_real; */
+  const real fuzz = 0;
+  const real epsilon = 0;
+  Point edge1, edge2, tvec, pvec, qvec;
+  real det, inv_det;
+  real u, v;
 
-    Op_Point_200( &tvec  ,-, &ray.origin  , &elem.pts[0] );
-    Op_Point_200( &edge2 ,-, &elem.pts[2] , &elem.pts[0] );
-    Op_Point_200( &edge1 ,-, &elem.pts[1] , &elem.pts[0] );
-    cross_Point (&pvec, &ray.direct, &edge2);
-    u = dot_Point (&tvec, &pvec);
-    det = dot_Point (&edge1, &pvec);
+  Op_Point_200( &tvec  ,-, &ray.origin  , &elem.pts[0] );
+  Op_Point_200( &edge2 ,-, &elem.pts[2] , &elem.pts[0] );
+  Op_Point_200( &edge1 ,-, &elem.pts[1] , &elem.pts[0] );
+  cross_Point (&pvec, &ray.direct, &edge2);
+  u = dot_Point (&tvec, &pvec);
+  det = dot_Point (&edge1, &pvec);
 
-    if (det > epsilon && front != Nil)
-    {
-        if (u < 0 || u > det)
-            return false;
+  if (det > epsilon && front != Nil)
+  {
+    if (u < -fuzz || u > det + fuzz)
+      return false;
 
-        cross_Point (&qvec, &tvec, &edge1);
-        v = dot_Point (&ray.direct, &qvec);
-        if (v < 0 || u + v > det)
-            return false;
+    cross_Point (&qvec, &tvec, &edge1);
+    v = dot_Point (&ray.direct, &qvec);
+    if (v < -fuzz || u + v > det + fuzz)
+      return false;
 
-    }
-    else if (det < -epsilon && front != Yes)
-    {
-        if (u > 0 || u < det)
-            return false;
+  }
+  else if (det < -epsilon && front != Yes)
+  {
+    if (u > fuzz || u < det - fuzz)
+      return false;
 
-        cross_Point (&qvec, &tvec, &edge1);
-        v = dot_Point (&ray.direct, &qvec);
-        if (v > 0 || u + v < det)
-            return false;
-    }
-    else
-    {
-        return false;
-    }
+    cross_Point (&qvec, &tvec, &edge1);
+    v = dot_Point (&ray.direct, &qvec);
+    if (v > fuzz || u + v < det - fuzz)
+      return false;
+  }
+  else
+  {
+    return false;
+  }
 
-    inv_det = 1 / det;
-    *ret_dist = dot_Point (&edge2, &qvec) * inv_det;
+  inv_det = 1 / det;
+  *ret_dist = dot_Point (&edge2, &qvec) * inv_det;
 
-        /* u *= inv_det; */
-        /* v *= inv_det; */
+  /* u *= inv_det; */
+  /* v *= inv_det; */
 
-    return *ret_dist >= 0;
+  return *ret_dist >= 0;
 }
 
 void init_Plane (Plane* plane, const Point* normal, const Point* point)
@@ -179,7 +192,7 @@ init_BarySimplex (BarySimplex* elem, const Simplex* raw)
     row_minors_PointXfrm (&plane->normal, &surf, 0);
     checker_negate_Point (&plane->normal);
     init_Plane (plane, &plane->normal, &raw->pts[0]);
-    copy_Point (&surf.pts[0], &plane->normal);
+    surf.pts[0] = plane->normal;
 
     UFor( i, NDimensions-1 )
     {
@@ -236,9 +249,9 @@ static inline
 isect_BarySimplex (real* restrict ret_dist,
                    const Ray* restrict ray,
                    const BarySimplex* restrict elem,
-                   Trit front)
+                   Trit front,
+                   const real fuzz)
 {
-    const real fuzz = -128 * Epsilon_real;
     real dist, dot, bcoord_sum;
     BaryPoint bpoint;
     Point isect;
@@ -261,13 +274,13 @@ isect_BarySimplex (real* restrict ret_dist,
         return false;
     }
 
-    bcoord_sum = max_uint(dist,1)*fuzz;
+    bcoord_sum = -((dist > 1) ? dist : 1) * fuzz;
     dist *= 1 / dot;
     follow_Ray (&isect, ray, dist);
 
     {:for (i ; NDims-1)
         bpoint.coords[i] = dist_Plane (&elem->barys[i], &isect);
-        if (bpoint.coords[i] < fuzz)  return false;
+        if (bpoint.coords[i] < -fuzz)  return false;
         bcoord_sum += bpoint.coords[i];
         if (bcoord_sum > 1)  return false;
     }
@@ -280,9 +293,9 @@ static inline
 delayed_div_isect_BarySimplex (real* restrict ret_dist,
                                const Ray* restrict ray,
                                const BarySimplex* restrict elem,
-                               Trit front)
+                               Trit front,
+                               const real fuzz)
 {
-    const real fuzz = -128 * Epsilon_real;
     real dist, dot, bcoord_sum;
     BaryPoint bpoint;
     Point isect;
@@ -309,12 +322,12 @@ delayed_div_isect_BarySimplex (real* restrict ret_dist,
                     ,+, dist*, &ray->direct
                     ,   dot*, &ray->origin );
 
-    bcoord_sum = dist*fuzz;
+    bcoord_sum = -dist*fuzz;
     {:for (i ; NDims-1)
         bpoint.coords[i] =
             dot_Point (&elem->barys[i].normal, &isect)
             + elem->barys[i].offset * dot;
-        if (bpoint.coords[i] < fuzz)  return false;
+        if (bpoint.coords[i] < -fuzz)  return false;
         bcoord_sum += bpoint.coords[i];
         if (bcoord_sum > dot)  return false;
     }
@@ -329,15 +342,15 @@ static inline
 superfast_isect_BarySimplex (real* restrict ret_dist,
                              const Ray* restrict ray,
                              const BarySimplex* restrict elem,
-                             Trit front)
+                             Trit front,
+                             const real fuzz)
 {
-    const real fuzz = -128 * Epsilon_real;
     real dist, dot, bcoord_sum;
     BaryPoint bpoint;
     Point isect;
 
     dist = dist_Plane (&elem->plane, &ray->origin);
-    bcoord_sum = dist*fuzz;
+    bcoord_sum = -dist*fuzz;
     dot = - dot_Point (&elem->plane.normal, &ray->direct);
     if (dot > 0 && front != Nil)
     {
@@ -351,7 +364,7 @@ superfast_isect_BarySimplex (real* restrict ret_dist,
             bpoint.coords[i] =
                 dot_Point (&elem->barys[i].normal, &isect)
                 + elem->barys[i].offset * dot;
-            if (bpoint.coords[i] < fuzz)  return false;
+            if (bpoint.coords[i] < -fuzz)  return false;
         }
 
         {:for (i ; NDims-1)
@@ -372,7 +385,7 @@ superfast_isect_BarySimplex (real* restrict ret_dist,
             bpoint.coords[i] =
                 dot_Point (&elem->barys[i].normal, &isect)
                 + elem->barys[i].offset * dot;
-            if (bpoint.coords[i] > - fuzz)  return false;
+            if (bpoint.coords[i] > fuzz)  return false;
         }
 
         {:for (i ; NDims-1)
@@ -399,14 +412,15 @@ hit_BarySimplex (real* restrict ret_dist,
                  const BarySimplex* restrict elem,
                  Trit front)
 {
-    return
-#if 1
-        isect_BarySimplex
+  const real fuzz = 2048 * Epsilon_real;
+  return
+#if 0
+    isect_BarySimplex
 #elif 0
-        delayed_div_isect_BarySimplex
+    delayed_div_isect_BarySimplex
 #else
-        superfast_isect_BarySimplex
+    superfast_isect_BarySimplex
 #endif
-        (ret_dist, ray, elem, front);
+    (ret_dist, ray, elem, front, fuzz);
 }
 

@@ -179,7 +179,7 @@ update_internal_transformed_ObjectRaySpace (ObjectRaySpace* space)
         bool good;
         simplex_Scene (&raw, scene, ei);
         good = init_BarySimplex (&space->simplices[ei], &raw);
-        if (!good)  DBog1( "ei:%u\n", ei );
+        if (!good)  DBog1( "ei:%u", ei );
         /* assert (good); */
     }
 }
@@ -736,6 +736,7 @@ pixel_from_Material (Color* ambient, Color* diffuse,
         set_Color (ambient, .2);
         set_Color (diffuse, .8);
         set_Color (specular, 0);
+        set_Color (emissive, 0);
         return;
     }
 
@@ -816,7 +817,7 @@ diffuse_camera_shading (Color* ret_color, const Ray* ray, const Point* normal)
   }
 }
 
-    void
+  void
 fill_pixel (Color* ret_color,
             uint hitidx, real mag, uint objidx,
             const RayImage* image,
@@ -827,82 +828,70 @@ fill_pixel (Color* ret_color,
             uint nbounces,
             GMRand* gmrand)
 {
-    const bool shade_by_element = false;
-    const bool color_by_element = false;
-    const bool compute_bary_coords = true;
-    const bool show_splitting_planes = false;
-    bool miss_effects = false;
-    Color color;
-    const BarySimplex* simplex;
-    const ObjectRaySpace* object;
-    Point rel_origin, rel_dir;
-    const Scene* scene;
-    const SceneElement* elem;
-    const Material* material = 0;
-    bool hit_front;
-    real cos_normal;
-    Point bpoint, normal;
-    BaryPoint texpoint;
-    uint i;
+  const bool shade_by_element = false;
+  const bool color_by_element = false;
+  const bool compute_bary_coords = true;
+  const bool show_splitting_planes = false;
+  Color color;
+  const BarySimplex* simplex;
+  const ObjectRaySpace* object;
+  Point rel_origin, rel_dir;
+  const Scene* scene;
+  const SceneElement* elem;
+  const Material* material = 0;
+  bool hit_front;
+  real cos_normal;
+  Point bpoint, normal;
+  BaryPoint texpoint;
+  uint i;
 
-    if (show_splitting_planes)
-        miss_effects = true;
 
-    if (objidx > space->nobjects)
+  set_Color (&color, 1);
+  if (objidx > space->nobjects)
+  {
+    if (space->skytxtr < space->main.scene.ntxtrs)
     {
-        if (space->skytxtr < space->main.scene.ntxtrs)
-        {
-            map_sky_Texture (ret_color,
-                             &space->main.scene.txtrs[space->skytxtr],
-                             dir);
-        }
-        else
-        {
-            zero_Color (ret_color);
-        }
-
-        if (!miss_effects)  return;
-        color = *ret_color;
-    }
-    else
-    {
-        set_Color (&color, 1);
+      map_sky_Texture (&color,
+                       &space->main.scene.txtrs[space->skytxtr],
+                       dir);
     }
 
-    if (show_splitting_planes && objidx > space->nobjects)
-    {
-        const real frac = .1;
-        real red;
-        uint nplanes;
+  }
 
-        nplanes = splitting_plane_count (origin, dir, mag,
+  if (show_splitting_planes && objidx > space->nobjects)
+  {
+    const real frac = .1;
+    real red;
+    uint nplanes;
+
+    nplanes = splitting_plane_count (origin, dir, mag,
 #if 1
-                                         &space->main.tree,
-                                         &space->main.box
+                                     &space->main.tree,
+                                     &space->main.box
 #else
-                                         &space->object_tree,
-                                         &space->box
+                                     &space->object_tree,
+                                     &space->box
 #endif
-                                        );
+                                    );
 
-        red = 1;
-        UFor( i, nplanes )
-            red = (1 - frac) * red;
+    red = 1;
+    UFor( i, nplanes )
+      red = (1 - frac) * red;
 
-        UFor( i, NColors )
-        {
-            if (i == 0)
-                color.coords[i] = clamp_real (1 - red * (1 - color.coords[i]), 0, 1);
-            else
-                color.coords[i] = clamp_real (red * color.coords[i], 0, 1);
-        }
-    }
-
-    if (objidx > space->nobjects)
+    UFor( i, NColors )
     {
-        summ_Color (ret_color, ret_color, &color);
-        return;
+      if (i == 0)
+        color.coords[i] = clamp_real (1 - red * (1 - color.coords[i]), 0, 1);
+      else
+        color.coords[i] = clamp_real (red * color.coords[i], 0, 1);
     }
+  }
+
+  if (objidx > space->nobjects)
+  {
+    summ_Color (ret_color, ret_color, &color);
+    return;
+  }
 
     object = ray_to_ObjectRaySpace (&rel_origin, &rel_dir,
                                     origin, dir, space, objidx);
@@ -1069,8 +1058,8 @@ fill_pixel (Color* ret_color,
                 {
                   const real dot = dot_Point (&simplex->plane.normal, &tolight_ray.direct);
                   if (dot < 0) {
-                  const real adjust = 1e2*Epsilon_real * taximag_Point (&isect);
-                    if (dot < 10 * (M_PI/180))
+                    const real adjust = 1e2*Epsilon_real * taximag_Point (&isect);
+                    if (true || dot < 10 * (M_PI/180))
                       continue;
                     magtolight -= adjust;
                     follow_Point (&tolight_ray.origin, &tolight_ray.origin,
@@ -1078,7 +1067,7 @@ fill_pixel (Color* ret_color,
                   }
                 }
                 if (cast_to_light (space, &tolight_ray,
-                                   front,
+                                   hit_front ? Yes : Nil,
                                    magtolight))
                 {
                     real dist_factor = 1;
@@ -1549,8 +1538,8 @@ cast_record (uint* hitline,
     uint hit_idx = Max_uint;
     real hit_mag = Max_real;
     uint hit_object = Max_uint;
-    const Trit front = Yes;
-    /* const Trit front = May; */
+    /* const Trit front = Yes; */
+    const Trit front = May;
 
     if (space->partition)
         cast_partitioned (&hit_idx, &hit_mag, &hit_object,

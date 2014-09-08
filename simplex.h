@@ -6,6 +6,8 @@
 #endif  /* #ifndef __OPENCL_VERSION__ */
 
 
+Point
+normal_of_tri (const Point* a, const Point* b, const Point* c);
 bool
 hit_Simplex (real* restrict ret_dist,
              const Ray ray,

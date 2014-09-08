@@ -172,6 +172,10 @@ readin_wavefront_Track (Track* track, RaySpace* space,
   init_Track (track);
   init_RaySpace (space);
 
+  space->nlights = 1;
+  space->lights = AllocT( PointLightSource, space->nlights );
+  init_PointLightSource (&space->lights[0]);
+
   {
     XFileB xfb[1];
     const char* fname = strrchr (filename, '/');
