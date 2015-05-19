@@ -13,9 +13,8 @@ set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
 
 project (OutherSpace)
 
-list (APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../cmake)
-
-set (CxPath ${CMAKE_CURRENT_SOURCE_DIR}/../cx)
+set (CxPath ${CMAKE_CURRENT_SOURCE_DIR}/../dep/cx)
+list (APPEND CMAKE_MODULE_PATH ${CxPath}/cmake)
 set (BinPath ${CMAKE_CURRENT_SOURCE_DIR}/../bin)
 set (BldPath outherspace)
 
@@ -90,8 +89,8 @@ list (APPEND CFiles hello.c)
 
 include (${CxPath}/include.cmake)
 
-#set (CMAKE_RUNTIME_OUTPUT_DIRECTORY ${BinPath})
-set (CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+set (CMAKE_RUNTIME_OUTPUT_DIRECTORY ${BinPath})
+#set (CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
 file (MAKE_DIRECTORY ${BldPath}/verif)
 
