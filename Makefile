@@ -46,6 +46,7 @@ distclean:
 init:
 	if [ ! -f $(CxPath)/src/cx.c ] ; then git submodule init dep/cx ; git submodule update dep/cx ; fi
 	if [ ! -f $(CxPath)-pp/cx.c ] ; then git submodule init dep/cx-pp ; git submodule update dep/cx-pp ; fi
+	if [ ! -f data/machine0.obj ] ; then git submodule init data ; git submodule update data ; fi
 
 update:
 	git pull

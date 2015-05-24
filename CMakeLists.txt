@@ -27,7 +27,7 @@ ExternalProject_Add(cx
   INSTALL_COMMAND echo "No install step."
   )
 
-ExternalProject_Add(exc
+ExternalProject_Add(outherspace
   DEPENDS cx
   PREFIX ${CMAKE_CURRENT_BINARY_DIR}/external/src
   SOURCE_DIR ${TopPath}/src
