@@ -13,9 +13,10 @@ set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
 
 project (OutherSpace)
 
-set (CxPath ${CMAKE_CURRENT_SOURCE_DIR}/../dep/cx/src)
-list (APPEND CMAKE_MODULE_PATH ${CxPath}/cmake)
-set (BinPath ${CMAKE_CURRENT_SOURCE_DIR}/../bin)
+set (TopPath ${CMAKE_CURRENT_SOURCE_DIR}/..)
+set (BinPath ${TopPath}/bin)
+set (CxTopPath ${TopPath}/dep/cx)
+list (APPEND CMAKE_MODULE_PATH ${CxTopPath}/cmake)
 set (BldPath outherspace)
 
 set (CommonCFiles
@@ -46,7 +47,6 @@ list (APPEND CFiles
     gui.c
     imgdiff.c
     motion.c
-    file2array.c
     verif/main.c
     verif/order.c
     verif/pack.c
@@ -82,12 +82,11 @@ list (APPEND HFiles
     util.h
     wavefront-file.h
     xfrm.h
-    verif/testlist.h
     )
 
 list (APPEND CFiles hello.c)
 
-include (${CxPath}/include.cmake)
+include (${CxTopPath}/src/include.cmake)
 
 set (CMAKE_RUNTIME_OUTPUT_DIRECTORY ${BinPath})
 #set (CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
@@ -157,20 +156,15 @@ addbinexe (imgdiff
 target_link_libraries (imgdiff CxLib ${M_LIB})
 
 
-addbinexe (file2array
-  file2array.c
-  )
-target_link_libraries (file2array CxLib)
-
 set (EmbedSfx .embed.h)
 
 add_custom_command (OUTPUT ${BldPath}/phong.glsl${EmbedSfx}
-  COMMAND file2array ${BldPath}/phong.glsl${EmbedSfx} phong.vert phong.frag 4d.vert
+  COMMAND cembed -o ${BldPath}/phong.glsl${EmbedSfx} phong.vert phong.frag 4d.vert
   DEPENDS phong.vert phong.frag 4d.vert
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_custom_command (OUTPUT ${BldPath}/perturb.cl${EmbedSfx}
-  COMMAND file2array ${BldPath}/perturb.cl${EmbedSfx} perturb.cl
+  COMMAND cembed -o ${BldPath}/perturb.cl${EmbedSfx} perturb.cl
   DEPENDS perturb.cl
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -185,6 +179,7 @@ if (SDL_IMAGE_FOUND)
   include_directories (SYSTEM ${SDL_IMAGE_INCLUDE_DIR})
 endif ()
 
+#### Test Executable ####
 addbinexe (verify
   verif/main.c
   verif/order.c
@@ -195,6 +190,19 @@ set_property (TARGET verify
   APPEND PROPERTY INCLUDE_DIRECTORIES ${BldPath})
 target_link_libraries (verify CxLib ${M_LIB})
 
+add_custom_command (
+  OUTPUT ${BldPath}/verif/testswitch.c
+  COMMAND cswitch testname
+  -case-pfx "fn = testfn_"
+  -array AllTests
+  -x ${CMAKE_CURRENT_SOURCE_DIR}/verif/testlist.txt
+  -o ${BldPath}/verif/testswitch.c
+  DEPENDS cswitch ${CMAKE_CURRENT_SOURCE_DIR}/verif/testlist.txt)
+add_custom_target (TestSwitchSources SOURCES ${BldPath}/verif/testswitch.c)
+add_dependencies(verify TestSwitchSources)
+
+
+#### GUI Executable ####
 if (SDL_FOUND AND OPENGL_FOUND)
   addbinexe (gui
     gui.c
@@ -231,7 +239,8 @@ endif ()
 
 enable_testing ()
 
-cat_parenthesized (TestNames "${CMAKE_CURRENT_SOURCE_DIR}/verif/testlist.h")
+file(READ ${CMAKE_CURRENT_SOURCE_DIR}/verif/testlist.txt TestNames)
+string(REPLACE "\n" ";" TestNames "${TestNames}")
 
 foreach (testname ${TestNames})
   add_test (NAME ${testname}

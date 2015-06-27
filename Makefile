@@ -5,14 +5,16 @@ BinPath=bin
 
 SrcPath=src
 DepPath=dep
-CxPath=$(DepPath)/cx
+CxTopPath=$(DepPath)/cx
 
 CMAKE=cmake
 GODO=$(CMAKE) -E chdir
 MKDIR=$(CMAKE) -E make_directory
+CTAGS=ctags
 
 .PHONY: default all cmake proj \
-	test clean distclean \
+	test tags \
+	clean distclean \
 	init update pull
 
 default:
@@ -37,15 +39,19 @@ proj:
 test:
 	$(GODO) $(BldPath) $(MAKE) test
 
+tags:
+	$(CTAGS) -R src -R dep/cx/src
+
 clean:
 	$(GODO) $(BldPath) $(MAKE) clean
 
 distclean:
-	rm -fr $(BldPath) $(BinPath)
+	$(GODO) $(CxTopPath) $(MAKE) distclean
+	rm -fr $(BldPath) $(BinPath) tags
 
 init:
-	if [ ! -f $(CxPath)/src/cx.c ] ; then git submodule init dep/cx ; git submodule update dep/cx ; fi
-	if [ ! -f $(CxPath)-pp/cx.c ] ; then git submodule init dep/cx-pp ; git submodule update dep/cx-pp ; fi
+	if [ ! -f $(DepPath)/cx/src/cx.c ] ; then git submodule init dep/cx ; git submodule update dep/cx ; fi
+	if [ ! -f $(DepPath)/cx-pp/cx.c ] ; then git submodule init dep/cx-pp ; git submodule update dep/cx-pp ; fi
 	if [ ! -f data/machine0.obj ] ; then git submodule init data ; git submodule update data ; fi
 
 update:

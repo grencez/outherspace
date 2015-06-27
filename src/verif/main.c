@@ -230,7 +230,7 @@ testfn_serial ()
     }
 
     oput_Point (of, &expect);
-    olay_OFile (olay, of, 0);
+    olay_txt_OFile (olay, of, 0);
     xget_Point (olay, &result);
 
     Claim( equal_Point (&expect, &result) );
@@ -349,50 +349,30 @@ testfn_SList ()
 }
 
 
-static void testfn_TestOrder();
-static void testfn_All();
-
-typedef struct TestInfo TestInfo;
-struct TestInfo
+static
+  void
+Test(const char testname[])
 {
-  const char* name;
-  void (*fn) ();
-};
+  void (*fn) () = 0;
 
-static int CmpTestInfo(const void* a, const void* b)
-{
-  return strcmp(((TestInfo*)a)->name, ((TestInfo*)b)->name);
-}
+  /* cswitch testname
+   *   -case-pfx "fn = testfn_"
+   *   -array AllTests
+   *   -x testlist.txt
+   *   -o testswitch.c
+   */
+#include "testswitch.c"
 
-#define W(testname)  ,{ Stringify(testname), testfn_##testname }
-static const TestInfo AllTests[] = {
-  { "", testfn_All }
-#include "testlist.h"
-};
-#undef W
-
-void testfn_TestOrder()
-{
-  for (uint i = 1; i < ArraySz(AllTests); ++i)
-    Claim2( 0 ,>, CmpTestInfo(&AllTests[i-1], &AllTests[i]) );
-}
-
-void testfn_All()
-{
-  for (uint i = 1; i < ArraySz(AllTests); ++i)
-    AllTests[i].fn();
-}
-
-static void Test(const char testname[])
-{
-  TestInfo key;
-  key.name = testname;
-  key.fn = 0;
-  {
-    const TestInfo* t = (TestInfo*) bsearch
-      (&key, AllTests, ArraySz(AllTests), sizeof(AllTests[0]), CmpTestInfo);
-    Claim( t );
-    t->fn();
+  if (fn) {
+    fn();
+  }
+  else if (!testname[0]) {
+    for (uint i = 0; i < ArraySz(AllTests); ++i) {
+      Test(AllTests[i]);
+    }
+  }
+  else {
+    Claim( 0 && "Test does not exist." );
   }
 }
 
@@ -411,7 +391,7 @@ int main(int argc, char** argv)
 #endif
 
   if (argi == argc) {
-    testfn_All();
+    Test("");
   }
   else {
     while (argi < argc) {
