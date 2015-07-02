@@ -2,7 +2,7 @@
 #ifndef LIGHTCUT_H_
 #define LIGHTCUT_H_
 
-#include "cx/gmrand.h"
+#include "cx/urandom.h"
 #include "bbox.h"
 #include "color.h"
 #include "point.h"
@@ -99,7 +99,7 @@ cast_LightCutTree (Color* ret_color, const LightCutTree* tree,
                    const Color* diffuse,
                    const RayHit* hit,
                    const RaySpace* space,
-                   GMRand* gmrand)
+                   URandom* urandom)
 {
         /* const uint nlights = (tree->nodes.sz + 1) / 2; */
     Color color;
@@ -126,7 +126,7 @@ cast_LightCutTree (Color* ret_color, const LightCutTree* tree,
         real dot, tscale;
         const LightCutNode* light =
                 /* node; */
-        &node->lights[uint_GMRand (gmrand, node->nlights)];
+        &node->lights[uint_URandom (urandom, node->nlights)];
 
         diff_Point (&tolight.direct, &light->iatt.origin, &hit->isect);
 
@@ -156,7 +156,7 @@ cast_LightCutTree (Color* ret_color, const LightCutTree* tree,
 
                 if (i > 0)
                 {
-                    uint idx = uint_GMRand (gmrand, node->nlights);
+                    uint idx = uint_URandom (urandom, node->nlights);
                     light = &node->lights[idx];
                     diff_Point (&tolight.direct,
                                 &light->iatt.origin,

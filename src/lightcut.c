@@ -1,7 +1,7 @@
 
 #include "lightcut.h"
 
-#include "cx/gmrand.h"
+#include "cx/urandom.h"
 #include "affine.h"
 #include "bbox.h"
 #include "kptree.h"
@@ -282,7 +282,7 @@ linearize_LightCutTree (LightCutTree* t)
 
 static
     void
-make_light_tree (LightCutTree* t, GMRand* gmrand)
+make_light_tree (LightCutTree* t, URandom* urandom)
 {
     LightCutBuild* clusters;
     const uint nlights = t->nodes.sz;
@@ -339,7 +339,7 @@ make_light_tree (LightCutTree* t, GMRand* gmrand)
         LightCutBuild* c0 = 0;
         LightCutNode* node;
 
-        c0 = &clusters[remlights.s[uint_GMRand (gmrand, remlights.sz)]];
+        c0 = &clusters[remlights.s[uint_URandom (urandom, remlights.sz)]];
 
         close = *c0;
         close.node = 0;
@@ -372,7 +372,7 @@ make_light_tree (LightCutTree* t, GMRand* gmrand)
         {
             real a = maxmag_Color (&node->color);
             real b = maxmag_Color (&close.node->color);
-            if (real_GMRand (gmrand) * (a + b) >= a)
+            if (real_URandom (urandom) * (a + b) >= a)
                 node->iatt = close.node->iatt;
         }
 
@@ -415,11 +415,11 @@ cast_lights (RaySpace* space, uint nphotons, uint nbounces)
     LightCutTree* tree = &space->lightcuts;
     const ObjectRaySpace* const object = &space->main;
     const Scene* const scene = &object->scene;
-    GMRand gmrand;
+    URandom urandom;
     DeclTable( EmisElem, elems );
     DeclTable( LightCutNode, lights );
 
-    init_GMRand (&gmrand);
+    init_URandom (&urandom);
 
     tree->area = 0;
     {:for (ei ; scene->nelems)
@@ -481,8 +481,8 @@ cast_lights (RaySpace* space, uint nphotons, uint nbounces)
 
         simplex = *elem->simplex;
 
-        c.coords[0] = real_GMRand (&gmrand);
-        c.coords[1] = real_GMRand (&gmrand);
+        c.coords[0] = real_URandom (&urandom);
+        c.coords[1] = real_URandom (&urandom);
         x = c.coords[0] + c.coords[1];
         if (x > 1)
         {
@@ -507,8 +507,8 @@ cast_lights (RaySpace* space, uint nphotons, uint nbounces)
         {:for (bounce_idx ; nbounces+1)
             DeclGrow1Table( LightCutNode, light, lights );
             PointXfrm A;
-            real zenith = asin (sqrt (real_GMRand (&gmrand)));
-            real azimuthcc = 2 * M_PI * real_GMRand (&gmrand);
+            real zenith = asin (sqrt (real_URandom (&urandom)));
+            real azimuthcc = 2 * M_PI * real_URandom (&urandom);
                 /* real zenith = asin (sqrt (halton (2, light_idx))); */
                 /* real azimuthcc = 2 * M_PI * halton (3, light_idx); */
             uint hit = Max_uint, obj = Max_uint;
@@ -577,7 +577,7 @@ cast_lights (RaySpace* space, uint nphotons, uint nbounces)
     }
 
     tree->nodes = lights;
-    make_light_tree (tree, &gmrand);
+    make_light_tree (tree, &urandom);
     LoseTable( elems );
 }
 

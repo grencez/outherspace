@@ -2,7 +2,7 @@
 #include "cx/syscx.h"
 #include "cx/fileb.h"
 #include "cx/bittable.h"
-#include "cx/gmrand.h"
+#include "cx/urandom.h"
 #include "affine.h"
 #include "bbox.h"
 #include "kdtree.h"
@@ -215,8 +215,8 @@ static
   void
 testfn_serial ()
 {
-  GMRand gmrand;
-  init_GMRand (&gmrand);
+  URandom urandom;
+  init_URandom (&urandom);
 
   {:for (testidx ; 1e5)
     OFile of[1];
@@ -226,7 +226,7 @@ testfn_serial ()
     init_OFile (of);
 
     {:for (i ; NDims)
-      expect.coords[i] = 1e7 * real_GMRand (&gmrand);
+      expect.coords[i] = 1e7 * real_URandom (&urandom);
     }
 
     oput_Point (of, &expect);
@@ -247,12 +247,11 @@ static
     void
 verifn_orthorotate_PointXfrm (uint npids, uint pidx)
 {
-    GMRand gmrand;
+    URandom urandom;
     uint i, n;
     n = 1 << 20;
 
-    init_GMRand (&gmrand);
-    step_GMRand (&gmrand, pidx);
+    init2_URandom (&urandom, pidx, npids);
 
     for (i = pidx; i < n; i += npids)
     {
@@ -265,19 +264,16 @@ verifn_orthorotate_PointXfrm (uint npids, uint pidx)
 
         UFor( j, NDimensions )
         {
-            v.coords[j] = real_GMRand (&gmrand);
-            step_GMRand (&gmrand, npids-1);
-            if (bool_GMRand (&gmrand))
+            v.coords[j] = real_URandom (&urandom);
+            if (bool_URandom (&urandom))
                 v.coords[j] = - v.coords[j];
-            step_GMRand (&gmrand, npids-1);
         }
 
         stable_orthorotate_PointXfrm (&A, &A, &v,
-                                      uint_GMRand (&gmrand, NDimensions));
-        step_GMRand (&gmrand, npids-1);
+                                      uint_URandom (&urandom, NDimensions));
         det = det_PointXfrm (&A);
             /* fprintf (stderr, "det:%.32f\n", det); */
-        AssertApprox( 1, det, NDimensions, 2e0 );
+        AssertApprox( 1, det, NDimensions, 5e0 );
     }
 }
 

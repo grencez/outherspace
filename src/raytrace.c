@@ -64,7 +64,7 @@ fill_pixel (Color* ret_color,
             const RaySpace* space,
             Trit front,
             uint nbounces,
-            GMRand* gmrand);
+            URandom* urandom);
 static void
 cast_colors (Color* ret_color,
              const RaySpace* restrict space,
@@ -74,16 +74,18 @@ cast_colors (Color* ret_color,
              const Color* factor,
              Trit front,
              uint nbounces,
-             GMRand* gmrand);
+             URandom* urandom);
 static void
 cast_row_orthographic (RayImage* restrict image,
                        uint row,
                        const RaySpace* restrict space,
-                       const RayCastAPriori* restrict known);
+                       const RayCastAPriori* restrict known,
+                       URandom* urandom);
 static void
 cast_row_perspective (RayImage* image, uint row,
                       const RaySpace* restrict space,
-                      const RayCastAPriori* restrict known);
+                      const RayCastAPriori* restrict known,
+                      URandom* urandom);
 
     /* Include all packet tracing stuff here.
      * Keep dependence on this minimal.
@@ -826,7 +828,7 @@ fill_pixel (Color* ret_color,
             const RaySpace* space,
             Trit front,
             uint nbounces,
-            GMRand* gmrand)
+            URandom* urandom)
 {
   const bool shade_by_element = false;
   const bool color_by_element = false;
@@ -846,16 +848,18 @@ fill_pixel (Color* ret_color,
   uint i;
 
 
-  set_Color (&color, 1);
-  if (objidx > space->nobjects)
+  if (objidx <= space->nobjects)
   {
-    if (space->skytxtr < space->main.scene.ntxtrs)
-    {
-      map_sky_Texture (&color,
-                       &space->main.scene.txtrs[space->skytxtr],
-                       dir);
-    }
-
+    set_Color (&color, 1);
+  }
+  else if (space->skytxtr < space->main.scene.ntxtrs)
+  {
+    map_sky_Texture (&color,
+                     &space->main.scene.txtrs[space->skytxtr],
+                     dir);
+  }
+  else {
+    set_Color (&color, 0);
   }
 
   if (show_splitting_planes && objidx > space->nobjects)
@@ -1110,7 +1114,7 @@ fill_pixel (Color* ret_color,
             hit.front = front;
             hit.mag = mag;
             cast_LightCutTree (&tmp, &space->lightcuts,
-                               &diffuse, &hit, space, gmrand);
+                               &diffuse, &hit, space, urandom);
             summ_Color (&color, &color, &tmp);
         }
 
@@ -1126,7 +1130,7 @@ fill_pixel (Color* ret_color,
                             material->optical_density, hit_front, cos_normal);
 
             cast_colors (&color, space, image, &isect, &tmp_dir,
-                         &factor, front == Nil ? Yes : Nil, nbounces, gmrand);
+                         &factor, front == Nil ? Yes : Nil, nbounces, urandom);
         }
         if (material && material->reflective)
         {
@@ -1134,7 +1138,7 @@ fill_pixel (Color* ret_color,
             scale_Color (&factor, &material->specular, material->opacity);
 
             cast_colors (&color, space, image, &isect, &refldir,
-                         &factor, front, nbounces, gmrand);
+                         &factor, front, nbounces, urandom);
         }
     }
 
@@ -1472,7 +1476,7 @@ cast_colors (Color* ret_color,
              const Color* factor,
              Trit front,
              uint nbounces,
-             GMRand* gmrand)
+             URandom* urandom)
 {
     Color color;
     uint hit_idx = Max_uint;
@@ -1502,7 +1506,7 @@ cast_colors (Color* ret_color,
     zero_Color (&color);
     fill_pixel (&color, hit_idx, hit_mag, hit_object,
                 image, origin, dir, space, front, nbounces+1,
-                gmrand);
+                urandom);
     prod_Color (&color, &color, factor);
     summ_Color (ret_color, ret_color, &color);
 }
@@ -1533,7 +1537,7 @@ cast_record (uint* hitline,
              const Point* restrict origin,
              const Point* restrict dir,
              bool inside_box,
-             GMRand* gmrand)
+             URandom* urandom)
 {
     uint hit_idx = Max_uint;
     real hit_mag = Max_real;
@@ -1560,7 +1564,7 @@ cast_record (uint* hitline,
         zero_Color (&color);
         fill_pixel (&color, hit_idx, hit_mag, hit_object,
                     image, origin, dir, space, front, 0,
-                    gmrand);
+                    urandom);
         {:for (i ; NColors)
             pixline[3*col+i] = (byte)
                 clamp_real (255.5 * color.coords[i], 0, 255.5);
@@ -1604,7 +1608,16 @@ rays_to_hits_fish (RayImage* restrict image,
 
     inside_box = inside_BBox (&space->box, origin);
 
-#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel
+  {
+  URandom urandom[1];
+#ifdef _OPENMP
+  init2_URandom (urandom, omp_get_thread_num(), omp_get_num_threads());
+#else
+  init_URandom (urandom);
+#endif
+
+#pragma omp for schedule(dynamic)
     UFor( row, nrows )
     {
         uint col;
@@ -1612,11 +1625,6 @@ rays_to_hits_fish (RayImage* restrict image,
         uint* hitline = 0;
         real* magline = 0;
         byte* pixline = 0;
-        GMRand gmrand;
-
-        // Setup is poor, arbitrary numbers.
-        init2_GMRand (&gmrand, row % 2, 2);
-        step_GMRand (&gmrand, (row * 2) % 17);
 
         if (image->hits)  hitline = &image->hits[row * image->stride];
         if (image->mags)  magline = &image->mags[row * image->stride];
@@ -1655,9 +1663,10 @@ rays_to_hits_fish (RayImage* restrict image,
             cast_record (hitline, magline, pixline, col,
                          space, image,
                          origin, &dir, inside_box,
-                         &gmrand);
+                         urandom);
         }
     }
+  }
 }
 
 
@@ -1743,7 +1752,8 @@ rays_to_hits_fixed_plane (uint* hits, real* mags,
 cast_row_orthographic (RayImage* restrict image,
                        uint row,
                        const RaySpace* restrict space,
-                       const RayCastAPriori* restrict known)
+                       const RayCastAPriori* restrict known,
+                       URandom* urandom)
 {
     uint col, ncols;
     const BBox* box;
@@ -1751,11 +1761,6 @@ cast_row_orthographic (RayImage* restrict image,
     uint* hitline = 0;
     real* magline = 0;
     byte* pixline = 0;
-    GMRand gmrand;
-
-    // Setup is poor, arbitrary numbers.
-    init2_GMRand (&gmrand, row % 2, 2);
-    step_GMRand (&gmrand, (row * 2) % 17);
 
     ncols = image->ncols;
     box = &space->box;
@@ -1784,7 +1789,7 @@ cast_row_orthographic (RayImage* restrict image,
         cast_record (hitline, magline, pixline, col,
                      space, image,
                      &ray_origin, dir,
-                     inside_box, &gmrand);
+                     inside_box, urandom);
     }
 }
 
@@ -1792,18 +1797,14 @@ cast_row_orthographic (RayImage* restrict image,
     void
 cast_row_perspective (RayImage* image, uint row,
                       const RaySpace* restrict space,
-                      const RayCastAPriori* restrict known)
+                      const RayCastAPriori* restrict known,
+                      URandom* urandom)
 {
     uint col, ncols;
     const Point* origin;
     uint* hitline = 0;
     real* magline = 0;
     byte* pixline = 0;
-    GMRand gmrand;
-
-    // Setup is poor, arbitrary numbers.
-    init2_GMRand (&gmrand, row % 2, 2);
-    step_GMRand (&gmrand, (row * 2) % 17);
 
     ncols = image->ncols;
 
@@ -1852,7 +1853,7 @@ cast_row_perspective (RayImage* image, uint row,
 
         cast_record (hitline, magline, pixline, col,
                      space, image,
-                     origin, &dir, known->inside_box, &gmrand);
+                     origin, &dir, known->inside_box, urandom);
         //if (DBogTraceOn)
         //  DBogTraceOn = false;
 
@@ -2011,33 +2012,46 @@ cast_partial_RayImage (RayImage* restrict image,
     inc = nprocs;
 #endif
 
-#pragma omp parallel for schedule(dynamic)
-    for (i = myrank; i < row_nul; i += inc)
-    {
-#ifdef PackOpsAvail
-        uint j;
-        if (RayPacketDimSz <= row_nul)
-        {
-            for (j = 0; j < image->ncols; j += RayPacketDimSz)
-                cast_packet_RayImage (image, row_off + i, j, space, known);
-        }
-        else
-        {
-            uint n;
-            n = row_nul - i;
-            UFor( j, n )
-                if (image->perspective)
-                    cast_row_perspective (image, row_off + i + j, space, known);
-                else
-                    cast_row_orthographic (image, row_off + i + j, space, known);
-        }
-#else
-        if (image->perspective)
-            cast_row_perspective (image, row_off + i, space, known);
-        else
-            cast_row_orthographic (image, row_off + i, space, known);
+#pragma omp parallel
+  {
+  URandom urandom[1];
+  uint threadid = myrank;
+  uint nthreads = nprocs;
+#ifdef _OPENMP
+  // Assume all MPI processes have the same number of threads.
+  nthreads *= omp_get_num_threads();
+  threadid = omp_get_thread_num() + myrank * (nthreads/nprocs);
 #endif
+  init2_URandom (urandom, threadid, nthreads);
+
+#pragma omp for schedule(dynamic)
+  for (i = myrank; i < row_nul; i += inc)
+  {
+#ifdef PackOpsAvail
+    uint j;
+    if (RayPacketDimSz <= row_nul)
+    {
+      for (j = 0; j < image->ncols; j += RayPacketDimSz)
+        cast_packet_RayImage (image, row_off + i, j, space, known);
     }
+    else
+    {
+      uint n;
+      n = row_nul - i;
+      UFor( j, n )
+        if (image->perspective)
+          cast_row_perspective (image, row_off + i + j, space, known, urandom);
+        else
+          cast_row_orthographic (image, row_off + i + j, space, known, urandom);
+    }
+#else
+    if (image->perspective)
+      cast_row_perspective (image, row_off + i, space, known, urandom);
+    else
+      cast_row_orthographic (image, row_off + i, space, known, urandom);
+#endif
+  }
+  }
 
 #ifdef TrivialMpiRayTrace
     if (myrank == 0)
