@@ -8,6 +8,7 @@
 #include "point.h"
 #include "serial.h"
 #include "simplex.h"
+#include "motion.h"
 #include "wavefront-file.h"
 #include "xfrm.h"
 

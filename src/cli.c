@@ -1,5 +1,7 @@
 
 #include "cx/syscx.h"
+#include "cx/alphatab.h"
+#include "cx/fileb.h"
 
 #include "dynamic-setup.h"
 #include "pnm-image.h"
@@ -15,36 +17,49 @@
 
 int main (int argc, char** argv)
 {
-    int argi =
-        (init_sysCx (&argc, &argv),
-         1);
-    char pathname[1024];
-    const char* infilename = 0;
-    bool good = true;
-    FILE* out;
-    RaySpace space;
-    RayImage image;
-    Point view_origin;
-    PointXfrm view_basis;
-    bool write_image = true;
-    real t0, t1;
-    Track track;
+  int argi = init_sysCx (&argc, &argv);
+  DecloStack1( AlphaTab, xdirname, dflt_AlphaTab() );
+  const char* pathname = "data";
+  const char* infilename = "curve-track.txt";
+  bool good = true;
+  FILE* out;
+  RaySpace space;
+  RayImage image;
+  Point view_origin;
+  PointXfrm view_basis;
+  bool write_image = true;
+  real t0, t1;
+  Track track;
 
 #ifdef DistribCompute
-    init_compute (&argc, &argv);
-    push_losefn_sysCx (cleanup_compute);
+  init_compute (&argc, &argv);
+  push_losefn_sysCx (cleanup_compute);
 #endif
+
+  if (argi < argc) {
+    pathname = 0;
+    infilename = argv[argi];
+  }
+
+  {
+    uint sepidx =
+      pathname2_AlphaTab (xdirname, pathname, infilename);
+    if (sepidx == 0) {
+      pathname = "";
+    }
+    else {
+      xdirname->s[sepidx-1] = '\0';
+      pathname = xdirname->s;
+    }
+    infilename = &xdirname->s[sepidx];
+  }
+  DBog2( "opening dir:%s  file:%s", pathname, infilename );
+
 
     out = stdout;
     init_Track (&track);
     init_RayImage (&image);
 
-    strcpy (pathname, "data");
-    if (argi < argc)
-    {
-        pathname[0] = '\0';
-        infilename = argv[argi];
-    }
 
     image.nrows = 800;
     image.ncols = 800;
@@ -61,7 +76,6 @@ int main (int argc, char** argv)
                                      pathname);
 #elif 1
         /* 1000 x 1000 */
-    if (!infilename)  infilename = "curve-track.txt";
     good = readin_Track (&track, &space, pathname, infilename);
     if (good)
     {
@@ -192,12 +206,14 @@ int main (int argc, char** argv)
             }
         }
     }
-    cleanup_RayImage (&image);
+  cleanup_RayImage (&image);
 
-    cleanup_RaySpace (&space);
-    lose_Track (&track);
+  cleanup_RaySpace (&space);
+  lose_Track (&track);
 
-    lose_sysCx ();
-    return 0;
+  lose_AlphaTab (xdirname);
+
+  lose_sysCx ();
+  return 0;
 }
 

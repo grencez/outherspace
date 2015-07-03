@@ -1179,48 +1179,57 @@ int SDL_main (int argc, char* argv[])
 int wrapped_main_fn (int argc, char* argv[])
 #endif
 {
-    int argi =
-        (init_sysCx (&argc, &argv),
-         1);
-    FILE* out = stderr;
-    bool good = true;
-    bool call_gui = true;
-    uint i;
+  int argi = init_sysCx (&argc, &argv);
+  FILE* out = stderr;
+  bool good = true;
+  bool call_gui = true;
+  uint i;
 #ifdef SupportImage
-    int ret;
+  int ret;
 #endif
-    RaySpace ray_space;
-    char inpathname[1024];
-    const char* infilename;
-    Pilot dflt_pilot;
-    RaySpace* space;
-
-    strcpy (inpathname, "data");
-    infilename = "curve-track.txt";
-    if (RunFromMyMac)
-    {
-        char pathname[1024];
-        uint idx = 0;
-        const char* str;
-        str = strrchr (argv[0], '/');
-        if (str)  idx = index_of (str, argv[0], sizeof(char));
-        CopyT( char, pathname, argv[0], 0, idx );
-        pathname[idx] = 0;
-        sprintf (inpathname, "%s/../Resources/share/outherspace", pathname);
-    }
-
-    if (argi < argc)
-    {
-        inpathname[0] = '\0';
-        infilename = argv[argi];
-    }
-
-    space = &ray_space;
+  DecloStack1( AlphaTab, xdirname, dflt_AlphaTab() );
+  const char* inpathname = "data";
+  const char* infilename = "curve-track.txt";
+  Pilot dflt_pilot;
+  RaySpace space[1];
 
 #ifdef DistribCompute
     init_compute (&argc, &argv);
     push_losefn_sysCx (cleanup_compute);
 #endif
+
+  if (argi < argc) {
+    inpathname = 0;
+    infilename = argv[argi];
+  }
+
+#if 0
+  if (RunFromMyMac)
+  {
+    char pathname[1024];
+    uint idx = 0;
+    const char* str;
+    str = strrchr (argv[0], '/');
+    if (str)  idx = index_of (str, argv[0], sizeof(char));
+    CopyT( char, pathname, argv[0], 0, idx );
+    pathname[idx] = 0;
+    sprintf (inpathname, "%s/../Resources/share/outherspace", pathname);
+  }
+#endif
+
+  {
+    uint sepidx =
+      pathname2_AlphaTab (xdirname, inpathname, infilename);
+    if (sepidx == 0) {
+      inpathname = "";
+    }
+    else {
+      xdirname->s[sepidx-1] = '\0';
+      inpathname = xdirname->s;
+    }
+    infilename = &xdirname->s[sepidx];
+  }
+
 
 #ifdef SupportImage
     ret = IMG_Init (IMG_INIT_PNG);
@@ -1304,10 +1313,12 @@ int wrapped_main_fn (int argc, char* argv[])
 #endif
     }
 
-    cleanup_RaySpace (space);
-    lose_Track (&track);
+  cleanup_RaySpace (space);
+  lose_Track (&track);
 
-    lose_sysCx ();
-    return 0;
+  lose_AlphaTab (xdirname);
+
+  lose_sysCx ();
+  return 0;
 }
 

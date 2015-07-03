@@ -107,10 +107,8 @@ addbinexe (cli
   )
 target_link_libraries (cli CxLib ${M_LIB})
 
-set (GuiName gui)
-list (APPEND GuiDFLAGS "NDimensions=3")
+
 list (APPEND GuiDFLAGS "EmbedFiles")
-#list (APPEND GuiDFLAGS "INCLUDE_SOURCE")
 
 if (NOT UNIX)
   if (NOT SDL_FOUND)
@@ -201,32 +199,41 @@ add_custom_command (
 add_custom_target (TestSwitchSources SOURCES ${BldPath}/verif/testswitch.c)
 add_dependencies(verify TestSwitchSources)
 
-
-#### GUI Executable ####
-if (SDL_FOUND AND OPENGL_FOUND)
-  addbinexe (gui
+#### GUI Executables ####
+function (add_gui_exe tgt oname)
+  addbinexe (${tgt}
     gui.c
     motion.c
     ${CommonCFiles}
     )
 
-  add_dependencies(gui EmbedSources)
-  #set_property (SOURCE ${BldPath}/gui.c
-  #  APPEND PROPERTY OBJECT_DEPENDS ${BldPath}/phong.glsl${EmbedSfx})
+  add_dependencies(${tgt} EmbedSources)
 
-  set_property (TARGET gui
+  set_property (TARGET ${tgt}
     APPEND PROPERTY INCLUDE_DIRECTORIES ${SDL_INCLUDE_DIR} ${OPENGL_INCLUDE_DIR})
 
-  set_target_properties (gui PROPERTIES
-    OUTPUT_NAME "${GuiName}"
-    COMPILE_DEFINITIONS "${GuiDFLAGS}"
+  set (tmpDFLAGS ${GuiDFLAGS})
+  foreach (dflag ${ARGN})
+    list (APPEND tmpDFLAGS ${dflag})
+  endforeach ()
+
+  set_target_properties (${tgt} PROPERTIES
+    OUTPUT_NAME "${oname}"
+    COMPILE_DEFINITIONS "${tmpDFLAGS}"
     LINK_FLAGS "${GuiLFLAGS}")
-  target_link_libraries (gui CxLib)
-  target_link_libraries (gui ${SDL_LIBRARY})
+
+  target_link_libraries (${tgt} CxLib)
+  target_link_libraries (${tgt} ${SDL_LIBRARY})
   if (SDL_IMAGE_FOUND)
-    target_link_libraries (gui ${SDL_IMAGE_LIBRARY})
+    target_link_libraries (${tgt} ${SDL_IMAGE_LIBRARY})
   endif ()
-  target_link_libraries (gui ${OPENGL_LIBRARIES} ${M_LIB})
+  target_link_libraries (${tgt} ${OPENGL_LIBRARIES} ${M_LIB})
+endfunction ()
+
+if (SDL_FOUND AND OPENGL_FOUND)
+  add_gui_exe (gui gui "NDimensions=3")
+  add_gui_exe (outherspace outherspace "NDimensions=3" "UseRaceCraft")
+  add_gui_exe (outherspace4d outherspace4d "NDimensions=4" "UseRaceCraft")
 endif ()
 
 if (OPENCL_FOUND)

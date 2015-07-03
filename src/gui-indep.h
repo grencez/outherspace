@@ -17,7 +17,11 @@
 
 #define NRacersMax 10
 
+#ifdef UseRaceCraft
+static const bool FollowRacer = true;
+#else
 static const bool FollowRacer = false;
+#endif
 
 static const bool RenderDrawsPattern = false;
 static const bool ForceFauxFishEye = false;

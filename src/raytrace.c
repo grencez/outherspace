@@ -428,6 +428,7 @@ void init_RayImage (RayImage* image)
     image->color_distance_on = true;
     image->diffuse_camera_on = false;
     image->nbounces_max = 2;
+  image->culling_on = false;
 }
 
 void resize_RayImage (RayImage* image)
@@ -1542,8 +1543,7 @@ cast_record (uint* hitline,
     uint hit_idx = Max_uint;
     real hit_mag = Max_real;
     uint hit_object = Max_uint;
-    /* const Trit front = Yes; */
-    const Trit front = May;
+  const Trit front = image->culling_on ? Yes : May;
 
     if (space->partition)
         cast_partitioned (&hit_idx, &hit_mag, &hit_object,

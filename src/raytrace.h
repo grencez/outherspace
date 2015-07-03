@@ -98,6 +98,7 @@ struct RayImage
     Bool color_distance_on;
     Bool diffuse_camera_on;
     uint nbounces_max;
+  Bool culling_on;
 };
 
 struct RayCastAPriori
