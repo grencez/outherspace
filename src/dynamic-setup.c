@@ -310,7 +310,7 @@ readin_Track (Track* track, RaySpace* space,
     else if (AccepTok( line, "camloc" ))
     {
       if (line[0] == ':')  line = &line[1];
-      skipto_XFile (olay, line);
+      offto_XFile (olay, line);
       xget_IAMap (olay, &track->camloc);
     }
     else if (AccepTok( line, "model:" ))
