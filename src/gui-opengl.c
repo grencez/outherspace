@@ -223,7 +223,7 @@ init_ogl_ui_data ()
       GLint logbufsz = 0;
       GLchar* logbuf;
       glGetShaderiv(vert_shader, GL_INFO_LOG_LENGTH, &logbufsz);
-      logbuf = AllocT( GLchar, logbufsz );
+      AllocTo( logbuf, logbufsz );
       glGetShaderInfoLog(vert_shader, logbufsz, &logbufsz, logbuf);
 
       DBog0("Failed to compile vertex shader!");
@@ -235,7 +235,7 @@ init_ogl_ui_data ()
       GLint logbufsz = 0;
       GLchar* logbuf;
       glGetShaderiv(frag_shader, GL_INFO_LOG_LENGTH, &logbufsz);
-      logbuf = AllocT( GLchar, logbufsz );
+      AllocTo( logbuf, logbufsz );
       glGetShaderInfoLog(frag_shader, logbufsz, &logbufsz, logbuf);
 
       DBog0("Failed to compile fragment shader!");
@@ -318,7 +318,7 @@ cleanup_ogl_ui_data (const RaySpace* space)
         {
             GLuint* ids;
             uint i;
-            ids = AllocT( GLuint, scene->ntxtrs );
+            AllocTo( ids, scene->ntxtrs );
             UFor( i, scene->ntxtrs )
                 ids[i] = i + scenegl->texture_offset;
             glDeleteTextures (scene->ntxtrs, ids);
@@ -350,7 +350,7 @@ ogl_setup (const RaySpace* space)
         const uint nscenes = space->nobjects+1;
 #endif
         if (!scenegls)
-          scenegls = AllocT( SceneGL, nscenes );
+          AllocTo( scenegls, nscenes );
         glActiveTexture (GL_TEXTURE0);
         UFor( i, nscenes )
         {

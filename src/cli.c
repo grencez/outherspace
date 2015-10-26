@@ -18,7 +18,7 @@
 int main (int argc, char** argv)
 {
   int argi = init_sysCx (&argc, &argv);
-  DecloStack1( AlphaTab, xdirname, dflt_AlphaTab() );
+  AlphaTab xdirname[] = default;
   const char* pathname = "data";
   const char* infilename = "curve-track.txt";
   bool good = true;
@@ -63,13 +63,13 @@ int main (int argc, char** argv)
 
     image.nrows = 800;
     image.ncols = 800;
-    image.pixels = AllocT( byte, 1 );
-    /* image.hits = AllocT( uint, 1 ); */
-    /* image.mags = AllocT( real, 1 ); */
+    AllocTo( image.pixels, 1 );
+    /* AllocTo( image.hits, 1 ); */
+    /* AllocTo( image.mags, 1 ); */
 #if 0
         /* 2001 x 2001 */
-    image.hits = AllocT( uint, 1 );
-    image.mags = AllocT( real, 1 );
+    AllocTo( image.hits, 1 );
+    AllocTo( image.mags, 1 );
     good = setup_testcase_triangles (&space,
                                      &view_origin, &view_basis,
                                      &image.hifov,

@@ -170,9 +170,9 @@ init_KDTreeGrid (KDTreeGrid* grid, uint nelems)
     nintls = 2 * nelems;
 
     grid->nelems = nelems;
-    grid->elemidcs = AllocT( uint, nelems );
-    grid->intls[0] = AllocT( uint, NDimensions * nintls );
-    grid->coords[0] = AllocT( real, NDimensions * nintls );
+    AllocTo( grid->elemidcs, nelems );
+    AllocTo( grid->intls[0], NDimensions * nintls );
+    AllocTo( grid->coords[0], NDimensions * nintls );
 
     UFor( dim, NDimensions-1 )
     {
@@ -305,7 +305,7 @@ split_KDTreeGrid (KDTreeGrid* logrid, KDTreeGrid* higrid,
     init_KDTreeGrid (logrid, logrid->nelems);
     init_KDTreeGrid (higrid, higrid->nelems);
 
-    lojumps = AllocT( uint, 2*nintls );
+    AllocTo( lojumps, 2*nintls );
     hijumps = &lojumps[nintls];
 
     UFor( i, grid->nelems )
@@ -577,7 +577,7 @@ build_KDTreeNode (KDTreeGrid* grid,
 {
     KDTreeGrid logrid, higrid;
     KDTreeNode* node;
-    node = AllocT( KDTreeNode, 1 );
+    AllocTo( node, 1 );
     app_SList (nodelist, node);
         /* printf ("%*sdepth=%u, nelems=%u\n", depth, "", depth, nelems); */
 
@@ -633,7 +633,8 @@ build_KDTreeNode (KDTreeGrid* grid,
 
             /* Perform tree split.*/
         {
-            SList tmp_nodelist, tmp_elemidxlist;
+            SList tmp_nodelist = default;
+            SList tmp_elemidxlist = default;
 #pragma omp parallel sections
             {
 
@@ -647,8 +648,6 @@ build_KDTreeNode (KDTreeGrid* grid,
 
 #pragma omp section
                 {
-                    init_SList (&tmp_nodelist);
-                    init_SList (&tmp_elemidxlist);
                     build_KDTreeNode (&higrid,
                                       &tmp_nodelist, &tmp_elemidxlist,
                                       1+depth, elems);
@@ -777,7 +776,7 @@ build_trivial_KDTree (KDTree* tree, uint nelems, const BBox* box)
     KDTreeLeaf* leaf;
 
     tree->nnodes = 1;
-    tree->nodes = AllocT( KDTreeNode, tree->nnodes );
+    AllocTo( tree->nodes, tree->nnodes );
 
         /* Set the single leaf node to hold everything.*/
     tree->nodes[0].split_dim = NDimensions;
@@ -788,7 +787,7 @@ build_trivial_KDTree (KDTree* tree, uint nelems, const BBox* box)
 
         /* Set element indices to be [0,..,n-1].*/
     tree->nelemidcs = nelems;
-    tree->elemidcs = AllocT( uint, tree->nelemidcs );
+    AllocTo( tree->elemidcs, tree->nelemidcs );
     fill_minimal_unique (tree->elemidcs, tree->nelemidcs);
 }
 
@@ -797,7 +796,8 @@ build_KDTree (KDTree* tree, KDTreeGrid* grid, const Simplex* elems)
 {
     uint i;
     real t0;
-    SList nodelist, elemidxlist;
+    SList nodelist = default;
+    SList elemidxlist = default;
 
     t0 = monotime ();
 
@@ -806,15 +806,13 @@ build_KDTree (KDTree* tree, KDTreeGrid* grid, const Simplex* elems)
         sort_indexed_reals (grid->intls[i], 0, 2*grid->nelems, grid->coords[i]);
 #endif
 
-    init_SList (&nodelist);
-    init_SList (&elemidxlist);
     build_KDTreeNode (grid, &nodelist, &elemidxlist, 0, elems);
 
     tree->nnodes = nodelist.nmembs;
     tree->nelemidcs = elemidxlist.nmembs;
 
-    tree->nodes = AllocT( KDTreeNode, tree->nnodes );
-    tree->elemidcs = AllocT( uint, tree->nelemidcs );
+    AllocTo( tree->nodes, tree->nnodes );
+    AllocTo( tree->elemidcs, tree->nelemidcs );
 
     unroll_SList (tree->nodes, &nodelist, sizeof (KDTreeNode));
     unroll_SList (tree->elemidcs, &elemidxlist, sizeof (uint));

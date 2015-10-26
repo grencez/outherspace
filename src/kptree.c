@@ -27,9 +27,9 @@ init_KPTreeGrid (KPTreeGrid* grid, uint n)
 {
     grid->npts = n;
     init0_BBox (&grid->box);
-    grid->indices = AllocT( uint, n );
+    AllocTo( grid->indices, n );
 
-    grid->coords[0] = AllocT( real, NDims * n );
+    AllocTo( grid->coords[0], NDims * n );
     {:for (i ; NDims-1)
         grid->coords[i+1] = &grid->coords[i][n];
     }
@@ -164,7 +164,7 @@ build_KPTreeNode (KPTree* tree, KPTreeGrid* grid,
 build_KPTree (KPTree* tree, KPTreeGrid* grid)
 {
     tree->nnodes = grid->npts;
-    tree->nodes = AllocT( KPTreeNode, tree->nnodes );
+    AllocTo( tree->nodes, tree->nnodes );
     build_KPTreeNode (tree, grid, 0, 0, tree->nnodes);
 }
 

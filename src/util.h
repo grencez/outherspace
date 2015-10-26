@@ -29,9 +29,6 @@
 #define CopyT( Type, dst, src, lo, count ) \
     (array_cpy (dst, src, lo, count, sizeof (Type)))
 
-#define ZeroT( Type, a, count ) \
-    (memset (a, 0, (count) * sizeof (Type)))
-
 #define ConcaT( Type, dst, src, end, count ) \
     ((dst) = (Type*) array_cat (dst, src, &end, count, sizeof (Type)))
 
@@ -111,8 +108,6 @@ tristate mul_signum (tristate a, tristate b);
 } while (0)
 
 #ifndef __OPENCL_VERSION__
-uint index_of (const void* e, const void* arr, size_t size);
-void array_set (void* arr, uint i, const void* e, size_t size);
 void
 array_cpy (void* dst, const void* src, uint lo, uint count, size_t size);
 void*

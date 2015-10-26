@@ -219,11 +219,9 @@ testfn_serial ()
   init_URandom (&urandom);
 
   {:for (testidx ; 1e5)
-    OFile of[1];
+    OFile of[] = default;
     XFile olay[1];
     Point expect, result;
-
-    init_OFile (of);
 
     {:for (i ; NDims)
       expect.coords[i] = 1e7 * real_URandom (&urandom);
@@ -289,11 +287,10 @@ testfn_SList ()
 {
     const uint counts[]  = { 19,  1, 0, 13,  5 };
     const uint factors[] = { 3,   5, 7, 11, 17 };
-    SList a, b;
+    SList a = default;
+    SList b = default;
     uint i, n;
     uint* membs;
-
-    init_SList (&a);  init_SList (&b);
 
     n = 0;
     UFor( i, 5 )
@@ -324,7 +321,7 @@ testfn_SList ()
         n += counts[i];
     }
 
-    membs = AllocT( uint, n );
+    AllocTo( membs, n );
     unroll_SList (membs, &a, sizeof(uint));
 
     UFor( i, n )

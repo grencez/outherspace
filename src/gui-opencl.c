@@ -58,7 +58,7 @@ compute_devices (uint* ret_ndevices,
     err = clGetPlatformIDs (0, 0, &nplatforms);
     AssertStatus( err, "query platform count" );
 
-    platforms = AllocT( cl_platform_id, nplatforms );
+    AllocTo( platforms, nplatforms );
 
     err = clGetPlatformIDs (nplatforms, platforms, 0);
     AssertStatus( err, "fetch platforms" );
@@ -72,7 +72,7 @@ compute_devices (uint* ret_ndevices,
         ndevices += n;
     }
 
-    devices = AllocT( cl_device_id, ndevices );
+    AllocTo( devices, ndevices );
 
     device_offset = 0;
     UFor( i, nplatforms )
@@ -92,7 +92,7 @@ compute_devices (uint* ret_ndevices,
     context = clCreateContext (context_props, ndevices, devices, NULL, NULL, &err);
     AssertStatus( err, "create context" );
 
-    comqs = AllocT( cl_command_queue, ndevices );
+    AllocTo( comqs, ndevices );
     UFor( i, ndevices )
     {
         char buf[BUFSIZ];
@@ -129,7 +129,7 @@ load_program (cl_program* ret_program, cl_context context,
     cl_int err;
     const bool show_warnings = false;
 
-    sizes = AllocT( size_t, nfiles );
+    AllocTo( sizes, nfiles );
     UFor( i, nfiles )
         sizes[i] = files_nbytes[i];
 
@@ -160,7 +160,7 @@ load_program (cl_program* ret_program, cl_context context,
                                             CL_PROGRAM_BUILD_LOG,
                                             0, 0, &size);
                 AssertStatus( be, "build log size" );
-                log = AllocT( char, 1+size/sizeof(char) );
+                AllocTo( log, 1+size/sizeof(char) );
                 log[size/sizeof(char)] = 0;
 
                 be = clGetProgramBuildInfo (program, devices[i],

@@ -108,10 +108,12 @@ readin_wavefront (Scene* scene, const char* pathname, const char* filename)
   uint line_no = 0;
   bool good = true;
   const char* line;
-  XFileB xfileb;
+  XFileB xfileb = default;
   FILE* err = stderr;
-  SList matlist, matnamelist,
-        texlist, texnamelist;
+  SList matlist = default;
+  SList matnamelist = default;
+  SList texlist = default;
+  SList texnamelist = default;
   DeclTable( SceneElement, elems );
   DeclTable( GeomSurf, surfs );
   DeclTable( Point, verts );
@@ -120,8 +122,6 @@ readin_wavefront (Scene* scene, const char* pathname, const char* filename)
   GeomSurf object_surface;
   GeomSurf* surf;
 
-  init_XFileB (&xfileb);
-
   surf = &object_surface;
   init_GeomSurf (surf);
 
@@ -129,11 +129,6 @@ readin_wavefront (Scene* scene, const char* pathname, const char* filename)
     fprintf (err, "No file with pathname:%s filename:%s\n", pathname, filename);
     return false;
   }
-
-  init_SList (&matlist);
-  init_SList (&matnamelist);
-  init_SList (&texlist);
-  init_SList (&texnamelist);
 
   for (line = getline_XFile (&xfileb.xf);
        good && line;
@@ -311,8 +306,8 @@ readin_wavefront (Scene* scene, const char* pathname, const char* filename)
     scene->verts = verts.s;
     scene->vnmls = vnmls.s;
     scene->txpts = txpts.s;
-    scene->matls = AllocT( Material, matlist.nmembs );
-    scene->txtrs = AllocT( Texture, texlist.nmembs );
+    AllocTo( scene->matls, matlist.nmembs );
+    AllocTo( scene->txtrs, texlist.nmembs );
     unroll_SList (scene->matls, &matlist, sizeof (Material));
     unroll_SList (scene->txtrs, &texlist, sizeof (Texture));
 
@@ -413,7 +408,7 @@ readin_materials (SList* matlist, SList* namelist,
                   const char* pathname, const char* filename)
 {
     uint line_no = 0;
-    XFileB xfileb;
+    XFileB xfileb = default;
     bool good = true;
     const char* line;
     FILE* err = stderr;
@@ -421,7 +416,6 @@ readin_materials (SList* matlist, SList* namelist,
     Material* material;
     uint illum = 1;
 
-    init_XFileB (&xfileb);
     material = &scrap_material;
     init_Material (material);
 
@@ -447,7 +441,7 @@ readin_materials (SList* matlist, SList* namelist,
 
             app_SList (namelist, DupliT( char, line, n ));
 
-            material = AllocT( Material, 1 );
+            AllocTo( material, 1 );
             init_Material (material);
             app_SList (matlist, material);
         }

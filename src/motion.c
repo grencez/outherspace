@@ -76,7 +76,7 @@ set_pts_ObjectMotion (ObjectMotion* motion, const Scene* scene)
 
     motion->npts =
         condense_lexi_reals (jumps, indices, coords, n, NDims, lexis);
-    motion->pts = AllocT( Point, motion->npts );
+    AllocTo( motion->pts, motion->npts );
 
     UFor( i, motion->npts )
     {
@@ -162,7 +162,7 @@ move_objects (RaySpace* space, ObjectMotion* motions, real dt,
     nincs = clamp_real (nincs, 10, 200);
 
     nobjects = space->nobjects;
-    prev_centroids = AllocT( Point, nobjects );
+    AllocTo( prev_centroids, nobjects );
 
     UFor( i, nobjects )
         copy_Point (&prev_centroids[i], &space->objects[i].centroid);
@@ -170,7 +170,7 @@ move_objects (RaySpace* space, ObjectMotion* motions, real dt,
     i = 1 + space->nobjects;
     i *= i;
     collisions = cons2_BitTable (i, 0);
-    refldirs = AllocT( Point, i );
+    AllocTo( refldirs, i );
 
     UFor( i, nobjects )
         mark_colliding (collisions, refldirs, motions, i, space);

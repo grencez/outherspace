@@ -96,7 +96,7 @@ compute_devices (uint* ret_ndevices,
     err = clGetPlatformIDs (0, 0, &nplatforms);
     check_cl_status (err, "query platform count");
 
-    platforms = AllocT( cl_platform_id, nplatforms );
+    AllocTo( platforms, nplatforms );
 
     err = clGetPlatformIDs (nplatforms, platforms, 0);
     check_cl_status (err, "fetch platforms");
@@ -111,7 +111,7 @@ compute_devices (uint* ret_ndevices,
     }
 
     /* ndevices = 1; */
-    devices = AllocT( cl_device_id, ndevices );
+    AllocTo( devices, ndevices );
 
     device_offset = 0;
     UFor( i, nplatforms )
@@ -131,7 +131,7 @@ compute_devices (uint* ret_ndevices,
     context = clCreateContext (0, ndevices, devices, NULL, NULL, &err);
     check_cl_status (err, "create context");
 
-    comqs = AllocT( cl_command_queue, ndevices );
+    AllocTo( comqs, ndevices );
     UFor( i, ndevices )
     {
         char buf[BUFSIZ];
@@ -165,8 +165,8 @@ load_program (cl_program* ret_program, cl_context context,
     cl_program program;
     cl_int err;
 
-    bufs = AllocT( char*, nfnames );
-    sizes = AllocT( size_t, nfnames );
+    AllocTo( bufs, nfnames );
+    AllocTo( sizes, nfnames );
 
     UFor( i, nfnames )
     {
@@ -179,7 +179,7 @@ load_program (cl_program* ret_program, cl_context context,
           const char color_sfx[] =
             "\n#undef NDims\n#define NDims NDimensions\n";
           len = strlen(color_pfx) + sizes[i-1] + strlen(color_sfx);
-          bufs[i] = AllocT( char, (size_t) len );
+          AllocTo( bufs[i], (size_t) len );
           sizes[i] = len;
           strncpy (bufs[i], color_pfx, strlen(color_pfx));
           strncpy (bufs[i]+strlen(color_pfx), bufs[i-1], sizes[i-1]);
@@ -193,7 +193,7 @@ load_program (cl_program* ret_program, cl_context context,
         len = ftell (in);
         fseek (in, 0, SEEK_SET);
 
-        bufs[i] = AllocT( char, (size_t) len );
+        AllocTo( bufs[i], (size_t) len );
         assert (bufs[i]);
 
         sizes[i] = fread (bufs[i], sizeof(char), (size_t)len, in);
@@ -228,7 +228,7 @@ load_program (cl_program* ret_program, cl_context context,
                                             CL_PROGRAM_BUILD_LOG,
                                             0, 0, &size);
                 check_cl_status (be, "build log size");
-                log = AllocT( char, 1+size/sizeof(char) );
+                AllocTo( log, 1+size/sizeof(char) );
                 log[size/sizeof(char)] = 0;
 
                 be = clGetProgramBuildInfo (program, devices[i],
@@ -422,7 +422,7 @@ run_ray_cast ()
 
   image.nrows = 500;
   image.ncols = 500;
-  image.hits = AllocT( uint, 1 );
+  AllocTo( image.hits, 1 );
 
   if (!readin_Track (&track, &space, "data", "rgtest.txt")) {
     DBog0( "Can't read file!" );

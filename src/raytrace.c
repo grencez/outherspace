@@ -190,8 +190,8 @@ update_internal_transformed_ObjectRaySpace (ObjectRaySpace* space)
 init_filled_ObjectRaySpace (ObjectRaySpace* object)
 {
     object->nelems = object->scene.nelems;
-    object->elems = AllocT( Simplex, object->nelems );
-    object->simplices = AllocT( BarySimplex, object->nelems );
+    AllocTo( object->elems, object->nelems );
+    AllocTo( object->simplices, object->nelems );
 
     update_internal_transformed_ObjectRaySpace (object);
 
@@ -203,8 +203,8 @@ init_filled_ObjectRaySpace (ObjectRaySpace* object)
 init_trivial_ObjectRaySpace (ObjectRaySpace* object)
 {
     object->nelems = object->scene.nelems;
-    object->elems = AllocT( Simplex, object->nelems );
-    object->simplices = AllocT( BarySimplex, object->nelems );
+    AllocTo( object->elems, object->nelems );
+    AllocTo( object->simplices, object->nelems );
 
     update_internal_transformed_ObjectRaySpace (object);
 
@@ -515,8 +515,8 @@ void downsample_RayImage (RayImage* image, uint inv)
 
     inv2 = inv * inv;
 
-    o_pixline = AllocT( byte, 3 * (1 + o_ncols) );
-    o_fracline = AllocT( byte, 3 * (1 + o_ncols) );
+    AllocTo( o_pixline, 3 * (1 + o_ncols) );
+    AllocTo( o_fracline, 3 * (1 + o_ncols) );
 
     memset (o_pixline, 0, 3 * o_ncols * sizeof(byte));
     memset (o_fracline, 0, 3 * o_ncols * sizeof(byte));

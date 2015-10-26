@@ -141,9 +141,9 @@ resize_pilot_viewports (uint nrows, uint ncols)
         ray_image = &pilot->ray_image;
 
         if (!ray_image->pixels) {
-            ray_image->pixels = AllocT( byte, 1 );
-                /* ray_image->hits = AllocT( uint, 1 ); */
-                /* ray_image->mags = AllocT( real, 1 ); */
+            AllocTo( ray_image->pixels, 1 );
+            /* AllocTo( ray_image->hits, 1 ); */
+            /* AllocTo( ray_image->mags, 1 ); */
         }
 
             /* Horizontal splits.*/
@@ -468,7 +468,7 @@ setup_laser_scenes (RaySpace* space)
             add_1elem_Scene_RaySpace (space);
             object = &space->objects[laser_objidcs[i][side]];
 
-            mat = AllocT( Material, 1 );
+            AllocTo( mat, 1 );
             init_Material (mat);
             zero_Color (&mat->ambient);
             zero_Color (&mat->diffuse);
@@ -836,7 +836,7 @@ init_ui_data (RaySpace* space,
 
         scene = &space->objects[checkplane_objidx].scene;
         scene->nmatls = 1;
-        scene->matls = AllocT( Material, scene->nmatls );
+        AllocTo( scene->matls, scene->nmatls );
         matl = &scene->matls[0];
         scene->elems[0].material = 0;
         scene->surfs[0].material = 0;

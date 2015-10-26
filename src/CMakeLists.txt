@@ -184,6 +184,8 @@ addbinexe (verify
   verif/pack.c
   ${CommonCFiles}
   )
+set_target_properties (verify PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 set_property (TARGET verify
   APPEND PROPERTY INCLUDE_DIRECTORIES ${BldPath})
 target_link_libraries (verify CxLib ${M_LIB})
@@ -238,6 +240,8 @@ endif ()
 
 if (OPENCL_FOUND)
   addbinexe (hello hello.c ${CommonCFiles})
+  set_target_properties (hello PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
   set_property (TARGET hello
     APPEND PROPERTY INCLUDE_DIRECTORIES ${OPENCL_INCLUDE_DIR})
   target_link_libraries (hello ${OPENCL_LIBRARIES} ${M_LIB})

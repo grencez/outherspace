@@ -35,7 +35,7 @@ interpolate_by_file (Scene* dst,
     if (NDimensions != 4)  return false;
     if (nscenes == 0)  return false;
 
-    scenes = AllocT( Scene, nscenes );
+    AllocTo( scenes, nscenes );
 
     UFor( i, nscenes )
     {
@@ -173,11 +173,11 @@ readin_wavefront_Track (Track* track, RaySpace* space,
   init_RaySpace (space);
 
   space->nlights = 1;
-  space->lights = AllocT( PointLightSource, space->nlights );
+  AllocTo( space->lights, space->nlights );
   init_PointLightSource (&space->lights[0]);
 
   {
-    XFileB xfb[1];
+    XFileB xfb[] = default;
     const char* fname = strrchr (filename, '/');
     if (fname) {
       fname = &fname[1];
@@ -185,7 +185,6 @@ readin_wavefront_Track (Track* track, RaySpace* space,
     else {
       fname = filename;
     }
-    init_XFileB (xfb);
     if (!open_FileB (&xfb->fb, pathname, filename))
       BailOut( false, "couldn't read file" );
     good = readin_wavefront (&track->scene, xfb->fb.pathname.s, fname);
@@ -214,12 +213,12 @@ readin_Track (Track* track, RaySpace* space,
   uint line_no = 0;
   bool good = true;
   const char* line;
-  XFileB xfb[1];
+  XFileB xfb[] = default;
   XFile* xf = &xfb->xf;
   FILE* out = stderr;
   PointXfrm coord_system;
   IAMap model_map;  /* Use to save model transformation.*/
-  DecloStack( IAMap, map );
+  IAMap map[1];
   Point scale;
   Point location;
   Scene* scene = 0;
@@ -230,7 +229,6 @@ readin_Track (Track* track, RaySpace* space,
     return readin_wavefront_Track (track, space, pathname, filename);
   }
 
-  init_XFileB (xfb);
   if (!open_FileB (&xfb->fb, pathname, filename))
     return false;
 
@@ -244,7 +242,7 @@ readin_Track (Track* track, RaySpace* space,
   init_RaySpace (space);
 
   space->nlights = 2;
-  space->lights = AllocT( PointLightSource, space->nlights );
+  AllocTo( space->lights, space->nlights );
   init_PointLightSource (&space->lights[0]);
   init_PointLightSource (&space->lights[1]);
   /* Op_s( real, NColors, space->lights[0].intensity , .5 ); */
@@ -352,7 +350,7 @@ readin_Track (Track* track, RaySpace* space,
     }
     else if (AccepTok( line, "sky:" ))
     {
-      skytex = AllocT( Texture, 1 );
+      AllocTo( skytex, 1 );
       good = readin_Texture (skytex, xfb->fb.pathname.s, line);
       if (!good)
         fprintf (out, "Line:%u  Sky failed!\n", line_no);
@@ -494,13 +492,11 @@ readin_checkplanes (uint* ret_nplanes, Plane** ret_planes, Point** ret_points,
     const char* line;
     uint nplanes = 0;
     uint line_no = 1;
-    SList planelist, pointlist;
+    SList planelist = default;
+    SList pointlist = default;
 
     in = fopen_path (pathname, filename, "rb");
     if (!in)  return false;
-
-    init_SList (&planelist);
-    init_SList (&pointlist);
 
     for (line = fgets (buf, len, in);
          good && line;
@@ -549,8 +545,8 @@ readin_checkplanes (uint* ret_nplanes, Plane** ret_planes, Point** ret_points,
     else
     {
         *ret_nplanes = nplanes;
-        *ret_points = AllocT( Point, nplanes );
-        *ret_planes = AllocT( Plane, nplanes );
+        AllocTo( *ret_points, nplanes );
+        AllocTo( *ret_planes, nplanes );
         unroll_SList (*ret_planes, &planelist, sizeof (Plane));
         unroll_SList (*ret_points, &pointlist, sizeof (Point));
     }
@@ -694,7 +690,7 @@ setup_box_lights (RaySpace* space,
     }
 
     space->nlights = exp2_uint (ndims);
-    space->lights = AllocT( PointLightSource, space->nlights );
+    AllocTo( space->lights, space->nlights );
 
     UFor( i, space->nlights )
     {

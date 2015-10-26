@@ -36,7 +36,7 @@ copy_Texture (Texture* dst, const Texture* src)
     const uint npixels = src->nrows * src->ncols;
     byte* pixels;
 
-    pixels = AllocT( byte, (npixels) * src->pixelsz );
+    AllocTo( pixels, (npixels) * src->pixelsz );
     CopyT( byte, pixels, src->pixels, 0, npixels * src->pixelsz );
 
     *dst = *src;
@@ -185,7 +185,7 @@ readin_SDL_Image (Texture* texture,
     texture->ncols = ncols = surface->w;
     texture->pixelsz = fmt->BytesPerPixel;
     texture->alpha = (texture->pixelsz == 4);
-    texture->pixels = AllocT( byte, texture->pixelsz * nrows * ncols );
+    AllocTo( texture->pixels, texture->pixelsz * nrows * ncols );
 
     UFor( row, nrows )
     {

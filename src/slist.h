@@ -9,18 +9,23 @@ typedef struct SList SList;
 
 struct SListNode
 {
-    void* car;
-    SListNode* cdr;
+  void* car;
+  SListNode* cdr;
 };
 
 struct SList
 {
-    uint nmembs;
-    SListNode* head;
-    SListNode* tail;
+  uint nmembs;
+  SListNode* head;
+  SListNode* tail;
 };
+#define DEFAULT_SList  { 0, 0, 0 }
 
-void init_SList (SList* l);
+qual_inline
+SList dflt_SList () { SList list = default; return list; }
+qual_inline
+void init_SList (SList* l) { *l = dflt_SList (); }
+
 void cleanup_SList (SList* l);
 void unroll_SList (void* dst, SList* src, size_t size);
 

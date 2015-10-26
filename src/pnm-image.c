@@ -84,10 +84,9 @@ output_PPM_image (const char* filename, uint nrows, uint ncols,
                   const byte* pixels)
 {
   const bool textmode = true;
-  OFileB ofb[1];
+  OFileB ofb[] = default;
   OFile* of = &ofb->of;
 
-  init_OFileB (ofb);
   if (!open_FileB (&ofb->fb, 0, filename))
   {
     fprintf (stderr, "Cannot open file for writing:%s\n", filename);
@@ -139,7 +138,7 @@ readin_PPM_image (uint* ret_nrows, uint* ret_ncols,
   uint nrows = 0, ncols = 0;
   bool good = true;
   byte* pixels;
-  XFileB xfb[1];
+  XFileB xfb[] = default;
   XFile* xf = &xfb->xf;
   uint max_color_value = 255;
   uint header_stage;
@@ -149,7 +148,6 @@ readin_PPM_image (uint* ret_nrows, uint* ret_ncols,
 
   t0 = monotime ();
 
-  init_XFileB (xfb);
   if (!open_FileB (&xfb->fb, pathname, filename))
   {
     fprintf (stderr, "Cannot open file for reading:%s/%s\n",
@@ -205,7 +203,7 @@ readin_PPM_image (uint* ret_nrows, uint* ret_ncols,
 
   if (!ascii)  setfmt_XFileB (xfb, FileB_Raw);
 
-  pixels = AllocT( byte, nrows * ncols * NColors );
+  AllocTo( pixels, nrows * ncols * NColors );
 
   {:for (row ; nrows)
     const uint n = ncols * NColors;

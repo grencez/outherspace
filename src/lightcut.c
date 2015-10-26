@@ -292,7 +292,7 @@ make_light_tree (LightCutTree* t, URandom* urandom)
     KPTree kptree;
     DeclTable( uint, remlights );
 
-    clusters = AllocT( LightCutBuild, nlights );
+    AllocTo( clusters, nlights );
     if (!clusters)  return;
 
     init_KPTreeGrid (&kpgrid, nlights);

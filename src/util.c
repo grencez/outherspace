@@ -21,23 +21,13 @@
 #include <time.h>
 #endif
 
-uint index_of (const void* e, const void* arr, size_t size)
-{
-    return ((size_t) e - (size_t) arr) / size;
-}
-
-void array_set (void* arr, uint i, const void* e, size_t size)
-{
-    memcpy ((void*) ((size_t) arr + ((size_t) i * size)), e, size);
-}
-
-    void
+  void
 array_cpy (void* dst, const void* src, uint lo, uint count, size_t size)
 {
-    if (size > 0)
-        memcpy ((void*) ((size_t) dst + ((size_t) lo * size)),
-                src,
-                count * size);
+  if (size > 0)
+    memcpy (EltZ(dst, lo, size),
+            src,
+            count * size);
 }
 
     void*
@@ -139,7 +129,7 @@ cat_strings (uint n, const char* const* a)
     UFor( i, n )  if (a[i])
         len += strlen (a[i]);
 
-    s = AllocT( char, len+1 );
+    AllocTo( s, len+1 );
 
     len = 0;
     UFor( i, n )  if (a[i])
@@ -182,11 +172,8 @@ fopen_path (const char* pathname, const char* filename, const char* mode)
 {
   FILE* file = 0;
   FileB* fb;
-  XFileB xfb[1];
-  OFileB ofb[1];
-
-  init_XFileB (xfb);
-  init_OFileB (ofb);
+  XFileB xfb[] = default;
+  OFileB ofb[] = default;
 
   fb = strchr (mode, 'w') ? &ofb->fb : &xfb->fb;
   open_FileB (fb, pathname, filename);
@@ -240,7 +227,7 @@ readin_files (uint nfiles, uint* files_nbytes, byte** files_bytes,
         }
         if (good && (good = (ret == 0)))
         {
-            files_bytes[i] = AllocT( byte, files_nbytes[i] + 1 );
+            AllocTo( files_bytes[i], files_nbytes[i] + 1 );
             ret = fread (files_bytes[i], 1, files_nbytes[i], in);
         }
         if (good)

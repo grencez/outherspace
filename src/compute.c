@@ -347,7 +347,7 @@ bool rays_to_hits_computeloop (RaySpace* restrict space)
     ObjectRaySpace* xfer_objects = 0;
 
     MPI_Comm_rank (MPI_COMM_WORLD, (int*) &proc);
-    xfer_objects = AllocT( ObjectRaySpace, space->nobjects );
+    AllocTo( xfer_objects, space->nobjects );
 
     if (proc == 0)  return false;
 
@@ -387,9 +387,9 @@ bool rays_to_hits_computeloop (RaySpace* restrict space)
             AssertStatus( ret, "" );
         }
 
-        if (image.hits)  image.hits = AllocT( uint, 1 );
-        if (image.mags)  image.mags = AllocT( real, 1 );
-        if (image.pixels)  image.pixels = AllocT( byte, 1 );
+        if (image.hits)  AllocTo( image.hits, 1 );
+        if (image.mags)  AllocTo( image.mags, 1 );
+        if (image.pixels)  AllocTo( image.pixels, 1 );
         resize_RayImage (&image);
 
         UFor( i, space->nobjects )
@@ -434,7 +434,7 @@ void rays_to_hits_computer (RayImage* restrict image,
 
     setup_RayCastAPriori (&known, image, origin, view_basis, &space->box);
 
-    rows_computed = AllocT( uint, nrows );
+    AllocTo( rows_computed, nrows );
 
     MPI_Recv (intl, 2, MPI_UNSIGNED, 0, StdMsgTag, MPI_COMM_WORLD, &status);
     AssertStatus( status.MPI_ERROR, "" );
@@ -549,10 +549,10 @@ rays_to_hits_balancer (RayImage* image)
     kcoeff = (real) ncomputers * (ncomputers - 1) / 2;
     nrows_per_workunit = 1 + (uint) ((real) nrows / (10 * ncomputers));
 
-    row_computers = AllocT( int, nrows );
-    cpts = AllocT( Compute, ncomputers );
-    send_intl_reqs = AllocT( MPI_Request, ncomputers );
-    recv_progress_reqs = AllocT( MPI_Request, ncomputers );
+    AllocTo( row_computers, nrows );
+    AllocTo( cpts, ncomputers );
+    AllocTo( send_intl_reqs, ncomputers );
+    AllocTo( recv_progress_reqs, ncomputers );
 
     t0 = monotime ();
 

@@ -757,7 +757,7 @@ sdl_redraw (SDL_Surface* screen)
     uint nrows = screen->h, ncols = screen->w;
 #ifdef SupportOpenGL
     const uint32  argb_order = 0x3012; /* RGBA */
-    pixels = AllocT( byte, ncols * nrows * 4 );
+    AllocTo( pixels, ncols * nrows * 4 );
     stride = ncols * 4;
 #else
     const uint32  argb_order = RunFromMyMac ? 0x0123 : 0x3210;
@@ -1187,9 +1187,9 @@ int wrapped_main_fn (int argc, char* argv[])
 #ifdef SupportImage
   int ret;
 #endif
-  DecloStack1( AlphaTab, xdirname, dflt_AlphaTab() );
   const char* inpathname = "data";
   const char* infilename = "curve-track.txt";
+  AlphaTab xdirname[] = default;
   Pilot dflt_pilot;
   RaySpace space[1];
 
@@ -1210,7 +1210,7 @@ int wrapped_main_fn (int argc, char* argv[])
     uint idx = 0;
     const char* str;
     str = strrchr (argv[0], '/');
-    if (str)  idx = index_of (str, argv[0], sizeof(char));
+    if (str)  idx = IdxElt( argv[0], str );
     CopyT( char, pathname, argv[0], 0, idx );
     pathname[idx] = 0;
     sprintf (inpathname, "%s/../Resources/share/outherspace", pathname);
@@ -1293,7 +1293,7 @@ int wrapped_main_fn (int argc, char* argv[])
             *pilot = dflt_pilot;
 
             // Enable detection of holes in geometry.
-            /* pilot->ray_image.hits = AllocT( uint, 1 ); */
+            /* AllocTo( pilot->ray_image.hits, 1 ); */
 
             pilot->craft_idx = i;
             init_RaceCraft (&crafts[pilot->craft_idx]);

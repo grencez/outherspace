@@ -155,7 +155,7 @@ setup_testcase_track (RaySpace* space,
     identity_PointXfrm (view_basis);
     zero_Point (view_origin);
 
-    space->objects = AllocT( ObjectRaySpace, space->nobjects );
+    AllocTo( space->objects, space->nobjects );
 
     if (NDimensions == 3)
     {
@@ -225,7 +225,7 @@ setup_testcase_track (RaySpace* space,
         /* space->lights[0].intensity = 1e6; */
 #else
     space->nlights = 2;
-    space->lights = AllocT( PointLightSource, space->nlights );
+    AllocTo( space->lights, space->nlights );
     copy_Point (&space->lights[0].location, view_origin);
     copy_Point (&space->lights[1].location, &space->main.box.max);
     Op_s( real, NColors, space->lights[0].intensity , .5 );
@@ -306,7 +306,7 @@ setup_testcase_4d_normals (RaySpace* space,
     init_RaySpace (space);
     scene = &space->main.scene;
     scene->nelems = 2;
-    scene->elems = AllocT( SceneElement, scene->nelems );
+    AllocTo( scene->elems, scene->nelems );
     UFor( i, scene->nelems )
     {
         uint j;
@@ -316,12 +316,12 @@ setup_testcase_4d_normals (RaySpace* space,
     }
 
     scene->nverts = 8;
-    scene->verts = AllocT( Point, scene->nverts );
+    AllocTo( scene->verts, scene->nverts );
     UFor( i, scene->nverts )
         copy_Point (&scene->verts[i], &verts[i]);
 
     scene->nmatls = 2;
-    scene->matls = AllocT( Material, scene->nmatls );
+    AllocTo( scene->matls, scene->nmatls );
     UFor( i, scene->nmatls )
         init_Material (&scene->matls[i]);
 
@@ -403,8 +403,8 @@ setup_testcase_manual_interp (RaySpace* space,
     scene = &space->main.scene;
     scene->nelems = nelems;
     scene->nverts = nverts;
-    scene->elems = AllocT( SceneElement, nelems );
-    scene->verts = AllocT( Point, nverts );
+    AllocTo( scene->elems, nelems );
+    AllocTo( scene->verts, nverts );
 
     UFor( i, nverts )
     {
@@ -474,16 +474,15 @@ random_Point (Point* p, const BBox* box)
 }
 
 
-    Point*
+  Point*
 random_Points (uint npts, const BBox* box)
 {
-    uint i;
-    Point* pts;
-    pts = AllocT( Point, npts );
+  Point* pts;
+  AllocTo( pts, npts );
 
-    UFor( i, npts )
-        random_Point (&pts[i], box);
-    return pts;
+  for (i ; npts)
+    random_Point (&pts[i], box);
+  return pts;
 }
 
 
@@ -501,7 +500,7 @@ random_Scene (Scene* scene, uint nelems, const BBox* box)
     scene->verts = random_Points (scene->nverts, box);
 
     scene->nelems = nelems;
-    scene->elems = AllocT( SceneElement, nelems );
+    AllocTo( scene->elems, nelems );
 
     UFor( i, nelems )
     {
@@ -518,7 +517,7 @@ setup_camera_light (RaySpace* space, const Point* origin)
 {
     assert (space->nlights == 0);
     space->nlights = 2;
-    space->lights = AllocT( PointLightSource, space->nlights );
+    AllocTo( space->lights, space->nlights );
     init_PointLightSource (&space->lights[0]);
     init_PointLightSource (&space->lights[1]);
     copy_Point (&space->lights[0].location, origin);

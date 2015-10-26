@@ -108,20 +108,20 @@ void cleanup_Scene (Scene* scene)
     void
 copy_Scene (Scene* dst, const Scene* src)
 {
-    uint i;
-    CopyT( Scene, dst, src, 0, 1 );
-    dst->elems = DupliT( SceneElement, dst->elems, dst->nelems );
-    dst->surfs = DupliT( GeomSurf, dst->surfs, dst->nsurfs );
-    if (dst->vidcs)
-        dst->vidcs = DupliT( uint, dst->vidcs, dst->ndims * dst->nelems );
-    dst->verts = DupliT( Point, dst->verts, dst->nverts );
-    dst->vnmls = DupliT( Point, dst->vnmls, dst->nvnmls );
-    dst->txpts = DupliT( BaryPoint, dst->txpts, dst->ntxpts );
-    dst->matls = DupliT( Material, dst->matls, dst->nmatls );
-    dst->txtrs = DupliT( Texture, dst->txtrs, dst->ntxtrs );
+  uint i;
+  *dst = *src;
+  Duplic( dst->elems, dst->elems, dst->nelems );
+  Duplic( dst->surfs, dst->surfs, dst->nsurfs );
+  if (dst->vidcs)
+    Duplic( dst->vidcs, dst->vidcs, dst->ndims * dst->nelems );
+  Duplic( dst->verts, dst->verts, dst->nverts );
+  Duplic( dst->vnmls, dst->vnmls, dst->nvnmls );
+  Duplic( dst->txpts, dst->txpts, dst->ntxpts );
+  Duplic( dst->matls, dst->matls, dst->nmatls );
+  Duplic( dst->txtrs, dst->txtrs, dst->ntxtrs );
 
-    UFor( i, dst->ntxtrs )
-        copy_Texture (&dst->txtrs[i], &dst->txtrs[i]);
+  UFor( i, dst->ntxtrs )
+    copy_Texture (&dst->txtrs[i], &dst->txtrs[i]);
 }
 
     void
@@ -228,9 +228,9 @@ setup_1elem_Scene (Scene* scene)
     scene->nelems = 1;
     scene->nsurfs = 1;
     scene->nverts = NDimensions;
-    scene->elems = AllocT( SceneElement, scene->nelems );
-    scene->surfs = AllocT( GeomSurf, scene->nsurfs );
-    scene->verts = AllocT( Point, scene->nverts );
+    AllocTo( scene->elems, scene->nelems );
+    AllocTo( scene->surfs, scene->nsurfs );
+    AllocTo( scene->verts, scene->nverts );
 
     init_GeomSurf (&scene->surfs[0]);
     scene->surfs[0].nelems = 1;
@@ -608,26 +608,26 @@ interpolate_Scene (Scene* dst, uint k, uint nscenes, const Scene* scenes)
     init_Scene (dst);
     dst->ndims = k+1;
     dst->nelems = (nscenes-1) * nelems * simplex_fill_count (k);
-    dst->elems = AllocT( SceneElement, dst->nelems );
+    AllocTo( dst->elems, dst->nelems );
 
     dst->nsurfs = nsurfs;
-    dst->surfs = DupliT( GeomSurf, scenes[0].surfs, dst->nsurfs );
+    Duplic( dst->surfs, scenes[0].surfs, dst->nsurfs );
 
     vcount = nscenes * nverts;
     dst->nverts = vcount + dst->nelems;
-    dst->verts = AllocT( Point, dst->nverts );
+    AllocTo( dst->verts, dst->nverts );
 
     vnmlcount = nscenes * nvnmls;
     dst->nvnmls = vnmlcount + dst->nelems;
-    dst->vnmls = AllocT( Point, dst->nvnmls );
+    AllocTo( dst->vnmls, dst->nvnmls );
     dst->nmatls = nmatls;
-    dst->matls = DupliT( Material, scenes[0].matls, dst->nmatls );
+    Duplic( dst->matls, scenes[0].matls, dst->nmatls );
 
         /* Copy info.*/
     UFor( i, nscenes )
     {
-        CopyT( Point, dst->verts, scenes[i].verts, i * nverts, nverts );
-        CopyT( Point, dst->vnmls, scenes[i].vnmls, i * nvnmls, nvnmls );
+        Replac( &dst->verts[i * nverts], scenes[i].verts, nverts );
+        Replac( &dst->vnmls[i * nvnmls], scenes[i].vnmls, nvnmls );
     }
     UFor( i, nsurfs )
         dst->surfs[i].nelems = 0;
@@ -782,11 +782,11 @@ reshuffle_for_surfaces_Scene (Scene* scene)
     vnmls = scene->vnmls;
     txpts = scene->txpts;
     if (scene->nelems > 0)
-        scene->verts = AllocT( Point, ndims * scene->nelems );
+        AllocTo( scene->verts, ndims * scene->nelems );
     if (scene->nvnmls > 0)
-        scene->vnmls = AllocT( Point, ndims * scene->nelems );
+        AllocTo( scene->vnmls, ndims * scene->nelems );
     if (scene->ntxpts > 0)
-        scene->txpts = AllocT( BaryPoint, ndims * scene->nelems );
+        AllocTo( scene->txpts, ndims * scene->nelems );
 
     UFor( surfi, scene->nsurfs )
     {
@@ -898,7 +898,7 @@ setup_surfaces_Scene (Scene* scene)
     UFor( i, scene->nelems )
         ++ scene->surfs[scene->elems[i].surface].nelems;
 
-    elems_offsets = AllocT( uint, scene->nsurfs );
+    AllocTo( elems_offsets, scene->nsurfs );
     elems_offsets[0] = 0;
     UFor( i, scene->nsurfs-1 )
         elems_offsets[i+1] = elems_offsets[i] + scene->surfs[i].nelems;
@@ -908,7 +908,7 @@ setup_surfaces_Scene (Scene* scene)
          * We would probably need a temporary index array
          * instead of a temporary scene element array.
          */
-    elems = DupliT( SceneElement, scene->elems, scene->nelems );
+    Duplic( elems, scene->elems, scene->nelems );
     UFor( i, scene->nelems )
     {
         uint* elems_offset;
@@ -1012,7 +1012,7 @@ apply_jumps_surf (Scene* scene,
         }
     }
 
-    CopyT( uint, scene->vidcs, jumps, surf->vidcs_offset, ndims * surf->nelems );
+    Replac( &scene->vidcs[surf->vidcs_offset], jumps,  ndims * surf->nelems );
 }
 
     void
@@ -1032,7 +1032,7 @@ condense_Scene (Scene* scene)
     pos.txpts_offset = 0;
 
     assert (!scene->vidcs);
-    scene->vidcs = AllocT( uint, ndims * scene->nelems );
+    AllocTo( scene->vidcs, ndims * scene->nelems );
 
     UFor( surfi, scene->nsurfs )
         max_n = max_uint (max_n, scene->surfs[surfi].nelems);
@@ -1040,10 +1040,10 @@ condense_Scene (Scene* scene)
         /* Max number of vertices in a surface.*/
     max_n *= ndims;
 
-    jumps = AllocT( uint, max_n );
-    indices = AllocT( uint, max_n );
-    coords  = AllocT( real, max_n );
-    lexis = AllocT( real, max_n * (3 * NDimensions - 1) );
+    AllocTo( jumps, max_n );
+    AllocTo( indices, max_n );
+    AllocTo( coords, max_n );
+    AllocTo( lexis, max_n * (3 * NDimensions - 1) );
 
     UFor( surfi, scene->nsurfs )
     {

@@ -2,13 +2,7 @@
 #include "slist.h"
 
 #include <assert.h>
-
-void init_SList (SList* l)
-{
-    l->nmembs = 0;
-    l->head = 0;
-    l->tail = 0;
-}
+#include <string.h>
 
 void cleanup_SList (SList* l)
 {
@@ -38,7 +32,8 @@ void unroll_SList (void* dst, SList* src, size_t size)
     {
         SListNode* tmp;
         assert (node->car);
-        array_set (dst, i++, node->car, size);
+        memcpy (EltZ(dst,i,size), node->car, size);
+        i += 1;
         free (node->car);
         tmp = node;
         node = node->cdr;
@@ -50,7 +45,7 @@ void unroll_SList (void* dst, SList* src, size_t size)
 app_uint_SList (SList* l, uint x)
 {
     uint* p;
-    p = AllocT( uint, 1 );
+    AllocTo( p, 1 );
     *p = x;
     app_SList (l, p);
 }
@@ -58,7 +53,7 @@ app_uint_SList (SList* l, uint x)
 void app_SList (SList* l, void* data)
 {
     SListNode* node;
-    node = AllocT( SListNode, 1 );
+    AllocTo( node, 1 );
 
     node->car = data;
     node->cdr = 0;
