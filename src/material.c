@@ -6,6 +6,7 @@
 #include "pnm-image.h"
 #include "xfrm.h"
 
+#include <string.h>
 #include <math.h>
 #ifdef SupportImage
 #include <SDL_image.h>
