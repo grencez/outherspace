@@ -190,9 +190,9 @@ find_light_match (LightCutBuild* close,
     centroid_BBox (&loc, &light->box);
 
     close->node = 0;
-    close->idx = Max_uint;
+    close->idx = UINT_MAX;
 
-    while (Max_uint != (i = next_KPTree (kptree, &loc, &travi, &mag2)))
+    while (UINT_MAX != (i = next_KPTree (kptree, &loc, &travi, &mag2)))
     {
         LightCutBuild b;
         real e;
@@ -425,7 +425,7 @@ cast_lights (RaySpace* space, uint nphotons, uint nbounces)
     {:for (ei ; scene->nelems)
         uint matl_idx = scene->elems[ei].material;
         const Material* matl;
-        if (matl_idx == Max_uint)  continue;
+        if (matl_idx == UINT_MAX)  continue;
         matl = &scene->matls[matl_idx];
         if (taximag_Color (&matl->emissive) > 0)
         {
@@ -511,7 +511,7 @@ cast_lights (RaySpace* space, uint nphotons, uint nbounces)
             real azimuthcc = 2 * M_PI * real_URandom (&urandom);
                 /* real zenith = asin (sqrt (halton (2, light_idx))); */
                 /* real azimuthcc = 2 * M_PI * halton (3, light_idx); */
-            uint hit = Max_uint, obj = Max_uint;
+            uint hit = UINT_MAX, obj = UINT_MAX;
             real mag = Max_real;
 
             light->color = color;
@@ -531,7 +531,7 @@ cast_lights (RaySpace* space, uint nphotons, uint nbounces)
 
             cast1_RaySpace (&hit, &mag, &obj, &ray, space, Yes);
 
-            if (hit < Max_uint)
+            if (hit < UINT_MAX)
             {
                 const ObjectRaySpace* const hitobj =
                     (obj < space->nobjects)

@@ -76,15 +76,15 @@ output_wavefront (const Scene* scene,
             a = elem->verts[j];
             b = elem->txpts[j];
             c = elem->vnmls[j];
-            assert (a < Max_uint);
-            if (b < Max_uint)
+            assert (a < UINT_MAX);
+            if (b < UINT_MAX)
             {
-                if (c < Max_uint)
+                if (c < UINT_MAX)
                     off += sprintf (&buf[off], "%u/%u/%u", a+1, b+1, c+1);
                 else
                     off += sprintf (&buf[off], "%u/%u/", a+1, b+1);
             }
-            else if (c < Max_uint)
+            else if (c < UINT_MAX)
             {
                 off += sprintf (&buf[off], "%u//%u", a+1, c+1);
             }
@@ -245,17 +245,17 @@ readin_wavefront (Scene* scene, const char* pathname, const char* filename)
     SceneElement* elem = &elems.s[ei];
     Point normal;
 
-    if (elem->vnmls[0] == Max_uint) {
+    if (elem->vnmls[0] == UINT_MAX) {
       for (uint dim = 1; dim < NDims; ++dim) {
-        if (elem->vnmls[dim] < Max_uint) {
+        if (elem->vnmls[dim] < UINT_MAX) {
           elem->vnmls[0] = elem->vnmls[dim];
         }
       }
     }
 
-    if (elem->vnmls[0] < Max_uint) {
+    if (elem->vnmls[0] < UINT_MAX) {
       for (uint dim = 1; dim < NDims; ++dim) {
-        if (elem->vnmls[dim] == Max_uint) {
+        if (elem->vnmls[dim] == UINT_MAX) {
           elem->vnmls[dim] = elem->vnmls[0];
         }
       }
@@ -356,15 +356,15 @@ parse_face_field (uint* v, uint* vt, uint* vn, const char* line)
     }
     if (line)
     {
-            /* Leave as Max_uint if not specified.*/
-        if (*vt < Max_uint)  *vt -= 1;
+            /* Leave as UINT_MAX if not specified.*/
+        if (*vt < UINT_MAX)  *vt -= 1;
         if (line[0] == '/')
             line = strto_uint (vn, &line[1]);
     }
     if (line)
     {
-            /* Leave as Max_uint if not specified.*/
-        if (*vn < Max_uint)  *vn -= 1;
+            /* Leave as UINT_MAX if not specified.*/
+        if (*vn < UINT_MAX)  *vn -= 1;
     }
 
     return line;
@@ -488,7 +488,7 @@ readin_materials (SList* matlist, SList* namelist,
             material->ambient_texture =
                 parse_texture (texlist, texnamelist,
                                pathname, strskip_ws (line));
-            if (material->ambient_texture == Max_uint)
+            if (material->ambient_texture == UINT_MAX)
                 good = false;
         }
         else if (AccepTok( line, "map_Kd" ))
@@ -496,7 +496,7 @@ readin_materials (SList* matlist, SList* namelist,
             material->diffuse_texture =
                 parse_texture (texlist, texnamelist,
                                pathname, strskip_ws (line));
-            if (material->diffuse_texture == Max_uint)
+            if (material->diffuse_texture == UINT_MAX)
                 good = false;
         }
         else if (AccepTok( line, "map_Ks" ))
@@ -504,7 +504,7 @@ readin_materials (SList* matlist, SList* namelist,
             material->specular_texture =
                 parse_texture (texlist, texnamelist,
                                pathname, strskip_ws (line));
-            if (material->specular_texture == Max_uint)
+            if (material->specular_texture == UINT_MAX)
                 good = false;
         }
         else if (AccepTok( line, "map_Ke" ))
@@ -512,7 +512,7 @@ readin_materials (SList* matlist, SList* namelist,
             material->emissive_texture =
                 parse_texture (texlist, texnamelist,
                                pathname, strskip_ws (line));
-            if (material->emissive_texture == Max_uint)
+            if (material->emissive_texture == UINT_MAX)
                 good = false;
         }
         else if (AccepTok( line, "map_Bump" ))
@@ -520,7 +520,7 @@ readin_materials (SList* matlist, SList* namelist,
             material->bump_texture =
                 parse_texture (texlist, texnamelist,
                                pathname, strskip_ws (line));
-            if (material->bump_texture == Max_uint)
+            if (material->bump_texture == UINT_MAX)
                 good = false;
         }
         else if (AccepTok( line, "illum" ))
@@ -548,7 +548,7 @@ parse_texture (SList* texlist, SList* texnamelist,
     uint i;
     i = search_SList (texnamelist, filename, streql);
 
-    if (i == Max_uint)
+    if (i == UINT_MAX)
     {
         bool good;
         Texture texture;

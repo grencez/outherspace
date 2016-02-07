@@ -118,11 +118,11 @@ next_pack_KDTreeNode (uintPack* ret_nodes,
                                                &ray, &rdirect,
                                                hit_mag[j],
                                                node_idx[j], nodes);
-            } while (node_idx[j] != Max_uint &&
+            } while (node_idx[j] != UINT_MAX &&
                      contains_uint (nprev_nodes, prev_nodes, node_idx[j]));
 
                 /* If exiting search space, flag it!*/
-            if (node_idx[j] == Max_uint)
+            if (node_idx[j] == UINT_MAX)
                 hit_in_box[j] = true;
         }
 
@@ -141,7 +141,7 @@ unique_pack_uints (uint* a)
     {
         uint j;
         bool match = false;
-        if (a[i] == Max_uint)  continue;
+        if (a[i] == UINT_MAX)  continue;
         UFor( j, n )
         {
             if (a[i] == a[j])
@@ -175,7 +175,7 @@ unique_node_pack_indices (uint* ret_nnodes, uint* ret_nodes,
             match = or_boolPack (match, tmp_match);
         }
 
-        cfill_uintPack (&node_idx, Max_uint, match);
+        cfill_uintPack (&node_idx, UINT_MAX, match);
         scat_uintPack (x, node_idx);
         j = unique_pack_uints (x);
         Op_0( uint, j, &ret_nodes[n] , x );
@@ -210,7 +210,7 @@ cast_RayPacket (RayHitPacket* hit, const RayPacket* pkt,
 
     UFor( i, RayPacketDimSz )
     {
-        hit_in_boxen[i] = eql1_uintPack (node_indices[i], Max_uint);
+        hit_in_boxen[i] = eql1_uintPack (node_indices[i], UINT_MAX);
         reci_PointPack (&rdirects[i], &pkt->directs[i]);
     }
 
@@ -389,8 +389,8 @@ cast_packet_RayImage (RayImage* image, uint row_off, uint col_off,
 
     UFor( i, RayPacketDimSz )
     {
-        hit.inds[i] = fill_uintPack (Max_uint);
-        hit.objs[i] = fill_uintPack (Max_uint);
+        hit.inds[i] = fill_uintPack (UINT_MAX);
+        hit.objs[i] = fill_uintPack (UINT_MAX);
         hit.mags[i] = fill_realPack (Max_real);
 
 #if 0
@@ -405,7 +405,7 @@ cast_packet_RayImage (RayImage* image, uint row_off, uint col_off,
 
     }
 
-    cast_packet_nopartition (&hit, &pkt, space, inside_box, Max_uint);
+    cast_packet_nopartition (&hit, &pkt, space, inside_box, UINT_MAX);
 
     UFor( i, RayPacketDimSz )
     {

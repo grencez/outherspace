@@ -652,40 +652,40 @@ ogl_set_GeomSurf (const GeomSurf* surf,
     glMaterialf (GL_FRONT_AND_BACK, GL_SHININESS, matl->shininess);
 
         /* These are hard-coded texture numbers set in init_ogl_ui_data()!*/
-    flag = (matl->ambient_texture < Max_uint);
+    flag = (matl->ambient_texture < UINT_MAX);
     glUniform1i (ambient_texflag_loc, flag ? 1 : 0);
     if (flag)
     {
         glActiveTexture (GL_TEXTURE0);
         glBindTexture (GL_TEXTURE_2D,
-                       ((matl->ambient_texture < Max_uint)
+                       ((matl->ambient_texture < UINT_MAX)
                         ? scenegl->texture_offset + matl->ambient_texture
                         : 0));
     }
 
-    flag = (matl->diffuse_texture < Max_uint);
+    flag = (matl->diffuse_texture < UINT_MAX);
     glUniform1i (diffuse_texflag_loc, flag ? 1 : 0);
     if (flag)
     {
         glActiveTexture (GL_TEXTURE1);
         glBindTexture (GL_TEXTURE_2D,
-                       ((matl->diffuse_texture < Max_uint)
+                       ((matl->diffuse_texture < UINT_MAX)
                         ? scenegl->texture_offset + matl->diffuse_texture
                         : 0));
     }
 
-    flag = (matl->specular_texture < Max_uint);
+    flag = (matl->specular_texture < UINT_MAX);
     glUniform1i (specular_texflag_loc, flag ? 1 : 0);
     if (flag)
     {
         glActiveTexture (GL_TEXTURE2);
         glBindTexture (GL_TEXTURE_2D,
-                       ((matl->specular_texture < Max_uint)
+                       ((matl->specular_texture < UINT_MAX)
                         ? scenegl->texture_offset + matl->specular_texture
                         : 0));
     }
 
-    flag = (matl->bump_texture < Max_uint);
+    flag = (matl->bump_texture < UINT_MAX);
     glUniform1i (normal_texflag_loc, flag ? 1 : 0);
     if (flag)
     {
@@ -706,7 +706,7 @@ ogl_immediate_redraw_ObjectRaySpace (const RaySpace* space,
     const ObjectRaySpace* object;
     uint i;
     bool first_elem = true;
-    uint material_idx = Max_uint;
+    uint material_idx = UINT_MAX;
 #if NDimensions == 4
 # ifdef Match4dGeom
     IAMap affine_map;
@@ -821,7 +821,7 @@ ogl_immediate_redraw_ObjectRaySpace (const RaySpace* space,
                         vnmls[j].coords[1],
                         vnmls[j].coords[2]);
 
-            if (elem->txpts[j%3] < Max_uint)
+            if (elem->txpts[j%3] < UINT_MAX)
             {
                 const BaryPoint* p;
                 p = &scene->txpts[elem->txpts[j%3]];
@@ -952,7 +952,7 @@ ogl_redraw_ObjectRaySpace (const RaySpace* space,
                                3, GL_REAL, GL_FALSE, sizeof (Point),
                                surf->verts_offset + (Point*) 0);
 #endif
-        if (surf->vnmls_offset < Max_uint)
+        if (surf->vnmls_offset < UINT_MAX)
         {
             glBindBuffer (GL_ARRAY_BUFFER, scenegl->vnmls_buffer);
             glNormalPointer (GL_REAL, sizeof (Point),
@@ -966,7 +966,7 @@ ogl_redraw_ObjectRaySpace (const RaySpace* space,
             glEnableVertexAttribArray (hivnml_attrib_loc);
 #endif
         }
-        if (surf->txpts_offset < Max_uint)
+        if (surf->txpts_offset < UINT_MAX)
         {
             glBindBuffer (GL_ARRAY_BUFFER, scenegl->txpts_buffer);
             glTexCoordPointer (2, GL_REAL, sizeof (BaryPoint),
@@ -974,7 +974,7 @@ ogl_redraw_ObjectRaySpace (const RaySpace* space,
             glEnableClientState (GL_TEXTURE_COORD_ARRAY);
         }
 
-        if (surf->vidcs_offset < Max_uint)
+        if (surf->vidcs_offset < UINT_MAX)
         {
             glBindBuffer (GL_ELEMENT_ARRAY_BUFFER, scenegl->vidcs_buffer);
             glDrawElements (GL_TRIANGLES,
@@ -988,14 +988,14 @@ ogl_redraw_ObjectRaySpace (const RaySpace* space,
             glDrawArrays (GL_TRIANGLES, 0, 3 * surf->nelems);
         }
 
-        if (surf->vnmls_offset < Max_uint)
+        if (surf->vnmls_offset < UINT_MAX)
         {
             glDisableClientState (GL_NORMAL_ARRAY);
 #if NDimensions == 4
             glDisableVertexAttribArray (hivnml_attrib_loc);
 #endif
         }
-        if (surf->txpts_offset < Max_uint)
+        if (surf->txpts_offset < UINT_MAX)
             glDisableClientState (GL_TEXTURE_COORD_ARRAY);
 #endif  /* !defined(Match4dGeom) */
     }

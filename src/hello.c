@@ -38,7 +38,7 @@ ray_cast_kernel (uint row, uint col,
                  __global const KDTreeNode* nodes)
 {
   Ray ray;
-  uint hit = Max_uint;
+  uint hit = UINT_MAX;
   real mag = Max_real;
 
   ray.origin = known->origin;

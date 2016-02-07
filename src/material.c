@@ -24,11 +24,11 @@ void init_Material (Material* mat)
     mat->shininess = 0;
     mat->optical_density = 1;
     mat->reflective = false;
-    mat->ambient_texture = Max_uint;
-    mat->diffuse_texture = Max_uint;
-    mat->specular_texture = Max_uint;
-    mat->emissive_texture = Max_uint;
-    mat->bump_texture = Max_uint;
+    mat->ambient_texture = UINT_MAX;
+    mat->diffuse_texture = UINT_MAX;
+    mat->specular_texture = UINT_MAX;
+    mat->emissive_texture = UINT_MAX;
+    mat->bump_texture = UINT_MAX;
 }
 
     void
@@ -203,7 +203,7 @@ readin_SDL_Image (Texture* texture,
             union LocalUnion
             {
                 Uint32 u;
-                byte bytes[CeilQuot( 32, NBitsInByte )];
+                byte bytes[CeilQuot( 32, BYTE_BIT )];
             } pixel;
 
             pixel.u = 0;

@@ -356,7 +356,7 @@ apply_track_gravity (ObjectMotion* motion, const RaySpace* space,
     copy_Point (&origin, centroid);
     inside_box = inside_BBox (&space->main.box, &origin);
 
-    hit_idx = Max_uint;
+    hit_idx = UINT_MAX;
     hit_mag = motion->escape_height;
     cast1_ObjectRaySpace (&hit_idx, &hit_mag,
                           &origin, &direct,
@@ -624,9 +624,9 @@ mark_colliding (BitTable collisions,
     UFor( i, motion->npts )
     {
         bool inside_box;
-        uint hit_idx = Max_uint;
+        uint hit_idx = UINT_MAX;
         real hit_mag;
-        uint hit_objidx = Max_uint;
+        uint hit_objidx = UINT_MAX;
         Point origin, direct;
 
         copy_Point (&origin, &motion->pts[i]);
@@ -729,9 +729,9 @@ detect_collision (ObjectMotion* motions,
                   real dt)
 {
     uint i;
-    uint hit_idx = Max_uint;
+    uint hit_idx = UINT_MAX;
     real hit_mag = Max_real;
-    uint hit_objidx = Max_uint;
+    uint hit_objidx = UINT_MAX;
     uint bs_offset;
     real hit_dx = 0;
     Point hit_dir, reflveloc;
@@ -787,8 +787,8 @@ detect_collision (ObjectMotion* motions,
 
         merge_BBox (&box, &box, &tmpbox);
 
-        j = inside_BBox_KPTree (&query_object->verttree, &box, Max_uint);
-        while (j != Max_uint)
+        j = inside_BBox_KPTree (&query_object->verttree, &box, UINT_MAX);
+        while (j != UINT_MAX)
         {
             bool inside_box;
             bool inside_object = false;
@@ -836,14 +836,14 @@ detect_collision (ObjectMotion* motions,
             inside_box = inside_BBox (&object->box, &p0);
             if (inside_box)
             {
-                tmp_hit = Max_uint;
+                tmp_hit = UINT_MAX;
                 tmp_mag = Max_real;
                 normalize_Point (&direct, &p0);
 
                 cast1_ObjectRaySpace (&tmp_hit, &tmp_mag, &p0, &direct,
                                       object, inside_box, May);
 
-                if (tmp_hit == Max_uint)
+                if (tmp_hit == UINT_MAX)
                 {
                     inside_object = true;
                     set1_BitTable (collisions, bs_offset + eff_objidx);
@@ -855,7 +855,7 @@ detect_collision (ObjectMotion* motions,
                 diff_Point (&direct, &p0, &p1);
                 normalize_Point (&direct, &direct);
                 inside_box = inside_BBox (&object->box, &p1);
-                tmp_hit = Max_uint;
+                tmp_hit = UINT_MAX;
                 tmp_mag = Max_real;
                 cast1_ObjectRaySpace (&tmp_hit, &tmp_mag, &p1, &direct,
                                       object, inside_box, May);
@@ -880,7 +880,7 @@ detect_collision (ObjectMotion* motions,
         real distance;
         Point unit_dir;
         real tmp_mag;
-        uint tmp_hit = Max_uint, tmp_objidx = Max_uint;
+        uint tmp_hit = UINT_MAX, tmp_objidx = UINT_MAX;
         bool inside_box;
 
         trxfrm_Point (&origin, &object->orientation, &motion->pts[i]);
@@ -911,9 +911,9 @@ detect_collision (ObjectMotion* motions,
 
             scale_Point (&unit_dir, &diff, 1 / distance);
 
-            tmp_hit = Max_uint;
+            tmp_hit = UINT_MAX;
             tmp_mag = distance;
-            tmp_objidx = Max_uint;
+            tmp_objidx = UINT_MAX;
             cast_nopartition (&tmp_hit, &tmp_mag, &tmp_objidx,
                               space, &origin, &unit_dir,
                               inside_box, May, objidx);

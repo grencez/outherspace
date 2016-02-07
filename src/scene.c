@@ -61,12 +61,12 @@ void init_Scene (Scene* scene)
 void init_SceneElement (SceneElement* elem)
 {
     uint i;
-    elem->material = Max_uint;
-    elem->surface = Max_uint;
+    elem->material = UINT_MAX;
+    elem->surface = UINT_MAX;
     UFor( i, NDimensions )
     {
-        elem->vnmls[i] = Max_uint;
-        elem->txpts[i] = Max_uint;
+        elem->vnmls[i] = UINT_MAX;
+        elem->txpts[i] = UINT_MAX;
     }
 }
 
@@ -79,11 +79,11 @@ void copy_SceneElement (SceneElement* dst, const SceneElement* src)
 init_GeomSurf (GeomSurf* surf)
 {
     surf->nelems = 0;
-    surf->vidcs_offset = Max_uint;
-    surf->verts_offset = Max_uint;
-    surf->vnmls_offset = Max_uint;
-    surf->txpts_offset = Max_uint;
-    surf->material = Max_uint;
+    surf->vidcs_offset = UINT_MAX;
+    surf->verts_offset = UINT_MAX;
+    surf->vnmls_offset = UINT_MAX;
+    surf->txpts_offset = UINT_MAX;
+    surf->material = UINT_MAX;
 }
 
 
@@ -150,36 +150,36 @@ concat0_Scene (Scene* scene, Scene* src)
         elem = &scene->elems[i + orig.nelems];
         UFor( dim, NDimensions )
         {
-            if (elem->verts[dim] < Max_uint)
+            if (elem->verts[dim] < UINT_MAX)
                 elem->verts[dim] += orig.nverts;
-            if (elem->vnmls[dim] < Max_uint)
+            if (elem->vnmls[dim] < UINT_MAX)
                 elem->vnmls[dim] += orig.nvnmls;
-            if (elem->txpts[dim] < Max_uint)
+            if (elem->txpts[dim] < UINT_MAX)
                 elem->txpts[dim] += orig.ntxpts;
         }
-        if (elem->material < Max_uint)  elem->material += orig.nmatls;
-        if (elem->surface < Max_uint)  elem->surface += orig.nsurfs;
+        if (elem->material < UINT_MAX)  elem->material += orig.nmatls;
+        if (elem->surface < UINT_MAX)  elem->surface += orig.nsurfs;
     }
 
     UFor( i, src->nsurfs )
     {
         GeomSurf* surf;
         surf = &scene->surfs[i + orig.nsurfs];
-        if (surf->vidcs_offset < Max_uint)
+        if (surf->vidcs_offset < UINT_MAX)
             surf->vidcs_offset += orig.ndims * orig.nelems;
-        if (surf->verts_offset < Max_uint)  surf->verts_offset += orig.nverts;
-        if (surf->vnmls_offset < Max_uint)  surf->vnmls_offset += orig.nvnmls;
-        if (surf->txpts_offset < Max_uint)  surf->txpts_offset += orig.ntxpts;
-        if (surf->material < Max_uint)  surf->material += orig.nmatls;
+        if (surf->verts_offset < UINT_MAX)  surf->verts_offset += orig.nverts;
+        if (surf->vnmls_offset < UINT_MAX)  surf->vnmls_offset += orig.nvnmls;
+        if (surf->txpts_offset < UINT_MAX)  surf->txpts_offset += orig.ntxpts;
+        if (surf->material < UINT_MAX)  surf->material += orig.nmatls;
     }
 
     UFor( i, src->nmatls )
     {
         Material* matl;
         matl = &scene->matls[i + orig.nmatls];
-        if (matl->ambient_texture < Max_uint)
+        if (matl->ambient_texture < UINT_MAX)
             matl->ambient_texture += orig.ntxtrs;
-        if (matl->diffuse_texture < Max_uint)
+        if (matl->diffuse_texture < UINT_MAX)
             matl->diffuse_texture += orig.ntxtrs;
     }
 
@@ -293,13 +293,13 @@ fill_between_simplices (SceneElement* elems,
             if (j <= i)
             {
                 elem->verts[j] = a_vert_offset + a->verts[j];
-                if (a_vnml_offset < Max_uint)
+                if (a_vnml_offset < UINT_MAX)
                     elem->vnmls[j] = a_vnml_offset + a->vnmls[j];
             }
             if (j >= i)
             {
                 elem->verts[j+1] = b_vert_offset + b->verts[j];
-                if (b_vnml_offset < Max_uint)
+                if (b_vnml_offset < UINT_MAX)
                     elem->vnmls[j+1] = b_vnml_offset + b->vnmls[j];
             }
         }
@@ -370,9 +370,9 @@ midfill_between_simplices (SceneElement* dst_elems,
     {
         vnmlidcs[4+  i] = a->vnmls[i];
         vnmlidcs[4+k+i] = b->vnmls[i];
-        if (vnmlidcs[4+  i] < Max_uint)  vnmlidcs[4+  i] += a_vnml_offset;
+        if (vnmlidcs[4+  i] < UINT_MAX)  vnmlidcs[4+  i] += a_vnml_offset;
         else  use_vnmls = false;
-        if (vnmlidcs[4+k+i] < Max_uint)  vnmlidcs[4+k+i] += b_vnml_offset;
+        if (vnmlidcs[4+k+i] < UINT_MAX)  vnmlidcs[4+k+i] += b_vnml_offset;
         else  use_vnmls = false;
     }
 
@@ -437,7 +437,7 @@ midfill_between_simplices (SceneElement* dst_elems,
             if (use_vnmls)
                 elem->vnmls[j] = vnmlidcs[elems[i][j]];
             else
-                elem->vnmls[j] = Max_uint;
+                elem->vnmls[j] = UINT_MAX;
         }
     }
 
@@ -486,12 +486,12 @@ brutefill_between_simplices (SceneElement* dst_elems,
     UFor( i, k )
     {
         vnmlidcs[0+i] = a->vnmls[i];
-        if (vnmlidcs[0+i] < Max_uint)  vnmlidcs[0+i] += a_vnml_offset;
+        if (vnmlidcs[0+i] < UINT_MAX)  vnmlidcs[0+i] += a_vnml_offset;
     }
     UFor( i, k )
     {
         vnmlidcs[k+i] = b->vnmls[i];
-        if (vnmlidcs[k+i] < Max_uint)  vnmlidcs[k+i] += b_vnml_offset;
+        if (vnmlidcs[k+i] < UINT_MAX)  vnmlidcs[k+i] += b_vnml_offset;
     }
 
     ecount = 0;
@@ -727,7 +727,7 @@ interpolate1_Scene (Scene* dst, real alpha,
 map_Scene (Scene* scene, const IAMap* map)
 {
     uint i;
-    uint prevtex = Max_uint;
+    uint prevtex = UINT_MAX;
 
     UFor( i, scene->nverts )
         map_Point (&scene->verts[i], map, &scene->verts[i]);
@@ -739,7 +739,7 @@ map_Scene (Scene* scene, const IAMap* map)
     {
         uint texidx;
         texidx = scene->matls[i].bump_texture;
-        if (texidx < Max_uint && texidx != prevtex)
+        if (texidx < UINT_MAX && texidx != prevtex)
         {
             prevtex = texidx;
             remap_bumps_Texture (&scene->txtrs[texidx], map);
@@ -798,15 +798,15 @@ reshuffle_for_surfaces_Scene (Scene* scene)
         assert (surf->nelems > 0);
         elem = &scene->elems[elems_offset];
 
-            /* Set the offsets, they should come in as Max_uint.*/
+            /* Set the offsets, they should come in as UINT_MAX.*/
         surf->verts_offset = pos.verts_offset;
         pos.verts_offset += ndims * surf->nelems;
-        if (elem->vnmls[0] < Max_uint)
+        if (elem->vnmls[0] < UINT_MAX)
         {
             surf->vnmls_offset = pos.vnmls_offset;
             pos.vnmls_offset += ndims * surf->nelems;
         }
-        if (elem->txpts[0] < Max_uint)
+        if (elem->txpts[0] < UINT_MAX)
         {
             surf->txpts_offset = pos.txpts_offset;
             pos.txpts_offset += ndims * surf->nelems;
@@ -825,16 +825,16 @@ reshuffle_for_surfaces_Scene (Scene* scene)
                 scene->verts[idx] = verts[elem->verts[i]];
                 elem->verts[i] = idx;
 
-                Claim2( (elem->vnmls[i] < Max_uint) ,==, (surf->vnmls_offset < Max_uint) );
-                if (surf->vnmls_offset < Max_uint)
+                Claim2( (elem->vnmls[i] < UINT_MAX) ,==, (surf->vnmls_offset < UINT_MAX) );
+                if (surf->vnmls_offset < UINT_MAX)
                 {
                     idx = i + ei * ndims + surf->vnmls_offset;
                     scene->vnmls[idx] = vnmls[elem->vnmls[i]];
                     elem->vnmls[i] = idx;
                 }
 
-                Claim2( (elem->txpts[i] < Max_uint) ,==, (surf->txpts_offset < Max_uint) );
-                if (surf->txpts_offset < Max_uint)
+                Claim2( (elem->txpts[i] < UINT_MAX) ,==, (surf->txpts_offset < UINT_MAX) );
+                if (surf->txpts_offset < UINT_MAX)
                 {
                     idx = i + ei * ndims + surf->txpts_offset;
                     scene->txpts[idx] = txpts[elem->txpts[i]];
@@ -926,17 +926,17 @@ condense_lexi_surf (real* lexis, const GeomSurf* surf,
                     const Scene* scene)
 {
     const uint ndims = scene->ndims;
-    uint vnml_offset = Max_uint;
-    uint txpt_offset = Max_uint;
+    uint vnml_offset = UINT_MAX;
+    uint txpt_offset = UINT_MAX;
     uint i, n, stride;
 
     stride = ndims;  /* Vertices.*/
-    if (surf->vnmls_offset < Max_uint)
+    if (surf->vnmls_offset < UINT_MAX)
     {
         vnml_offset = stride;
         stride += ndims;  /* Normals.*/
     }
-    if (surf->txpts_offset < Max_uint)
+    if (surf->txpts_offset < UINT_MAX)
     {
         txpt_offset = stride;
         stride += ndims - 1;
@@ -955,13 +955,13 @@ condense_lexi_surf (real* lexis, const GeomSurf* surf,
             UFor( j, ndims )  lexi[j] = p.coords[j];
         }
 
-        if (vnml_offset < Max_uint)
+        if (vnml_offset < UINT_MAX)
         {
             Point p = scene->vnmls[i + surf->vnmls_offset];
             UFor( j, ndims )  lexi[j + vnml_offset] = p.coords[j];
         }
 
-        if (txpt_offset < Max_uint)
+        if (txpt_offset < UINT_MAX)
         {
             BaryPoint p = scene->txpts[i + surf->txpts_offset];
             UFor( j, ndims-1 )  lexi[j + txpt_offset] = p.coords[j];
@@ -985,11 +985,11 @@ apply_jumps_surf (Scene* scene,
         scene->verts[i + surf->verts_offset] =
             scene->verts[indices[i] + old_surf->verts_offset];
 
-        if (surf->vnmls_offset < Max_uint)
+        if (surf->vnmls_offset < UINT_MAX)
             scene->vnmls[i + surf->vnmls_offset] =
                 scene->vnmls[indices[i] + old_surf->vnmls_offset];
 
-        if (surf->txpts_offset < Max_uint)
+        if (surf->txpts_offset < UINT_MAX)
             scene->txpts[i + surf->txpts_offset] =
                 scene->txpts[indices[i] + old_surf->txpts_offset];
     }
@@ -1005,9 +1005,9 @@ apply_jumps_surf (Scene* scene,
         {
             uint x = jumps[elem->verts[dim] - old_surf->verts_offset];
             elem->verts[dim] = x + surf->verts_offset;
-            if (elem->vnmls[dim] < Max_uint)
+            if (elem->vnmls[dim] < UINT_MAX)
                 elem->vnmls[dim] = x + surf->vnmls_offset;
-            if (elem->txpts[dim] < Max_uint)
+            if (elem->txpts[dim] < UINT_MAX)
                 elem->txpts[dim] = x + surf->txpts_offset;
         }
     }
@@ -1062,12 +1062,12 @@ condense_Scene (Scene* scene)
         pos.vidcs_offset += ndims * surf->nelems;
         surf->verts_offset = pos.verts_offset;
         pos.verts_offset += n;
-        if (surf->vnmls_offset < Max_uint)
+        if (surf->vnmls_offset < UINT_MAX)
         {
             surf->vnmls_offset = pos.vnmls_offset;
             pos.vnmls_offset += n;
         }
-        if (surf->txpts_offset < Max_uint)
+        if (surf->txpts_offset < UINT_MAX)
         {
             surf->txpts_offset = pos.txpts_offset;
             pos.txpts_offset += n;

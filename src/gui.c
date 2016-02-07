@@ -637,9 +637,9 @@ mouse_down_fn (Pilot* pilot,
     }
     else if (do_raycast || pilot->input.mouse_orbit)
     {
-        uint hit_idx = Max_uint;
+        uint hit_idx = UINT_MAX;
         real hit_mag = Max_real;
-        uint hit_objidx = Max_uint;
+        uint hit_objidx = UINT_MAX;
         Point isect;
         bool didhit;
 
@@ -650,7 +650,7 @@ mouse_down_fn (Pilot* pilot,
         cast_nopartition (&hit_idx, &hit_mag, &hit_objidx,
                           space, &ray.origin, &ray.direct,
                           priori.inside_box,
-                          May, Max_uint);
+                          May, UINT_MAX);
 
         didhit = hit_objidx <= space->nobjects;
 

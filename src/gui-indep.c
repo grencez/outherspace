@@ -531,9 +531,9 @@ update_health (const RaySpace* space, real dt)
         UFor( j, 2 )
         {
             bool inside_box;
-            uint hit_idx = Max_uint;
+            uint hit_idx = UINT_MAX;
             real hit_mag = Max_real;
-            uint hit_objidx = Max_uint;
+            uint hit_objidx = UINT_MAX;
             Point origin;
 
             laser_objects[j]->visible = pilot->input.firing[j];

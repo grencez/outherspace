@@ -344,7 +344,7 @@ split_KDTreeGrid (KDTreeGrid* logrid, KDTreeGrid* higrid,
             }
         }
 
-        lojumps[i] = Max_uint;
+        lojumps[i] = UINT_MAX;
         if (in_lo)
         {
             lojumps[i] = loidx;
@@ -358,7 +358,7 @@ split_KDTreeGrid (KDTreeGrid* logrid, KDTreeGrid* higrid,
             loidx += 1;
         }
 
-        hijumps[i] = Max_uint;
+        hijumps[i] = UINT_MAX;
         if (in_hi)
         {
             hijumps[i] = hiidx;
@@ -388,9 +388,9 @@ split_KDTreeGrid (KDTreeGrid* logrid, KDTreeGrid* higrid,
             q = ti / 2;
             r = ti % 2;
 
-            if (lojumps[q] != Max_uint)
+            if (lojumps[q] != UINT_MAX)
                 logrid->intls[dim][loidx++] = 2 * lojumps[q] + r;
-            if (hijumps[q] != Max_uint)
+            if (hijumps[q] != UINT_MAX)
                 higrid->intls[dim][hiidx++] = 2 * hijumps[q] + r;
         }
 
@@ -677,7 +677,7 @@ fixup_node_indices (KDTree* tree)
         {
             KDTreeInner* inner;
             inner = &nodes[parent_idx].as.inner;
-            if (inner->children[1] == Max_uint)
+            if (inner->children[1] == UINT_MAX)
             {
                 inner->children[1] = node_count;
                 node_idx = node_count;
@@ -713,7 +713,7 @@ fixup_node_indices (KDTree* tree)
             node_count += 1;
             node_idx = node_count;
             inner->children[0] = node_idx;
-            inner->children[1] = Max_uint;
+            inner->children[1] = UINT_MAX;
         }
     }
     while (node_idx != parent_idx);
@@ -855,7 +855,7 @@ upnext_KDTreeNode (Point* entrance,
     uint child_idx;
     uint split_dim;
     uint to_idx;
-    uint ret_idx = Max_uint;
+    uint ret_idx = UINT_MAX;
 
     {
         __global const KDTreeNode* node = &nodes[node_idx];
@@ -865,7 +865,7 @@ upnext_KDTreeNode (Point* entrance,
         mag = hit_inner_BBox (entrance, &split_dim, &box,
                               ray, invdirect);
         if (hit_mag < mag)
-            return Max_uint;
+            return UINT_MAX;
     }
 
         /* Subtlety: Inclusive case opposite when descending tree.*/
@@ -879,7 +879,7 @@ upnext_KDTreeNode (Point* entrance,
         /* Terminating condition:
          * Backtracked from root node => no possible next leaf.
          */
-    while (child_idx != 0 && ret_idx == Max_uint)
+    while (child_idx != 0 && ret_idx == UINT_MAX)
     {
         __global const KDTreeNode* node;
         __global const KDTreeInner* inner;
@@ -974,7 +974,7 @@ first_KDTreeNode (uint* ret_parent,
                             &ray->origin, &ray->direct))
             node_idx = descend_KDTreeNode (&parent, &entrance, 0, nodes);
         else
-            node_idx = parent = Max_uint;
+            node_idx = parent = UINT_MAX;
     }
     *ret_parent = parent;
     return node_idx;
@@ -997,7 +997,7 @@ next_KDTreeNode (uint* ret_parent,
                                   hit_mag,
                                   node_idx, nodes);
 
-    if (node_idx == Max_uint)  return Max_uint;
+    if (node_idx == UINT_MAX)  return UINT_MAX;
     node_idx = descend_KDTreeNode (&parent, &entrance, node_idx, nodes);
 
     *ret_parent = parent;

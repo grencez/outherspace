@@ -600,7 +600,7 @@ map_vertex_normal (Point* normal,
     zero_Point (normal);
     UFor( i, NDimensions )
     {
-        assert (elem->vnmls[i] != Max_uint);
+        assert (elem->vnmls[i] != UINT_MAX);
         follow_Point (normal, normal, &vnmls[elem->vnmls[i]],
                       bpoint->coords[i]);
     }
@@ -690,11 +690,11 @@ splitting_plane_count (const Point* origin, const Point* direct, real mag,
         destin_nodeidx = find_KDTreeNode (&parent, &destin,
                                           tree->nodes);
     else
-        destin_nodeidx = Max_uint;
+        destin_nodeidx = UINT_MAX;
 
 #if 0
         /* Return the number of elements in the hit node.*/
-    return ((destin_nodeidx == Max_uint) ? 0 :
+    return ((destin_nodeidx == UINT_MAX) ? 0 :
             tree->nodes[destin_nodeidx].as.leaf.nelems);
 #endif
 
@@ -705,10 +705,10 @@ splitting_plane_count (const Point* origin, const Point* direct, real mag,
                                  tree->nodes,
                                  box, inside_box);
 
-    if (node_idx != Max_uint && inside_box)
+    if (node_idx != UINT_MAX && inside_box)
         count += 1;
 
-    while (node_idx != Max_uint && node_idx != destin_nodeidx)
+    while (node_idx != UINT_MAX && node_idx != destin_nodeidx)
     {
         count += 1;
         node_idx = next_KDTreeNode (&parent, &ray, &invdirect,
@@ -754,19 +754,19 @@ pixel_from_Material (Color* ambient, Color* diffuse,
         const Texture* tex;
         Color color;
         real alpha;
-        if (matl->ambient_texture != Max_uint)
+        if (matl->ambient_texture != UINT_MAX)
         {
             tex = &scene->txtrs[matl->ambient_texture];
             alpha = map_Texture (&color, tex, texpoint);
             mix_Color (ambient, ambient, &color, alpha);
         }
-        if (matl->diffuse_texture != Max_uint)
+        if (matl->diffuse_texture != UINT_MAX)
         {
             tex = &scene->txtrs[matl->diffuse_texture];
             alpha = map_Texture (&color, tex, texpoint);
             mix_Color (diffuse, diffuse, &color, alpha);
         }
-        if (matl->specular_texture != Max_uint)
+        if (matl->specular_texture != UINT_MAX)
         {
             tex = &scene->txtrs[matl->specular_texture];
             alpha = map_Texture (&color, tex, texpoint);
@@ -907,7 +907,7 @@ fill_pixel (Color* ret_color,
     scene = &object->scene;
 
     elem = &scene->elems[hitidx];
-    if (elem->material != Max_uint)
+    if (elem->material != UINT_MAX)
         material = &scene->matls[elem->material];
 
     if (image->color_distance_on && mag < image->view_light)
@@ -944,13 +944,13 @@ fill_pixel (Color* ret_color,
         follow_Point (&rel_isect, &rel_origin, &rel_dir, mag);
         barycentric_Point (&bpoint, &rel_isect, simplex);
 
-        if (elem->txpts[0] < Max_uint)
+        if (elem->txpts[0] < UINT_MAX)
         {
             Op_s( real, NDimensions-1, texpoint.coords , 0 );
 
             UFor( i, NDimensions )
             {
-                assert (elem->txpts[i] < Max_uint);
+                assert (elem->txpts[i] < UINT_MAX);
                 Op_2020s( real, NDimensions-1, texpoint.coords
                           ,+, texpoint.coords
                           ,   *, scene->txpts[elem->txpts[i]].coords
@@ -961,7 +961,7 @@ fill_pixel (Color* ret_color,
 
 
         /* Get the normal.*/
-    if (material && material->bump_texture < Max_uint)
+    if (material && material->bump_texture < UINT_MAX)
         map_bump_Texture (&normal, &scene->txtrs[material->bump_texture],
                           &texpoint);
     else if (compute_bary_coords && 0 < scene->nvnmls)
@@ -1228,7 +1228,7 @@ cast_Ray (uint* restrict ret_hit, real* restrict ret_mag,
                                    nodes, &tmp_box, inside_box);
     }
 
-    while (node_idx != Max_uint)
+    while (node_idx != UINT_MAX)
     {
         __global const KDTreeLeaf* restrict leaf;
 
@@ -1309,7 +1309,7 @@ cast_nopartition (uint* ret_hit,
         rel_inside_box =
             inside_BBox (&object->box, &rel_origin);
 
-        tmp_hit = Max_uint;
+        tmp_hit = UINT_MAX;
         tmp_mag = *ret_mag;
         cast1_ObjectRaySpace (&tmp_hit, &tmp_mag,
                               &rel_origin, &rel_dir,
@@ -1363,7 +1363,7 @@ test_object_intersections (uint* ret_hit,
         rel_inside_box =
             inside_BBox (&object->box, &rel_origin);
 
-        tmp_hit = Max_uint;
+        tmp_hit = UINT_MAX;
         tmp_mag = *ret_mag;
         cast1_ObjectRaySpace (&tmp_hit, &tmp_mag, &rel_origin, &rel_dir,
                               object, rel_inside_box, front);
@@ -1418,7 +1418,7 @@ cast_partitioned (uint* ret_hit,
     node_idx = first_KDTreeNode (&parent, &ray, nodes,
                                  &space->box, inside_box);
 
-    while (node_idx != Max_uint)
+    while (node_idx != UINT_MAX)
     {
         __global const KDTreeLeaf* restrict leaf;
 
@@ -1457,7 +1457,7 @@ cast1_RaySpace (uint* ret_hit, real* ret_mag,
                           &ray->direct,
                           inside_box,
                           front,
-                          Max_uint);
+                          UINT_MAX);
     else
         cast_nopartition (ret_hit, ret_mag, ret_objidx,
                           space,
@@ -1465,7 +1465,7 @@ cast1_RaySpace (uint* ret_hit, real* ret_mag,
                           &ray->direct,
                           inside_box,
                           front,
-                          Max_uint);
+                          UINT_MAX);
 }
 
     void
@@ -1480,9 +1480,9 @@ cast_colors (Color* ret_color,
              URandom* urandom)
 {
     Color color;
-    uint hit_idx = Max_uint;
+    uint hit_idx = UINT_MAX;
     real hit_mag = Max_real;
-    uint hit_object = Max_uint;
+    uint hit_object = UINT_MAX;
     bool inside_box;
 
     if (nbounces >= image->nbounces_max)  return;
@@ -1493,7 +1493,7 @@ cast_colors (Color* ret_color,
         cast_partitioned (&hit_idx, &hit_mag, &hit_object,
                           space, origin, dir, inside_box,
                           front,
-                          Max_uint);
+                          UINT_MAX);
     }
     else
     {
@@ -1501,7 +1501,7 @@ cast_colors (Color* ret_color,
         cast_nopartition (&hit_idx, &hit_mag, &hit_object,
                           space, origin, dir, inside_box,
                           front,
-                          Max_uint);
+                          UINT_MAX);
     }
 
     zero_Color (&color);
@@ -1518,9 +1518,9 @@ cast_to_light (const RaySpace* restrict space,
                Trit front,
                real magtolight)
 {
-    uint hit_idx = Max_uint;
+    uint hit_idx = UINT_MAX;
     real hit_mag = magtolight;
-    uint hit_object = Max_uint;
+    uint hit_object = UINT_MAX;
 
     cast1_RaySpace (&hit_idx, &hit_mag, &hit_object, ray, space, front);
     return approx_eql (magtolight, hit_mag, 1, 1e2);
@@ -1540,21 +1540,21 @@ cast_record (uint* hitline,
              bool inside_box,
              URandom* urandom)
 {
-    uint hit_idx = Max_uint;
+    uint hit_idx = UINT_MAX;
     real hit_mag = Max_real;
-    uint hit_object = Max_uint;
+    uint hit_object = UINT_MAX;
   const Trit front = image->culling_on ? Yes : May;
 
     if (space->partition)
         cast_partitioned (&hit_idx, &hit_mag, &hit_object,
                           space, origin, dir, inside_box,
                           front,
-                          Max_uint);
+                          UINT_MAX);
     else
         cast_nopartition (&hit_idx, &hit_mag, &hit_object,
                           space, origin, dir, inside_box,
                           front,
-                          Max_uint);
+                          UINT_MAX);
 
     if (hitline)  hitline[col] = hit_idx;
     if (magline)  magline[col] = hit_mag;
@@ -1831,7 +1831,7 @@ cast_row_perspective (RayImage* image, uint row,
             ! (image->nrows - 1 - row == 31 && col == 28) &&
             ! (image->nrows - 1 - row == 31 && col == 26))
         {
-            if (hitline)  hitline[col] = Max_uint;
+            if (hitline)  hitline[col] = UINT_MAX;
             if (magline)  magline[col] = Max_real;
             if (pixline)
             {
@@ -1860,7 +1860,7 @@ cast_row_perspective (RayImage* image, uint row,
 #if 0
         {
             static bool missed = false;
-            if (!missed && hitline[col] == Max_uint)
+            if (!missed && hitline[col] == UINT_MAX)
             {
                 printf ("row:%u  col:%u\n", row, col);
                 missed = true;

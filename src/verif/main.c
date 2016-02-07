@@ -115,8 +115,8 @@ testfn_KPTree ()
         box.max.coords[i] = 4.1;
     }
 
-    i = inside_BBox_KPTree (&tree, &box, Max_uint);
-    while (i != Max_uint)
+    i = inside_BBox_KPTree (&tree, &box, UINT_MAX);
+    while (i != UINT_MAX)
     {
         FILE* out = stderr;
         output_Point (out, &tree.nodes[i].loc);

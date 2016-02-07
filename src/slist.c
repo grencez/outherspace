@@ -131,6 +131,6 @@ search_SList (SList* l, const void* item,
         if (f (item, node->car))  return i;
         node = node->cdr;
     }
-    return Max_uint;
+    return UINT_MAX;
 }
 

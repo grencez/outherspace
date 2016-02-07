@@ -13,7 +13,7 @@ pack_boolPack (const bool* src)
     } x;
     uint i;
     UFor( i, realPackSz )
-        x.v[i] = src[i] ? Max_uint : 0;
+        x.v[i] = src[i] ? UINT_MAX : 0;
     return x.u;
 }
 

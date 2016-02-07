@@ -568,7 +568,7 @@ parse_coord_system (PointXfrm* a, const char* line)
 
     for (i = 0; i < 3 && good; ++i)
     {
-        uint d = Max_uint;
+        uint d = UINT_MAX;
 
         line = strskip_ws (line);
         good = !!line;
@@ -582,7 +582,7 @@ parse_coord_system (PointXfrm* a, const char* line)
         else if (AccepTok( line, "fwd" ))    d = 2 * FwDim;
         else if (AccepTok( line, "back" ))   d = 2 * FwDim + 1;
 
-        good = (d < Max_uint);
+        good = (d < UINT_MAX);
         if (good)
         {
             cover[d/2] = true;

@@ -24,8 +24,8 @@ ray_cast_kernel (__write_only __global unsigned int* hits,
   uint col = get_global_id(1);
   const uint nelems = dims[3];
   Ray ray;
-  uint hit = Max_uint;
-  real mag = Max_real;
+  uint hit = UINT_MAX;
+  real mag = REAL_MAX;
   uint i;
   const BBox tmp_box = *box;
 
